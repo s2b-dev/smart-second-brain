@@ -44,7 +44,7 @@ import {
 	granularityToResolution,
 	type TopicHierarchy,
 } from "../../utils/topicHierarchy";
-import { edgeKey, graphTopologySignature, isTagNode } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, graphTopologySignature, isTagNode } from "../../utils/graphUtils";
 import { openTagSearch } from "../../utils/tagSearch";
 import {
 	applyWikiPatch,
@@ -585,11 +585,7 @@ async function buildGraph() {
 			const fused = { ...wikiData, edges: [...wikiData.edges, ...semanticEdges] };
 			// Degree drives node size and the Detail filter's hub ranking. Recompute it
 			// over the fused edge set so semantically-central notes read as hubs too.
-			const degreeMap = new Map<string, number>();
-			for (const edge of fused.edges) {
-				degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
-				degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
-			}
+			const degreeMap = computeNodeDegrees(fused.edges);
 			graphData = {
 				...fused,
 				nodes: fused.nodes.map((node) => ({ ...node, degree: degreeMap.get(node.path) ?? 0 })),

@@ -35,6 +35,27 @@ export function isTagNode(node: { kind?: string }): boolean {
 }
 
 /**
+ * Per-node degree over an edge set — the one rule every degree recompute
+ * (full build, fused build, live patch) shares.
+ *
+ * A tag edge counts for its tag only: the tag's size says how many notes
+ * carry it, but a note's degree stays what its links make it. Note degree is
+ * the tie-breaker for a topic's representative (label, colour anchor, the
+ * titles sent for naming), so letting tags inflate it would let a display
+ * toggle re-label topics whose membership hasn't changed.
+ */
+export function computeNodeDegrees(
+	edges: Iterable<{ source: string; target: string; type: string }>,
+): Map<string, number> {
+	const degrees = new Map<string, number>();
+	for (const edge of edges) {
+		if (edge.type !== "tag") degrees.set(edge.source, (degrees.get(edge.source) ?? 0) + 1);
+		degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + 1);
+	}
+	return degrees;
+}
+
+/**
  * Radius (in world px, on top of the base size) of the vault's *largest*
  * collapsed topic — the top of the bubble scale. Keeps the biggest topic sane
  * at fit-to-view: ~5× a hub note, not a disc that swallows the layout.

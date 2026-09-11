@@ -40,7 +40,7 @@ import {
 	type SegmentBy,
 	type SpaceSegment,
 } from "../../types/graph";
-import { edgeKey, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
 import { MIN_TOPIC_SIZE } from "../../utils/topicHierarchy";
 
 // ============================================================================
@@ -122,6 +122,10 @@ function buildWikiEdges(app: App, filteredPathSet: Set<string>): GraphEdge[] {
  * own node, not a child of `#a`. Only the notes passed in contribute, so every
  * folder/tag/extension filter and the private-note exclusion already applied
  * to them carries over to the tags shown.
+ *
+ * Display only, by contract: nothing derived from the note graph — topics,
+ * their representatives, semantic edges, note degree — may read this layer,
+ * so that showing tags never changes what the graph says about the notes.
  */
 function buildTagLayer(app: App, files: TFile[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
 	const labelById = new Map<string, string>();
@@ -231,15 +235,6 @@ export async function buildSemanticEdges(
 		weight: pair.score,
 		type: "semantic" as const,
 	}));
-}
-
-function buildDegreeMap(edges: GraphEdge[]): Map<string, number> {
-	const degreeMap = new Map<string, number>();
-	for (const edge of edges) {
-		degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
-		degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
-	}
-	return degreeMap;
 }
 
 function createWikiNodes(filteredFiles: TFile[], degreeMap: Map<string, number>): GraphNode[] {
@@ -367,9 +362,9 @@ export function buildWikiGraph(
 	const filteredPathSet = new Set(filteredPaths);
 	const tagLayer = options.includeTags ? buildTagLayer(app, filteredFiles) : { nodes: [], edges: [] };
 	const edges = [...buildWikiEdges(app, filteredPathSet), ...tagLayer.edges];
-	// Tag edges count toward degree on both ends: a note's size reflects its
-	// tags like any other link, and a tag's size says how many notes carry it.
-	const degreeMap = buildDegreeMap(edges);
+	// A tag's degree is how many notes carry it; a note's degree ignores its
+	// tags (see computeNodeDegrees for why).
+	const degreeMap = computeNodeDegrees(edges);
 	const nodes = [
 		...createWikiNodes(filteredFiles, degreeMap),
 		...tagLayer.nodes.map((node) => ({ ...node, degree: degreeMap.get(node.id) ?? 0 })),

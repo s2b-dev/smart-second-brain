@@ -3,6 +3,7 @@ import {
 	densityForceProfile,
 	densitySpreadFactor,
 	edgeAlphaZoomLift,
+	computeNodeDegrees,
 	edgeKey,
 	graphTopologySignature,
 	nodeDrawRadius,
@@ -14,6 +15,21 @@ describe("edgeKey / splitEdgeKey", () => {
 	it("is order-independent and invertible", () => {
 		expect(edgeKey("a.md", "b.md")).toBe(edgeKey("b.md", "a.md"));
 		expect(splitEdgeKey(edgeKey("a.md", "b.md"))).toEqual(["a.md", "b.md"]);
+	});
+});
+
+describe("computeNodeDegrees", () => {
+	it("counts a tag edge for its tag only", () => {
+		const degrees = computeNodeDegrees([
+			{ source: "a.md", target: "b.md", type: "wiki" },
+			{ source: "a.md", target: "c.md", type: "semantic" },
+			{ source: "a.md", target: "tag:#x", type: "tag" },
+			{ source: "b.md", target: "tag:#x", type: "tag" },
+		]);
+		expect(degrees.get("a.md")).toBe(2);
+		expect(degrees.get("b.md")).toBe(1);
+		expect(degrees.get("c.md")).toBe(1);
+		expect(degrees.get("tag:#x")).toBe(2);
 	});
 });
 

@@ -280,7 +280,9 @@ describe("applyWikiPatch — tag layer", () => {
 		// The note whose tags changed is worth a re-vote; the tag itself is not.
 		expect(result.touchedPaths).toEqual(["a.md"]);
 		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "b.md", "tag:#foo"]);
-		expect(result.data.nodes.find((n) => n.id === "a.md")?.degree).toBe(2);
+		// The note's degree ignores the new tag edge; the tag's counts it.
+		expect(result.data.nodes.find((n) => n.id === "a.md")?.degree).toBe(1);
+		expect(result.data.nodes.find((n) => n.id === "tag:#foo")?.degree).toBe(1);
 		// Presentation state survives on the notes as usual.
 		expect(result.data.nodes.find((n) => n.id === "a.md")?.cluster).toBe(0);
 	});

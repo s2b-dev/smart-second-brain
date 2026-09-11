@@ -288,13 +288,14 @@ describe("buildWikiGraph — tags as nodes", () => {
 		]);
 		expect(tagEdges.every((edge) => edge.weight === 1)).toBe(true);
 
-		// Tag links count toward degree on both ends: the tag's size says how
-		// many notes carry it, and the note's size counts its tags like links.
+		// A tag's degree is how many notes carry it. A note's degree ignores its
+		// tags: degree breaks ties for a topic's representative, so a display
+		// toggle must not be able to move it.
 		const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
 		expect(byId.get("tag:#foo")?.degree).toBe(2);
 		expect(byId.get("tag:#bar")?.degree).toBe(1);
-		expect(byId.get("a.md")?.degree).toBe(3);
-		expect(byId.get("b.md")?.degree).toBe(1);
+		expect(byId.get("a.md")?.degree).toBe(1);
+		expect(byId.get("b.md")?.degree).toBe(0);
 
 		// The note list handed back never includes tag ids.
 		expect(filteredPaths.sort()).toEqual(["a.md", "b.md", "c.md"]);

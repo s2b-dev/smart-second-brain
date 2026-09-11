@@ -21,7 +21,7 @@
 
 import type { GraphData, GraphEdge, GraphNode } from "../types/graph";
 import type { DocumentVector, ScoredDocument } from "../vectorstore/types";
-import { edgeKey, isTagNode } from "./graphUtils";
+import { computeNodeDegrees, edgeKey, isTagNode } from "./graphUtils";
 
 export interface WikiPatchResult {
 	data: GraphData;
@@ -40,13 +40,9 @@ export interface WikiPatchResult {
 	changed: boolean;
 }
 
-/** Recompute per-node degree over the fused edge set (wiki + semantic). */
+/** Recompute per-node degree over the fused edge set, by the shared rule in `computeNodeDegrees`. */
 function withRecomputedDegrees(nodes: GraphNode[], edges: GraphEdge[]): GraphNode[] {
-	const degrees = new Map<string, number>();
-	for (const edge of edges) {
-		degrees.set(edge.source, (degrees.get(edge.source) ?? 0) + 1);
-		degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + 1);
-	}
+	const degrees = computeNodeDegrees(edges);
 	return nodes.map((node) => {
 		const degree = degrees.get(node.path) ?? 0;
 		return node.degree === degree ? node : { ...node, degree };
