@@ -220,6 +220,14 @@ function formatTokenLimit(tokens?: number): string {
 	return tokens.toString();
 }
 
+function getEffectiveContextLimit(model: HydratedModel): number {
+	const override =
+		pluginData.getModelContextOverride(model.variantKey) ??
+		pluginData.getModelContextOverride(`${model.provider}:${model.variantKey}`);
+	if (override) return override;
+	return model.kind === "chat" ? model.contextWindow : model.maxInputTokens;
+}
+
 function getVariantKeyDisplay(model: HydratedModel): string {
 	if (model.provider === "ollama") {
 		return model.variantKey.replace(/:latest$/i, "");
@@ -464,11 +472,11 @@ function getProviderListDisplay(): string {
                   <div class="model-meta">
                     {#if model.kind === "chat"}
                       <span class="meta-tag" title="Context window">
-                        {formatTokenLimit(model.contextWindow)} ctx
+                        {formatTokenLimit(getEffectiveContextLimit(model))} ctx
                       </span>
                     {:else}
                       <span class="meta-tag" title="Max input tokens">
-                        {formatTokenLimit(model.maxInputTokens)} max input
+                        {formatTokenLimit(getEffectiveContextLimit(model))} max input
                       </span>
                     {/if}
 

@@ -301,6 +301,7 @@ export class AvailableModels {
 				openRouterData: this.#openRouterData,
 				ollamaData,
 				temperature: model.modelConfig.temperature,
+				modelContextOverrides: this.#data.modelContextOverrides,
 			}),
 		);
 	});

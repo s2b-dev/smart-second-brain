@@ -636,6 +636,12 @@ export interface PluginData {
 	diffViewMode: DiffViewMode;
 
 	/**
+	 * User-defined context window overrides for models (in tokens), keyed by model ID
+	 * or "provider:model" (e.g. { "qwen3.8": 41000 }).
+	 */
+	modelContextOverrides?: Record<string, number>;
+
+	/**
 	 * Stable slug derived from the vault name, used to scope IndexedDB database names.
 	 * Computed once on first load and persisted so renaming the vault doesn't orphan indexes.
 	 * e.g. "My Vault" → "my-vault" or "my-vault-2" if already taken by another vault.

@@ -257,6 +257,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	searchEmbedIndex: null,
 	graphEmbedIndex: null,
 	favoriteModels: [],
+	modelContextOverrides: {},
 
 	// Smart Graph View
 	smartGraphSettings: DEFAULT_SMART_GRAPH_SETTINGS,
@@ -1453,6 +1454,56 @@ export class PluginDataStore {
 		void this.saveSettings();
 	}
 
+	// --- Model Context Overrides ---
+
+	get modelContextOverrides(): Record<string, number> {
+		return this.#data.modelContextOverrides ?? {};
+	}
+
+	setModelContextOverride(modelKey: string, contextWindow: number | null): void {
+		const current = { ...(this.#data.modelContextOverrides ?? {}) };
+		const trimmedKey = modelKey.trim();
+		if (!trimmedKey) return;
+		if (contextWindow === null || contextWindow <= 0) {
+			delete current[trimmedKey];
+		} else {
+			current[trimmedKey] = Math.round(contextWindow);
+		}
+		this.#data.modelContextOverrides = current;
+
+		const effectiveLimit = current[trimmedKey];
+		for (const [agentId, agent] of Object.entries(this.#data.agents)) {
+			let changed = false;
+			if (agent.chatModel) {
+				const matches =
+					agent.chatModel.model === trimmedKey ||
+					`${agent.chatModel.provider}:${agent.chatModel.model}` === trimmedKey;
+				if (matches && effectiveLimit) {
+					agent.chatModel.modelConfig.contextWindow = effectiveLimit;
+					changed = true;
+				}
+			}
+			if (agent.summarizationModel) {
+				const matches =
+					agent.summarizationModel.model === trimmedKey ||
+					`${agent.summarizationModel.provider}:${agent.summarizationModel.model}` === trimmedKey;
+				if (matches && effectiveLimit) {
+					agent.summarizationModel.modelConfig.contextWindow = effectiveLimit;
+					changed = true;
+				}
+			}
+			if (changed) {
+				this._plugin.agentManager?.invalidateAgentRunnable(agentId);
+			}
+		}
+
+		void this.saveSettings();
+	}
+
+	getModelContextOverride(modelKey: string): number | undefined {
+		return this.#data.modelContextOverrides?.[modelKey];
+	}
+
 	// Get/set isConfigured for a provider
 	getProviderIsConfigured(provider: string): boolean {
 		const config = this.#data.providerConfig[provider];
@@ -2128,6 +2179,21 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 		mergedData.selectedAgentId = DEFAULT_AGENT_ID;
 	} else {
 		normalizeAgents(mergedData);
+	}
+
+	if (!mergedData.modelContextOverrides) {
+		mergedData.modelContextOverrides = {};
+	}
+	if (Object.keys(mergedData.modelContextOverrides).length === 0 && mergedData.agents) {
+		for (const agent of Object.values(mergedData.agents)) {
+			if (
+				agent.chatModel?.model &&
+				agent.chatModel.modelConfig?.contextWindow &&
+				agent.chatModel.modelConfig.contextWindow !== 128000
+			) {
+				mergedData.modelContextOverrides[agent.chatModel.model] = agent.chatModel.modelConfig.contextWindow;
+			}
+		}
 	}
 
 	// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes

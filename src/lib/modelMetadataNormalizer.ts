@@ -22,6 +22,7 @@ export interface ModelHydrationSourceData {
 	ollamaData?: Map<string, OllamaModelInfo> | null;
 	temperature?: number;
 	similarityThresholdDefault?: number;
+	modelContextOverrides?: Record<string, number> | null;
 }
 
 function toNumber(value: unknown): number | undefined {
@@ -114,8 +115,16 @@ export function hydrateChatModel(
 		paramSize,
 	);
 
+	const contextOverride =
+		sourceData.modelContextOverrides?.[variantKey] ??
+		sourceData.modelContextOverrides?.[`${provider}:${variantKey}`];
+
 	const contextWindow =
-		openRouter?.context_length || ollama?.contextLength || modelsDev?.limit?.context || DEFAULT_CHAT_CONTEXT_WINDOW;
+		contextOverride ||
+		openRouter?.context_length ||
+		ollama?.contextLength ||
+		modelsDev?.limit?.context ||
+		DEFAULT_CHAT_CONTEXT_WINDOW;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
 	const outputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.completion);

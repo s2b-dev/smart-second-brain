@@ -269,7 +269,11 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		tag(this.getProviderDisplayName(model.provider), "s2b-model-suggestion-tag--provider");
 
 		if (model.kind === "chat") {
-			tag(`${formatTokenLimit(model.contextWindow)} ctx`);
+			const ctxLimit =
+				this.pluginData.getModelContextOverride(model.variantKey) ??
+				this.pluginData.getModelContextOverride(`${model.provider}:${model.variantKey}`) ??
+				model.contextWindow;
+			tag(`${formatTokenLimit(ctxLimit)} ctx`);
 			if (model.pricing?.inputUsdPer1M !== undefined || model.pricing?.outputUsdPer1M !== undefined) {
 				tag(`${formatCost(model.pricing?.inputUsdPer1M)}/${formatCost(model.pricing?.outputUsdPer1M)}`);
 			}

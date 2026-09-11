@@ -1,5 +1,6 @@
 import type { ChatModel } from "../stores/chatTimeline";
 import { useAvailableModels } from "../hooks/useAvailableModels.svelte";
+import { getData } from "../stores/dataStore.svelte";
 
 /**
  * Build the `ChatModel` record persisted on an agent when a model is picked.
@@ -14,13 +15,27 @@ import { useAvailableModels } from "../hooks/useAvailableModels.svelte";
  */
 export function buildPersistedChatModel(provider: string, model: string, existing?: ChatModel | null): ChatModel {
 	const models = useAvailableModels();
+	let override: number | undefined;
+	try {
+		const data = getData();
+		override = data?.getModelContextOverride?.(model) ?? data?.getModelContextOverride?.(`${provider}:${model}`);
+	} catch {
+		// Plugin data store not initialized in test environments
+	}
 	const hydrated = models.hydratedChatModelsByKey.get(`${provider}:${model}`);
+	const isSameModel = existing?.provider === provider && existing?.model === model;
+	const contextWindow =
+		override ??
+		(isSameModel && existing?.modelConfig?.contextWindow
+			? existing.modelConfig.contextWindow
+			: (hydrated?.contextWindow ?? existing?.modelConfig?.contextWindow ?? 128000));
+
 	return {
 		provider,
 		model,
 		modelConfig: {
-			contextWindow: hydrated?.contextWindow ?? existing?.modelConfig?.contextWindow ?? 128000,
-			supportsVision: hydrated?.capabilities.vision ?? existing?.modelConfig?.supportsVision,
+			contextWindow,
+			supportsVision: hydrated?.capabilities?.vision ?? existing?.modelConfig?.supportsVision,
 			temperature: existing?.modelConfig?.temperature,
 		},
 	};

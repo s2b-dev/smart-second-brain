@@ -174,6 +174,58 @@ const summarizationContextWindowWarning = $derived.by(() => {
 	return `This summarization model has a smaller context window (${formatContextWindowLabel(summarizationContextWindow)}) than the chat model (${formatContextWindowLabel(chatContextWindow)}), so history compaction may fail earlier.`;
 });
 
+function updateChatContextWindow(val: number) {
+	if (!selectedAgent?.chatModel) return;
+	const parsed = Math.round(Number(val));
+	if (Number.isNaN(parsed) || parsed <= 0) return;
+	if (selectedAgent.chatModel.modelConfig?.contextWindow === parsed) return;
+	pluginData.updateAgent(agentId, {
+		chatModel: {
+			...selectedAgent.chatModel,
+			modelConfig: {
+				...selectedAgent.chatModel.modelConfig,
+				contextWindow: parsed,
+			},
+		},
+	});
+	void applyChanges();
+}
+
+function resetChatContextWindow() {
+	if (!selectedAgent?.chatModel) return;
+	const hydrated = models.hydratedChatModelsByKey.get(
+		`${selectedAgent.chatModel.provider}:${selectedAgent.chatModel.model}`,
+	);
+	const defaultWindow = hydrated?.contextWindow ?? 128000;
+	updateChatContextWindow(defaultWindow);
+}
+
+function updateSummarizationContextWindow(val: number) {
+	if (!selectedAgent?.summarizationModel) return;
+	const parsed = Math.round(Number(val));
+	if (Number.isNaN(parsed) || parsed <= 0) return;
+	if (selectedAgent.summarizationModel.modelConfig?.contextWindow === parsed) return;
+	pluginData.updateAgent(agentId, {
+		summarizationModel: {
+			...selectedAgent.summarizationModel,
+			modelConfig: {
+				...selectedAgent.summarizationModel.modelConfig,
+				contextWindow: parsed,
+			},
+		},
+	});
+	void applyChanges();
+}
+
+function resetSummarizationContextWindow() {
+	if (!selectedAgent?.summarizationModel) return;
+	const hydrated = models.hydratedChatModelsByKey.get(
+		`${selectedAgent.summarizationModel.provider}:${selectedAgent.summarizationModel.model}`,
+	);
+	const defaultWindow = hydrated?.contextWindow ?? 128000;
+	updateSummarizationContextWindow(defaultWindow);
+}
+
 function openModelSelectionModal() {
 	const currentSelection = selectedAgent?.chatModel
 		? { provider: selectedAgent.chatModel.provider, model: selectedAgent.chatModel.model }
@@ -788,6 +840,29 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           />
         </SettingItem>
 
+        {#if selectedAgent.chatModel}
+          <SettingItem
+            name="Chat context window"
+            desc="Maximum context size in tokens (used for prompt budget, tool outputs, and summarization trigger)"
+          >
+            <div class="flex items-center gap-2">
+              <Text
+                inputType="number"
+                placeholder="128000"
+                class="w-28 text-right"
+                value={selectedAgent.chatModel.modelConfig?.contextWindow ?? 128000}
+                onchange={(value) => updateChatContextWindow(value)}
+                onblur={(value) => updateChatContextWindow(value)}
+              />
+              <Button
+                buttonText="Reset"
+                tooltip="Reset to catalog default"
+                onClick={resetChatContextWindow}
+              />
+            </div>
+          </SettingItem>
+        {/if}
+
         <!-- The agent's whole definition is one note: base instructions, the current-date
              section, and the memory section, with live values written as placeholders that
              assembly substitutes. There is no memory toggle — an agent participates in memory
@@ -853,6 +928,29 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             {/if}
           </div>
         </SettingItem>
+
+        {#if selectedAgent.summarizationModel}
+          <SettingItem
+            name="Summarization context window"
+            desc="Maximum context size in tokens for the summarization model"
+          >
+            <div class="flex items-center gap-2">
+              <Text
+                inputType="number"
+                placeholder="128000"
+                class="w-28 text-right"
+                value={selectedAgent.summarizationModel.modelConfig?.contextWindow ?? 128000}
+                onchange={(value) => updateSummarizationContextWindow(value)}
+                onblur={(value) => updateSummarizationContextWindow(value)}
+              />
+              <Button
+                buttonText="Reset"
+                tooltip="Reset to catalog default"
+                onClick={resetSummarizationContextWindow}
+              />
+            </div>
+          </SettingItem>
+        {/if}
 
         <SettingItem
           name="Title generation model"
