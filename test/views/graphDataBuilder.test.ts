@@ -382,6 +382,14 @@ describe("resolveSegments — tags in communities", () => {
 		expect(segments.every((segment) => ![...segment.paths].some((path) => path.startsWith("tag:")))).toBe(true);
 	});
 
+	it("lists a tag as living in the topic that holds at least half its notes", () => {
+		const segments = resolveSegments(graph, "leiden", { leidenCommunities: communities });
+		expect([...(segments.find((segment) => segment.communityId === 0)?.tagIds ?? [])]).toEqual(["tag:#cooking"]);
+		expect(segments.find((segment) => segment.communityId === 1)?.tagIds.size).toBe(0);
+		// ...but never as a member.
+		expect([...(segments.find((segment) => segment.communityId === 0)?.paths ?? [])]).not.toContain("tag:#cooking");
+	});
+
 	it("lets a tag name the topic it mostly lives in", () => {
 		const segments = resolveSegments(graph, "leiden", { leidenCommunities: communities });
 		// Three of the four notes carrying #cooking are in topic 0, and the tag
@@ -398,6 +406,7 @@ describe("resolveSegments — tags in communities", () => {
 		};
 		const segments = resolveSegments(broad, "leiden", { leidenCommunities: communities });
 		expect(segments.find((segment) => segment.communityId === 0)?.label).not.toBe("#cooking");
+		expect(segments.find((segment) => segment.communityId === 0)?.tagIds.size).toBe(0);
 	});
 
 	it("does not count a tag toward the minimum topic size", () => {

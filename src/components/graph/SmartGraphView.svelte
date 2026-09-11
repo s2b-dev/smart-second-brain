@@ -1955,11 +1955,18 @@ function resolveAndApplySegments(gd: GraphData) {
 	// Build path → segment lookup once so the single node-map pass below can do everything:
 	// strip stale color/cluster, apply bridge/isolated highlights, apply segment color.
 	const pathInfo = new Map<string, { color: string; cluster: number }>();
+	// A tag that lives in a topic is drawn as one of its own: it gets the
+	// cluster (so the region wraps it and cohesion pulls it to the centre) but
+	// no colour — the renderer keeps tags in the tag colour regardless.
+	const tagCluster = new Map<string, number>();
 	for (let i = 0; i < resolved.length; i++) {
 		for (const path of resolved[i].paths) {
 			if (!pathInfo.has(path)) {
 				pathInfo.set(path, { color: resolved[i].color, cluster: i });
 			}
+		}
+		for (const tagId of resolved[i].tagIds) {
+			if (!tagCluster.has(tagId)) tagCluster.set(tagId, i);
 		}
 	}
 	const isLeiden = Object.keys(leidenCommunities).length > 0;
@@ -2037,7 +2044,7 @@ function resolveAndApplySegments(gd: GraphData) {
 				return {
 					...n,
 					color: info?.color ?? undefined,
-					cluster: info?.cluster ?? undefined,
+					cluster: info?.cluster ?? tagCluster.get(n.id),
 					highlighted,
 				};
 			}),

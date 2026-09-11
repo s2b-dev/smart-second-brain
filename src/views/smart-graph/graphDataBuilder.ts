@@ -409,7 +409,8 @@ export function resolveSegments(
  * interlink end up in the same community regardless of content similarity.
  * Nodes with no wiki links are not assigned to any community and keep the
  * default node color. Tag nodes may appear in `communities` (they take part in
- * detection) but never in a segment's `paths`.
+ * detection) but never in a segment's `paths`; the ones that live in the topic
+ * are listed in `tagIds` instead.
  *
  * `communities` is a pre-computed node-id → community-id map produced by
  * `leidenAsync` in the compute worker.
@@ -467,13 +468,20 @@ function resolveSegmentsByLeiden(
 	// otherwise change with the number of topics and remap every colour.
 	const colors = generateClusterColors(Math.max(TOPIC_COLOR_SLOTS, sorted.length), themeColors);
 
+	// A tag *lives* in a community when at least half of the notes carrying it
+	// are inside. That is the bar for a tag to count as one of the topic's own
+	// (drawn inside its region, pulled to its centre) and to be allowed to name
+	// it — for a vault organised by tags, `#cooking` is the best name that
+	// topic can have. A broad tag spread across many topics would otherwise win
+	// the internal-degree contest in whichever one it happened to land, and
+	// label a group it doesn't describe.
+	const tagLivesHere = (id: string) => {
+		const node = nodeById.get(id);
+		if (node === undefined || !isTagNode(node)) return false;
+		return (internalDegree.get(id) ?? 0) * 2 >= (node.degree ?? 0);
+	};
+
 	// Representative first (it anchors both label and colour), then build segments.
-	//
-	// A tag may represent a topic — for a vault organised by tags, `#cooking` is
-	// the best name that topic can have — but only when the topic is where the
-	// tag *lives*: at least half of the notes carrying it are inside. A broad tag
-	// spread across many topics would otherwise win the internal-degree contest
-	// in whichever one it happened to land, and label a group it doesn't describe.
 	const withRepresentative = sorted.map(([communityId, nodeIds], i) => {
 		let bestId = nodeIds.find(isNoteId) ?? nodeIds[0];
 		let bestInternal = Number.NEGATIVE_INFINITY;
@@ -481,7 +489,7 @@ function resolveSegmentsByLeiden(
 		for (const id of nodeIds) {
 			const internal = internalDegree.get(id) ?? 0;
 			const total = nodeById.get(id)?.degree ?? 0;
-			if (!isNoteId(id) && internal * 2 < total) continue;
+			if (!isNoteId(id) && !tagLivesHere(id)) continue;
 			if (internal > bestInternal || (internal === bestInternal && total > bestTotal)) {
 				bestInternal = internal;
 				bestTotal = total;
@@ -527,6 +535,7 @@ function resolveSegmentsByLeiden(
 				.map((id) => nodeById.get(id)?.path)
 				.filter((p): p is string => p != null),
 		);
+		const tagIds = new Set(nodeIds.filter(tagLivesHere));
 
 		return {
 			id: `leiden:${index}`,
@@ -534,6 +543,7 @@ function resolveSegmentsByLeiden(
 			color: colorByAnchor.get(anchorOf(bestId, communityId)) ?? colors[index],
 			source: "leiden",
 			paths,
+			tagIds,
 			communityId,
 		};
 	});

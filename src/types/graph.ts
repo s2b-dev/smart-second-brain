@@ -28,6 +28,14 @@ export interface SpaceSegment {
 	/** Resolved file paths that belong to this segment */
 	paths: Set<string>;
 	/**
+	 * Ids of the tag nodes that *live* in this topic — at least half of the
+	 * notes carrying the tag are members. Display membership only: such a tag
+	 * takes the topic's `cluster` so the region wraps it and the cohesion force
+	 * pulls it to the topic's centre, but it is never in `paths`, so it counts
+	 * for nothing, folds into nothing, and reaches chat as nothing.
+	 */
+	tagIds: Set<string>;
+	/**
 	 * For `leiden` segments: the underlying community id.
 	 *
 	 * Segments are ordered by size, so a segment's position is NOT its community
@@ -93,8 +101,10 @@ export interface GraphNode {
 	 * behind it, so file-opening interactions must branch on this. `"tag"` is a
 	 * vault tag drawn as a node (Scope → "Tags"), linked to every note carrying
 	 * it; also fileless. Tags take part in community detection but are never
-	 * *members* of the resulting topics (no `cluster`, no segment path), so they
-	 * keep the tag colour, sit outside hulls and never fold into a bubble.
+	 * *members* of the resulting topics (no segment path), so they keep the tag
+	 * colour, count for nothing and never fold into a bubble. A tag that lives
+	 * in a topic (see `SpaceSegment.tagIds`) does take its `cluster` for
+	 * drawing, so the region wraps it and it settles at the topic's centre.
 	 */
 	kind?: "note" | "topic" | "tag";
 	/** For `kind: "topic"` — the vault paths this node stands for. */

@@ -741,7 +741,8 @@ function refreshClusterMetadata(data: GraphData) {
 	);
 	clusterNodeCounts = new Map<number, number>();
 	for (const node of data.nodes) {
-		if (node.cluster == null) continue;
+		// A resident tag shares the cluster for drawing but is not a note of it.
+		if (node.cluster == null || node.kind === "tag") continue;
 		clusterNodeCounts.set(node.cluster, (clusterNodeCounts.get(node.cluster) ?? 0) + 1);
 	}
 }
@@ -2128,7 +2129,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 			.setIcon("box-select")
 			.onClick(() => {
 				if (node.cluster != null) {
-					const clusterPaths = simNodes.filter((n) => n.cluster === node.cluster).map((n) => n.path);
+					const clusterPaths = simNodes.filter((n) => n.cluster === node.cluster).flatMap(resolveNodePaths);
 					selectNodesByPaths(clusterPaths);
 					onSelectionChange?.(clusterPaths);
 				}
