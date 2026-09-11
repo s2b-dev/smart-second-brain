@@ -710,6 +710,12 @@ let buildGraphSignature = $derived(
 		// derived needs a rebuild (unlike `showSemanticLinks`, which only hides them).
 		semanticNeighborCount: settings.semanticNeighborCount,
 		semanticThreshold: settings.semanticThreshold,
+		// Which index (if any) the scan reads. `loadSemanticEdges` only sees it
+		// inside the untracked build, so without this key picking or clearing an
+		// index in settings left the old edges on screen — and still shaping the
+		// topics — until something else forced a rebuild. The edge cache is keyed
+		// on the id, so switching back is served from cache, not rescanned.
+		graphIndex: data.graphEmbedIndex,
 	}),
 );
 $effect(() => {
