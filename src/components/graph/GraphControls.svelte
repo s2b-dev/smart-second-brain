@@ -45,6 +45,11 @@ interface Props {
 	lassoMode?: boolean;
 	onLassoModeChange?: (active: boolean) => void;
 	graphData?: GraphData;
+	/**
+	 * False when no graph embedding index is selected (or its config is gone),
+	 * so no inferred edge can exist regardless of the toggle's stored value.
+	 */
+	hasGraphIndex?: boolean;
 	nodeCount?: number;
 	// Segments (community list)
 	segments?: SpaceSegment[];
@@ -94,6 +99,7 @@ let {
 	lassoMode = false,
 	onLassoModeChange,
 	graphData = { nodes: [], edges: [] },
+	hasGraphIndex = true,
 	nodeCount = 0,
 	segments = [],
 	focusedSegmentIds = new Set<string>(),
@@ -180,6 +186,9 @@ let inferredLinksOn = $derived(!(settings.linkOnlyTopics ?? false) && (settings.
  */
 let inferredLinksHint = $derived.by(() => {
 	const total = graphData.nodes.length;
+	if (!hasGraphIndex) {
+		return "Connect notes by meaning as well as by the links you wrote. Needs a graph embedding index — pick one in the plugin's Graph settings.";
+	}
 	if (!inferredLinksOn) {
 		// Only report link coverage when topics really are link-only. A stored
 		// half-state (hidden but still grouping) would make that number a lie.
@@ -480,8 +489,13 @@ $effect(() => {
          number is still there without this row growing an extra line and an
          affordance nothing else in the panel has. -->
     <SettingContainer name="Inferred links" desc={inferredLinksHint} compact>
+      <!-- Disabled, not hidden, without a graph index: the stored value is kept
+           (flipping it would silently rewrite settings on every open), the
+           hint says what's missing, and the switch comes alive the moment an
+           index is picked. -->
       <Toggle
         checked={!(settings.linkOnlyTopics ?? false) && (settings.showSemanticLinks ?? true)}
+        disabled={!hasGraphIndex}
         onchange={(value) =>
           onSettingsChange({ linkOnlyTopics: !value, showSemanticLinks: value })}
       />
@@ -605,14 +619,16 @@ $effect(() => {
          and the hint says which switch to flip to get it back. -->
     <SettingContainer
       name="Highlight inferred links"
-      desc={inferredLinksOn
-        ? "Draw inferred links in the accent color so they stand apart from the links you wrote"
-        : "Draw inferred links in the accent color. Needs Inferred links (under Topics) turned on."}
+      desc={!hasGraphIndex
+        ? "Draw inferred links in the accent color. Needs a graph embedding index — pick one in the plugin's Graph settings."
+        : inferredLinksOn
+          ? "Draw inferred links in the accent color so they stand apart from the links you wrote"
+          : "Draw inferred links in the accent color. Needs Inferred links (under Topics) turned on."}
       compact
     >
       <Toggle
         checked={settings.highlightSemanticLinks ?? false}
-        disabled={!inferredLinksOn}
+        disabled={!hasGraphIndex || !inferredLinksOn}
         onchange={(value) => onSettingsChange({ highlightSemanticLinks: value })}
       />
     </SettingContainer>
