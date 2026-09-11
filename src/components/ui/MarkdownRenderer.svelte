@@ -1,30 +1,13 @@
 <script lang="ts">
-import { Keymap, MarkdownRenderer, Notice, type View, loadMathJax } from "obsidian";
+import { Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
 import { getPlugin } from "../../stores/state.svelte";
-import { Logger } from "../../utils/logging";
+import { openTagSearch } from "../../utils/tagSearch";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 
 interface Props {
 	content: string;
 	class?: string;
 	enableMath?: boolean;
-}
-
-// Internal Obsidian types not in public API
-interface ObsidianApp {
-	commands?: {
-		executeCommandById: (id: string) => Promise<void>;
-	};
-}
-
-interface SearchView extends View {
-	_children?: unknown[];
-	setQuery?: (query: string) => void;
-	searchComponent?: {
-		setValue: (value: string) => void;
-	};
-	searchInputEl?: HTMLInputElement;
-	startSearch?: () => void;
 }
 
 const { content, class: className = "", enableMath = true }: Props = $props();
@@ -60,90 +43,6 @@ function getTagText(tagEl: HTMLElement): string | null {
 	return text ?? null;
 }
 
-/**
- * Open the search pane with a tag query (matches Obsidian's tag click behavior)
- */
-async function openTagSearch(tag: string): Promise<boolean> {
-	const { workspace } = plugin.app;
-	// Access the internal commands API (not in public types but available)
-	const app = plugin.app as unknown as ObsidianApp;
-	const commands = app.commands;
-
-	try {
-		const searchQuery = `tag:#${tag}`;
-
-		// Try to find existing search view first
-		let searchLeaf = workspace.getLeavesOfType("search").first();
-		let searchView = searchLeaf?.view as SearchView | undefined;
-
-		// Check if view exists but isn't fully initialized
-		// A deferred/lazy view will have no children and no setQuery method
-		const isViewDeferred =
-			searchLeaf &&
-			searchView &&
-			((searchView._children as unknown[])?.length === 0 || typeof searchView.setQuery !== "function");
-
-		if (!searchLeaf || isViewDeferred) {
-			// Use Obsidian's native command to properly initialize search
-			if (commands?.executeCommandById) {
-				await commands.executeCommandById("global-search:open");
-				await new Promise((resolve) => window.setTimeout(resolve, 50));
-				searchLeaf = workspace.getLeavesOfType("search").first();
-				searchView = searchLeaf?.view as SearchView | undefined;
-			}
-
-			// Fallback: try to create the view manually
-			if (!searchLeaf) {
-				const leftLeaf = workspace.getLeftLeaf(false);
-				if (leftLeaf) {
-					await leftLeaf.setViewState({
-						type: "search",
-						active: true,
-					});
-					searchLeaf = leftLeaf;
-					searchView = searchLeaf?.view as SearchView | undefined;
-				}
-			}
-		}
-
-		// Ensure we have a valid search leaf
-		if (!searchLeaf || !searchView) {
-			Logger.warn("[MarkdownRenderer] No search leaf available");
-			return false;
-		}
-
-		// Try different methods to set the search query based on Obsidian version
-		if (typeof searchView.setQuery === "function") {
-			// Newer Obsidian versions
-			searchView.setQuery(searchQuery);
-		} else if (typeof searchView.searchComponent?.setValue === "function") {
-			// Alternative method
-			searchView.searchComponent.setValue(searchQuery);
-		} else if (searchView.searchInputEl) {
-			// Fallback: set the input value directly
-			searchView.searchInputEl.value = searchQuery;
-			// Trigger search if possible
-			if (typeof searchView.startSearch === "function") {
-				searchView.startSearch();
-			}
-		} else {
-			Logger.warn("[MarkdownRenderer] Could not find method to set search query");
-			new Notice("Search pane opened but could not set tag query");
-			return false;
-		}
-
-		// Reveal and focus the search pane
-		workspace.revealLeaf(searchLeaf);
-		workspace.setActiveLeaf(searchLeaf, { focus: true });
-
-		return true;
-	} catch (error) {
-		Logger.error("[MarkdownRenderer] Error opening search pane with tag:", error);
-		new Notice(`Failed to open search pane for tag: ${tag}`);
-		return false;
-	}
-}
-
 // Handle internal link clicks
 function handleClick(evt: MouseEvent) {
 	const target = evt.target as HTMLElement;
@@ -156,7 +55,7 @@ function handleClick(evt: MouseEvent) {
 
 		const tag = getTagText(tagEl);
 		if (tag) {
-			openTagSearch(tag);
+			void openTagSearch(plugin.app, tag);
 		}
 		return;
 	}

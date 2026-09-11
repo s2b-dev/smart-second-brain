@@ -256,3 +256,73 @@ describe("buildWikiGraph", () => {
 		expect(result.graphData.nodes[0].label).toBe("My Note");
 	});
 });
+
+describe("buildWikiGraph — tags as nodes", () => {
+	const tagged = () =>
+		createMockApp({ "a.md": { "c.md": 1 } }, ["a.md", "b.md", "c.md"], {
+			"a.md": ["#foo", "#bar"],
+			"b.md": ["#foo"],
+		});
+
+	it("leaves tags out unless asked for", () => {
+		const { graphData, filteredPaths } = buildWikiGraph(tagged());
+		expect(graphData.nodes.every((node) => node.kind !== "tag")).toBe(true);
+		expect(graphData.edges.every((edge) => edge.type !== "tag")).toBe(true);
+		expect(filteredPaths.sort()).toEqual(["a.md", "b.md", "c.md"]);
+	});
+
+	it("draws each tag as a node linked to every note carrying it", () => {
+		const { graphData, filteredPaths } = buildWikiGraph(tagged(), undefined, undefined, { includeTags: true });
+
+		const tagNodes = graphData.nodes.filter((node) => node.kind === "tag");
+		expect(tagNodes.map((node) => node.id).sort()).toEqual(["tag:#bar", "tag:#foo"]);
+		expect(tagNodes.map((node) => node.label).sort()).toEqual(["#bar", "#foo"]);
+		// A tag node's path is its synthetic id, never a vault file.
+		expect(tagNodes.every((node) => node.path === node.id)).toBe(true);
+
+		const tagEdges = graphData.edges.filter((edge) => edge.type === "tag");
+		expect(tagEdges.map((edge) => `${edge.source}>${edge.target}`).sort()).toEqual([
+			"a.md>tag:#bar",
+			"a.md>tag:#foo",
+			"b.md>tag:#foo",
+		]);
+		expect(tagEdges.every((edge) => edge.weight === 1)).toBe(true);
+
+		// Tag links count toward degree on both ends: the tag's size says how
+		// many notes carry it, and the note's size counts its tags like links.
+		const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
+		expect(byId.get("tag:#foo")?.degree).toBe(2);
+		expect(byId.get("tag:#bar")?.degree).toBe(1);
+		expect(byId.get("a.md")?.degree).toBe(3);
+		expect(byId.get("b.md")?.degree).toBe(1);
+
+		// The note list handed back never includes tag ids.
+		expect(filteredPaths.sort()).toEqual(["a.md", "b.md", "c.md"]);
+	});
+
+	it("treats tag casing and repeats the way Obsidian does: one tag, one link per note", () => {
+		const app = createMockApp({}, ["a.md", "b.md"], {
+			"a.md": ["#Foo", "#foo", "#Foo"],
+			"b.md": ["#FOO"],
+		});
+		const { graphData } = buildWikiGraph(app, undefined, undefined, { includeTags: true });
+
+		const tagNodes = graphData.nodes.filter((node) => node.kind === "tag");
+		expect(tagNodes).toHaveLength(1);
+		expect(tagNodes[0].id).toBe("tag:#foo");
+		// First-seen casing is the label.
+		expect(tagNodes[0].label).toBe("#Foo");
+		expect(graphData.edges.filter((edge) => edge.type === "tag")).toHaveLength(2);
+	});
+
+	it("only shows tags of notes that are in the graph", () => {
+		const app = createMockApp({}, ["Work/a.md", "Home/b.md"], {
+			"Work/a.md": ["#work"],
+			"Home/b.md": ["#home"],
+		});
+		const { graphData } = buildWikiGraph(app, { folders: ["Work"] }, undefined, { includeTags: true });
+
+		expect(graphData.nodes.map((node) => node.id).sort()).toEqual(["Work/a.md", "tag:#work"]);
+		expect(graphData.edges).toEqual([{ source: "Work/a.md", target: "tag:#work", weight: 1, type: "tag" }]);
+	});
+});

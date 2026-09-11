@@ -26,6 +26,17 @@ describe("graphTopologySignature", () => {
 		edges: [wiki("a.md", "b.md"), wiki("b.md", "c.md", 2)],
 	});
 
+	it("ignores the tag layer, so showing tags invalidates nothing derived", () => {
+		const withTags = () => {
+			const graph = base();
+			return {
+				nodes: [...graph.nodes, { id: "tag:#foo", kind: "tag" }],
+				edges: [...graph.edges, { source: "a.md", target: "tag:#foo", type: "tag", weight: 1 }],
+			};
+		};
+		expect(graphTopologySignature(withTags())).toBe(graphTopologySignature(base()));
+	});
+
 	it("is stable for an identical graph", () => {
 		expect(graphTopologySignature(base())).toBe(graphTopologySignature(base()));
 	});

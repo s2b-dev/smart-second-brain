@@ -104,6 +104,8 @@ export interface ThemeColors {
 	textAccent: string;
 	graphLine: string;
 	graphNode: string;
+	/** Fill for tag nodes — Obsidian's own graph colour for them. */
+	graphNodeTag: string;
 	textOnAccent: string;
 	bgPrimary: string;
 	font: string;
@@ -172,6 +174,7 @@ export function readThemeColors(el: HTMLElement): ThemeColors {
 		textAccent: get("--text-accent", "#7b6cd9"),
 		graphLine: get("--graph-line", "#969696"),
 		graphNode: get("--graph-node", "#999999"),
+		graphNodeTag: get("--graph-node-tag", "#08b94e"),
 		textOnAccent: get("--text-on-accent", "#ffffff"),
 		bgPrimary: get("--background-primary", "#1e1e1e"),
 		font: style.getPropertyValue("--font-interface").trim() || "-apple-system, BlinkMacSystemFont, sans-serif",
@@ -804,7 +807,14 @@ export class PixiRenderer {
 			// nodes visible when the camera is far out (GraphCanvas applies the
 			// same factor to hit-testing and label anchoring).
 			const radius = nodeDrawRadius(node, nodeSize) * spawnScale * zoomNodeScale(scale);
-			const rawFill = node.highlighted ? c.accent : (node.color ?? c.graphNode);
+			// A tag never joins a topic, so it has no segment colour to carry; it
+			// takes the theme's tag colour instead, which is how the eye tells a
+			// tag hub from a hub note.
+			const rawFill = node.highlighted
+				? c.accent
+				: node.kind === "tag"
+					? c.graphNodeTag
+					: (node.color ?? c.graphNode);
 			// Resolve hsl()/calc() colors to hex so Pixi.js can parse them
 			const resolvedFillColor = rawFill.startsWith("#") ? rawFill : resolveColor(rawFill, c.graphNode);
 
@@ -998,7 +1008,9 @@ export class PixiRenderer {
 
 		const showWiki = opts.showWikiLinks;
 		const showSemantic = opts.showSemanticLinks !== false;
-		if (!showWiki && !showSemantic) return;
+		// Tag edges are drawn whenever tag nodes are (they only exist then): a
+		// tag with no lines to its notes would be a floating label.
+		if (!showWiki && !showSemantic && !edges.some((edge) => edge.type === "tag")) return;
 
 		const c = this._theme;
 		const scale = this.viewport.scaled || 1;
@@ -1046,7 +1058,9 @@ export class PixiRenderer {
 
 		for (const edge of edges) {
 			const isSemantic = edge.type === "semantic";
-			if (isSemantic ? !showSemantic : !showWiki) continue;
+			const isTag = edge.type === "tag";
+			const hidden = isSemantic ? !showSemantic : !isTag && !showWiki;
+			if (hidden) continue;
 
 			const sx = edge.source.x;
 			const sy = edge.source.y;
@@ -1141,7 +1155,8 @@ export class PixiRenderer {
 			}
 			bucket.push({ sx, sy, tx, ty });
 
-			if (opts.directedWikiEdges) {
+			// Arrowheads mark an authored link's direction; carrying a tag has none.
+			if (opts.directedWikiEdges && !isTag) {
 				const dx = tx - sx;
 				const dy = ty - sy;
 				const len = Math.hypot(dx, dy);
@@ -1477,6 +1492,9 @@ export class PixiRenderer {
 			lines.push(
 				`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}  ·  ${links.toLocaleString()} ${links === 1 ? "link" : "links"}`,
 			);
+		} else if (node.kind === "tag") {
+			const notes = node.degree ?? 0;
+			lines.push(`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}`);
 		} else if (node.cluster != null) {
 			const clusterLabel = clusterLabels[node.cluster] ?? `Cluster ${node.cluster}`;
 			lines.push(`${clusterLabel}  ·  ${node.degree ?? 0} connections`);

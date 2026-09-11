@@ -546,6 +546,16 @@ $effect(() => {
         onchange={(value) => onSettingsChange({ markdownOnly: value })}
       />
     </SettingContainer>
+    <SettingContainer
+      name="Tags"
+      desc="Draw each tag as a node linked to the notes that carry it; tags don't affect topics"
+      compact
+    >
+      <Toggle
+        checked={settings.showTags ?? false}
+        onchange={(value) => onSettingsChange({ showTags: value })}
+      />
+    </SettingContainer>
       </div>
     </div>
 

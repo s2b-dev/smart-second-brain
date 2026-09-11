@@ -42,23 +42,30 @@ export interface SpaceSegment {
  * - "wiki": An explicit wiki link authored by the user in Obsidian
  * - "semantic": An inferred similarity link between notes whose embeddings are
  *   close. Weight is the cosine similarity rather than a link count.
+ * - "tag": A note carrying a tag, joining the note to that tag's node. Only
+ *   present while tags are shown as nodes (`showTags`); weight is always 1.
+ *   A display-layer edge: it never feeds topic detection or the semantic scan.
  */
-export type EdgeType = "wiki" | "semantic";
+export type EdgeType = "wiki" | "semantic" | "tag";
 
 /**
  * A node in the graph representing a vault note.
  */
 export interface GraphNode {
-	/** Unique identifier (file path, or `topic:<cluster>` for a collapsed topic) */
+	/**
+	 * Unique identifier: the file path, `topic:<cluster>` for a collapsed topic,
+	 * or `tag:<tag>` for a tag node (see `tagNodeId`).
+	 */
 	id: string;
 	/**
 	 * Vault-relative file path.
 	 *
-	 * For a `kind: "topic"` node this is a synthetic id, NOT a real file — every
-	 * path that opens, reveals, or previews a file must check {@link kind} first.
+	 * For a `kind: "topic"` or `kind: "tag"` node this is a synthetic id, NOT a
+	 * real file — every path that opens, reveals, or previews a file must check
+	 * {@link kind} first.
 	 */
 	path: string;
-	/** Display label (file basename without extension) */
+	/** Display label (file basename without extension; the `#tag` for a tag node) */
 	label: string;
 	/** X position (set by the d3-force simulation) */
 	x: number;
@@ -81,9 +88,11 @@ export interface GraphNode {
 	 *
 	 * `"note"` (the default when absent) is a real vault file. `"topic"` is a
 	 * synthetic node standing in for a whole collapsed topic — it has no file
-	 * behind it, so file-opening interactions must branch on this.
+	 * behind it, so file-opening interactions must branch on this. `"tag"` is a
+	 * vault tag drawn as a node (Scope → "Tags"), linked to every note carrying
+	 * it; also fileless, and it never belongs to a topic.
 	 */
-	kind?: "note" | "topic";
+	kind?: "note" | "topic" | "tag";
 	/** For `kind: "topic"` — the vault paths this node stands for. */
 	memberPaths?: string[];
 	/**
@@ -166,6 +175,13 @@ export interface SmartGraphSettings {
 	autoLabelClusters: boolean;
 	/** When true, only include markdown files in the graph; otherwise all indexable files */
 	markdownOnly: boolean;
+	/**
+	 * Whether tags are drawn as nodes, each linked to the notes that carry it —
+	 * the same option as Obsidian's own graph. Tag nodes pull their notes
+	 * together in the layout but stay out of topic detection and the semantic
+	 * scan, so flipping this is a rebuild of the drawn graph, not of the topics.
+	 */
+	showTags: boolean;
 	/** Leiden PRNG seed — controls community assignment reproducibility */
 	leidenSeed: number;
 	/** Leiden resolution γ (default 1.0). Lower → fewer larger communities; higher → more smaller ones */
@@ -217,6 +233,7 @@ export const DEFAULT_SMART_GRAPH_SETTINGS: SmartGraphSettings = {
 	graphChatModel: null,
 	autoLabelClusters: false,
 	markdownOnly: false,
+	showTags: false,
 	leidenSeed: 42,
 	// Granularity level 3 on the ladder in topicHierarchy.ts. Kept exactly on a rung so
 	// the slider doesn't silently shift γ the first time it's touched.

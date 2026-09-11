@@ -232,3 +232,73 @@ describe("queryNoteSemanticEdges", () => {
 		expect(edges).toEqual([]);
 	});
 });
+
+describe("applyWikiPatch — tag layer", () => {
+	const tagNode = (tag: string): GraphNode => ({
+		id: `tag:${tag}`,
+		path: `tag:${tag}`,
+		label: tag,
+		x: 5,
+		y: 5,
+		degree: 1,
+		highlighted: false,
+		kind: "tag",
+	});
+	const tagEdge = (source: string, tag: string): GraphEdge => ({
+		source,
+		target: `tag:${tag}`,
+		weight: 1,
+		type: "tag",
+	});
+
+	it("reports no change when the tag layer is identical", () => {
+		const cur = graph(
+			[node("a.md", { cluster: 0 }), node("b.md", { cluster: 0 }), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo"), semantic("a.md", "b.md")],
+		);
+		const fresh = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo")],
+		);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(false);
+		expect(result.data).toBe(cur);
+	});
+
+	it("counts a tag change as structural but never reports tag nodes as note paths", () => {
+		const cur = graph([node("a.md", { cluster: 0 }), node("b.md", { cluster: 0 })], [wiki("a.md", "b.md")]);
+		const fresh = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo")],
+		);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(true);
+		expect(result.addedPaths).toEqual([]);
+		expect(result.removedPaths).toEqual([]);
+		// The note whose tags changed is worth a re-vote; the tag itself is not.
+		expect(result.touchedPaths).toEqual(["a.md"]);
+		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "b.md", "tag:#foo"]);
+		expect(result.data.nodes.find((n) => n.id === "a.md")?.degree).toBe(2);
+		// Presentation state survives on the notes as usual.
+		expect(result.data.nodes.find((n) => n.id === "a.md")?.cluster).toBe(0);
+	});
+
+	it("drops a tag node with its last note and keeps the surviving tag in place", () => {
+		const cur = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo"), tagNode("#bar")],
+			[tagEdge("a.md", "#foo"), tagEdge("b.md", "#bar")],
+		);
+		const fresh = graph([node("a.md"), { ...tagNode("#foo"), x: 0, y: 0 }], [tagEdge("a.md", "#foo")]);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(true);
+		expect(result.removedPaths).toEqual(["b.md"]);
+		expect(result.touchedPaths).toEqual([]);
+		const foo = result.data.nodes.find((n) => n.id === "tag:#foo");
+		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "tag:#foo"]);
+		// The tag keeps its layout position across the patch like any other node.
+		expect(foo).toMatchObject({ x: 5, y: 5, kind: "tag" });
+	});
+});

@@ -44,7 +44,8 @@ import {
 	granularityToResolution,
 	type TopicHierarchy,
 } from "../../utils/topicHierarchy";
-import { edgeKey, graphTopologySignature } from "../../utils/graphUtils";
+import { edgeKey, graphTopologySignature, isTagNode } from "../../utils/graphUtils";
+import { openTagSearch } from "../../utils/tagSearch";
 import {
 	applyWikiPatch,
 	queryNoteSemanticEdges,
@@ -295,8 +296,9 @@ let collapsedTopics: Set<number> = $state(new Set());
 let allTopicIds: number[] = $derived.by(() => {
 	const ids = new Set(graphData.nodes.map((node) => node.cluster).filter((c): c is number => c != null));
 	// Notes with no topic are foldable too — in the merged view they'd otherwise
-	// sit among the topic nodes looking like topics of their own.
-	if (graphData.nodes.some((node) => node.cluster == null)) ids.add(UNSORTED_CLUSTER);
+	// sit among the topic nodes looking like topics of their own. (Tags never
+	// have a topic and never fold, so they don't make an "Unsorted" group.)
+	if (graphData.nodes.some((node) => !isTagNode(node) && node.cluster == null)) ids.add(UNSORTED_CLUSTER);
 	return [...ids].sort((a, b) => a - b);
 });
 
@@ -356,6 +358,18 @@ let displayGraphData: GraphData = $derived.by(() => {
 	});
 });
 
+/**
+ * How many notes the graph holds. `graphData.nodes` also carries tag nodes when
+ * tags are shown, and those aren't notes for any purpose here — counts shown to
+ * the user, the semantic-scan ceiling, the drift threshold.
+ */
+let noteNodeCount = $derived(graphData.nodes.reduce((count, node) => (isTagNode(node) ? count : count + 1), 0));
+
+/** Options for the wiki graph build, from the scope settings. */
+function wikiGraphOptions() {
+	return { includeTags: settings.showTags ?? false };
+}
+
 // Build cancellation — abort stale builds when a new one starts
 let currentBuild: AbortController | null = null;
 
@@ -385,6 +399,7 @@ function createAutoRebuildSignature(filter: GraphFilter): string {
 		extensions: [...(filter.extensions ?? [])].sort(),
 		showWikiLinks: settings.showWikiLinks,
 		markdownOnly: settings.markdownOnly,
+		showTags: settings.showTags ?? false,
 	});
 }
 
@@ -444,7 +459,9 @@ function loadFilterOptions() {
  */
 async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number): Promise<GraphEdge[]> {
 	if (!data.graphEmbedIndex) return [];
-	if (wikiData.nodes.length < 2 || wikiData.nodes.length > SEMANTIC_EDGE_MAX_NOTES) return [];
+	// Only notes have embeddings; tag nodes are neither scanned nor counted.
+	const noteNodes = wikiData.nodes.filter((node) => !isTagNode(node));
+	if (noteNodes.length < 2 || noteNodes.length > SEMANTIC_EDGE_MAX_NOTES) return [];
 
 	const serviceReady = await waitForVectorStore();
 	if (!serviceReady || localBuildVersion !== buildVersion) return [];
@@ -478,7 +495,7 @@ async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number)
 	// Only connect notes that are actually on screen, and never duplicate a pair
 	// the user already linked by hand. The store scans its own vectors and
 	// returns pairs; no embedding is copied to this thread.
-	const includePaths = new Set(wikiData.nodes.map((node) => node.path));
+	const includePaths = new Set(noteNodes.map((node) => node.path));
 	const wikiEdgeKeys = new Set(wikiData.edges.map((edge) => edgeKey(edge.source, edge.target)));
 
 	const edges = await buildSemanticEdges(inst.store, includePaths, {
@@ -516,7 +533,12 @@ async function buildGraph() {
 		if (localBuildVersion !== buildVersion) return;
 
 		const filter = getFilter();
-		const { graphData: wikiData } = buildWikiGraph(plugin.app, filter, immersePaths ?? undefined);
+		const { graphData: wikiData } = buildWikiGraph(
+			plugin.app,
+			filter,
+			immersePaths ?? undefined,
+			wikiGraphOptions(),
+		);
 		// A newer build (or unmount) superseded us before we could apply.
 		if (localBuildVersion !== buildVersion) return;
 		graphData = wikiData;
@@ -663,6 +685,11 @@ let buildGraphSignature = $derived(
 		extensions: selectedExtensions,
 		showWikiLinks: settings.showWikiLinks,
 		markdownOnly: settings.markdownOnly,
+		// Tag nodes are part of the built graph (they carry edges and degree),
+		// not a draw-time overlay, so showing them is a rebuild — a cheap one:
+		// the topology signature ignores the tag layer, so topics and semantic
+		// edges come straight back from cache.
+		showTags: settings.showTags ?? false,
 		// Semantic edges are computed during the build, so changing how they're
 		// derived needs a rebuild (unlike `showSemanticLinks`, which only hides them).
 		semanticNeighborCount: settings.semanticNeighborCount,
@@ -833,7 +860,12 @@ function flushLiveUpdate() {
 	// New folders/tags/extensions should appear in the filter dropdowns too.
 	loadFilterOptions();
 
-	const { graphData: freshWiki } = buildWikiGraph(plugin.app, getFilter(), immersePaths ?? undefined);
+	const { graphData: freshWiki } = buildWikiGraph(
+		plugin.app,
+		getFilter(),
+		immersePaths ?? undefined,
+		wikiGraphOptions(),
+	);
 	const patch = applyWikiPatch(graphData, freshWiki);
 	if (patch.changed) {
 		const communities = { ...leidenCommunities };
@@ -957,7 +989,7 @@ function applyLivePatch(patched: GraphData, communities: Record<string, number>,
  * of changed notes don't invalidate them.
  */
 function maybeReclusterAfterDrift() {
-	const threshold = Math.max(8, Math.ceil(graphData.nodes.length * 0.02));
+	const threshold = Math.max(8, Math.ceil(noteNodeCount * 0.02));
 	if (liveTopicDrift < threshold) return;
 	Logger.info(`[SmartGraph] Live topic drift ${liveTopicDrift} ≥ ${threshold} — re-running Leiden`);
 	liveTopicDrift = 0;
@@ -991,7 +1023,7 @@ async function processPendingSemanticQueries() {
 	}
 	// Same ceiling as the full build: past it the graph is wiki-only, so there
 	// are no semantic edges to keep current.
-	if (graphData.nodes.length > SEMANTIC_EDGE_MAX_NOTES) {
+	if (noteNodeCount > SEMANTIC_EDGE_MAX_NOTES) {
 		pendingSemantic.clear();
 		return;
 	}
@@ -1006,7 +1038,7 @@ async function processPendingSemanticQueries() {
 			.catch(() => null);
 		if (!store || isDestroyed) return;
 
-		const nodePaths = new Set(graphData.nodes.map((node) => node.path));
+		const nodePaths = new Set(graphData.nodes.filter((node) => !isTagNode(node)).map((node) => node.path));
 		const replacements = new Map<string, GraphEdge[]>();
 		/**
 		 * Retire an entry only if it is still the one this pass processed.
@@ -1176,6 +1208,10 @@ function handleRefresh() {
 
 function handleNodeClick(path: string) {
 	plugin.app.workspace.openLinkText(path, "", false);
+}
+
+function handleTagClick(tag: string) {
+	void openTagSearch(plugin.app, tag);
 }
 
 function handleRevealFile(path: string) {
@@ -1967,8 +2003,9 @@ function resolveAndApplySegments(gd: GraphData) {
 				// "Isolated" means the user never linked this note — a note pulled into a
 				// topic purely by semantic similarity is still unlinked, and that's exactly
 				// the gap worth surfacing. So this counts authored links only, not `degree`
-				// (which now includes inferred edges).
-				const isIsolated = !linkedPaths.has(n.path);
+				// (which now includes inferred edges). A tag is not a note, so it is
+				// never "unlinked".
+				const isIsolated = !isTagNode(n) && !linkedPaths.has(n.path);
 				const highlighted =
 					(settings.highlightBridges && isBridge) || (settings.highlightIsolated && isIsolated);
 				return {
@@ -2371,6 +2408,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
       showClusterLabels={settings.showClusterLabels ?? true}
       clusterCohesionStrength={settings.clusterCohesionStrength ?? 0.15}
       onNodeClick={handleNodeClick}
+      onTagClick={handleTagClick}
       onSetTopicCollapsed={(cluster, collapsed) => void setTopicsCollapsed([cluster], collapsed)}
       onRevealFile={handleRevealFile}
       onFocusCluster={handleFocusCluster}
@@ -2419,8 +2457,8 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
       Immersed into
       <strong title={immerseTopicLabels.join(", ")}>{immerseTopicLabels.join(", ")}</strong>
     {:else}
-      <strong>{graphData.nodes.length}</strong>
-      {graphData.nodes.length === 1 ? "note" : "notes"} · immersed
+      <strong>{noteNodeCount}</strong>
+      {noteNodeCount === 1 ? "note" : "notes"} · immersed
     {/if}
   {/snippet}
 
@@ -2445,8 +2483,8 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
         {:else}
           <!-- A raw lasso has no name to give, so fall back to the size of what
                you're in — the same thing the desktop bar says in this case. -->
-          Immersed · <strong>{graphData.nodes.length}</strong>
-          {graphData.nodes.length === 1 ? "note" : "notes"}
+          Immersed · <strong>{noteNodeCount}</strong>
+          {noteNodeCount === 1 ? "note" : "notes"}
         {/if}
       </span>
     </div>

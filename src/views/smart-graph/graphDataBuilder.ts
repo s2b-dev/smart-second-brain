@@ -7,6 +7,10 @@
  * - **wiki** — authored `[[links]]` from Obsidian's `resolvedLinks`.
  * - **semantic** — inferred top-K embedding neighbours ({@link buildSemanticEdges}).
  *
+ * A third, optional layer draws each tag as a node linked to the notes that
+ * carry it ({@link buildTagLayer}). It is display only: tag nodes and edges are
+ * part of the picture, not of the structure the derivations below read.
+ *
  * The fusion matters because most vaults are link-sparse: with wiki links alone
  * the great majority of notes have degree 0, so community detection cannot place
  * them and they render as an unstructured cloud. Semantic edges give every
@@ -36,7 +40,7 @@ import {
 	type SegmentBy,
 	type SpaceSegment,
 } from "../../types/graph";
-import { edgeKey, splitEdgeKey } from "../../utils/graphUtils";
+import { edgeKey, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
 import { MIN_TOPIC_SIZE } from "../../utils/topicHierarchy";
 
 // ============================================================================
@@ -102,6 +106,51 @@ function buildWikiEdges(app: App, filteredPathSet: Set<string>): GraphEdge[] {
 	}
 
 	return edges;
+}
+
+// ============================================================================
+// Tag layer
+// ============================================================================
+
+/**
+ * Tags as nodes: one node per distinct tag across the given notes, and one
+ * `tag` edge from each note to every tag it carries — the same picture as
+ * Obsidian's own graph with its "Tags" filter on.
+ *
+ * Tags are matched case-insensitively (as Obsidian treats them) with the
+ * first-seen casing kept for the label. Nested tags stay whole: `#a/b` is its
+ * own node, not a child of `#a`. Only the notes passed in contribute, so every
+ * folder/tag/extension filter and the private-note exclusion already applied
+ * to them carries over to the tags shown.
+ */
+function buildTagLayer(app: App, files: TFile[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+	const labelById = new Map<string, string>();
+	const edges: GraphEdge[] = [];
+	for (const file of files) {
+		if (file.extension !== "md") continue;
+		const cache = app.metadataCache.getFileCache(file);
+		if (!cache) continue;
+		const seen = new Set<string>();
+		for (const tag of getAllTags(cache) ?? []) {
+			const id = tagNodeId(tag);
+			// A note that mentions a tag twice still links to it once.
+			if (seen.has(id)) continue;
+			seen.add(id);
+			if (!labelById.has(id)) labelById.set(id, tag);
+			edges.push({ source: file.path, target: id, weight: 1, type: "tag" });
+		}
+	}
+	const nodes: GraphNode[] = [...labelById.entries()].map(([id, label]) => ({
+		id,
+		path: id,
+		label,
+		x: 0,
+		y: 0,
+		degree: 0,
+		highlighted: false,
+		kind: "tag",
+	}));
+	return { nodes, edges };
 }
 
 // ============================================================================
@@ -279,18 +328,29 @@ export function deriveClusterRepresentativesFromGraph(graphData: GraphData): Clu
 /** Result of building a wiki-link-only graph (no semantic edges). */
 export interface WikiGraphResult {
 	graphData: GraphData;
+	/** The note paths in the graph — never tag node ids. */
 	filteredPaths: string[];
 }
 
+export interface WikiGraphOptions {
+	/** Draw each tag as a node linked to the notes carrying it ({@link buildTagLayer}). */
+	includeTags?: boolean;
+}
+
 /**
- * Build a graph using only Obsidian wiki-link edges. Nodes start at (0,0) and
- * are positioned by d3-force.
+ * Build a graph using only Obsidian wiki-link edges (plus the tag layer when
+ * asked for). Nodes start at (0,0) and are positioned by d3-force.
  *
  * @param constrainToPaths — When provided, only include files whose path is in
  *   this set. Used to keep the wiki graph's node set identical to the smart
  *   graph's so mode transitions don't add/remove nodes.
  */
-export function buildWikiGraph(app: App, filter?: GraphFilter, constrainToPaths?: Set<string>): WikiGraphResult {
+export function buildWikiGraph(
+	app: App,
+	filter?: GraphFilter,
+	constrainToPaths?: Set<string>,
+	options: WikiGraphOptions = {},
+): WikiGraphResult {
 	let filteredFiles = getIndexableVaultFiles(app.vault);
 	if (constrainToPaths) {
 		filteredFiles = filteredFiles.filter((file) => constrainToPaths.has(file.path));
@@ -305,9 +365,15 @@ export function buildWikiGraph(app: App, filter?: GraphFilter, constrainToPaths?
 
 	const filteredPaths = filteredFiles.map((file) => file.path);
 	const filteredPathSet = new Set(filteredPaths);
-	const edges = buildWikiEdges(app, filteredPathSet);
+	const tagLayer = options.includeTags ? buildTagLayer(app, filteredFiles) : { nodes: [], edges: [] };
+	const edges = [...buildWikiEdges(app, filteredPathSet), ...tagLayer.edges];
+	// Tag edges count toward degree on both ends: a note's size reflects its
+	// tags like any other link, and a tag's size says how many notes carry it.
 	const degreeMap = buildDegreeMap(edges);
-	const nodes = createWikiNodes(filteredFiles, degreeMap);
+	const nodes = [
+		...createWikiNodes(filteredFiles, degreeMap),
+		...tagLayer.nodes.map((node) => ({ ...node, degree: degreeMap.get(node.id) ?? 0 })),
+	];
 
 	const nodeIds = new Set(nodes.map((n) => n.id));
 	const filteredEdges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));

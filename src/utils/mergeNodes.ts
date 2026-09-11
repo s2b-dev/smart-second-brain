@@ -17,7 +17,7 @@
  */
 
 import type { GraphData, GraphEdge, GraphNode } from "../types/graph";
-import { edgeKey } from "./graphUtils";
+import { edgeKey, isTagNode } from "./graphUtils";
 
 /** Stable id for a collapsed topic — must not collide with any vault path. */
 export function topicNodeId(cluster: number): string {
@@ -61,7 +61,9 @@ export interface CollapseOptions {
  * Build a graph where each collapsed topic is a single node.
  *
  * Nodes with no topic assignment always pass through as themselves — an
- * unclustered note has no group to be folded into.
+ * unclustered note has no group to be folded into. Tag nodes pass through
+ * too, even with `collapseUnsorted`: the unsorted bubble is "notes that found
+ * no topic", and a tag was never a candidate for one.
  *
  * Edge remapping resolves each endpoint to either its own note (expanded, or
  * unclustered) or its topic node (collapsed), then:
@@ -84,6 +86,7 @@ export function buildCollapsedGraph(graph: GraphData, options: CollapseOptions =
 	// that group — identical rules to any real topic.
 	const membersByTopic = new Map<number, GraphNode[]>();
 	for (const node of graph.nodes) {
+		if (isTagNode(node)) continue;
 		const group = node.cluster ?? UNSORTED_CLUSTER;
 		const shouldFold =
 			group === UNSORTED_CLUSTER
@@ -105,6 +108,7 @@ export function buildCollapsedGraph(graph: GraphData, options: CollapseOptions =
 	// of their own — otherwise they are loose notes, not a topic.
 	const sizeByTopic = new Map<number, number>();
 	for (const node of graph.nodes) {
+		if (isTagNode(node)) continue;
 		const group = node.cluster ?? UNSORTED_CLUSTER;
 		if (group === UNSORTED_CLUSTER && !collapseUnsorted) continue;
 		sizeByTopic.set(group, (sizeByTopic.get(group) ?? 0) + 1);
@@ -118,10 +122,11 @@ export function buildCollapsedGraph(graph: GraphData, options: CollapseOptions =
 		for (const member of members) representativeOf.set(member.id, id);
 	}
 
-	// Surviving notes: those in expanded topics, or with no topic at all.
+	// Surviving nodes: notes in expanded topics or with no topic at all, and
+	// every tag node.
 	const nodes: GraphNode[] = graph.nodes
 		.filter((node) => !representativeOf.has(node.id))
-		.map((node) => ({ ...node, kind: "note" as const }));
+		.map((node) => ({ ...node, kind: node.kind ?? ("note" as const) }));
 
 	// Merge edges by their resolved endpoints.
 	const merged = new Map<string, GraphEdge>();
@@ -133,9 +138,13 @@ export function buildCollapsedGraph(graph: GraphData, options: CollapseOptions =
 		if (source === target) continue;
 
 		// Track how many note-level links each collapsed topic sends outward, so
-		// the tooltip can report how connected it actually is.
-		if (source.startsWith("topic:")) crossingCount.set(source, (crossingCount.get(source) ?? 0) + 1);
-		if (target.startsWith("topic:")) crossingCount.set(target, (crossingCount.get(target) ?? 0) + 1);
+		// the tooltip can report how connected it actually is. A tag edge is the
+		// topic's notes carrying a tag, not a link to another note, so it's drawn
+		// but not counted.
+		if (edge.type !== "tag") {
+			if (source.startsWith("topic:")) crossingCount.set(source, (crossingCount.get(source) ?? 0) + 1);
+			if (target.startsWith("topic:")) crossingCount.set(target, (crossingCount.get(target) ?? 0) + 1);
+		}
 
 		// Keep wiki and semantic edges distinct so the renderer can still tell an
 		// authored connection from an inferred one.
@@ -197,9 +206,12 @@ export function buildCollapsedGraph(graph: GraphData, options: CollapseOptions =
 }
 
 /**
- * Note paths a node stands for — itself for a note, its members for a topic.
- * Lets selection hand real vault paths to chat even when topics are collapsed.
+ * Note paths a node stands for — itself for a note, its members for a topic,
+ * none for a tag. Lets selection hand real vault paths to chat even when
+ * topics are collapsed.
  */
 export function resolveNodePaths(node: GraphNode): string[] {
-	return node.kind === "topic" ? (node.memberPaths ?? []) : [node.path];
+	if (node.kind === "topic") return node.memberPaths ?? [];
+	if (isTagNode(node)) return [];
+	return [node.path];
 }

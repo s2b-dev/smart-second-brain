@@ -17,6 +17,24 @@ export function splitEdgeKey(key: string): [string, string] {
 }
 
 /**
+ * Stable node id for a tag drawn as a node — must not collide with any vault
+ * path (a colon can't start a path segment on any supported platform) or with
+ * a collapsed topic's `topic:<n>`.
+ *
+ * Tags are case-insensitive in Obsidian (`#Foo` and `#foo` are one tag), so
+ * the id is keyed on the lower-cased form; the first-seen casing is kept as
+ * the node's label.
+ */
+export function tagNodeId(tag: string): string {
+	return `tag:${tag.toLowerCase()}`;
+}
+
+/** Whether a node is a tag drawn as a node rather than a note (or a collapsed topic). */
+export function isTagNode(node: { kind?: string }): boolean {
+	return node.kind === "tag";
+}
+
+/**
  * Radius (in world px, on top of the base size) of the vault's *largest*
  * collapsed topic — the top of the bubble scale. Keeps the biggest topic sane
  * at fit-to-view: ~5× a hub note, not a disc that swallows the layout.
@@ -295,30 +313,41 @@ function djb2(text: string): number {
  * builds that enumerate the same nodes and edges in different orders produce
  * the same signature. Counts are included so the accumulators can't be walked
  * back into a collision by adding and removing offsetting elements.
+ *
+ * Tag nodes and tag edges are left out: they are a display layer over the
+ * note graph that none of the derivations read (topics come from wiki and
+ * semantic edges; the semantic scan covers notes), so showing or hiding tags
+ * must not invalidate any of them.
  */
 export function graphTopologySignature(graph: {
-	nodes: Array<{ id: string }>;
+	nodes: Array<{ id: string; kind?: string }>;
 	edges: Array<{ source: string; target: string; type: string; weight: number }>;
 }): string {
+	let nodeCount = 0;
 	let nodeSum = 0;
 	let nodeXor = 0;
 	for (const node of graph.nodes) {
+		if (isTagNode(node)) continue;
+		nodeCount++;
 		const hash = djb2(node.id);
 		nodeSum = (nodeSum + hash) >>> 0;
 		nodeXor = (nodeXor ^ hash) >>> 0;
 	}
+	let edgeCount = 0;
 	let edgeSum = 0;
 	let edgeXor = 0;
 	for (const edge of graph.edges) {
+		if (edge.type === "tag") continue;
+		edgeCount++;
 		const hash = djb2(`${edge.source}\0${edge.target}\0${edge.type}\0${edge.weight}`);
 		edgeSum = (edgeSum + hash) >>> 0;
 		edgeXor = (edgeXor ^ hash) >>> 0;
 	}
 	return [
-		graph.nodes.length,
+		nodeCount,
 		nodeSum.toString(36),
 		nodeXor.toString(36),
-		graph.edges.length,
+		edgeCount,
 		edgeSum.toString(36),
 		edgeXor.toString(36),
 	].join(":");

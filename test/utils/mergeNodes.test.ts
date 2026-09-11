@@ -364,3 +364,50 @@ describe("resolveNodePaths", () => {
 		expect(resolveNodePaths({ ...note("topic:9"), kind: "topic" })).toEqual([]);
 	});
 });
+
+describe("buildCollapsedGraph — tag nodes", () => {
+	function tag(id: string): GraphNode {
+		return {
+			id: `tag:${id}`,
+			path: `tag:${id}`,
+			label: id,
+			x: 3,
+			y: 3,
+			degree: 1,
+			highlighted: false,
+			kind: "tag",
+		};
+	}
+
+	it("never folds a tag, even into the unsorted bubble, and keeps its kind", () => {
+		const collapsed = buildCollapsedGraph(
+			{
+				nodes: [note("a1", 0), note("a2", 0), note("loose"), tag("#foo")],
+				edges: [edge("a1", "a2"), edge("a1", "tag:#foo", 1, "tag"), edge("loose", "tag:#foo", 1, "tag")],
+			},
+			{ collapsedTopics: new Set([0, UNSORTED_CLUSTER]), collapseUnsorted: true },
+		);
+
+		expect(collapsed.nodes.map((n) => n.id).sort()).toEqual([
+			"tag:#foo",
+			topicNodeId(UNSORTED_CLUSTER),
+			topicNodeId(0),
+		]);
+		expect(collapsed.nodes.find((n) => n.id === "tag:#foo")?.kind).toBe("tag");
+		// The unsorted bubble holds the loose note only — a tag was never a
+		// candidate for a topic.
+		expect(collapsed.nodes.find((n) => n.id === topicNodeId(UNSORTED_CLUSTER))?.memberPaths).toEqual(["loose"]);
+
+		// Tag edges are re-pointed at the bubbles but stay typed as tag edges.
+		expect(collapsed.edges.map((e) => `${e.type}:${e.source}>${e.target}`).sort()).toEqual([
+			`tag:${topicNodeId(UNSORTED_CLUSTER)}>tag:#foo`,
+			`tag:${topicNodeId(0)}>tag:#foo`,
+		]);
+		// ...and are not counted as links crossing the topic boundary.
+		expect(collapsed.nodes.find((n) => n.id === topicNodeId(0))?.degree).toBe(0);
+	});
+
+	it("resolveNodePaths hands chat no path for a tag", () => {
+		expect(resolveNodePaths(tag("#foo"))).toEqual([]);
+	});
+});

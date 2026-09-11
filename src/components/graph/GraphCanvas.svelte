@@ -48,6 +48,8 @@ interface Props {
 	 */
 	clusterCohesionStrength?: number;
 	onNodeClick?: (path: string) => void;
+	/** A tag node was clicked; receives the tag as labelled (with its `#`). */
+	onTagClick?: (tag: string) => void;
 	/** Fold or unfold one topic. Used by the context menu's direct actions. */
 	onSetTopicCollapsed?: (cluster: number, collapsed: boolean) => void;
 	onRevealFile?: (path: string) => void;
@@ -95,6 +97,7 @@ let {
 	showClusterLabels = true,
 	clusterCohesionStrength = 0.15,
 	onNodeClick,
+	onTagClick,
 	onSetTopicCollapsed,
 	onRevealFile,
 	onFocusCluster,
@@ -131,7 +134,11 @@ let pixi: PixiRenderer | null = null;
 // camera fit already magnifies the handful of topic nodes, so re-inflating
 // their world radius on top rendered them as giant discs.
 let representedNoteCount = $derived(
-	graphData.nodes.reduce((count, node) => count + (node.kind === "topic" ? (node.memberPaths?.length ?? 1) : 1), 0),
+	graphData.nodes.reduce(
+		(count, node) =>
+			count + (node.kind === "topic" ? (node.memberPaths?.length ?? 1) : node.kind === "tag" ? 0 : 1),
+		0,
+	),
 );
 let nodeSize = $derived(autoNodeSize(representedNoteCount));
 
@@ -1948,6 +1955,10 @@ function handleClick(e: MouseEvent) {
 			if (node.cluster != null) {
 				onFocusCluster?.(node.cluster, false, e.shiftKey || e.metaKey || e.ctrlKey);
 			}
+		} else if (node.kind === "tag") {
+			// No file behind a tag either — searching for it is what a tag click
+			// does everywhere else in Obsidian.
+			onTagClick?.(node.label);
 		} else if (onNodeClick) {
 			onNodeClick(node.path);
 		}
@@ -1982,8 +1993,8 @@ function triggerNodePreview(event: MouseEvent | KeyboardEvent, node: GraphNode) 
 	const containerRect = containerEl.getBoundingClientRect();
 	const offsetX = canvasRect.left - containerRect.left;
 	const offsetY = canvasRect.top - containerRect.top;
-	// Nothing to preview for a synthetic topic node.
-	if (node.kind === "topic") return;
+	// Nothing to preview for a synthetic topic or tag node.
+	if (node.kind === "topic" || node.kind === "tag") return;
 
 	hoverAnchorEl.href = node.path;
 	hoverAnchorEl.dataset.href = node.path;
@@ -2051,6 +2062,18 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 					onOpenPaths?.(node.memberPaths ?? []);
 				}),
 		);
+	} else if (node.kind === "tag") {
+		// A tag belongs to no topic, so none of the cluster actions below apply.
+		menu.addItem((item) =>
+			item
+				.setTitle("Search notes with this tag")
+				.setIcon("search")
+				.onClick(() => {
+					onTagClick?.(node.label);
+				}),
+		);
+		menu.showAtPosition({ x: clientX, y: clientY });
+		return;
 	} else {
 		menu.addItem((item) =>
 			item
