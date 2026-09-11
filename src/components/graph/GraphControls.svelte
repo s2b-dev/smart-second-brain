@@ -548,7 +548,7 @@ $effect(() => {
     </SettingContainer>
     <SettingContainer
       name="Tags"
-      desc="Draw each tag as a node linked to the notes that carry it; tags don't affect topics"
+      desc="Draw each tag as a node linked to the notes that carry it; shared tags also help shape topics"
       compact
     >
       <Toggle

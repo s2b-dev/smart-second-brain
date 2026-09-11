@@ -39,10 +39,11 @@ export function isTagNode(node: { kind?: string }): boolean {
  * (full build, fused build, live patch) shares.
  *
  * A tag edge counts for its tag only: the tag's size says how many notes
- * carry it, but a note's degree stays what its links make it. Note degree is
- * the tie-breaker for a topic's representative (label, colour anchor, the
- * titles sent for naming), so letting tags inflate it would let a display
- * toggle re-label topics whose membership hasn't changed.
+ * carry it (which is also the breadth the Leiden weight damps by), but a
+ * note's degree stays what its links make it. Note degree is the tie-breaker
+ * for a topic's representative (label, colour anchor, the titles sent for
+ * naming), so letting tags inflate it would let the Tags toggle re-label
+ * topics whose membership it didn't change.
  */
 export function computeNodeDegrees(
 	edges: Iterable<{ source: string; target: string; type: string }>,
@@ -53,6 +54,23 @@ export function computeNodeDegrees(
 		degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + 1);
 	}
 	return degrees;
+}
+
+/**
+ * The graph without its tag layer: note nodes and the edges between notes.
+ *
+ * For derivations that are over note *content* rather than authored structure —
+ * the semantic scan and its cache key — where a tag can neither contribute nor
+ * invalidate anything.
+ */
+export function noteSubgraph<N extends object, E extends { type: string }>(graph: {
+	nodes: N[];
+	edges: E[];
+}): { nodes: N[]; edges: E[] } {
+	return {
+		nodes: graph.nodes.filter((node) => !isTagNode(node as { kind?: string })),
+		edges: graph.edges.filter((edge) => edge.type !== "tag"),
+	};
 }
 
 /**
@@ -335,40 +353,34 @@ function djb2(text: string): number {
  * the same signature. Counts are included so the accumulators can't be walked
  * back into a collision by adding and removing offsetting elements.
  *
- * Tag nodes and tag edges are left out: they are a display layer over the
- * note graph that none of the derivations read (topics come from wiki and
- * semantic edges; the semantic scan covers notes), so showing or hiding tags
- * must not invalidate any of them.
+ * The tag layer is part of the signature: tag edges feed community detection,
+ * so a graph with tags shown is a different topic-bearing graph from the same
+ * notes without them. Derivations that ignore tags (the semantic scan) key on
+ * `noteSubgraph` instead.
  */
 export function graphTopologySignature(graph: {
-	nodes: Array<{ id: string; kind?: string }>;
+	nodes: Array<{ id: string }>;
 	edges: Array<{ source: string; target: string; type: string; weight: number }>;
 }): string {
-	let nodeCount = 0;
 	let nodeSum = 0;
 	let nodeXor = 0;
 	for (const node of graph.nodes) {
-		if (isTagNode(node)) continue;
-		nodeCount++;
 		const hash = djb2(node.id);
 		nodeSum = (nodeSum + hash) >>> 0;
 		nodeXor = (nodeXor ^ hash) >>> 0;
 	}
-	let edgeCount = 0;
 	let edgeSum = 0;
 	let edgeXor = 0;
 	for (const edge of graph.edges) {
-		if (edge.type === "tag") continue;
-		edgeCount++;
 		const hash = djb2(`${edge.source}\0${edge.target}\0${edge.type}\0${edge.weight}`);
 		edgeSum = (edgeSum + hash) >>> 0;
 		edgeXor = (edgeXor ^ hash) >>> 0;
 	}
 	return [
-		nodeCount,
+		graph.nodes.length,
 		nodeSum.toString(36),
 		nodeXor.toString(36),
-		edgeCount,
+		graph.edges.length,
 		edgeSum.toString(36),
 		edgeXor.toString(36),
 	].join(":");

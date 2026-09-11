@@ -44,7 +44,9 @@ export interface SpaceSegment {
  *   close. Weight is the cosine similarity rather than a link count.
  * - "tag": A note carrying a tag, joining the note to that tag's node. Only
  *   present while tags are shown as nodes (`showTags`); weight is always 1.
- *   A display-layer edge: it never feeds topic detection or the semantic scan.
+ *   Authored structure like a wiki link, so it informs topic detection (damped
+ *   by how many notes share the tag) — but never the semantic scan, which is
+ *   over note content.
  */
 export type EdgeType = "wiki" | "semantic" | "tag";
 
@@ -90,7 +92,9 @@ export interface GraphNode {
 	 * synthetic node standing in for a whole collapsed topic — it has no file
 	 * behind it, so file-opening interactions must branch on this. `"tag"` is a
 	 * vault tag drawn as a node (Scope → "Tags"), linked to every note carrying
-	 * it; also fileless, and it never belongs to a topic.
+	 * it; also fileless. Tags take part in community detection but are never
+	 * *members* of the resulting topics (no `cluster`, no segment path), so they
+	 * keep the tag colour, sit outside hulls and never fold into a bubble.
 	 */
 	kind?: "note" | "topic" | "tag";
 	/** For `kind: "topic"` — the vault paths this node stands for. */
@@ -177,9 +181,10 @@ export interface SmartGraphSettings {
 	markdownOnly: boolean;
 	/**
 	 * Whether tags are drawn as nodes, each linked to the notes that carry it —
-	 * the same option as Obsidian's own graph. Tag nodes pull their notes
-	 * together in the layout but stay out of topic detection and the semantic
-	 * scan, so flipping this is a rebuild of the drawn graph, not of the topics.
+	 * the same option as Obsidian's own graph. Tags are authored structure, so
+	 * with this on they also inform topic detection (in link-only mode too): a
+	 * vault organised by tags rather than links gets topics from them. The
+	 * semantic scan is over note content and never sees tags.
 	 */
 	showTags: boolean;
 	/** Leiden PRNG seed — controls community assignment reproducibility */

@@ -44,7 +44,7 @@ import {
 	granularityToResolution,
 	type TopicHierarchy,
 } from "../../utils/topicHierarchy";
-import { computeNodeDegrees, edgeKey, graphTopologySignature, isTagNode } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, graphTopologySignature, isTagNode, noteSubgraph } from "../../utils/graphUtils";
 import { openTagSearch } from "../../utils/tagSearch";
 import {
 	applyWikiPatch,
@@ -236,6 +236,15 @@ const INTERIM_TOPIC_MIN_COVERAGE = 0.8;
  * statement about how two notes relate.
  */
 const SEMANTIC_LEIDEN_WEIGHT = 0.7;
+
+/**
+ * Weight of a tag edge for community detection, for a tag carried by a single
+ * note — the same as one wiki link. Divided by √(notes carrying the tag): a
+ * tag's total pull then grows only as √n, so a topical tag on a dozen notes
+ * binds them firmly while a status tag on hundreds (`#todo`, `#draft`) can't
+ * form a gravity well that drags unrelated notes into one topic.
+ */
+const TAG_LEIDEN_WEIGHT = 1;
 
 /**
  * Colour for the folded "Unsorted" node — deliberately neutral so it reads as
@@ -481,7 +490,9 @@ async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number)
 	const metadata = await inst.store.getMetadata().catch(() => null);
 	if (localBuildVersion !== buildVersion) return [];
 	const cacheKey = [
-		graphTopologySignature(wikiData),
+		// Over the notes only: the scan never sees tags, so showing them must
+		// not throw its result away.
+		graphTopologySignature(noteSubgraph(wikiData)),
 		data.graphEmbedIndex,
 		metadata?.lastUpdated ?? "no-metadata",
 		settings.semanticNeighborCount,
@@ -681,10 +692,9 @@ let buildGraphSignature = $derived(
 		extensions: selectedExtensions,
 		showWikiLinks: settings.showWikiLinks,
 		markdownOnly: settings.markdownOnly,
-		// Tag nodes are part of the built graph (they carry edges and degree),
-		// not a draw-time overlay, so showing them is a rebuild — a cheap one:
-		// the topology signature ignores the tag layer, so topics and semantic
-		// edges come straight back from cache.
+		// Tag nodes are part of the built graph (they carry edges and inform
+		// topics), so showing them is a rebuild. Semantic edges come back from
+		// cache (keyed on the note subgraph); Leiden re-runs once per graph.
 		showTags: settings.showTags ?? false,
 		// Semantic edges are computed during the build, so changing how they're
 		// derived needs a rebuild (unlike `showSemanticLinks`, which only hides them).
@@ -873,6 +883,7 @@ function flushLiveUpdate() {
 			}
 		}
 		const topicEdges = getTopicEdgesFor(patch.data);
+		const leidenWeight = leidenWeightFor(patch.data);
 		for (const path of patch.addedPaths) {
 			const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
 			if (vote !== undefined) {
@@ -886,6 +897,17 @@ function flushLiveUpdate() {
 			const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
 			if (vote !== undefined && vote !== communities[path]) {
 				communities[path] = vote;
+				drift++;
+			}
+		}
+		// Tags take part in detection, so a tag first used since the last Leiden
+		// run votes like a new note would; otherwise its notes' votes could never
+		// see it and it would pull nothing until the next full run.
+		for (const node of patch.data.nodes) {
+			if (!isTagNode(node) || communities[node.id] !== undefined) continue;
+			const vote = voteNodeCommunity(node.id, topicEdges, communities, leidenWeight);
+			if (vote !== undefined) {
+				communities[node.id] = vote;
 				drift++;
 			}
 		}
@@ -1097,6 +1119,7 @@ async function processPendingSemanticQueries() {
 				const communities = { ...leidenCommunities };
 				let drift = 0;
 				const topicEdges = getTopicEdgesFor(patched);
+				const leidenWeight = leidenWeightFor(patched);
 				for (const path of paths) {
 					const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
 					if (vote !== undefined && vote !== communities[path]) {
@@ -1528,11 +1551,20 @@ async function handleExitImmerse() {
  * similarities (~0.55–1.0), so the raw values aren't comparable — passing them
  * through unchanged would let a single authored link dominate a strong semantic
  * match. Authored links are deliberately kept the stronger signal, with repeat
- * links damped so one heavily-linked pair can't swamp a topic.
+ * links damped so one heavily-linked pair can't swamp a topic. Tag edges are
+ * damped by the tag's breadth (see {@link TAG_LEIDEN_WEIGHT}), which is the
+ * tag node's degree — hence the graph is needed, not just the edge.
  */
-function leidenWeight(edge: GraphEdge): number {
-	if (edge.type === "wiki") return 1 + Math.log2(Math.max(1, edge.weight));
-	return edge.weight * SEMANTIC_LEIDEN_WEIGHT;
+function leidenWeightFor(gd: GraphData): (edge: GraphEdge) => number {
+	const tagBreadth = new Map<string, number>();
+	for (const node of gd.nodes) {
+		if (isTagNode(node)) tagBreadth.set(node.id, Math.max(1, node.degree ?? 1));
+	}
+	return (edge) => {
+		if (edge.type === "wiki") return 1 + Math.log2(Math.max(1, edge.weight));
+		if (edge.type === "tag") return TAG_LEIDEN_WEIGHT / Math.sqrt(tagBreadth.get(edge.target) ?? 1);
+		return edge.weight * SEMANTIC_LEIDEN_WEIGHT;
+	};
 }
 
 /**
@@ -1540,7 +1572,8 @@ function leidenWeight(edge: GraphEdge): number {
  *
  * Normally authored *and* inferred — that fusion is what lets notes with no wiki
  * links land in a topic. In link-only mode inferred edges are excluded so the
- * topics reflect nothing but the user's own linking.
+ * topics reflect nothing but the user's own structure — which includes tags
+ * whenever they're shown: for a vault organised by tags, they *are* the links.
  */
 function getTopicEdges(): GraphEdge[] {
 	return getTopicEdgesFor(graphData);
@@ -1548,9 +1581,7 @@ function getTopicEdges(): GraphEdge[] {
 
 /** Same filter over an arbitrary graph — used by live patches before they land. */
 function getTopicEdgesFor(gd: GraphData): GraphEdge[] {
-	return gd.edges.filter((e) =>
-		settings.linkOnlyTopics ? e.type === "wiki" : e.type === "wiki" || e.type === "semantic",
-	);
+	return settings.linkOnlyTopics ? gd.edges.filter((e) => e.type !== "semantic") : gd.edges;
 }
 
 /**
@@ -1609,7 +1640,7 @@ async function runLeidenSegmentation() {
 
 	const sources = topicEdges.map((e) => e.source);
 	const targets = topicEdges.map((e) => e.target);
-	const weights = topicEdges.map(leidenWeight);
+	const weights = topicEdges.map(leidenWeightFor(graphData));
 	const start = performance.now();
 	isLeidenRunning = true;
 	let result: Awaited<ReturnType<typeof leidenAsync>>;
@@ -1682,7 +1713,7 @@ async function deriveGranularityLevels(topicEdges: GraphEdge[]) {
 	const seed = settings.leidenSeed;
 	const sources = topicEdges.map((e) => e.source);
 	const targets = topicEdges.map((e) => e.target);
-	const weights = topicEdges.map(leidenWeight);
+	const weights = topicEdges.map(leidenWeightFor(graphData));
 
 	const probes: Array<{ resolution: number; topicCount: number; isFragmented: boolean }> = [];
 	const start = performance.now();
@@ -1800,7 +1831,7 @@ async function computeTopicHierarchy(topicEdges: GraphEdge[]) {
 			const result = await leidenAsync(
 				topicEdges.map((e) => e.source),
 				topicEdges.map((e) => e.target),
-				topicEdges.map(leidenWeight),
+				topicEdges.map(leidenWeightFor(graphData)),
 				settings.leidenSeed,
 				coarseResolution,
 			);
@@ -1935,10 +1966,11 @@ function resolveAndApplySegments(gd: GraphData) {
 		}
 	}
 	const isLeiden = Object.keys(leidenCommunities).length > 0;
-	// Paths touched by at least one authored wiki link — drives the isolated highlight.
+	// Paths touched by at least one authored edge (wiki link or tag) — drives
+	// the isolated highlight.
 	const linkedPaths = new Set<string>();
 	for (const edge of gd.edges) {
-		if (edge.type !== "wiki") continue;
+		if (edge.type === "semantic") continue;
 		linkedPaths.add(edge.source);
 		linkedPaths.add(edge.target);
 	}
@@ -1947,9 +1979,10 @@ function resolveAndApplySegments(gd: GraphData) {
 		// neighbors belong to a DIFFERENT community than its own. High-degree hubs link to
 		// many clusters but are firmly assigned to one — their own community dominates their neighbor
 		// vote, so they don't qualify. Only nodes that are structurally "between" communities do.
-		// Both edge types count here, matching the Leiden input: a note that ties two topics together
-		// by topic rather than by an authored link is exactly as much a bridge.
-		const isTopicEdge = (edge: GraphEdge) => edge.type === "wiki" || edge.type === "semantic";
+		// Every edge type counts here, matching the fused Leiden input: a note that ties two topics
+		// together by similarity or by a shared tag rather than by an authored link is exactly as
+		// much a bridge.
+		const isTopicEdge = (_edge: GraphEdge) => true;
 		let bridgeNodes: Set<string> | null = null;
 		if (isLeiden) {
 			// Build neighbor community vote counts per node

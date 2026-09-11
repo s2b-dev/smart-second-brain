@@ -7,6 +7,7 @@ import {
 	edgeKey,
 	graphTopologySignature,
 	nodeDrawRadius,
+	noteSubgraph,
 	splitEdgeKey,
 	zoomNodeScale,
 } from "../../src/utils/graphUtils";
@@ -42,7 +43,7 @@ describe("graphTopologySignature", () => {
 		edges: [wiki("a.md", "b.md"), wiki("b.md", "c.md", 2)],
 	});
 
-	it("ignores the tag layer, so showing tags invalidates nothing derived", () => {
+	it("changes with the tag layer, which feeds topic detection", () => {
 		const withTags = () => {
 			const graph = base();
 			return {
@@ -50,7 +51,9 @@ describe("graphTopologySignature", () => {
 				edges: [...graph.edges, { source: "a.md", target: "tag:#foo", type: "tag", weight: 1 }],
 			};
 		};
-		expect(graphTopologySignature(withTags())).toBe(graphTopologySignature(base()));
+		expect(graphTopologySignature(withTags())).not.toBe(graphTopologySignature(base()));
+		// ...while the note subgraph strips it back out for note-only derivations.
+		expect(graphTopologySignature(noteSubgraph(withTags()))).toBe(graphTopologySignature(base()));
 	});
 
 	it("is stable for an identical graph", () => {

@@ -8,8 +8,9 @@
  * - **semantic** — inferred top-K embedding neighbours ({@link buildSemanticEdges}).
  *
  * A third, optional layer draws each tag as a node linked to the notes that
- * carry it ({@link buildTagLayer}). It is display only: tag nodes and edges are
- * part of the picture, not of the structure the derivations below read.
+ * carry it ({@link buildTagLayer}). Tag edges are authored structure and join
+ * the Leiden input alongside wiki links (damped by tag breadth, see the view's
+ * `leidenWeightFor`); the semantic scan never sees them.
  *
  * The fusion matters because most vaults are link-sparse: with wiki links alone
  * the great majority of notes have degree 0, so community detection cannot place
@@ -40,7 +41,7 @@ import {
 	type SegmentBy,
 	type SpaceSegment,
 } from "../../types/graph";
-import { computeNodeDegrees, edgeKey, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, isTagNode, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
 import { MIN_TOPIC_SIZE } from "../../utils/topicHierarchy";
 
 // ============================================================================
@@ -123,9 +124,10 @@ function buildWikiEdges(app: App, filteredPathSet: Set<string>): GraphEdge[] {
  * folder/tag/extension filter and the private-note exclusion already applied
  * to them carries over to the tags shown.
  *
- * Display only, by contract: nothing derived from the note graph — topics,
- * their representatives, semantic edges, note degree — may read this layer,
- * so that showing tags never changes what the graph says about the notes.
+ * Tags shape topics but are never topic *members*: {@link resolveSegments}
+ * keeps them out of every segment's `paths`, so they carry no `cluster`, no
+ * topic colour, and never fold into a collapsed bubble. A tag can still name
+ * a topic — see the representative rule in `resolveSegmentsByLeiden`.
  */
 function buildTagLayer(app: App, files: TFile[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
 	const labelById = new Map<string, string>();
@@ -406,7 +408,8 @@ export function resolveSegments(
  * Communities are derived purely from link topology — notes that heavily
  * interlink end up in the same community regardless of content similarity.
  * Nodes with no wiki links are not assigned to any community and keep the
- * default node color.
+ * default node color. Tag nodes may appear in `communities` (they take part in
+ * detection) but never in a segment's `paths`.
  *
  * `communities` is a pre-computed node-id → community-id map produced by
  * `leidenAsync` in the compute worker.
@@ -439,13 +442,25 @@ function resolveSegmentsByLeiden(
 		internalDegree.set(edge.target, (internalDegree.get(edge.target) ?? 0) + 1);
 	}
 
+	// Tags sit in the community map (they took part in detection) but a topic
+	// is its notes: tags don't count toward its size and don't become members.
+	const isNoteId = (id: string) => {
+		const node = nodeById.get(id);
+		return node !== undefined && !isTagNode(node);
+	};
+	const noteCount = new Map<number, number>();
+	for (const [communityId, nodeIds] of communityNodes) {
+		noteCount.set(communityId, nodeIds.filter(isNoteId).length);
+	}
+
 	// Sort communities by size descending so the largest get the most prominent colors.
 	// Groups below MIN_TOPIC_SIZE are dropped: a lone note isn't a topic, it's a note
 	// that failed to join one, and listing hundreds of them buries the real topics.
 	// Those notes still render — they simply keep the default colour and no label.
+	const sizeOf = (communityId: number) => noteCount.get(communityId) ?? 0;
 	const sorted = [...communityNodes.entries()]
-		.filter(([, nodeIds]) => nodeIds.length >= MIN_TOPIC_SIZE)
-		.sort((a, b) => b[1].length - a[1].length || a[0] - b[0]);
+		.filter(([communityId]) => sizeOf(communityId) >= MIN_TOPIC_SIZE)
+		.sort((a, b) => sizeOf(b[0]) - sizeOf(a[0]) || a[0] - b[0]);
 	if (sorted.length === 0) return [];
 	// Palette size is fixed rather than sized to the current topic count: a hashed
 	// slot must land the same way at every granularity level, and `colors.length` would
@@ -453,13 +468,20 @@ function resolveSegmentsByLeiden(
 	const colors = generateClusterColors(Math.max(TOPIC_COLOR_SLOTS, sorted.length), themeColors);
 
 	// Representative first (it anchors both label and colour), then build segments.
+	//
+	// A tag may represent a topic — for a vault organised by tags, `#cooking` is
+	// the best name that topic can have — but only when the topic is where the
+	// tag *lives*: at least half of the notes carrying it are inside. A broad tag
+	// spread across many topics would otherwise win the internal-degree contest
+	// in whichever one it happened to land, and label a group it doesn't describe.
 	const withRepresentative = sorted.map(([communityId, nodeIds], i) => {
-		let bestId = nodeIds[0];
+		let bestId = nodeIds.find(isNoteId) ?? nodeIds[0];
 		let bestInternal = Number.NEGATIVE_INFINITY;
 		let bestTotal = Number.NEGATIVE_INFINITY;
 		for (const id of nodeIds) {
 			const internal = internalDegree.get(id) ?? 0;
 			const total = nodeById.get(id)?.degree ?? 0;
+			if (!isNoteId(id) && internal * 2 < total) continue;
 			if (internal > bestInternal || (internal === bestInternal && total > bestTotal)) {
 				bestInternal = internal;
 				bestTotal = total;
@@ -499,7 +521,12 @@ function resolveSegmentsByLeiden(
 
 	return withRepresentative.map(({ communityId, nodeIds, bestId, index }) => {
 		const label = nodeById.get(bestId)?.label ?? nodeById.get(bestId)?.path ?? `Community ${index + 1}`;
-		const paths = new Set(nodeIds.map((id) => nodeById.get(id)?.path).filter((p): p is string => p != null));
+		const paths = new Set(
+			nodeIds
+				.filter(isNoteId)
+				.map((id) => nodeById.get(id)?.path)
+				.filter((p): p is string => p != null),
+		);
 
 		return {
 			id: `leiden:${index}`,
