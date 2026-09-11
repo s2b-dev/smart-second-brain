@@ -5,6 +5,7 @@ import {
 	queryNoteSemanticEdges,
 	replaceSemanticEdgesForPaths,
 	voteNodeCommunity,
+	voteUntilSettled,
 	type SemanticQueryStore,
 } from "../../src/utils/liveGraphPatch";
 import type { DocumentVector, ScoredDocument } from "../../src/vectorstore/types";
@@ -302,5 +303,32 @@ describe("applyWikiPatch — tag layer", () => {
 		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "tag:#foo"]);
 		// The tag keeps its layout position across the patch like any other node.
 		expect(foo).toMatchObject({ x: 5, y: 5, kind: "tag" });
+	});
+});
+
+describe("voteUntilSettled", () => {
+	const weightOf = () => 1;
+	const tagEdge = (source: string, tag: string): GraphEdge => ({ source, target: tag, weight: 1, type: "tag" });
+
+	it("lands a new note that hinges on a new tag, whichever is listed first", () => {
+		// Existing a.md/b.md sit in topic 0. One patch adds a brand-new tag to
+		// them and a new note whose only edge is that tag.
+		const edges = [tagEdge("a.md", "tag:#new"), tagEdge("b.md", "tag:#new"), tagEdge("new.md", "tag:#new")];
+		for (const order of [
+			["new.md", "tag:#new"],
+			["tag:#new", "new.md"],
+		]) {
+			const communities: Record<string, number> = { "a.md": 0, "b.md": 0 };
+			const landed = voteUntilSettled(order, edges, communities, weightOf);
+			expect(landed.sort()).toEqual(["new.md", "tag:#new"]);
+			expect(communities).toEqual({ "a.md": 0, "b.md": 0, "tag:#new": 0, "new.md": 0 });
+		}
+	});
+
+	it("leaves a pair with no assigned neighbour unsorted and terminates", () => {
+		const communities: Record<string, number> = {};
+		const landed = voteUntilSettled(["new.md", "tag:#new"], [tagEdge("new.md", "tag:#new")], communities, weightOf);
+		expect(landed).toEqual([]);
+		expect(communities).toEqual({});
 	});
 });

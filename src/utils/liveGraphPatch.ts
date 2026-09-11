@@ -247,6 +247,41 @@ export function voteNodeCommunity(
 	return best;
 }
 
+/**
+ * Vote a set of unassigned nodes into communities until nothing more lands.
+ *
+ * A single pass in a fixed order misses a realistic case: a live patch that
+ * adds a note together with a brand-new tag (also applied to existing notes).
+ * Voted first, the note sees only a tag with no community; voted first, the
+ * tag might see only that note. Repeating the pass lets whichever side can
+ * settle from already-assigned neighbours go first, and the other follow.
+ * Bounded: every round either assigns at least one more node or stops.
+ *
+ * Mutates `communities`; returns the ids that landed, in the order they did.
+ */
+export function voteUntilSettled(
+	ids: Iterable<string>,
+	edges: GraphEdge[],
+	communities: Record<string, number>,
+	weightOf: (edge: GraphEdge) => number,
+): string[] {
+	const pending = new Set(ids);
+	const landed: string[] = [];
+	let progressed = true;
+	while (progressed && pending.size > 0) {
+		progressed = false;
+		for (const id of [...pending]) {
+			const vote = voteNodeCommunity(id, edges, communities, weightOf);
+			if (vote === undefined) continue;
+			communities[id] = vote;
+			pending.delete(id);
+			landed.push(id);
+			progressed = true;
+		}
+	}
+	return landed;
+}
+
 /** The slice of the vector store the incremental semantic query needs. */
 export interface SemanticQueryStore {
 	getAllByPath(path: string): Promise<DocumentVector[]>;

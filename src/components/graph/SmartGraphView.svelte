@@ -51,6 +51,7 @@ import {
 	queryNoteSemanticEdges,
 	replaceSemanticEdgesForPaths,
 	voteNodeCommunity,
+	voteUntilSettled,
 } from "../../utils/liveGraphPatch";
 import {
 	clearCachedPartitions,
@@ -884,30 +885,26 @@ function flushLiveUpdate() {
 		}
 		const topicEdges = getTopicEdgesFor(patch.data);
 		const leidenWeight = leidenWeightFor(patch.data);
-		for (const path of patch.addedPaths) {
-			const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
-			if (vote !== undefined) {
-				communities[path] = vote;
-				drift++;
-			}
-		}
+		// Added notes, plus tags first seen since the last Leiden run (tags take
+		// part in detection, so an unassigned tag would pull nothing until the
+		// next full run). Voted to a fixed point rather than in one pass: a new
+		// note may hinge on a new tag and that tag on the note's other
+		// neighbours, or the other way round.
+		const unassignedTagIds = patch.data.nodes
+			.filter((node) => isTagNode(node) && communities[node.id] === undefined)
+			.map((node) => node.id);
+		drift += voteUntilSettled(
+			[...patch.addedPaths, ...unassignedTagIds],
+			topicEdges,
+			communities,
+			leidenWeight,
+		).length;
 		// A surviving note whose links changed may now belong elsewhere; re-vote
 		// it, but only count actual moves as drift.
 		for (const path of patch.touchedPaths) {
 			const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
 			if (vote !== undefined && vote !== communities[path]) {
 				communities[path] = vote;
-				drift++;
-			}
-		}
-		// Tags take part in detection, so a tag first used since the last Leiden
-		// run votes like a new note would; otherwise its notes' votes could never
-		// see it and it would pull nothing until the next full run.
-		for (const node of patch.data.nodes) {
-			if (!isTagNode(node) || communities[node.id] !== undefined) continue;
-			const vote = voteNodeCommunity(node.id, topicEdges, communities, leidenWeight);
-			if (vote !== undefined) {
-				communities[node.id] = vote;
 				drift++;
 			}
 		}
