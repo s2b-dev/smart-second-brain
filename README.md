@@ -31,7 +31,7 @@ Search surfaces your notes, the graph groups them into the topics your vault is 
 
 Install **Smart Second Brain** from Obsidian's community plugins and enable it. Search and the Smart Graph work immediately, with no configuration.
 
-Add an embedding model to unlock semantic search and topics that read what your notes say, not just how they link; add an AI provider to enable the agent. See the [getting started guide](https://smartsecondbrain.dev/start/installation/).
+Add an embedding model and pick it for search and for the graph to unlock semantic search and topics that read what your notes say, not just how they link; add an AI provider to enable the agent. See the [getting started guide](https://smartsecondbrain.dev/start/installation/).
 
 Out of the box, nothing leaves your machine. The only network requests are to the providers you configure, and there is no telemetry — see [privacy](https://smartsecondbrain.dev/privacy/model/).
 
