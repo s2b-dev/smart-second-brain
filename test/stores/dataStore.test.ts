@@ -1061,3 +1061,54 @@ describe("PluginDataStore – Embedding Indexes", () => {
 		expect(store.graphEmbedIndex).toBeNull();
 	});
 });
+
+/* --------------------------------------------------------------------------
+ * Graph index availability
+ * ------------------------------------------------------------------------*/
+
+describe("PluginDataStore graph index availability", () => {
+	let store: PluginDataStore;
+
+	beforeEach(() => {
+		({ store } = makeStore());
+	});
+
+	/**
+	 * The smart graph derives `hasGraphIndex` from `getGraphEmbedModel()` and
+	 * disables the "Inferred links" controls on it. Svelte tracks that read
+	 * because the method goes through the store's `$state`-backed data on every
+	 * call; these pin that it answers each transition the settings UI can
+	 * trigger from live state, never from anything cached at construction.
+	 * (Effects are inert under this Vitest config — Svelte modules compile in
+	 * server mode here — so the tracking itself can't be exercised in a unit test.)
+	 */
+	it("reports a graph index only while one is selected", () => {
+		expect(store.getGraphEmbedModel()).toBeNull();
+
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).toEqual({ provider: "ollama", model: "nomic-embed-text" });
+
+		store.clearEmbedIndex("graph");
+		expect(store.getGraphEmbedModel()).toBeNull();
+
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).not.toBeNull();
+	});
+
+	it("reports no graph index once its config is removed, even via the search purpose", () => {
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		store.setEmbedIndex("search", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).not.toBeNull();
+
+		store.removeEmbeddingIndex("ollama:nomic-embed-text");
+		expect(store.graphEmbedIndex).toBeNull();
+		expect(store.getGraphEmbedModel()).toBeNull();
+	});
+
+	it("reports no graph index when the selected id has no config", () => {
+		// A stale selection can survive a sync; the lookup, not the id, decides.
+		({ store } = makeStore({ graphEmbedIndex: "ollama:gone", embeddingIndexes: [] }));
+		expect(store.graphEmbedIndex).toBe("ollama:gone");
+		expect(store.getGraphEmbedModel()).toBeNull();
+	});
+});
