@@ -2377,8 +2377,10 @@ function buildInternalData(data: GraphData): {
 		];
 	});
 
-	// Pre-split by edge type to avoid filtering every render frame
-	renderableSimLinks = simLinks.filter((l) => l.type === "wiki" || l.type === "semantic");
+	// Pre-split by edge type to avoid filtering every render frame. Every
+	// drawable type is listed: the renderer decides per frame which of them
+	// the display toggles currently show.
+	renderableSimLinks = simLinks.filter((l) => l.type === "wiki" || l.type === "semantic" || l.type === "tag");
 	refreshClusterMetadata(data);
 
 	// Build adjacency map for O(1) hover-dimming lookups
