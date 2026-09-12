@@ -177,12 +177,29 @@ function inflateNode(value: unknown, table: unknown[]): unknown {
  * in-memory thread keeps its inflated shape (table entries are shared with it,
  * not copied).
  */
+/**
+ * Drop runtime-only fields from a checkpoint entry's `parentConfig` before it is
+ * written to disk. LangChain populates `parentConfig` with `callbacks` (the live
+ * `StreamMessagesHandler` and its ever-growing `seen` map) and `tags` — objects
+ * re-created every session, never read back on load, but previously serialized
+ * into EVERY checkpoint (~1.5 MB each). That is the dominant driver of
+ * hundreds-of-MB `.chat` files and the resulting Obsidian OOM crashes. Only
+ * `configurable` (the parent link LangGraph needs to resolve the checkpoint
+ * tree) is persisted. Because this runs on every save, it also shrinks files
+ * written by older builds the next time they are saved.
+ */
+function stripRuntimeConfig(entry: CheckpointEntry): CheckpointEntry {
+	const pc = entry.parentConfig;
+	if (!pc || (pc.callbacks === undefined && pc.tags === undefined)) return entry;
+	return { ...entry, parentConfig: { configurable: pc.configurable } };
+}
+
 export function deflateThreadData(data: ThreadData): Record<string, unknown> {
 	const interner = new MessageInterner();
 
 	const checkpoints: Record<string, unknown> = {};
 	for (const [id, entry] of Object.entries(data.checkpoints ?? {})) {
-		checkpoints[id] = deflateNode(entry, interner);
+		checkpoints[id] = deflateNode(stripRuntimeConfig(entry), interner);
 	}
 
 	const writes: Record<string, unknown> = {};
