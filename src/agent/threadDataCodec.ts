@@ -190,7 +190,10 @@ function inflateNode(value: unknown, table: unknown[]): unknown {
  */
 function stripRuntimeConfig(entry: CheckpointEntry): CheckpointEntry {
 	const pc = entry.parentConfig;
-	if (!pc || (pc.callbacks === undefined && pc.tags === undefined)) return entry;
+	// Persist only the parent link; drop callbacks/tags/any other runtime config so
+	// the on-disk invariant is consistently "configurable-only". Skip the copy only
+	// when parentConfig is already exactly `{ configurable }` (nothing to strip).
+	if (!pc || (Object.keys(pc).length === 1 && pc.configurable !== undefined)) return entry;
 	return { ...entry, parentConfig: { configurable: pc.configurable } };
 }
 
