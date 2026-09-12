@@ -151,8 +151,12 @@ function normalizeLinks(containerEl: HTMLElement) {
 $effect(() => {
 	if (!container) return;
 
+	// Read every reactive dep synchronously here so the effect re-runs when any of
+	// them change — including `enableMath`, which is only used later inside the
+	// rAF-deferred render() and would otherwise not be tracked.
 	const currentContent = content;
 	const currentSourcePath = sourcePath;
+	const currentEnableMath = enableMath;
 
 	let frame: number | null = null;
 	let disposed = false;
@@ -161,7 +165,7 @@ $effect(() => {
 	async function render() {
 		if (disposed || !container) return;
 
-		if (enableMath) {
+		if (currentEnableMath) {
 			await loadMathJax();
 		}
 
