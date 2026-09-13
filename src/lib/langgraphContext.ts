@@ -1,10 +1,11 @@
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import { Logger } from "../utils/logging";
-import { createAsyncLocalStorage, hasNativeAsyncLocalStorage } from "./asyncLocalStorage";
+import { createAsyncLocalStorage, hasAsyncHooksAsyncLocalStorage } from "./asyncLocalStorage";
 
 /**
- * Wires LangChain-core's global AsyncLocalStorage singleton to a real
- * `node:async_hooks` instance.
+ * Wires LangChain-core's global AsyncLocalStorage singleton to our
+ * `async_hooks`-backed instance (see `asyncLocalStorage.ts` for why it is
+ * never Node's own `AsyncLocalStorage` class).
  *
  * Why this is needed:
  * LangGraph threads the active `RunnableConfig` through nested runs via
@@ -28,10 +29,10 @@ import { createAsyncLocalStorage, hasNativeAsyncLocalStorage } from "./asyncLoca
  * throws when it tries to build the subagent's state.
  *
  * Obsidian desktop runs in Electron's renderer where `node:async_hooks` IS
- * available (see `src/lib/aiTransport.ts`). On mobile there is no
- * `node:async_hooks`, so `createAsyncLocalStorage()` returns a synchronous shim
- * that still satisfies the singleton's `getStore()`/`run()` contract for the
- * single-run agent flows the mobile UI drives.
+ * available. On mobile there is no `node:async_hooks`, so
+ * `createAsyncLocalStorage()` returns a synchronous shim that still satisfies
+ * the singleton's `getStore()`/`run()` contract for the single-run agent flows
+ * the mobile UI drives.
  *
  * `initializeGlobalInstance` is a no-op if some other code already set an
  * instance, so importing this module is idempotent and safe to run first.
@@ -40,7 +41,7 @@ export function initLangGraphAsyncContext(): void {
 	try {
 		// The singleton accepts a duck-typed ALS; our shim matches its run/getStore surface.
 		AsyncLocalStorageProviderSingleton.initializeGlobalInstance(createAsyncLocalStorage<unknown>());
-		if (!hasNativeAsyncLocalStorage) {
+		if (!hasAsyncHooksAsyncLocalStorage) {
 			Logger.info("langgraphContext: using synchronous AsyncLocalStorage shim (no node:async_hooks)");
 		}
 	} catch (error) {
