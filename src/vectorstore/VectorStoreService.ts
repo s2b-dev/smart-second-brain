@@ -2304,9 +2304,12 @@ export class VectorStoreService {
 			inst.currentProviderId = provider;
 			inst.currentModelId = model;
 
-			await this.notifyStatsChanged(inst);
+			// One update, one save: the count and the build date must land together.
 			// An export is a complete index by construction, so the import is a build.
-			getData().updateEmbeddingIndexStats(indexId, { lastBuiltAt: Date.now() });
+			getData().updateEmbeddingIndexStats(indexId, {
+				documentCount: await inst.store.countNotes(),
+				lastBuiltAt: Date.now(),
+			});
 
 			Logger.log(`[VectorStore] Imported ${docs.length} documents for ${indexId}`);
 			new Notice(`Imported ${docs.length} embeddings (${model}).`);
