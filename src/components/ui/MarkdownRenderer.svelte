@@ -139,35 +139,61 @@ function normalizeLinks(containerEl: HTMLElement) {
 	}
 }
 
-// Render markdown when content changes
+// Render markdown when content changes.
+// Coalesced to one paint per animation frame. During streaming, `content` updates
+// once per token (often 100-300/s); a naive re-render tears down and re-parses the
+// entire accumulated message each time, forcing a full style/layout recalc per token
+// that stalls the whole app for the length of the reply. Scheduling the render on
+// requestAnimationFrame collapses a burst of token updates into a single re-parse per
+// frame (~60Hz). The effect re-runs on every `content` change and the cleanup cancels
+// the previous pending frame, so only the newest content is ever rendered — the final
+// token is never dropped, and static (non-streaming) content just paints one frame later.
 $effect(() => {
 	if (!container) return;
 
+	// Read every reactive dep synchronously here so the effect re-runs when any of
+	// them change — including `enableMath`, which is only used later inside the
+	// rAF-deferred render() and would otherwise not be tracked.
 	const currentContent = content;
 	const currentSourcePath = sourcePath;
+	const currentEnableMath = enableMath;
+
+	let frame: number | null = null;
+	let disposed = false;
 
 	// Async render function
 	async function render() {
-		if (!container) return;
+		if (disposed || !container) return;
 
-		if (enableMath) {
+		if (currentEnableMath) {
 			await loadMathJax();
 		}
 
-		// `container` may have been unbound (component unmounted) while awaiting
-		// above. Re-check before touching it — otherwise clearing `container`
-		// throws "Cannot read properties of null" during rapid mount/unmount
-		// (e.g. subagent tool cards folding in/out during streaming).
-		if (!container) return;
+		// `container` may have been unbound (component unmounted), or this render
+		// superseded by a newer frame, while awaiting above. Re-check before touching
+		// it — otherwise clearing `container` throws "Cannot read properties of null"
+		// during rapid mount/unmount (e.g. subagent tool cards folding in/out).
+		if (disposed || !container) return;
 
 		container.empty();
 		await MarkdownRenderer.render(plugin.app, currentContent ?? "", container, currentSourcePath, plugin);
 
-		if (!container) return;
+		if (disposed || !container) return;
 		normalizeLinks(container);
 	}
 
-	render();
+	frame = requestAnimationFrame(() => {
+		frame = null;
+		render();
+	});
+
+	// Runs before the effect re-runs (content changed) and on unmount: drop the
+	// pending frame and abort any in-flight render so we never render stale content
+	// or touch an unbound container.
+	return () => {
+		disposed = true;
+		if (frame !== null) cancelAnimationFrame(frame);
+	};
 });
 </script>
 

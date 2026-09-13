@@ -66,11 +66,28 @@ describe("lookupModelInfoSync", () => {
 		expect(lookupModelInfoSync(data, "openai", "o1")).toBeNull();
 	});
 
-	it("still fuzzy-matches a non-digit typo with identical digits", () => {
+	it("does not fuzzy-match a typo, even with identical digits", () => {
 		const data = catalogue("anthropic", {
 			"claude-sonnet-4-5": model("claude-sonnet-4-5", "Claude Sonnet 4.5"),
 		});
-		expect(lookupModelInfoSync(data, "anthropic", "claude-sonet-4-5")?.name).toBe("Claude Sonnet 4.5");
+		expect(lookupModelInfoSync(data, "anthropic", "claude-sonet-4-5")).toBeNull();
+	});
+
+	it("matches the same id written with different separators", () => {
+		const data = catalogue("qwen", {
+			"qwen3-8b": model("qwen3-8b", "Qwen3 8B"),
+		});
+		expect(lookupModelInfoSync(data, "custom-instance-1", "qwen3:8b")?.name).toBe("Qwen3 8B");
+		expect(lookupModelInfoSync(data, "custom-instance-1", "Qwen3-8B")?.name).toBe("Qwen3 8B");
+	});
+
+	it("does not match an id that is one edit away from a catalogue entry (#480)", () => {
+		const data = catalogue("qwen", {
+			"qwen3-8b": model("qwen3-8b", "Qwen3 8B"),
+		});
+		// "qwen3.8" normalizes to "qwen38", one character short of "qwen38b". The size suffix
+		// is meaning, not a typo; the model must keep its own name and metadata.
+		expect(lookupModelInfoSync(data, "custom-instance-1", "qwen3.8")).toBeNull();
 	});
 
 	describe("cross-provider fallback precedence", () => {
@@ -120,7 +137,7 @@ describe("lookupModelInfoSync", () => {
 			);
 		});
 
-		it("still falls back to a fuzzy match when no provider holds the exact id", () => {
+		it("falls back to a normalized match when no provider holds the exact id", () => {
 			const data = multiProviderCatalogue([
 				"digitalocean",
 				{ "anthropic-claude-4.5-opus": model("anthropic-claude-4.5-opus", "Anthropic Claude 4.5 Opus") },

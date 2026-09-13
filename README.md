@@ -42,7 +42,7 @@ Out of the box, nothing leaves your machine. The only network requests are to th
 - Share a skill, agent, or workflow in [Show and tell](https://github.com/s2b-dev/smart-second-brain/discussions/categories/show-and-tell)
 - Pull requests welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the development setup and how we handle AI-assisted contributions; [AGENTS.md](AGENTS.md) has the architecture, commands, and conventions
 
-We initially built this as a university project. That's long finished, but we keep developing it in our spare time, as an experimental playground for state-of-the-art AI and as a tool for the Obsidian workflow we're passionate about.
+We initially built this as a university project. That's long finished, but we keep developing it in our spare time, as an experimental playground for state-of-the-art AI and as a tool for the Obsidian workflow we're passionate about. Much of the code is written with AI coding agents; we review, test, and stand behind every change, and commits and pull requests say when an agent was involved.
 
 ## License
 

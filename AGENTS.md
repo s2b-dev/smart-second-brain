@@ -13,6 +13,20 @@ provider and skill recipes) live in [CONTRIBUTING.md](CONTRIBUTING.md). CI (`.gi
 runs the Biome format and lint checks, `bun run check`, `bun run test`, and `bun run build` on every pull request; a
 change that fails any of those locally will fail there too.
 
+**Disclose AI involvement; never hide it.** Most of this repo is written by coding agents
+working from the maintainer's briefs, and the history should say so:
+- Commits made from Claude Code carry a `Co-Authored-By: Claude <noreply@anthropic.com>`
+  trailer, configured in `.claude/settings.json` (it overrides the user-level setting). Keep
+  the trailer. If you commit through another agent, add a trailer naming *that* agent instead;
+  never attribute a change to an agent that did not make it.
+- Every PR body follows `.github/PULL_REQUEST_TEMPLATE.md`, including the italic
+  `_AI assistance: ..._` line under "How I tested it". Fill it in honestly in one sentence: which agent wrote the
+  change, from what brief, and what the human reviewed and tested. Do not leave the line out.
+  "none" is the right answer only for a change no agent touched, which a change you are making
+  is not.
+- Replies to review-bot findings are written by whoever is driving the loop, agent or human;
+  that is fine. Replies to a *person's* review are the maintainer's to write.
+
 ## Commands
 
 Use `bun` (not npm/yarn). The lockfile is `bun.lock`.
