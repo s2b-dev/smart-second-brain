@@ -111,7 +111,7 @@ Maintainers hold themselves to the same rules: maintainer commits made with an a
 `Co-Authored-By` trailer naming that agent (`Co-Authored-By: Claude <noreply@anthropic.com>`
 for Claude Code), and maintainer PRs fill in the same "AI assistance:" line. PRs merged before
 [#488](https://github.com/s2b-dev/smart-second-brain/pull/488) predate this policy; the ones
-from the agent era carry a backfilled line saying so. If you see a maintainer PR that reads like
+from the agent era carry a backfilled line. If you see a maintainer PR that reads like
 unreviewed output, say so.
 
 ## Recipes
