@@ -1444,13 +1444,28 @@ export class VectorStoreService {
 			if (entry.chunkIndex === 0) noteIndexed(entry.file.path);
 		};
 
+		// A note that lost any chunk must not get its chunk 0 written. Chunk 0 is
+		// the "note is indexed" marker (`orderChunksForWriting` puts it last), so
+		// writing it after a sibling failed would leave a partial note that startup
+		// validation reads as complete — its sections silently missing from
+		// retrieval for as long as the note's mtime holds. Dropping the note's
+		// remaining chunks instead leaves it without `#0`, and the next validation
+		// pass re-indexes it whole.
+		const failedPaths = new Set<string>();
+		const noteFailed = (path: string, reason: SkipReason) => {
+			failedPaths.add(path);
+			noteSkipped(path, reason);
+		};
+
 		// Consecutive transport-level failures. Reset on any success, so a flaky
 		// connection that recovers does not accumulate toward the limit.
 		let consecutiveUnreachable = 0;
 		let batchNumber = 0;
 
 		/** Embed and store one batch. Resolves false when the run must stop. */
-		const embedBatch = async (batch: ChunkEntry[]): Promise<boolean> => {
+		const embedBatch = async (queued: ChunkEntry[]): Promise<boolean> => {
+			const batch = queued.filter((entry) => !failedPaths.has(entry.file.path));
+			if (batch.length === 0) return true;
 			batchNumber++;
 			this.updateInstanceProgress(inst, {
 				currentFile: batch.length === 1 ? batch[0].file.path : `Embedding batch ${batchNumber}...`,
@@ -1468,13 +1483,14 @@ export class VectorStoreService {
 				consecutiveUnreachable = 0;
 				if (!vectors || vectors.length === 0) {
 					Logger.error(`[VectorStore] embedDocuments returned empty result for ${inst.indexId}`);
-					for (const entry of batch) noteSkipped(entry.file.path, "embed-error");
+					for (const entry of batch) noteFailed(entry.file.path, "embed-error");
 					return true;
 				}
 				for (let j = 0; j < batch.length; j++) {
+					if (failedPaths.has(batch[j].file.path)) continue;
 					if (!vectors[j]) {
 						Logger.error(`[VectorStore] Empty vector for ${batch[j].file.path}`);
-						noteSkipped(batch[j].file.path, "embed-error");
+						noteFailed(batch[j].file.path, "embed-error");
 						continue;
 					}
 					await writeVector(batch[j], vectors[j]);
@@ -1495,18 +1511,19 @@ export class VectorStoreService {
 					// Account for the batch before skipping the per-entry retry, so
 					// the notes are reported as skipped rather than silently dropped
 					// from a run that still claims success.
-					for (const entry of batch) noteSkipped(entry.file.path, "embed-error");
+					for (const entry of batch) noteFailed(entry.file.path, "embed-error");
 					return true;
 				}
 				consecutiveUnreachable = 0;
 
 				for (const entry of batch) {
 					if (aborted()) return false;
+					if (failedPaths.has(entry.file.path)) continue;
 					try {
 						const vector = await this.embedWithCancellation(inst, embeddings.embedQuery(entry.embedText));
 						if (!vector || vector.length === 0) {
 							Logger.error(`[VectorStore] embedQuery returned empty result for ${entry.file.path}`);
-							noteSkipped(entry.file.path, "embed-error");
+							noteFailed(entry.file.path, "embed-error");
 							continue;
 						}
 						await writeVector(entry, vector);
@@ -1518,7 +1535,7 @@ export class VectorStoreService {
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
-						noteSkipped(entry.file.path, "embed-error");
+						noteFailed(entry.file.path, "embed-error");
 					}
 				}
 				return true;
