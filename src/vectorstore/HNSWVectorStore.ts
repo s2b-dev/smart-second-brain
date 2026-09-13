@@ -286,8 +286,21 @@ export class HNSWVectorStore implements VectorStore {
 			this.dimensions = meta.dimensions;
 			this._providerId = meta.providerId;
 			this._modelId = meta.modelId;
-			this.nextHnswId = meta.nextHnswId ?? this.idToNumeric.size;
 		}
+
+		// The id counter must clear every numeric id that is or was in use, and the
+		// metadata record is not a safe sole source for it: a store can hold rows and
+		// a persisted graph without that record at all (a bulk run that never called
+		// `setMetadata` — `updateLastUpdated` then has nothing to write the counter
+		// into). Restoring 0 in that state reassigned live ids: `addPoint` threw
+		// "Node with id N already exists" for every new chunk, and each attempt had
+		// already overwritten the id mapping of the note that owned N. Observed on a
+		// resumed build: 450 graph nodes, no metadata record, 87 rows written over
+		// live ids. The mappings are loaded anyway, so take their high-water mark
+		// too and keep whichever is larger.
+		let maxMapped = -1;
+		for (const numericId of this.numericToId.keys()) if (numericId > maxMapped) maxMapped = numericId;
+		this.nextHnswId = Math.max(meta?.nextHnswId ?? 0, maxMapped + 1);
 	}
 
 	/**

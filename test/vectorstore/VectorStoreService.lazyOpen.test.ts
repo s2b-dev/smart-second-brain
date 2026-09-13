@@ -418,4 +418,34 @@ describe("bulk embed run", () => {
 		await startService();
 		expect(indexStats.documentCount).toBe(1);
 	});
+
+	it("a fresh index gets exactly one full build when startup validation fires before ensureIndex", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md")];
+		const svc = await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		// The real store answers over a worker round-trip, so `ensureIndex`'s reads
+		// land after the zero-delay validation timer registered at open. Model that
+		// by parking the two reads on a (fake) macrotask.
+		for (const method of ["getMetadata", "count"] as const) {
+			const original = store[method].bind(store);
+			(store as unknown as Record<string, unknown>)[method] = async () => {
+				await new Promise((resolve) => setTimeout(resolve, 0));
+				return original();
+			};
+		}
+
+		const run = svc.ensureIndex(INDEX);
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(await run).toBe(true);
+
+		// Every note embedded once — one build, not a validation run racing a build.
+		const embedded = embedDocuments.mock.calls.flatMap(([texts]) => texts);
+		expect(embedded).toHaveLength(3);
+		expect(await store.countNotes()).toBe(3);
+		// And it was the *full build*: the metadata record and the build date exist.
+		expect(store.meta).not.toBeNull();
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+	});
 });

@@ -245,6 +245,8 @@ interface IndexInstance {
 	validationScheduled: boolean;
 	/** A full build (`buildFullIndex`) is in progress. Validation runs set only `progress.isIndexing`. */
 	isIndexing: boolean;
+	/** The full build in flight, so a second caller joins it instead of racing it. */
+	buildPromise: Promise<void> | null;
 	progress: IndexingProgress;
 	/** Timestamp (ms) when the current indexing run started, for ETA estimation */
 	indexingStartedAt: number | null;
@@ -432,6 +434,7 @@ export class VectorStoreService {
 			hasValidatedThisSession: false,
 			validationScheduled: false,
 			isIndexing: false,
+			buildPromise: null,
 			progress: {
 				isIndexing: false,
 				total: 0,
@@ -845,6 +848,19 @@ export class VectorStoreService {
 			indexedMap.set(note.path, { mtime: note.mtime });
 		}
 
+		// An empty store is not a repair job, it is a first build, and the two paths
+		// differ in what they leave behind: only the full build writes the store's
+		// metadata record (the version, dimensions and the id counter — see
+		// `HNSWVectorStore.open`) and stamps `lastBuiltAt`. This was reachable for
+		// every newly added index: "Add index" runs `ensureIndex`, whose opening of
+		// the instance schedules this validation on a zero-delay timer, and the
+		// timer wins the race against `ensureIndex`'s two worker round-trips.
+		if (indexedMap.size === 0 && vaultFiles.length > 0) {
+			Logger.log(`[VectorStore] ${inst.indexId} is empty — running a full build instead of a repair`);
+			await this.buildFullIndex(inst, embeddings, defaultModel);
+			return;
+		}
+
 		const missingFiles: TFile[] = [];
 		const staleFiles: TFile[] = [];
 		const vaultPaths = new Set<string>();
@@ -906,6 +922,13 @@ export class VectorStoreService {
 			});
 			if (notice) this.updateNotice(notice, inst.progress);
 			inst.abortController = new AbortController();
+
+			// A store built through the old validation path has rows but no metadata
+			// record, so nothing persists its dimensions or id counter. Write it now
+			// so the next open restores both the normal way.
+			if ((await inst.store.getMetadata()) === null) {
+				await inst.store.setMetadata(defaultModel.provider, defaultModel.model, INDEX_VERSION);
+			}
 
 			let outcome: BulkEmbedOutcome;
 			try {
@@ -1283,16 +1306,30 @@ export class VectorStoreService {
 	 * Build the full index for a specific instance. The store has been cleared
 	 * (or is empty) when this is called, so chunks are written without purging.
 	 */
-	private async buildFullIndex(
+	private buildFullIndex(
 		inst: IndexInstance,
 		embeddings: EmbeddingsInterface,
 		model: DefaultEmbedModel,
 	): Promise<void> {
+		// One build per instance. The startup validation and `ensureIndex` can both
+		// decide an empty store needs building; the second joins the first rather
+		// than reporting "already in progress" against its own twin.
+		if (inst.buildPromise) return inst.buildPromise;
 		if (inst.isIndexing || inst.progress.isIndexing) {
 			new Notice("Indexing already in progress...");
-			return;
+			return Promise.resolve();
 		}
+		inst.buildPromise = this.runFullBuild(inst, embeddings, model).finally(() => {
+			inst.buildPromise = null;
+		});
+		return inst.buildPromise;
+	}
 
+	private async runFullBuild(
+		inst: IndexInstance,
+		embeddings: EmbeddingsInterface,
+		model: DefaultEmbedModel,
+	): Promise<void> {
 		inst.isIndexing = true;
 		inst.abortController = new AbortController();
 		const { vault } = this.plugin.app;
