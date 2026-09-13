@@ -1361,7 +1361,7 @@ export class PluginDataStore {
 	 */
 	updateEmbeddingIndexStats(
 		indexId: string,
-		stats: { lastBuiltAt?: number; documentCount?: number; dimensions?: number },
+		stats: { lastBuiltAt?: number | null; documentCount?: number; dimensions?: number },
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
 		if (!config) return;

@@ -597,7 +597,7 @@ export class VectorStoreService {
 					? `schema v${runtimeMeta.version} < v${INDEX_VERSION} (pre-chunking)`
 					: "model mismatch";
 				Logger.log(`[VectorStore] Clearing index for ${indexId} (${why}), will rebuild on next use`);
-				await inst.store.clear();
+				await this.clearStore(inst);
 			}
 
 			// The settings row reads a cached count from plugin data, which only the
@@ -873,6 +873,9 @@ export class VectorStoreService {
 				await inst.store.remove(path);
 			}
 			Logger.log(`[VectorStore] Removed ${orphanedPaths.length} orphaned entries`);
+			// Removal changes the count on its own; when nothing is left to embed,
+			// no bulk run follows to sync it.
+			await this.notifyStatsChanged(inst);
 		}
 
 		const filesToIndex = [...missingFiles, ...staleFiles];
@@ -1131,7 +1134,7 @@ export class VectorStoreService {
 			Logger.log(
 				`[VectorStore] Rebuilding index for ${resolvedId} (${versionStale ? `schema v${meta?.version} < v${INDEX_VERSION}` : "model changed"})`,
 			);
-			await inst.store.clear();
+			await this.clearStore(inst);
 		}
 
 		const count = await inst.store.count();
@@ -1532,8 +1535,13 @@ export class VectorStoreService {
 				await inst.store.flush();
 				// The notes just flushed are searchable now, so the count the
 				// settings row shows must say so — not only once the run ends,
-				// which an interrupted build never reaches (#466).
-				await this.notifyStatsChanged(inst);
+				// which an interrupted build never reaches (#466). Best effort:
+				// a failed count read must not take the build down with it.
+				try {
+					await this.notifyStatsChanged(inst);
+				} catch (error) {
+					Logger.warn(`[VectorStore] Count sync for ${inst.indexId} failed:`, error);
+				}
 				await bulkPause(bulkCheckpointPauseMs());
 			} else {
 				await bulkPause(bulkBatchPauseMs());
@@ -2145,6 +2153,19 @@ export class VectorStoreService {
 	}
 
 	/**
+	 * Empty an index's store and reset the stats the settings row renders.
+	 *
+	 * `lastBuiltAt` records a *completed* build of the rows currently stored. Once
+	 * they are gone the date describes nothing, and leaving it in place made a
+	 * rebuild that is cancelled part-way read as built on that date rather than
+	 * "Build incomplete" (#466).
+	 */
+	private async clearStore(inst: IndexInstance): Promise<void> {
+		await inst.store.clear();
+		getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: null, documentCount: 0 });
+	}
+
+	/**
 	 * Cancel ongoing indexing for a specific index.
 	 */
 	cancelIndexing(indexId: string): void {
@@ -2167,7 +2188,7 @@ export class VectorStoreService {
 		if (!resolvedId) return;
 
 		const inst = await this.getOrCreateInstance(resolvedId);
-		await inst.store.clear();
+		await this.clearStore(inst);
 		await this.ensureIndex(resolvedId);
 	}
 
@@ -2267,7 +2288,7 @@ export class VectorStoreService {
 
 			const indexId = `${provider}:${model}`;
 			const inst = await this.getOrCreateInstance(indexId);
-			await inst.store.clear();
+			await this.clearStore(inst);
 
 			const docs: DocumentVector[] = decoded.documents.map((d) => ({
 				id: d.id,
@@ -2284,6 +2305,8 @@ export class VectorStoreService {
 			inst.currentModelId = model;
 
 			await this.notifyStatsChanged(inst);
+			// An export is a complete index by construction, so the import is a build.
+			getData().updateEmbeddingIndexStats(indexId, { lastBuiltAt: Date.now() });
 
 			Logger.log(`[VectorStore] Imported ${docs.length} documents for ${indexId}`);
 			new Notice(`Imported ${docs.length} embeddings (${model}).`);

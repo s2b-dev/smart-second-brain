@@ -343,6 +343,57 @@ describe("bulk embed run", () => {
 		expect(indexStats.lastBuiltAt).toBeUndefined();
 	});
 
+	it("a cancelled rebuild drops the previous build date, so the row reads incomplete (#466)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
+		const svc = await startService();
+		const build = svc.ensureIndex(INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await build).toBe(true);
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+
+		// Rebuild: the first batch lands, the second hangs until cancelled.
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(() => new Promise<number[][]>(() => {}));
+		const rebuild = svc.rebuildIndex(INDEX);
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(4));
+		svc.cancelIndexing(INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+		await rebuild;
+
+		expect(indexStats.lastBuiltAt).toBeNull();
+		expect(indexStats.documentCount).toBe(2);
+	});
+
+	it("validation that only removes orphans still syncs the count (#466)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		await store.setMetadata("fake", "embed-model", 2);
+		for (const path of ["a.md", "gone.md"]) {
+			await store.upsert({
+				id: `${path}#0`,
+				path,
+				mtime: 1_000,
+				checksum: "x",
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			});
+		}
+		// The cache still counts the note that has since left the vault.
+		indexStats.documentCount = 2;
+
+		expect(await svc.ensureIndex(INDEX)).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(embedDocuments).not.toHaveBeenCalled();
+		expect((await store.listNoteMeta()).map((n) => n.path)).toEqual(["a.md"]);
+		expect(indexStats.documentCount).toBe(1);
+	});
+
 	it("re-syncs the cached count from the store when an index is opened", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md")];
