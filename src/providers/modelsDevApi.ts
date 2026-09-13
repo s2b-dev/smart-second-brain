@@ -132,84 +132,29 @@ function normalizeModelToken(value: string): string {
 	return token;
 }
 
-function digitSequence(token: string): string {
-	return token.replace(/[^0-9]/g, "");
-}
-
-function levenshteinDistance(a: string, b: string): number {
-	if (a === b) return 0;
-	if (a.length === 0) return b.length;
-	if (b.length === 0) return a.length;
-
-	const prev = new Array<number>(b.length + 1);
-	const curr = new Array<number>(b.length + 1);
-
-	for (let j = 0; j <= b.length; j++) {
-		prev[j] = j;
-	}
-
-	for (let i = 1; i <= a.length; i++) {
-		curr[0] = i;
-		for (let j = 1; j <= b.length; j++) {
-			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-			curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
-		}
-
-		for (let j = 0; j <= b.length; j++) {
-			prev[j] = curr[j];
-		}
-	}
-
-	return prev[b.length];
-}
-
-function findNormalizedOrFuzzyModelMatch(
+/**
+ * Match after stripping separators, so "qwen3:8b", "Qwen3-8B" and "qwen/qwen3-8b" all
+ * resolve to the same entry. Equality only — no edit-distance tolerance. Model ids pack
+ * meaning into single characters (a version digit, a size suffix, a variant letter), so a
+ * one-edit "typo" is usually a different model: "qwen3.8" is one edit from "qwen3-8b" and
+ * was being renamed to it, inheriting its context window and capability flags (#480).
+ */
+function findNormalizedModelMatch(
 	models: Record<string, ModelsDevModelInfo>,
 	modelId: string,
 ): ModelsDevModelInfo | null {
 	const target = normalizeModelToken(modelId);
 	if (!target) return null;
 
-	let bestMatch: { value: ModelsDevModelInfo; distance: number; score: number } | null = null;
-
 	for (const [key, value] of Object.entries(models)) {
-		const candidates = [key, value.id, value.name];
-		for (const candidate of candidates) {
-			if (!candidate) continue;
-			const normalized = normalizeModelToken(candidate);
-			if (!normalized) continue;
-
-			if (normalized === target) {
+		for (const candidate of [key, value.id, value.name]) {
+			if (candidate && normalizeModelToken(candidate) === target) {
 				return value;
-			}
-
-			// A version digit is a one-character edit, so without this guard the
-			// fuzzy tier reads "claude-sonnet-4" as a typo of "claude-sonnet-4.5".
-			if (digitSequence(normalized) !== digitSequence(target)) {
-				continue;
-			}
-
-			if (Math.abs(normalized.length - target.length) > 2) {
-				continue;
-			}
-
-			const prefixLen = Math.min(3, normalized.length, target.length);
-			if (prefixLen > 0 && normalized.slice(0, prefixLen) !== target.slice(0, prefixLen)) {
-				continue;
-			}
-
-			const distance = levenshteinDistance(target, normalized);
-			const maxLen = Math.max(target.length, normalized.length);
-			const score = distance / maxLen;
-			if (distance <= 2 && score <= 0.2) {
-				if (!bestMatch || distance < bestMatch.distance || score < bestMatch.score) {
-					bestMatch = { value, distance, score };
-				}
 			}
 		}
 	}
 
-	return bestMatch?.value ?? null;
+	return null;
 }
 
 /**
@@ -250,7 +195,7 @@ export function lookupModelInfoSync(
 				}
 			}
 
-			const normalizedMatch = findNormalizedOrFuzzyModelMatch(provider.models, modelId);
+			const normalizedMatch = findNormalizedModelMatch(provider.models, modelId);
 			if (normalizedMatch) {
 				return normalizedMatch;
 			}
@@ -262,9 +207,10 @@ export function lookupModelInfoSync(
 	// Each tier is exhausted across every provider before the next one starts. Doing this
 	// per-provider instead lets an early-iterated provider win with a weak match while a
 	// later one holds the exact id: models.dev iterates "digitalocean" before "sap-ai-core",
-	// so "anthropic--claude-4.6-opus" fuzzy-matched DigitalOcean's "anthropic-claude-4.1-opus"
-	// and never reached its own vendor's verbatim entry. Provider order in the catalogue is
-	// not a relevance signal, so it must not outrank match quality.
+	// so "anthropic--claude-4.5-sonnet" normalized-matched DigitalOcean's
+	// "anthropic-claude-4.5-sonnet" and never reached its own vendor's verbatim entry.
+	// Provider order in the catalogue is not a relevance signal, so it must not outrank
+	// match quality.
 	for (const provider of Object.values(data)) {
 		if (provider.models?.[modelId]) {
 			return provider.models[modelId];
@@ -283,7 +229,7 @@ export function lookupModelInfoSync(
 
 	for (const provider of Object.values(data)) {
 		if (!provider.models) continue;
-		const normalizedMatch = findNormalizedOrFuzzyModelMatch(provider.models, modelId);
+		const normalizedMatch = findNormalizedModelMatch(provider.models, modelId);
 		if (normalizedMatch) {
 			return normalizedMatch;
 		}
