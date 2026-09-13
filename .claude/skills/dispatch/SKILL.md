@@ -48,7 +48,10 @@ For each task Leo gives:
      first for bugs; behavior matrix in the PR description for behavioral
      changes; tests).
    - **PR + bot-review loop**: run `bun run check` / `format` / `lint` /
-     `test`, open a PR against main with gh, then drive the review bot
+     `test`, open a PR against main with gh whose body follows
+     `.github/PULL_REQUEST_TEMPLATE.md` including a filled-in **AI
+     assistance** section (per AGENTS.md "Disclose AI involvement"), then
+     drive the review bot
      (Greptile) to a clean state per AGENTS.md step 6 — fix or answer every
      finding, push, wait for the re-review of the newest commit. Never
      merge; merging is the dispatcher's job after Leo's live test.

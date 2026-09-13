@@ -107,8 +107,9 @@ where to look harder. Not disclosing, and being found out, does count against it
 build commands, and the architecture notes. If your change makes something in AGENTS.md wrong,
 update AGENTS.md in the same PR.
 
-Maintainers hold themselves to the same rules. If you see a maintainer PR that reads like
-unreviewed output, say so.
+Maintainers hold themselves to the same rules: maintainer commits made with an agent carry a
+`Co-Authored-By: Claude <noreply@anthropic.com>` trailer, and maintainer PRs fill in the same
+"AI assistance" field. If you see a maintainer PR that reads like unreviewed output, say so.
 
 ## Recipes
 
