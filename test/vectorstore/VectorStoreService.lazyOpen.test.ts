@@ -109,7 +109,16 @@ const fakeData = {
 	searchEmbedIndex: INDEX as string | null,
 	graphEmbedIndex: null as string | null,
 	getEmbeddingIndex: (id: string) =>
-		id === INDEX ? { id, provider: "fake", model: "embed-model", batchSize: 2 } : undefined,
+		id === INDEX
+			? {
+					id,
+					provider: "fake",
+					model: "embed-model",
+					batchSize: 2,
+					// Mirror the stats the service wrote, as the real config would.
+					lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
+				}
+			: undefined,
 	updateEmbeddingIndexStats: vi.fn((_id: string, stats: Record<string, unknown>) => Object.assign(indexStats, stats)),
 	isProviderTrusted: () => true,
 	isFilePrivate: () => false,
@@ -392,6 +401,52 @@ describe("bulk embed run", () => {
 		expect(embedDocuments).not.toHaveBeenCalled();
 		expect((await store.listNoteMeta()).map((n) => n.path)).toEqual(["a.md"]);
 		expect(indexStats.documentCount).toBe(1);
+	});
+
+	it("a build finished by the next launch's validation gets its build date (#466)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(() => new Promise<number[][]>(() => {}));
+		const svc = await startService();
+		const run = svc.ensureIndex(INDEX);
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(2));
+		svc.cancelIndexing(INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+		await run;
+		expect(indexStats.lastBuiltAt).toBeUndefined();
+
+		// "Reload": the startup validation embeds what the build missed.
+		await svc.cleanup();
+		service = null;
+		await startService();
+		await vi.advanceTimersByTimeAsync(2_000);
+
+		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
+		expect(indexStats.documentCount).toBe(4);
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+	});
+
+	it("a routine catch-up leaves an existing build date alone", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md")];
+		const svc = await startService();
+		const build = svc.ensureIndex(INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await build).toBe(true);
+		const builtAt = indexStats.lastBuiltAt;
+		expect(builtAt).toEqual(expect.any(Number));
+
+		vaultFiles.push(file("c.md"));
+		await svc.cleanup();
+		service = null;
+		await vi.advanceTimersByTimeAsync(60_000); // a later launch
+		await startService();
+		await vi.advanceTimersByTimeAsync(2_000);
+
+		expect(await stores.get(INDEX)?.countNotes()).toBe(3);
+		expect(indexStats.lastBuiltAt).toBe(builtAt);
 	});
 
 	it("re-syncs the cached count from the store when an index is opened", async () => {

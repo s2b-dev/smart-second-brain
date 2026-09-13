@@ -894,6 +894,7 @@ export class VectorStoreService {
 			Logger.log(`[VectorStore] Index ${inst.indexId} is up to date`);
 			// Always sync document count to fix stale cached values
 			await this.notifyStatsChanged(inst);
+			this.markBuiltIfUnstamped(inst);
 			return;
 		}
 
@@ -966,7 +967,24 @@ export class VectorStoreService {
 
 		// The note count was synced by the run's final checkpoint in
 		// `embedFilesInBatches`, cancelled or not.
+		if (!cancelled) this.markBuiltIfUnstamped(inst);
 		Logger.log(`[VectorStore] Validation complete for ${inst.indexId}`);
+	}
+
+	/**
+	 * Stamp `lastBuiltAt` on an index that has no build date but is now complete.
+	 *
+	 * Only the full build stamps the date, but a build cut short is finished by
+	 * the startup validation on the next launch: that run covers every note the
+	 * build missed, and what it leaves behind is exactly what an uninterrupted
+	 * build would have produced. Without a date the settings row read
+	 * "Build incomplete" for good, beside a count that said otherwise (#466).
+	 * An existing date is left alone — a routine catch-up is not a rebuild.
+	 */
+	private markBuiltIfUnstamped(inst: IndexInstance): void {
+		const data = getData();
+		if (data.getEmbeddingIndex(inst.indexId)?.lastBuiltAt) return;
+		data.updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: Date.now() });
 	}
 
 	/**
