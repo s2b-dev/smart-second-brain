@@ -140,8 +140,16 @@ const DEFAULT_EMBED_MAX_INPUT_TOKENS = 8191;
 /** Debounce delay before re-embedding a modified file (ms) */
 const MODIFY_DEBOUNCE_MS = 5_000;
 
-/** Approximate chars per token for rough estimation */
-const CHARS_PER_TOKEN = 4;
+/**
+ * Chars per token for sizing chunks against a model's input cap.
+ *
+ * Four is the usual English-prose figure, but a chunk budget has to hold for
+ * the densest content a note can contain — JSON, code, tables and non-Latin
+ * scripts tokenize at 2–3 chars per token — and an overshoot is a rejected (or
+ * silently truncated) chunk. Estimating low costs a few more, smaller chunks
+ * on prose; estimating high dropped whole notes from the index (#485).
+ */
+const CHARS_PER_TOKEN = 3;
 
 /**
  * Over-fetch factor for semantic search. A note is stored as one vector per

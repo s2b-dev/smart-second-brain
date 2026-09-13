@@ -408,11 +408,40 @@ export function createTransportedOpenAIEmbeddings(
 	});
 }
 
+/**
+ * Retry policy for Ollama embedding calls.
+ *
+ * LangChain's default handler skips retries for 4xx responses, but it reads
+ * the status from `status` / `statusCode` / `response.status`, and the Ollama
+ * client's `ResponseError` carries it as `status_code`. So a permanent
+ * rejection — "the input length exceeds the context length", HTTP 400 — was
+ * retried six times with exponential backoff: 7 requests and ~85 s of idle GPU
+ * per call, and the bulk indexer then repeats that for every entry of the
+ * failed batch (#485). Replacing the handler drops the default's other rules,
+ * so the one that matters is restated here: a cancellation is never retried.
+ * Everything else (transport failures, 5xx) keeps the default retry budget.
+ */
+export function ollamaEmbedFailedAttempt(error: unknown): void {
+	if (typeof error !== "object" || error === null) return;
+	const {
+		name,
+		message,
+		status_code: statusCode,
+	} = error as {
+		name?: unknown;
+		message?: unknown;
+		status_code?: unknown;
+	};
+	if (name === "AbortError" || (typeof message === "string" && message.startsWith("Cancel"))) throw error;
+	if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) throw error;
+}
+
 export function createTransportedOllamaEmbeddings(
 	config: ConstructorParameters<typeof OllamaEmbeddings>[0],
 ): OllamaEmbeddings {
 	const baseConfig = config ?? {};
 	return new OllamaEmbeddings({
+		onFailedAttempt: ollamaEmbedFailedAttempt,
 		...baseConfig,
 		fetch: baseConfig.fetch ?? createObsidianFetch(),
 	});

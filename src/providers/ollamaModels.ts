@@ -12,6 +12,19 @@ import { Logger } from "../utils/logging";
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour (shorter than cloud APIs since local)
 
 /**
+ * `num_ctx` sent with every Ollama embedding request, and the ceiling on the
+ * input budget the chunker sizes Ollama models against.
+ *
+ * The server accepts min(num_ctx, model context) tokens per input, and its
+ * num_ctx default is chosen from free VRAM (4k and up) — not readable through
+ * the API, and unrelated to the architecture context `/api/show` reports.
+ * Pinning one value on both sides is what makes a chunk that fits the budget
+ * fit the server (#485). 8k covers every current embedding model's useful
+ * range while keeping the KV allocation modest on small GPUs.
+ */
+export const OLLAMA_EMBED_NUM_CTX = 8192;
+
+/**
  * Model details from Ollama API
  */
 interface OllamaModelDetails {
