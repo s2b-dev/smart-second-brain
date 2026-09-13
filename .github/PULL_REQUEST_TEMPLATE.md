@@ -18,7 +18,8 @@ a real vault: which Obsidian version, desktop or mobile, which provider, what yo
 clicked. "Ran the unit tests" on its own is not enough for user-facing changes.
 -->
 
-**AI assistance:** <!-- none / autocomplete / "Claude Code drafted it, I reviewed the retry logic and tested on iOS" -->
+<!-- One sentence: none / autocomplete / "Claude Code drafted it, I reviewed the retry logic and tested on iOS" -->
+_AI assistance: ..._
 
 ## Checklist
 

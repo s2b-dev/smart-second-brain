@@ -19,8 +19,8 @@ working from the maintainer's briefs, and the history should say so:
   trailer, configured in `.claude/settings.json` (it overrides the user-level setting). Keep
   the trailer. If you commit through another agent, add a trailer naming *that* agent instead;
   never attribute a change to an agent that did not make it.
-- Every PR body follows `.github/PULL_REQUEST_TEMPLATE.md`, including the **AI assistance:**
-  line under "How I tested it". Fill it in honestly in one sentence: which agent wrote the
+- Every PR body follows `.github/PULL_REQUEST_TEMPLATE.md`, including the italic
+  `_AI assistance: ..._` line under "How I tested it". Fill it in honestly in one sentence: which agent wrote the
   change, from what brief, and what the human reviewed and tested. Do not leave the line out.
   "none" is the right answer only for a change no agent touched, which a change you are making
   is not.
