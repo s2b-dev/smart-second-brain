@@ -252,6 +252,18 @@ interface IndexInstance {
 }
 
 /**
+ * Status label for an index row: the date it was last built, or why it has none.
+ *
+ * A build that was cancelled or interrupted never sets `lastBuiltAt`, but the
+ * notes it wrote are persisted at every checkpoint and searchable. Reporting
+ * that as "Never built" beside a live note count reads as a contradiction (#466).
+ */
+export function formatIndexBuildStatus(lastBuiltAt: number | null | undefined, documentCount: number): string {
+	if (lastBuiltAt) return new Date(lastBuiltAt).toLocaleDateString();
+	return documentCount > 0 ? "Build incomplete" : "Never built";
+}
+
+/**
  * Format an estimated-time-remaining duration (in ms) as a short human string,
  * e.g. "45s", "3m", "1h 12m". Rounds up so the estimate never reads as "0s"
  * while work is still in flight.
@@ -588,6 +600,12 @@ export class VectorStoreService {
 				await inst.store.clear();
 			}
 
+			// The settings row reads a cached count from plugin data, which only the
+			// runs above keep current. A build interrupted by a quit or reload never
+			// reached its final checkpoint, so bring the cache up to date from what
+			// the store actually holds before the row can render (#466).
+			await this.notifyStatsChanged(inst);
+
 			this.instances.set(indexId, inst);
 			Logger.info(`[VectorStore] Init ${indexId}: ${Math.round(performance.now() - initStart)}ms`);
 			// Every opened instance gets validated against the vault (missing, stale
@@ -910,14 +928,8 @@ export class VectorStoreService {
 			Logger.log(`[VectorStore] Indexed ${outcome.indexedChunks} chunks for ${inst.indexId}`);
 		}
 
-		// Sync document count to pluginData for reactive UI updates. Skip when the
-		// run was aborted (e.g. the index was deleted mid-build) since the store
-		// may have been closed out from under us.
-		if (!cancelled && this.instances.has(inst.indexId)) {
-			const noteCount = await inst.store.countNotes();
-			getData().updateEmbeddingIndexStats(inst.indexId, { documentCount: noteCount });
-		}
-
+		// The note count was synced by the run's final checkpoint in
+		// `embedFilesInBatches`, cancelled or not.
 		Logger.log(`[VectorStore] Validation complete for ${inst.indexId}`);
 	}
 
@@ -1315,15 +1327,10 @@ export class VectorStoreService {
 			// Save the indexing report
 			inst.report = { ...report, timestamp: Date.now() };
 
-			// A cancelled run may have had its store torn down (e.g. index deleted
-			// mid-build); skip the post-run store read/stats update in that case.
+			// The note count was synced by the run's final checkpoint; only a run
+			// that reached the end counts as a build.
 			if (!cancelled) {
-				// Update cached stats in plugin data using the distinct-note count
-				const noteCount = await inst.store.countNotes();
-				getData().updateEmbeddingIndexStats(inst.indexId, {
-					lastBuiltAt: Date.now(),
-					documentCount: noteCount,
-				});
+				getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: Date.now() });
 			}
 
 			const { indexed, skipped } = inst.progress;
@@ -1523,6 +1530,10 @@ export class VectorStoreService {
 			if (notesSinceCheckpoint >= BULK_CHECKPOINT_INTERVAL) {
 				notesSinceCheckpoint = 0;
 				await inst.store.flush();
+				// The notes just flushed are searchable now, so the count the
+				// settings row shows must say so — not only once the run ends,
+				// which an interrupted build never reaches (#466).
+				await this.notifyStatsChanged(inst);
 				await bulkPause(bulkCheckpointPauseMs());
 			} else {
 				await bulkPause(bulkBatchPauseMs());
@@ -1585,9 +1596,14 @@ export class VectorStoreService {
 		}
 		// Final checkpoint. The store may already be closed if the run was cancelled
 		// because the index was deleted; that is not a failure of this run.
+		// This is also the one place the cached note count is brought up to date
+		// for every way a run can end. A cancelled run keeps what it wrote, so
+		// its count must reflect that too; the pre-#466 code synced only on
+		// completion and a cancelled build reported "0 notes indexed".
 		if (this.instances.get(inst.indexId) === inst) {
 			try {
 				await inst.store.flush();
+				await this.notifyStatsChanged(inst);
 			} catch (error) {
 				Logger.warn(`[VectorStore] Final graph flush for ${inst.indexId} failed:`, error);
 			}

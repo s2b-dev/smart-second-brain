@@ -1365,10 +1365,23 @@ export class PluginDataStore {
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
 		if (!config) return;
-		if (stats.lastBuiltAt !== undefined) config.lastBuiltAt = stats.lastBuiltAt;
-		if (stats.documentCount !== undefined) config.documentCount = stats.documentCount;
-		if (stats.dimensions !== undefined) config.dimensions = stats.dimensions;
-		void this.saveSettings();
+		// Skip the save when nothing moved: the count is now re-synced at every
+		// index open and bulk checkpoint, and most of those confirm the cached
+		// value rather than change it.
+		let changed = false;
+		if (stats.lastBuiltAt !== undefined && config.lastBuiltAt !== stats.lastBuiltAt) {
+			config.lastBuiltAt = stats.lastBuiltAt;
+			changed = true;
+		}
+		if (stats.documentCount !== undefined && config.documentCount !== stats.documentCount) {
+			config.documentCount = stats.documentCount;
+			changed = true;
+		}
+		if (stats.dimensions !== undefined && config.dimensions !== stats.dimensions) {
+			config.dimensions = stats.dimensions;
+			changed = true;
+		}
+		if (changed) void this.saveSettings();
 	}
 
 	/**

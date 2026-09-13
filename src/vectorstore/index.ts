@@ -13,6 +13,7 @@ export {
 	waitForVectorStore,
 	waitForVectorStoreIndex,
 	formatEta,
+	formatIndexBuildStatus,
 } from "./VectorStoreService";
 
 export type { IndexingProgress, NoteNeighbor, SearchFilter, SearchResult, VectorStore } from "./types";
