@@ -17,10 +17,12 @@ change that fails any of those locally will fail there too.
 working from the maintainer's briefs, and the history should say so:
 - Commits made from Claude Code carry a `Co-Authored-By: Claude <noreply@anthropic.com>`
   trailer, configured in `.claude/settings.json` (it overrides the user-level setting). Keep
-  the trailer; add the equivalent one by hand if you commit through another agent.
+  the trailer. If you commit through another agent, add a trailer naming *that* agent instead;
+  never attribute a change to an agent that did not make it.
 - Every PR body follows `.github/PULL_REQUEST_TEMPLATE.md`, including the **AI assistance**
   section. Fill it in honestly in one or two lines: which agent wrote the change, from what
-  brief, and what the human reviewed and tested. Do not leave the section out or write "none".
+  brief, and what the human reviewed and tested. Do not leave the section out. "none" is the
+  right answer only for a change no agent touched, which a change you are making is not.
 - Replies to review-bot findings are written by whoever is driving the loop, agent or human;
   that is fine. Replies to a *person's* review are the maintainer's to write.
 

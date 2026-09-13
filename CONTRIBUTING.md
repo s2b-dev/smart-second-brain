@@ -108,8 +108,9 @@ build commands, and the architecture notes. If your change makes something in AG
 update AGENTS.md in the same PR.
 
 Maintainers hold themselves to the same rules: maintainer commits made with an agent carry a
-`Co-Authored-By: Claude <noreply@anthropic.com>` trailer, and maintainer PRs fill in the same
-"AI assistance" field. If you see a maintainer PR that reads like unreviewed output, say so.
+`Co-Authored-By` trailer naming that agent (`Co-Authored-By: Claude <noreply@anthropic.com>`
+for Claude Code), and maintainer PRs fill in the same "AI assistance" field. If you see a
+maintainer PR that reads like unreviewed output, say so.
 
 ## Recipes
 
