@@ -296,11 +296,37 @@ export class HNSWVectorStore implements VectorStore {
 		// "Node with id N already exists" for every new chunk, and each attempt had
 		// already overwritten the id mapping of the note that owned N. Observed on a
 		// resumed build: 450 graph nodes, no metadata record, 87 rows written over
-		// live ids. The mappings are loaded anyway, so take their high-water mark
-		// too and keep whichever is larger.
-		let maxMapped = -1;
-		for (const numericId of this.numericToId.keys()) if (numericId > maxMapped) maxMapped = numericId;
-		this.nextHnswId = Math.max(meta?.nextHnswId ?? 0, maxMapped + 1);
+		// live ids.
+		//
+		// So take the high-water mark of everything that can hold an id. The
+		// mappings alone are not enough: `remove()` deletes a note's mappings before
+		// its rows, in separate transactions, so an interrupted removal leaves a row
+		// and a persisted graph node with no mapping — and `loadGraph` keeps a node
+		// whose row exists. Each read is one reverse key-cursor step.
+		const [maxMapped, maxGraphNode] = await Promise.all([this.maxKey(ID_MAPPING_STORE), this.maxKey(GRAPH_STORE)]);
+		this.nextHnswId = Math.max(meta?.nextHnswId ?? 0, maxMapped + 1, maxGraphNode + 1);
+	}
+
+	/** Largest numeric primary key in a store, or -1 when it is empty. */
+	private async maxKey(storeName: string): Promise<number> {
+		const db = this.requireDb();
+		const tx = db.transaction(storeName, "readonly");
+		const request = tx.objectStore(storeName).openKeyCursor(null, "prev");
+		return awaitCursor(tx, request, (cursor) => ({
+			done: true,
+			value: cursor && typeof cursor.key === "number" ? cursor.key : -1,
+		}));
+	}
+
+	/** Vector width of the first stored row, or null for an empty store. */
+	private async probeDimensions(): Promise<number | null> {
+		const db = this.requireDb();
+		const tx = db.transaction(DOCUMENTS_STORE, "readonly");
+		const request = tx.objectStore(DOCUMENTS_STORE).openCursor();
+		return awaitCursor(tx, request, (cursor) => ({
+			done: true,
+			value: cursor ? ((cursor as IDBCursorWithValue).value as StoredDocument).vector.length : null,
+		}));
 	}
 
 	/**
@@ -691,6 +717,11 @@ export class HNSWVectorStore implements VectorStore {
 	async setMetadata(providerId: string, modelId: string, version: number): Promise<void> {
 		this._providerId = providerId;
 		this._modelId = modelId;
+
+		// A record written to repair a store that already holds rows must carry
+		// their width, or the next open leaves `dimensions` unset and the graph is
+		// never loaded until something is written. An empty store stays at 0.
+		if (!this.dimensions) this.dimensions = await this.probeDimensions();
 
 		const meta: StoredMetadata = {
 			key: "metadata",

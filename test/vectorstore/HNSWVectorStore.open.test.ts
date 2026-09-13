@@ -42,6 +42,8 @@ function makeConnection() {
 				objectStore: () => ({
 					getAll: () => makeReq([]),
 					get: () => makeReq(undefined),
+					// `open()` reads each id store's high-water mark; null = empty.
+					openKeyCursor: () => makeReq(null),
 				}),
 				onerror: null as null | (() => void),
 				onabort: null as null | (() => void),

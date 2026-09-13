@@ -448,4 +448,28 @@ describe("bulk embed run", () => {
 		expect(store.meta).not.toBeNull();
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
 	});
+
+	it("writes the missing metadata record of a store that has rows, even with nothing to embed", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		// Built through the old validation path: a row, no record.
+		await store.upsert({
+			id: "a.md#0",
+			path: "a.md",
+			mtime: 1_000,
+			checksum: "x",
+			chunkIndex: 0,
+			vector: new Float32Array(3),
+		});
+		expect(store.meta).toBeNull();
+
+		expect(await svc.ensureIndex(INDEX)).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(embedDocuments).not.toHaveBeenCalled();
+		expect(store.meta).toMatchObject({ providerId: "fake", modelId: "embed-model" });
+	});
 });

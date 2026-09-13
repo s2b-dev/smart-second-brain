@@ -861,6 +861,15 @@ export class VectorStoreService {
 			return;
 		}
 
+		// A store built through the old validation path has rows but no metadata
+		// record, so nothing persists its dimensions or id counter. Repair that
+		// here, whether or not any note needs embedding, so the next open restores
+		// both the normal way.
+		if (indexedMap.size > 0 && (await inst.store.getMetadata()) === null) {
+			Logger.log(`[VectorStore] ${inst.indexId} has rows but no metadata record — writing it`);
+			await inst.store.setMetadata(defaultModel.provider, defaultModel.model, INDEX_VERSION);
+		}
+
 		const missingFiles: TFile[] = [];
 		const staleFiles: TFile[] = [];
 		const vaultPaths = new Set<string>();
@@ -922,13 +931,6 @@ export class VectorStoreService {
 			});
 			if (notice) this.updateNotice(notice, inst.progress);
 			inst.abortController = new AbortController();
-
-			// A store built through the old validation path has rows but no metadata
-			// record, so nothing persists its dimensions or id counter. Write it now
-			// so the next open restores both the normal way.
-			if ((await inst.store.getMetadata()) === null) {
-				await inst.store.setMetadata(defaultModel.provider, defaultModel.model, INDEX_VERSION);
-			}
 
 			let outcome: BulkEmbedOutcome;
 			try {

@@ -130,6 +130,39 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		await second.close();
 	});
 
+	it("clears a graph node whose mapping was lost to an interrupted removal", async () => {
+		// `remove()` drops mappings before rows in separate transactions; a kill in
+		// between leaves c's row and graph node with no mapping. Its id must still
+		// be off limits on the next open, or the next upsert collides with it.
+		const first = await openStore();
+		await first.upsert(doc("a.md", [1, 0, 0]));
+		await first.upsert(doc("b.md", [0, 1, 0]));
+		await first.upsert(doc("c.md", [0, 0, 1])); // numeric id 2, the high-water mark
+		await first.flush();
+		const dbName = (first as unknown as { dbName: string }).dbName;
+		await new Promise<void>((resolve, reject) => {
+			const open = indexedDB.open(dbName);
+			open.onerror = () => reject(open.error);
+			open.onsuccess = () => {
+				const db = open.result;
+				const tx = db.transaction("id_mapping", "readwrite");
+				tx.objectStore("id_mapping").delete(2);
+				tx.oncomplete = () => {
+					db.close();
+					resolve();
+				};
+				tx.onerror = () => reject(tx.error);
+			};
+		});
+
+		const second = await openStore();
+		await expect(second.upsert(doc("d.md", [1, 1, 0]))).resolves.toBeUndefined();
+		expect(await second.count()).toBe(4);
+		const hits = await second.search(new Float32Array([1, 1, 0]), 1);
+		expect(hits.map((h) => h.doc.path)).toEqual(["d.md"]);
+		await second.close();
+	});
+
 	it("flush() persists the pending graph immediately instead of on the debounce", async () => {
 		const first = await openForBuild();
 		await first.upsert(doc("a.md", [1, 0]));
