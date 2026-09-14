@@ -604,8 +604,10 @@ export class VectorStoreService {
 	 * (`getOrCreateInstance`, via `waitForVectorStoreIndex`): opening it costs a
 	 * worker, a vault scan and, for every missing or stale note, a provider
 	 * round trip, on every launch, for a view that may not be opened that
-	 * session. When both purposes point at the same model there is one instance
-	 * and the search side opens it.
+	 * session. The view's first scan can therefore run against rows the
+	 * validation has not repaired yet; it watches the index's progress and
+	 * rebuilds when the run ends (`SmartGraphView`). When both purposes point
+	 * at the same model there is one instance and the search side opens it.
 	 *
 	 * Desktop opens the search index right away. Mobile opens nothing at boot:
 	 * opening an index spawns its worker and loads the id maps, and the first
