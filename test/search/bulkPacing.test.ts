@@ -146,11 +146,12 @@ describe("scheduleBulkRun", () => {
 		scheduleBulkRun("Embedding", marker, async () => {
 			order.push("embedding");
 		});
-		await vi.advanceTimersByTimeAsync(0);
+		// Each run yields through a timer before starting, hence the small advances.
+		await vi.advanceTimersByTimeAsync(10);
 		expect(order).toEqual(["lexical:start"]);
 		if (!releaseFirst) throw new Error("first run never started");
 		(releaseFirst as () => void)();
-		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10);
 		expect(order).toEqual(["lexical:start", "lexical:end", "embedding"]);
 
 		scheduleBulkRun("Broken", marker, async () => {
@@ -159,8 +160,29 @@ describe("scheduleBulkRun", () => {
 		scheduleBulkRun("Next", marker, async () => {
 			order.push("next");
 		});
-		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(10);
 		expect(order.at(-1)).toBe("next");
+	});
+
+	it("keeps scheduling order when a later run has the shorter backoff", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = true;
+		const lexical = new BulkAttemptMarker("lexical", storage);
+		lexical.markAttempt(); // crashed once: 2× the base delay
+		const embedding = new BulkAttemptMarker("embedding", storage); // clean: 1×
+		const order: string[] = [];
+		scheduleBulkRun("Lexical", lexical, async () => {
+			order.push("lexical");
+		});
+		scheduleBulkRun("Embedding", embedding, async () => {
+			order.push("embedding");
+		});
+
+		// The embedding run's own delay has elapsed, but it is behind the lexical run.
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS + 10);
+		expect(order).toEqual([]);
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS);
+		expect(order).toEqual(["lexical", "embedding"]);
 	});
 });
 

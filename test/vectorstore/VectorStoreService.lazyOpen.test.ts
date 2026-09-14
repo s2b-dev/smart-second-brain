@@ -100,6 +100,8 @@ class FakeStore implements VectorStore {
 const INDEX = "fake:embed-model";
 const stores = new Map<string, FakeStore>();
 let vaultFiles: FakeFile[] = [];
+/** Paths whose `readIndexableContent` throws. */
+let readFailures = new Set<string>();
 const embedDocuments = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 const embedQuery = vi.fn(async () => [1, 0, 0]);
 const indexStats: Record<string, unknown> = {};
@@ -172,7 +174,10 @@ vi.mock("../../src/utils/fileFiltering", () => ({
 	getEmbeddableVaultFiles: () => vaultFiles,
 	isEmbeddableFile: () => true,
 	isBinaryTextFile: (f: FakeFile) => f.extension === "pdf",
-	readIndexableContent: async (_vault: unknown, f: FakeFile) => `content of ${f.path}`,
+	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
+		if (readFailures.has(f.path)) throw new Error(`cannot read ${f.path}`);
+		return `content of ${f.path}`;
+	},
 }));
 
 import { VectorStoreService, waitForVectorStore } from "../../src/vectorstore/VectorStoreService";
@@ -219,6 +224,7 @@ beforeEach(() => {
 	vaultStorage.clear();
 	stores.clear();
 	vaultFiles = [];
+	readFailures = new Set();
 	providerTrusted = true;
 	privatePaths = new Set();
 	privacyListeners.clear();
@@ -792,6 +798,58 @@ describe("indexing review follow-ups", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(stores.get(INDEX)?.docs.get("bad.md#0")?.mtime).toBe(2_000);
 		expect(indexStats.failedNotes).toEqual({});
+	});
+
+	it("a rejected re-embed of an edited note drops its stale vectors and is not retried", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+
+		// The edit is rejected: the pre-edit vectors must not keep the note
+		// searchable, nor make validation see a stale note to retry.
+		embedDocuments.mockImplementation(async () => {
+			throw new Error("content policy");
+		});
+		vaultFiles[0].stat.mtime = 2_000;
+		(svc as unknown as EventHooks).handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(stores.get(INDEX)?.docs.size).toBe(0);
+		expect(indexStats.failedNotes).toEqual({ "a.md": 2_000 });
+		const attempts = embedDocuments.mock.calls.length;
+
+		await svc.cleanup();
+		service = null;
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(attempts);
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+	});
+
+	it("a failed read or store write on the incremental path is not recorded as a rejection", async () => {
+		platform.isMobile = false;
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const unreadable = file("a.md");
+		vaultFiles.push(unreadable);
+		readFailures.add("a.md");
+		await (svc as unknown as EventHooks).handleFileCreate(unreadable);
+		expect(embedDocuments).not.toHaveBeenCalled();
+		expect(indexStats.failedNotes).toBeUndefined();
+
+		// Readable now; the write fails instead.
+		readFailures.clear();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		const upsert = store.upsert.bind(store);
+		store.upsert = async () => {
+			throw new Error("QuotaExceededError");
+		};
+		await (svc as unknown as EventHooks).handleFileCreate(unreadable);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		expect(indexStats.failedNotes).toBeUndefined();
+		store.upsert = upsert;
 	});
 
 	it("a privacy-rule change re-validates: notes now private go, notes now allowed come in", async () => {

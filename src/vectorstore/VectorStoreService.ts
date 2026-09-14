@@ -1479,13 +1479,17 @@ export class VectorStoreService {
 		const { vault } = this.plugin.app;
 		const allFiles = getEmbeddableVaultFiles(vault);
 
-		// Categorize files by skip reason
+		// Categorize files by skip reason. A note the provider rejected at this
+		// very mtime is skipped here as it is by validation: a store emptied by
+		// such rejections takes this path on every launch, and would retry them.
 		const files: TFile[] = [];
 		const skippedFiles: SkippedFile[] = [];
 		for (const file of allFiles) {
 			const reason = this.getFileSkipReason(file, model.provider);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
+			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
+				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				files.push(file);
 			}
@@ -1716,10 +1720,10 @@ export class VectorStoreService {
 		 * stops the run without marking anything, and a whole batch coming back
 		 * empty says something about the call, not about the notes in it.
 		 */
-		const noteFailed = (entry: ChunkEntry, reason: SkipReason, remember = true) => {
+		const noteFailed = async (entry: ChunkEntry, reason: SkipReason, remember = true) => {
 			failedPaths.add(entry.file.path);
 			noteSkipped(entry.file.path, reason);
-			if (remember) this.recordNoteFailure(inst, entry.file.path, entry.mtime);
+			if (remember) await this.rejectNote(inst, entry.file.path, entry.mtime);
 		};
 
 		// Consecutive transport-level failures. Reset on any success, so a flaky
@@ -1748,14 +1752,14 @@ export class VectorStoreService {
 				consecutiveUnreachable = 0;
 				if (!vectors || vectors.length === 0) {
 					Logger.error(`[VectorStore] embedDocuments returned empty result for ${inst.indexId}`);
-					for (const entry of batch) noteFailed(entry, "embed-error", false);
+					for (const entry of batch) await noteFailed(entry, "embed-error", false);
 					return true;
 				}
 				for (let j = 0; j < batch.length; j++) {
 					if (failedPaths.has(batch[j].file.path)) continue;
 					if (!vectors[j]) {
 						Logger.error(`[VectorStore] Empty vector for ${batch[j].file.path}`);
-						noteFailed(batch[j], "embed-error");
+						await noteFailed(batch[j], "embed-error");
 						continue;
 					}
 					await writeVector(batch[j], vectors[j]);
@@ -1787,19 +1791,11 @@ export class VectorStoreService {
 				for (const entry of batch) {
 					if (aborted()) return false;
 					if (failedPaths.has(entry.file.path)) continue;
+					let vector: number[] | undefined;
 					try {
 						// A document, so `embedDocuments` — `embedQuery` is the query
 						// side of an asymmetric model and may be wrapped differently.
-						const [vector] = await this.embedWithCancellation(
-							inst,
-							embeddings.embedDocuments([entry.embedText]),
-						);
-						if (!vector || vector.length === 0) {
-							Logger.error(`[VectorStore] embedDocuments returned empty result for ${entry.file.path}`);
-							noteFailed(entry, "embed-error");
-							continue;
-						}
-						await writeVector(entry, vector);
+						[vector] = await this.embedWithCancellation(inst, embeddings.embedDocuments([entry.embedText]));
 					} catch (entryError) {
 						// Cancellation is not a per-file failure. Without this guard,
 						// aborting mid-batch fires one error Notice per remaining
@@ -1808,8 +1804,17 @@ export class VectorStoreService {
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
-						noteFailed(entry, "embed-error");
+						await noteFailed(entry, "embed-error");
+						continue;
 					}
+					if (!vector || vector.length === 0) {
+						Logger.error(`[VectorStore] embedDocuments returned empty result for ${entry.file.path}`);
+						await noteFailed(entry, "embed-error");
+						continue;
+					}
+					// The write is a local matter: a store failure throws out of the
+					// run rather than being recorded against the note.
+					await writeVector(entry, vector);
 				}
 				return true;
 			}
@@ -1983,27 +1988,45 @@ export class VectorStoreService {
 		}
 
 		const mtime = stampForRead(file);
+		// A read that fails is a local, usually transient matter; the next
+		// validation retries the note. Only the provider's verdict is remembered.
+		let chunks: ReturnType<typeof chunkText>;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
 			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
-			const chunks = chunkText(content, file.basename, maxContentLength);
+			chunks = chunkText(content, file.basename, maxContentLength);
+		} catch (error) {
+			Logger.error(`[VectorStore] Failed to read ${file.path} (${inst.indexId}):`, error);
+			return;
+		}
 
-			// Embed all chunks first — as documents, in one call — and only touch
-			// the store once every embedding succeeded, so a mid-way failure can't
-			// leave a note partially indexed.
-			const raw = await embeddings.embedDocuments(chunks.map((chunk) => chunk.content));
-			const vectors: Float32Array[] = [];
-			for (let i = 0; i < chunks.length; i++) {
-				const vector = raw[i];
-				if (!vector || vector.length === 0) {
-					Logger.error(`[VectorStore] embedDocuments returned empty result for ${file.path}`);
-					new Notice(`Failed to embed ${file.basename}: empty result from model`);
-					this.recordNoteFailure(inst, file.path, mtime);
-					return;
-				}
-				vectors.push(new Float32Array(vector));
+		// Embed all chunks first — as documents, in one call — and only touch
+		// the store once every embedding succeeded, so a mid-way failure can't
+		// leave a note partially indexed.
+		let raw: number[][];
+		try {
+			raw = await embeddings.embedDocuments(chunks.map((chunk) => chunk.content));
+		} catch (error) {
+			Logger.error(`[VectorStore] Failed to embed ${file.path} (${inst.indexId}):`, error);
+			const reason = error instanceof Error ? error.message : String(error);
+			new Notice(`Failed to embed ${file.basename}: ${reason}`);
+			// A dead provider is not this note's fault; anything else is, until it changes.
+			if (!isProviderUnreachableError(error)) await this.rejectNote(inst, file.path, mtime);
+			return;
+		}
+		const vectors: Float32Array[] = [];
+		for (let i = 0; i < chunks.length; i++) {
+			const vector = raw[i];
+			if (!vector || vector.length === 0) {
+				Logger.error(`[VectorStore] embedDocuments returned empty result for ${file.path}`);
+				new Notice(`Failed to embed ${file.basename}: empty result from model`);
+				await this.rejectNote(inst, file.path, mtime);
+				return;
 			}
+			vectors.push(new Float32Array(vector));
+		}
 
+		try {
 			// Replace any prior version's chunks, then write the new ones — chunk 0
 			// last, so the note only reads as indexed once every chunk is stored.
 			await inst.store.remove(file.path);
@@ -2018,18 +2041,32 @@ export class VectorStoreService {
 				await inst.store.upsert(doc);
 			}
 			this.clearNoteFailure(inst, file.path);
-
 			Logger.log(`[VectorStore] Indexed: ${file.path} (${chunks.length} chunks, ${inst.indexId})`);
 		} catch (error) {
-			Logger.error(`[VectorStore] Failed to index ${file.path} (${inst.indexId}):`, error);
-			const reason = error instanceof Error ? error.message : String(error);
-			new Notice(`Failed to embed ${file.basename}: ${reason}`);
-			// A dead provider is not this note's fault; anything else is, until it changes.
-			if (!isProviderUnreachableError(error)) this.recordNoteFailure(inst, file.path, mtime);
+			// A store failure is not the note's fault either: nothing is recorded,
+			// and validation compares mtimes on the next run.
+			Logger.error(`[VectorStore] Failed to store ${file.path} (${inst.indexId}):`, error);
 		}
 	}
 
 	// ── Notes the provider rejected ────────────────────────────────────────
+
+	/**
+	 * The provider rejected this version of the note. Record it, and drop what
+	 * the store holds for the path: an earlier version's vectors would keep the
+	 * note searchable by content it no longer has, and would make it read as
+	 * indexed — so validation would compare mtimes, find it stale, and retry
+	 * the rejected version on every run. Absent plus recorded, it is skipped
+	 * until it changes.
+	 */
+	private async rejectNote(inst: IndexInstance, path: string, mtime: number): Promise<void> {
+		this.recordNoteFailure(inst, path, mtime);
+		try {
+			await inst.store.remove(path);
+		} catch (error) {
+			Logger.warn(`[VectorStore] Could not drop the stored rows of rejected note ${path}:`, error);
+		}
+	}
 
 	private recordNoteFailure(inst: IndexInstance, path: string, mtime: number): void {
 		if (inst.failedNotes.get(path) === mtime) return;
