@@ -30,6 +30,7 @@ import { chunkText } from "../utils/chunkText";
 import { getEmbeddableVaultFiles, isEmbeddableFile, readIndexableContent } from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 import { matchesPathPrefix } from "../utils/pathUtils";
+import { isConnectionRefusedError, isProviderUnreachableError } from "../lib/transportErrors";
 import {
 	configureEmbedIndexAction,
 	settingsAction,
@@ -1322,21 +1323,9 @@ export class VectorStoreService {
 		return typeof name === "string" ? name : undefined;
 	}
 
-	private isProviderUnreachable(error: unknown): boolean {
-		// `AbortError` is deliberately NOT here: it means the *user* cancelled, which
-		// callers handle separately (and treating it as a provider fault would show a
-		// spurious "provider unreachable" notice on every cancel). `TimeoutError` is a
-		// provider fault and must survive `isUserCancellation` above it.
-		if (this.errorName(error) === "TimeoutError") return true;
-		const message = error instanceof Error ? error.message : String(error);
-		return /network error|you are offline|connection may have changed|fetch failed|failed to fetch|timed out|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|socket hang up|502|503|504/i.test(
-			message,
-		);
-	}
-
 	/**
-	 * Abort the run when the provider has failed repeatedly, rather than grinding
-	 * through every remaining chunk against a host that is plainly not answering.
+	 * Abort the run when the provider is not answering, rather than grinding
+	 * through every remaining chunk against a host that is plainly down.
 	 *
 	 * Without this, an unreachable endpoint produces one failed batch, then a
 	 * per-entry retry of every chunk in it, then the next batch, and so on —
@@ -1344,14 +1333,18 @@ export class VectorStoreService {
 	 * the progress notice sits frozen. Measured against a disconnected provider:
 	 * still "Embedding batch 1" and unchanged at 310/370 after 107 s.
 	 *
-	 * The threshold is >1 so a single blip (one flaky request, a transient 502
-	 * under load) still gets the existing per-entry retry path. Two consecutive
-	 * transport failures is no longer a blip.
+	 * Two kinds of failure, two thresholds. A refused connection or an
+	 * unresolvable host (`isConnectionRefusedError`) stops the run on the first
+	 * failure: nothing is listening, and a second batch against it only adds the
+	 * retry budget's wait to the notice's delay. Softer failures — a timeout, a
+	 * reset, a 502 under load — get one more chance, so a single blip still
+	 * takes the per-entry retry path; two in a row is no longer a blip.
 	 */
 	private readonly UNREACHABLE_FAILURE_LIMIT = 2;
 
 	private abortForUnreachableProvider(inst: IndexInstance, error: unknown, consecutiveFailures: number): boolean {
-		if (!this.isProviderUnreachable(error) || consecutiveFailures < this.UNREACHABLE_FAILURE_LIMIT) return false;
+		if (!isProviderUnreachableError(error)) return false;
+		if (!isConnectionRefusedError(error) && consecutiveFailures < this.UNREACHABLE_FAILURE_LIMIT) return false;
 
 		const reason = error instanceof Error ? error.message : String(error);
 		Logger.error(
@@ -1658,7 +1651,7 @@ export class VectorStoreService {
 				// A transport failure will hit every remaining chunk the same way,
 				// so retrying this batch entry-by-entry is pure waste. Give the
 				// connection one more chance, then stop the whole run.
-				if (this.isProviderUnreachable(error)) {
+				if (isProviderUnreachableError(error)) {
 					consecutiveUnreachable++;
 					if (this.abortForUnreachableProvider(inst, error, consecutiveUnreachable)) return false;
 					// Account for the batch before skipping the per-entry retry, so
@@ -2062,7 +2055,7 @@ export class VectorStoreService {
 		this.lastSearchFailureNoticeAt = now;
 
 		const reason = error instanceof Error ? error.message : String(error);
-		const offline = /network|offline|fetch failed|timed out|ECONNREFUSED|ENOTFOUND/i.test(reason);
+		const offline = isProviderUnreachableError(error);
 		showActionNotice(
 			offline
 				? "Semantic search unavailable — the embedding provider is not reachable. Showing no semantic results."

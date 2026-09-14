@@ -138,6 +138,14 @@ vi.mock("../../src/vectorstore/storeFactory", () => ({
 	},
 }));
 vi.mock("../../src/providers/registrySync", () => ({ ensureProviderRegistered: () => true }));
+// The notices render into Obsidian's extended DOM (`createEl`, `appendText`), which jsdom lacks.
+const showActionNotice = vi.fn();
+vi.mock("../../src/utils/actionNotice", () => ({
+	showActionNotice: (...args: unknown[]) => showActionNotice(...args),
+	showSettingsLinkNotice: vi.fn(),
+	settingsAction: vi.fn(() => ({ label: "", run: async () => {} })),
+	configureEmbedIndexAction: vi.fn(() => ({ label: "", run: async () => {} })),
+}));
 vi.mock("../../src/providers/registry", () => ({
 	getRegistry: () => ({
 		getAuthGeneration: () => 1,
@@ -200,6 +208,7 @@ beforeEach(() => {
 	vaultStorage.clear();
 	stores.clear();
 	vaultFiles = [];
+	showActionNotice.mockClear();
 	for (const key of Object.keys(indexStats)) delete indexStats[key];
 });
 
@@ -642,5 +651,49 @@ describe("vault events during a bulk run", () => {
 		expect(resumed.map((text) => text.match(/content of (\S+)/)?.[1]).sort()).toEqual(["a.md", "c.md", "d.md"]);
 		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(2_000);
 		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
+	});
+});
+
+describe("unreachable provider", () => {
+	it("a refused connection stops the run after the first batch, with no per-entry retries", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
+		// What reaches the indexer through the OpenAI client when the local
+		// server is not running: the SDK's wrapper, Electron's error on `cause`.
+		embedDocuments.mockImplementation(async () => {
+			throw Object.assign(new Error("Connection error."), { cause: new Error("net::ERR_CONNECTION_REFUSED") });
+		});
+		// Desktop start: the open schedules the startup validation, which finds
+		// an empty store and runs the full build itself.
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// One batch, then stop: no second batch, no entry-by-entry fallback.
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		expect(embedQuery).not.toHaveBeenCalled();
+		expect(showActionNotice).toHaveBeenCalledWith(
+			expect.stringMatching(/not reachable/),
+			expect.anything(),
+			expect.anything(),
+		);
+		// Nothing was written, and the run does not count as a build.
+		expect(await stores.get(INDEX)?.countNotes()).toBe(0);
+		expect(indexStats.lastBuiltAt).toBeUndefined();
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+	});
+
+	it("a timeout gets one more batch before the run stops", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md"), file("e.md"), file("f.md")];
+		embedDocuments.mockImplementation(async () => {
+			throw new DOMException("Request timed out after 60000ms", "TimeoutError");
+		});
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		expect(embedQuery).not.toHaveBeenCalled();
+		expect(showActionNotice).toHaveBeenCalledTimes(1);
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 });
