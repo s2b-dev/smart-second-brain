@@ -239,15 +239,29 @@ function awaitTransaction(tx: IDBTransaction, run: () => void): Promise<void> {
 const ADOPTED_STORES = [DOCUMENTS_STORE, ID_MAPPING_STORE, GRAPH_STORE, METADATA_STORE] as const;
 
 /**
- * Open a database to copy from: it must exist and be at the current schema
- * (one behind would be dropped by the upgrade anyway, so it is left for the
- * orphan cleanup). Resolves null otherwise, with nothing left behind.
+ * Open a database to copy from: it must exist, be at the current schema (one
+ * behind would be dropped by the upgrade anyway, so it is left for the orphan
+ * cleanup), and not itself hold an interrupted copy — a source still carrying
+ * the adoption marker was never opened since its own adoption stopped, so its
+ * rows are partial and copying them would launder that into a complete-looking
+ * index. Resolves null otherwise, with nothing left behind.
  */
 async function openAdoptableDatabase(name: string): Promise<IDBDatabase | null> {
 	const db = await openExistingDatabase(name);
 	if (!db) return null;
 	if (db.version !== DB_VERSION || ADOPTED_STORES.some((store) => !db.objectStoreNames.contains(store))) {
 		Logger.warn(`${LOG_PREFIX} Not adopting "${name}": schema v${db.version} ≠ v${DB_VERSION}.`);
+		db.close();
+		return null;
+	}
+	const tx = db.transaction(METADATA_STORE, "readonly");
+	const marked = await awaitRequest(
+		tx,
+		tx.objectStore(METADATA_STORE).get(ADOPTION_MARKER_KEY),
+		(marker: StoredAdoptionMarker | undefined) => marker !== undefined,
+	);
+	if (marked) {
+		Logger.warn(`${LOG_PREFIX} Not adopting "${name}": it holds an interrupted copy itself.`);
 		db.close();
 		return null;
 	}

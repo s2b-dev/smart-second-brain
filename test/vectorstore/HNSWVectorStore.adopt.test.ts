@@ -33,12 +33,12 @@ async function writeSource(): Promise<void> {
  * The state a copy killed after its first document batch leaves behind: the
  * adoption marker plus one row, no mappings, no graph, no metadata record.
  */
-async function leavePartialCopy(from: string): Promise<void> {
-	const shell = new HNSWVectorStore("vault-1", TARGET);
+async function leavePartialCopy(from: string, at = TARGET): Promise<void> {
+	const shell = new HNSWVectorStore("vault-1", at);
 	await shell.open();
 	await shell.close();
 	await new Promise<void>((resolve, reject) => {
-		const open = indexedDB.open(getDbName("s2b-hnsw", "vault-1", TARGET));
+		const open = indexedDB.open(getDbName("s2b-hnsw", "vault-1", at));
 		open.onerror = () => reject(open.error);
 		open.onsuccess = () => {
 			const db = open.result;
@@ -153,6 +153,19 @@ describe("HNSWVectorStore.adoptDatabase", () => {
 		expect(await renamed.count()).toBe(1);
 		await renamed.close();
 		expect(await databaseExists(sourceName)).toBe(false);
+	});
+
+	it("refuses a source that itself holds an interrupted copy", async () => {
+		// A → B was interrupted and B never opened since; now B → C.
+		await leavePartialCopy(getDbName("s2b-hnsw", "vault-1", "openai-older:small"), SOURCE);
+
+		const renamed = new HNSWVectorStore("vault-1", TARGET);
+		expect(await renamed.adoptDatabase(SOURCE)).toBe(false);
+		await renamed.open();
+		expect(await renamed.count()).toBe(0);
+		await renamed.close();
+		// The partial source is left for its own open (or the orphan cleanup).
+		expect(await databaseExists(sourceName)).toBe(true);
 	});
 
 	it("adopts nothing when there is no old database, and leaves no shell behind", async () => {
