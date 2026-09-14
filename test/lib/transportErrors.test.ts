@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	isConnectionRefusedError,
+	isDocumentRejectionError,
 	isProviderUnreachableError,
 	isRequestTimeoutError,
 } from "../../src/lib/transportErrors";
@@ -85,5 +86,28 @@ describe("isProviderUnreachableError", () => {
 		expect(isProviderUnreachableError(new Error("content filtered"))).toBe(false);
 		// A number inside a longer token is not a gateway status.
 		expect(isProviderUnreachableError(new Error("model qwen-1503 not found"))).toBe(false);
+	});
+});
+
+describe("isDocumentRejectionError", () => {
+	it("recognises the statuses that speak to the request body, however the client names them", () => {
+		// The OpenAI client's `status`; Ollama's `status_code`; either down a cause chain.
+		expect(isDocumentRejectionError(Object.assign(new Error("400 context length exceeded"), { status: 400 }))).toBe(
+			true,
+		);
+		expect(isDocumentRejectionError(Object.assign(new Error("input too long"), { status_code: 413 }))).toBe(true);
+		expect(
+			isDocumentRejectionError(
+				new Error("wrapped", { cause: Object.assign(new Error("unprocessable"), { status: 422 }) }),
+			),
+		).toBe(true);
+	});
+
+	it("leaves provider-wide failures and unclassified errors retryable", () => {
+		for (const status of [401, 403, 404, 429, 500, 502, 503]) {
+			expect(isDocumentRejectionError(Object.assign(new Error(`HTTP ${status}`), { status }))).toBe(false);
+		}
+		expect(isDocumentRejectionError(new Error("content policy"))).toBe(false);
+		expect(isDocumentRejectionError(new Error("net::ERR_CONNECTION_REFUSED"))).toBe(false);
 	});
 });

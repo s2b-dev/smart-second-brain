@@ -73,6 +73,12 @@ export interface EmbeddingIndexConfig {
 	batchSize?: number;
 	/** Vector width the model produced, recorded from the first stored vector */
 	dimensions?: number;
+	/**
+	 * Notes the provider rejected (a content filter, a chunk it refuses), keyed
+	 * by path with the mtime they failed at. Validation leaves them alone until
+	 * that mtime changes; absent when nothing failed.
+	 */
+	failedNotes?: Record<string, number>;
 }
 
 // ============================================================================

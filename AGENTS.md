@@ -137,6 +137,11 @@ August 2026; recover it from git history if useful, but do not trust it.)
 - **Worker offload:** Graph projection/clustering and HNSW operations run in workers (`hnswWorker.ts`, `computeWorker.ts`) to keep the UI fluid.
 - **Capability-driven multimodal:** Vision/PDF support is resolved per model at runtime — do not hard-code provider assumptions.
 - **Secrets:** `dataStore` holds secret IDs, not raw values; raw values resolve through `secretStorage.ts`.
+- **AsyncLocalStorage:** `lib/asyncLocalStorage.ts` is the only ALS source, and on desktop it is a port of
+  Node 22's `async_hooks`-based implementation. Never hand LangChain (or anything else) Node's own
+  `AsyncLocalStorage` class in the renderer: from Node 24 (Electron 40+, Obsidian installer 1.13+) it keeps
+  its frame in V8's continuation-preserved embedder data, the slot Blink's task-attribution scheduler also
+  writes, and the first `getStore()` inside an interaction-attributed task aborts the renderer (#478, #481).
 - **No runtime import cycles.** `bunx madge --circular --extensions ts src/main.ts` with a `.madgerc` of `{"detectiveOptions":{"ts":{"skipTypeImports":true,"skipAsyncImports":true}}}` reports none; keep it that way. The seams that make this hold: `providers/*` never import `stores/dataStore` (they read through `getPlugin()` from the leaf `state.svelte.ts`, and `providerRuntime` announces Codex session changes via `onCodexSessionChange`, which `main.ts` wires to query invalidation); `utils/agentPaths` and `utils/fileFiltering` read the agent folder from `utils/agentPathSource.ts`, which `PluginDataStore` installs on construction; UI-opening helpers in `utils/actionNotice.ts` use dynamic `import()` for the modals and services they open. Built-in tool metadata (display name, UI summary, stored default `ToolConfig`) has exactly one table, `agent/tools/builtInToolDefaults.ts`.
 
 ## Build

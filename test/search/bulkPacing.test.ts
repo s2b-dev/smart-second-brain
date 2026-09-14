@@ -9,6 +9,7 @@ import {
 	bulkCheckpointPauseMs,
 	bulkStartDelayMs,
 	orderForBulkIndexing,
+	resetBulkRunQueue,
 	type VaultLocalStorage,
 	scheduleBulkRun,
 } from "../../src/search/bulkPacing";
@@ -39,6 +40,7 @@ let storage: ReturnType<typeof memoryStorage>;
 
 beforeEach(() => {
 	storage = memoryStorage();
+	resetBulkRunQueue();
 });
 
 afterEach(() => {
@@ -120,6 +122,67 @@ describe("scheduleBulkRun", () => {
 		scheduleBulkRun("Test", marker, work);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(work).toHaveBeenCalledTimes(1);
+	});
+
+	it("runs scheduled work one after another, and a failing run does not block the next", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = false;
+		const marker = new BulkAttemptMarker("embedding", storage);
+		const order: string[] = [];
+		let releaseFirst: (() => void) | null = null;
+		// Both indexers schedule on the same tick, as they do at layout-ready.
+		scheduleBulkRun(
+			"Lexical",
+			marker,
+			() =>
+				new Promise<void>((resolve) => {
+					order.push("lexical:start");
+					releaseFirst = () => {
+						order.push("lexical:end");
+						resolve();
+					};
+				}),
+		);
+		scheduleBulkRun("Embedding", marker, async () => {
+			order.push("embedding");
+		});
+		// Each run yields through a timer before starting, hence the small advances.
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order).toEqual(["lexical:start"]);
+		if (!releaseFirst) throw new Error("first run never started");
+		(releaseFirst as () => void)();
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order).toEqual(["lexical:start", "lexical:end", "embedding"]);
+
+		scheduleBulkRun("Broken", marker, async () => {
+			throw new Error("boom");
+		});
+		scheduleBulkRun("Next", marker, async () => {
+			order.push("next");
+		});
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order.at(-1)).toBe("next");
+	});
+
+	it("keeps scheduling order when a later run has the shorter backoff", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = true;
+		const lexical = new BulkAttemptMarker("lexical", storage);
+		lexical.markAttempt(); // crashed once: 2× the base delay
+		const embedding = new BulkAttemptMarker("embedding", storage); // clean: 1×
+		const order: string[] = [];
+		scheduleBulkRun("Lexical", lexical, async () => {
+			order.push("lexical");
+		});
+		scheduleBulkRun("Embedding", embedding, async () => {
+			order.push("embedding");
+		});
+
+		// The embedding run's own delay has elapsed, but it is behind the lexical run.
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS + 10);
+		expect(order).toEqual([]);
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS);
+		expect(order).toEqual(["lexical", "embedding"]);
 	});
 });
 

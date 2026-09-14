@@ -92,6 +92,41 @@ function errorNames(error: unknown): string[] {
 	return names;
 }
 
+/** HTTP status of the error, or of anything down its `cause` chain, however the client names it. */
+function errorStatus(error: unknown): number | undefined {
+	let current: unknown = error;
+	for (let depth = 0; depth < 5 && typeof current === "object" && current !== null; depth++) {
+		const {
+			status,
+			status_code: statusCode,
+			cause,
+		} = current as {
+			status?: unknown;
+			status_code?: unknown;
+			cause?: unknown;
+		};
+		if (typeof status === "number") return status;
+		if (typeof statusCode === "number") return statusCode;
+		current = cause;
+	}
+	return undefined;
+}
+
+/**
+ * True when the provider rejected *this document* — a status that speaks to
+ * the request body: malformed input, over the model's context, an input the
+ * content filter refuses. Only these are worth remembering against the note
+ * (`VectorStoreService` skips such notes until they change). Everything else
+ * — an expired key (401/403), a model that is gone (404), rate limiting (429),
+ * a server fault (5xx), a transport failure, or an error that carries no
+ * status at all — is a property of the provider or the moment, and the note
+ * must stay retryable once it is fixed.
+ */
+export function isDocumentRejectionError(error: unknown): boolean {
+	const status = errorStatus(error);
+	return status === 400 || status === 413 || status === 422;
+}
+
 /**
  * True when the host refused the connection or could not be resolved — the
  * failures where retrying without the user's intervention is pointless.

@@ -184,6 +184,41 @@ describe("LexicalSearchService.validateIndex", () => {
 		expect(loaded.get("a.md")).toBe(3_000);
 	});
 
+	it("debounces re-indexing of a modified note: a burst of saves reads and indexes it once", async () => {
+		loaded = new Map([["a.md", 1_000]]);
+		vaultFiles = [file("a.md", 1_000)];
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000); // startup validation: nothing to do
+		addDocument.mockClear();
+		const hooks = service as unknown as {
+			handleFileModify(file: FakeFile): void;
+			handleFileRename(file: FakeFile, oldPath: string): Promise<void>;
+		};
+
+		vaultFiles[0].stat.mtime = 2_000;
+		hooks.handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(1_500);
+		vaultFiles[0].stat.mtime = 3_000;
+		hooks.handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(1_500);
+		// 1.5 s after the last save: still waiting, and the first save was folded in.
+		expect(addDocument).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(500);
+		expect(addDocument).toHaveBeenCalledTimes(1);
+		expect(addDocument.mock.calls[0][4]).toBe(3_000);
+
+		// A rename while a re-index is pending drops it: the old path is gone.
+		addDocument.mockClear();
+		hooks.handleFileModify(vaultFiles[0]);
+		const renamed = file("b.md", 3_000);
+		vaultFiles = [renamed];
+		await hooks.handleFileRename(renamed, "a.md");
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(removeDocument).toHaveBeenCalledWith("a.md");
+		expect(addDocument.mock.calls.map(([path]) => path)).toEqual(["b.md"]);
+	});
+
 	it("leaves an index that matches the vault alone", async () => {
 		loaded = new Map([["a.md", 1_000]]);
 		vaultFiles = [file("a.md", 1_000)];

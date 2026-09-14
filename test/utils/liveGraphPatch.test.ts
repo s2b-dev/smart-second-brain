@@ -184,7 +184,6 @@ describe("queryNoteSemanticEdges", () => {
 		id: `${path}#${chunkIndex}`,
 		path,
 		mtime: 0,
-		checksum: "",
 		vector: new Float32Array([1, 0]),
 		chunkIndex,
 	});

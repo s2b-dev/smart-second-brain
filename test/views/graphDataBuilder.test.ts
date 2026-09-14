@@ -68,7 +68,6 @@ function createMockDocumentVector(path: string, vector: number[]): DocumentVecto
 		id: path,
 		path,
 		mtime: Date.now(),
-		checksum: "abc123",
 		vector: new Float32Array(vector),
 	};
 }

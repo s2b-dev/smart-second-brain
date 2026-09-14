@@ -727,6 +727,37 @@ $effect(() => {
 	return () => window.clearTimeout(timer);
 });
 
+// The graph index is opened by this view's first request, not at boot, and
+// its validation against the vault then runs while the first build is already
+// scanning the store — so that scan can read rows that are missing or stale,
+// and nothing else would ever redo it. Watch the index's progress and rebuild
+// once a run (validation, full build, a later catch-up) ends. The semantic
+// edge cache is keyed on the index's `lastUpdated`, so a run that wrote
+// nothing costs no rescan.
+$effect(() => {
+	const indexId = data.graphEmbedIndex;
+	if (!indexId) return;
+	let cancelled = false;
+	let unsubscribe: (() => void) | null = null;
+	void waitForVectorStore().then((ready) => {
+		if (!ready || cancelled) return;
+		let wasIndexing = false;
+		unsubscribe = getVectorStoreService().onProgress((progress) => {
+			if (progress.isIndexing) {
+				wasIndexing = true;
+				return;
+			}
+			if (!wasIndexing) return;
+			wasIndexing = false;
+			untrack(() => void buildGraph());
+		}, indexId);
+	});
+	return () => {
+		cancelled = true;
+		unsubscribe?.();
+	};
+});
+
 // Re-apply segment coloring when highlight toggles change (no Leiden re-run needed).
 // Use a derived signature to avoid firing on every settings write — see buildGraphSignature above.
 let highlightSignature = $derived(`${settings.highlightIsolated}:${settings.highlightBridges}`);
