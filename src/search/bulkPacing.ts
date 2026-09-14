@@ -123,9 +123,32 @@ export class BulkAttemptMarker {
 export type VaultLocalStorage = Pick<App, "loadLocalStorage" | "saveLocalStorage">;
 
 /**
- * Run `work` after the platform-appropriate bulk start delay, logging when the
- * delay was lengthened by earlier crashed attempts. `label` names the indexer
- * in that log line.
+ * Scheduled bulk runs, across both indexers, run one after another on this
+ * chain, in the order they were scheduled. The lexical and embedding builds
+ * used to start on the same tick and each read every note — and extracted
+ * every PDF, the expensive read — on its own; on a phone that also meant two
+ * bulk allocators competing inside the boot spike. Sequenced, each file is
+ * read once per run, and the search index (fast, no provider round trips) is
+ * complete before the embedding run starts. A run that throws is logged and
+ * does not block the ones behind it.
+ */
+let bulkRunChain: Promise<void> = Promise.resolve();
+
+/** Test hook: drop whatever is queued so one test's run cannot delay the next. */
+export function resetBulkRunQueue(): void {
+	bulkRunChain = Promise.resolve();
+}
+
+/**
+ * Run `work` after the platform-appropriate bulk start delay — and after any
+ * bulk run scheduled before it has finished — logging when the delay was
+ * lengthened by earlier crashed attempts. `label` names the indexer in that
+ * log line.
+ *
+ * The run is queued at once and waits out its own delay *inside* the chain,
+ * so scheduling order is run order even when the indexers' crash backoffs
+ * differ (each has its own marker): a lexical run with a longer backoff still
+ * goes before the embedding run scheduled after it.
  */
 export function scheduleBulkRun(label: string, marker: BulkAttemptMarker, work: () => Promise<void>): void {
 	const attempts = marker.read();
@@ -135,7 +158,17 @@ export function scheduleBulkRun(label: string, marker: BulkAttemptMarker, work: 
 			`[${label}] Last bulk index attempt did not complete (${attempts} in a row) — delaying the next by ${Math.round(delay / 1000)}s`,
 		);
 	}
-	window.setTimeout(() => void work(), delay);
+	const readyAt = Date.now() + delay;
+	bulkRunChain = bulkRunChain
+		.then(async () => {
+			// Always through a timer, even for no delay: a run never starts inside
+			// the tick that scheduled it (layout-ready, or a run's own completion).
+			await bulkPause(Math.max(0, readyAt - Date.now()));
+			await work();
+		})
+		.catch((error: unknown) => {
+			Logger.error(`[${label}] Bulk run failed:`, error);
+		});
 }
 
 /**

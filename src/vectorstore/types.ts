@@ -22,8 +22,6 @@ export interface DocumentVector {
 	path: string;
 	/** File modification time (Unix timestamp ms) for change detection */
 	mtime: number;
-	/** MD5 hash of content for change detection */
-	checksum: string;
 	/** Embedding vector as Float32Array for efficient computation */
 	vector: Float32Array;
 	/**
@@ -43,7 +41,6 @@ export interface SerializedDocument {
 	id: string;
 	path: string;
 	mtime: number;
-	checksum: string;
 	/** Vector as number array for serialization */
 	vector: number[];
 	chunkIndex?: number;
@@ -205,7 +202,7 @@ export interface IndexingProgress {
 }
 
 /** Reasons a file can be skipped during indexing */
-export type SkipReason = "excluded" | "privacy" | "too-large" | "not-indexed" | "read-error" | "embed-error";
+export type SkipReason = "excluded" | "privacy" | "not-indexed" | "read-error" | "embed-error";
 
 /** A file that was skipped during indexing, with its reason */
 export interface SkippedFile {
@@ -246,6 +243,18 @@ export function sanitizeIndexId(provider: string, model: string): string {
  */
 export function makeChunkId(path: string, chunkIndex: number): string {
 	return `${path}#${chunkIndex}`;
+}
+
+/**
+ * Inverse of {@link makeChunkId}. `#` is legal in a vault path, so the split
+ * is on the *last* `#`: the chunk index is numeric and always comes last.
+ */
+export function parseChunkId(id: string): { path: string; chunkIndex: number } {
+	const hash = id.lastIndexOf("#");
+	if (hash === -1) return { path: id, chunkIndex: 0 };
+	const chunkIndex = Number(id.slice(hash + 1));
+	if (!Number.isInteger(chunkIndex) || chunkIndex < 0) return { path: id, chunkIndex: 0 };
+	return { path: id.slice(0, hash), chunkIndex };
 }
 
 /**
@@ -319,11 +328,19 @@ export function deleteDatabase(name: string): Promise<DeleteDatabaseResult> {
 }
 
 /**
- * Result from a vector similarity search (internal use).
- * Contains the document and its similarity score.
+ * One chunk hit from a vector similarity search.
+ *
+ * Identity and score only, never the vector: the service aggregates hits to
+ * notes by `path` and the graph's live patch reads `path` too, so returning
+ * the row would deserialise and clone one vector per hit for nothing. With
+ * the tool's `topK` of 100 and the chunk over-fetch that was a thousand
+ * IndexedDB reads and several megabytes crossing the worker boundary per query.
  */
-export interface ScoredDocument {
-	doc: DocumentVector;
+export interface SearchHit {
+	/** Chunk row id (`makeChunkId`). */
+	id: string;
+	path: string;
+	chunkIndex: number;
 	score: number;
 }
 
@@ -361,6 +378,18 @@ export interface VectorStore {
 	open(): Promise<void>;
 
 	/**
+	 * Take over the database of another index id — the one this index had
+	 * before its provider was renamed — by copying its stored rows, mappings,
+	 * graph and metadata into this index's database and deleting the old one.
+	 * Must run before `open()`, and only when this index's database is still
+	 * empty; resolves false (and copies nothing) when there is nothing to take
+	 * over, the old database is of another schema version, or this one already
+	 * holds rows. Without it a rename orphaned the old database and the index
+	 * silently rebuilt from scratch.
+	 */
+	adoptDatabase(fromIndexId: string): Promise<boolean>;
+
+	/**
 	 * Close the database connection.
 	 */
 	close(): Promise<void>;
@@ -386,18 +415,31 @@ export interface VectorStore {
 	getMetadata(): Promise<IndexMetadata | null>;
 
 	/**
-	 * Add or update a document in the store.
+	 * Write a note: every chunk of it, replacing whatever the store held for
+	 * that path, in one atomic transaction. All chunks share the note's `path`
+	 * and `mtime`; a note is either wholly present or wholly absent, never a
+	 * subset of its chunks, so a process kill mid-write costs nothing but the
+	 * note itself.
 	 *
-	 * The store takes ownership of `doc.vector`: the worker-backed implementation
-	 * transfers its buffer rather than copying it, so the caller's array is
-	 * detached (length 0) once this resolves. Build a fresh `Float32Array` per call.
+	 * The store takes ownership of every `chunk.vector`: the worker-backed
+	 * implementation transfers the buffers rather than copying them, so the
+	 * caller's arrays are detached (length 0) once this resolves. Build fresh
+	 * `Float32Array`s per call.
 	 */
-	upsert(doc: DocumentVector): Promise<void>;
+	putNote(chunks: DocumentVector[]): Promise<void>;
 
 	/**
-	 * Remove a document by path.
+	 * Remove a note (every chunk row of the path) in one transaction.
 	 */
 	remove(path: string): Promise<void>;
+
+	/**
+	 * Re-key a note's rows from `oldPath` to `newPath` without re-embedding:
+	 * the vectors, mtime and graph links are unchanged, only the ids move.
+	 * Rows already stored under `newPath` are replaced. A no-op when nothing
+	 * is stored under `oldPath`.
+	 */
+	renameNote(oldPath: string, newPath: string): Promise<void>;
 
 	/**
 	 * Get a document by path.
@@ -416,13 +458,14 @@ export interface VectorStore {
 	getDocumentMtime(path: string): Promise<number | undefined>;
 
 	/**
-	 * `{ path, mtime }` of every *completely* indexed note, one entry per note,
-	 * read without deserialising a single vector. A note counts as indexed only
-	 * once its chunk-0 row exists; bulk writers store that row last, so a note
-	 * whose write was interrupted is reported as absent and gets re-indexed.
-	 * This is the read to use for "what is indexed, and is it stale" questions —
-	 * there is deliberately no whole-set `getAll()`: materialising every vector
-	 * on the main thread is the memory spike #432 removes.
+	 * `{ path, mtime }` of every indexed note, one entry per note, read without
+	 * deserialising a single vector. `putNote` writes a note atomically, so a
+	 * listed note has all of its chunks; rows written chunk by chunk by older
+	 * versions are listed only when their chunk-0 row exists, so an interrupted
+	 * write of that era still reads as absent and gets re-indexed. This is the
+	 * read to use for "what is indexed, and is it stale" questions — there is
+	 * deliberately no whole-set `getAll()`: materialising every vector on the
+	 * main thread is the memory spike #432 removes.
 	 */
 	listNoteMeta(): Promise<NoteMeta[]>;
 
@@ -447,13 +490,13 @@ export interface VectorStore {
 
 	/**
 	 * Bulk insert documents (for loading from file). Takes ownership of every
-	 * `doc.vector` the same way `upsert` does.
+	 * `doc.vector` the same way `putNote` does.
 	 */
 	bulkPut(docs: DocumentVector[]): Promise<void>;
 
 	/**
 	 * Persist any in-memory index state that is still pending (the HNSW graph
-	 * topology, which `upsert` saves on a debounce). A bulk run calls this as
+	 * topology, which `putNote` saves on a debounce). A bulk run calls this as
 	 * its checkpoint so a process kill loses at most one interval's worth of
 	 * graph links; no-op when nothing is pending.
 	 */
@@ -481,7 +524,7 @@ export interface VectorStore {
 	 * @param queryVector The query vector to search for
 	 * @param topK Maximum number of results to return
 	 * @param threshold Minimum similarity score (0-1)
-	 * @returns Array of documents with their similarity scores
+	 * @returns Chunk hits (identity + score, no vectors), best first
 	 */
-	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]>;
+	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]>;
 }

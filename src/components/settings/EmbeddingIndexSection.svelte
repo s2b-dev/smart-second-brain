@@ -15,7 +15,13 @@ import { Logger } from "../../utils/logging";
 import { getProviderDefinition } from "../../providers/index";
 import { getData } from "../../stores/dataStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
-import { isVectorStoreInitialized, getVectorStoreService, formatEta, type IndexingProgress } from "../../vectorstore";
+import {
+	isVectorStoreInitialized,
+	getVectorStoreService,
+	formatEta,
+	formatIndexBuildStatus,
+	type IndexingProgress,
+} from "../../vectorstore";
 import { largeDimensionHint } from "../../vectorstore/embeddingMemoryHint";
 
 interface Props {
@@ -197,11 +203,6 @@ async function importFromFile(): Promise<boolean> {
 	return false;
 }
 
-function formatDate(timestamp: number | null): string {
-	if (!timestamp) return "Never built";
-	return new Date(timestamp).toLocaleDateString();
-}
-
 function describeCurrentSelection(): string {
 	return purpose === "search"
 		? "Embedding indexes power semantic search across your notes."
@@ -272,7 +273,7 @@ function getSelectionGroupLabel(): string {
           name={entry.model}
           meta={[
             entryProviderDef?.displayName ?? entry.provider,
-            formatDate(entry.lastBuiltAt),
+            formatIndexBuildStatus(entry.lastBuiltAt, entry.documentCount),
             `${entry.documentCount} notes indexed`,
           ]
             .filter(Boolean)

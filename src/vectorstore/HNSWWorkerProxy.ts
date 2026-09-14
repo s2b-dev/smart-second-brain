@@ -6,7 +6,7 @@
  * Every CPU-intensive operation (build, search, add) runs off the main thread.
  *
  * Writes transfer their vector buffers to the worker instead of cloning them
- * (see `upsert`/`bulkPut`), so a vector is never resident on both sides.
+ * (see `putNote`/`bulkPut`), so a vector is never resident on both sides.
  */
 
 import type {
@@ -14,7 +14,7 @@ import type {
 	IndexMetadata,
 	NoteMeta,
 	NoteNeighbor,
-	ScoredDocument,
+	SearchHit,
 	SemanticPairOptions,
 	SerializedDocument,
 	VectorStore,
@@ -28,6 +28,8 @@ export class HNSWWorkerProxy implements VectorStore {
 	private worker: Worker;
 	private nextId = 0;
 	private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+	/** Set by `close()`; every call from then on rejects instead of posting into a dead worker. */
+	private closed = false;
 
 	private _providerId: string | null = null;
 	private _modelId: string | null = null;
@@ -46,11 +48,18 @@ export class HNSWWorkerProxy implements VectorStore {
 			}
 		};
 		this.worker.onerror = (e) => {
+			// A script error inside the worker means no request in flight will be
+			// answered; settle them instead of leaving their callers hanging.
 			Logger.error("[VectorStore] [HNSW] Worker error:", e.message);
+			this.rejectPending(new Error(`Vector store worker failed: ${e.message}`));
 		};
 
-		// Initialize the store inside the worker (fire-and-forget, open() will await)
-		void this.call("init", [vaultId, indexId]);
+		// Initialize the store inside the worker (fire-and-forget, open() will
+		// await). A failure here is reported, not surfaced: `open()` is the call
+		// that fails visibly when the worker never came up.
+		this.call("init", [vaultId, indexId]).catch((error: unknown) => {
+			Logger.error("[VectorStore] [HNSW] Worker init failed:", error);
+		});
 	}
 
 	/**
@@ -58,12 +67,17 @@ export class HNSWWorkerProxy implements VectorStore {
 	 * copy; they are detached on this thread once posted.
 	 */
 	private call(method: string, args: unknown[], transfer: Transferable[] = []): Promise<unknown> {
+		if (this.closed) return Promise.reject(new Error(`Vector store is closed (${method})`));
 		const id = this.nextId++;
 		return new Promise((resolve, reject) => {
 			this.pending.set(id, { resolve, reject });
 			const request: HNSWWorkerRequest = { id, method, args };
 			this.worker.postMessage(request, transfer);
 		});
+	}
+
+	async adoptDatabase(fromIndexId: string): Promise<boolean> {
+		return (await this.call("adoptDatabase", [fromIndexId])) as boolean;
 	}
 
 	async open(): Promise<void> {
@@ -73,10 +87,65 @@ export class HNSWWorkerProxy implements VectorStore {
 		this._modelId = (await this.call("getModelId", [])) as string | null;
 	}
 
+	/**
+	 * How long `close()` waits for the worker to acknowledge the close request
+	 * (which flushes the pending graph save) before terminating it regardless.
+	 * A worker that has died or is wedged never answers; without a bound the
+	 * close — and with it index deletion or plugin unload — would hang on it.
+	 */
+	private static readonly CLOSE_ACK_TIMEOUT_MS = 10_000;
+
+	/**
+	 * Close the store and terminate the worker.
+	 *
+	 * Every request still in flight is rejected, not dropped. `terminate()`
+	 * discards the worker's reply queue, so a promise left in `pending` would
+	 * never settle: a bulk run whose `putNote` was in flight when its index was
+	 * deleted hung forever on that await — its `finally` never ran and the
+	 * progress notice stayed on screen for the rest of the session.
+	 *
+	 * The close request itself is awaited only up to {@link CLOSE_ACK_TIMEOUT_MS};
+	 * the worker is terminated and the pending requests rejected either way.
+	 */
 	async close(): Promise<void> {
-		await this.call("close", []);
-		this.worker.terminate();
+		if (this.closed) return;
+		this.closed = true;
+		let timer: number | null = null;
+		try {
+			await Promise.race([
+				this.callUnchecked("close", []),
+				new Promise<void>((resolve) => {
+					timer = self.setTimeout(() => {
+						Logger.warn("[VectorStore] [HNSW] Worker did not acknowledge close; terminating it.");
+						resolve();
+					}, HNSWWorkerProxy.CLOSE_ACK_TIMEOUT_MS);
+				}),
+			]);
+		} catch (error) {
+			// The worker failed while closing (`onerror` rejected the request); it
+			// is terminated below regardless.
+			Logger.warn("[VectorStore] [HNSW] Close request failed:", error);
+		} finally {
+			if (timer !== null) self.clearTimeout(timer);
+			this.worker.terminate();
+			this.rejectPending(new Error("Vector store closed while the request was in flight"));
+		}
+	}
+
+	/** `call` without the closed guard, for the close request itself. */
+	private callUnchecked(method: string, args: unknown[]): Promise<unknown> {
+		const id = this.nextId++;
+		return new Promise((resolve, reject) => {
+			this.pending.set(id, { resolve, reject });
+			const request: HNSWWorkerRequest = { id, method, args };
+			this.worker.postMessage(request);
+		});
+	}
+
+	private rejectPending(error: Error): void {
+		const entries = [...this.pending.values()];
 		this.pending.clear();
+		for (const entry of entries) entry.reject(error);
 	}
 
 	get providerId(): string | null {
@@ -97,12 +166,16 @@ export class HNSWWorkerProxy implements VectorStore {
 		return (await this.call("getMetadata", [])) as IndexMetadata | null;
 	}
 
-	async upsert(doc: DocumentVector): Promise<void> {
-		await this.call("upsert", [doc], vectorBuffers([doc]));
+	async putNote(chunks: DocumentVector[]): Promise<void> {
+		await this.call("putNote", [chunks], vectorBuffers(chunks));
 	}
 
 	async remove(path: string): Promise<void> {
 		await this.call("remove", [path]);
+	}
+
+	async renameNote(oldPath: string, newPath: string): Promise<void> {
+		await this.call("renameNote", [oldPath, newPath]);
 	}
 
 	async getByPath(path: string): Promise<DocumentVector | undefined> {
@@ -155,10 +228,10 @@ export class HNSWWorkerProxy implements VectorStore {
 		return (await this.call("countNotes", [])) as number;
 	}
 
-	async search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]> {
+	async search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]> {
 		// The query is small and callers may reuse it (e.g. against a second
 		// index), so it is cloned rather than transferred.
-		return (await this.call("search", [queryVector, topK, threshold])) as ScoredDocument[];
+		return (await this.call("search", [queryVector, topK, threshold])) as SearchHit[];
 	}
 
 	/**

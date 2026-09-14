@@ -46,6 +46,10 @@ self.onmessage = async (e: MessageEvent<HNSWWorkerRequest>) => {
 				result = await requireStore().open();
 				break;
 			}
+			case "adoptDatabase": {
+				result = await requireStore().adoptDatabase(args[0] as string);
+				break;
+			}
 			case "close": {
 				result = await requireStore().close();
 				break;
@@ -67,12 +71,17 @@ self.onmessage = async (e: MessageEvent<HNSWWorkerRequest>) => {
 				result = await requireStore().getMetadata();
 				break;
 			}
-			case "upsert": {
-				result = await requireStore().upsert(args[0] as DocumentVector);
+			case "putNote": {
+				result = await requireStore().putNote(args[0] as DocumentVector[]);
 				break;
 			}
 			case "remove": {
 				result = await requireStore().remove(args[0] as string);
+				break;
+			}
+			case "renameNote": {
+				const [oldPath, newPath] = args as [string, string];
+				result = await requireStore().renameNote(oldPath, newPath);
 				break;
 			}
 			case "getByPath": {

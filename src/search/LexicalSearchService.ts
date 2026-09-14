@@ -31,6 +31,15 @@ import { getData } from "../stores/dataStore.svelte";
 
 const MAX_SNIPPET_LENGTH = 180;
 
+/**
+ * Debounce before re-indexing a modified note. Obsidian autosaves while the
+ * user types, and every save re-read, re-tokenized and re-added the note;
+ * the embedding path already waits (5 s, a provider round trip per save). The
+ * lexical index is cheap to update, so it waits less — an edit is searchable
+ * a couple of seconds after the last keystroke.
+ */
+const MODIFY_DEBOUNCE_MS = 2_000;
+
 interface ResolvedMatchMetadata {
 	badges?: SearchMatchBadge[];
 	explanation?: SearchMatchExplanation;
@@ -66,6 +75,8 @@ export class LexicalSearchService {
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-lexical-bulk-attempts`, vault-scoped). */
 	private readonly bulkAttempts: BulkAttemptMarker;
+	/** Pending debounced re-index per path (see `MODIFY_DEBOUNCE_MS`). */
+	private readonly modifyTimers = new Map<string, number>();
 
 	private constructor(plugin: SecondBrainPlugin) {
 		this.plugin = plugin;
@@ -229,7 +240,6 @@ export class LexicalSearchService {
 
 	/** Index `files`, paced in batches and checkpointing every {@link BULK_CHECKPOINT_INTERVAL} additions. */
 	private async bulkIndexFiles(files: TFile[]): Promise<number> {
-		const { vault } = this.plugin.app;
 		let added = 0;
 		let processed = 0;
 		// Mark the attempt before the first read; cleared below only when the whole
@@ -241,9 +251,7 @@ export class LexicalSearchService {
 		try {
 			for (const file of files) {
 				try {
-					const content = await readIndexableContent(vault, file);
-					this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
-					added++;
+					if (await this.indexFile(file)) added++;
 				} catch (error) {
 					Logger.error(`[LexicalSearch] Failed to read ${file.path}:`, error);
 				}
@@ -277,6 +285,32 @@ export class LexicalSearchService {
 	}
 
 	/**
+	 * Read a file and (re)index it, stamped with the mtime it had *before* the
+	 * read. Returns whether the index was written.
+	 *
+	 * Stamping first is the same rule as the embedding indexer's `stampForRead`:
+	 * an edit landing during the read leaves the stored mtime older than the
+	 * file's, so the next validation repairs it — never equal, which would hide
+	 * it. The stamp also orders concurrent writers. The startup validation and a
+	 * vault event handler can both index one note, and their reads finish in
+	 * any order; the one that stamped later read the newer content, so a read
+	 * during which a *newer* stamp landed in the index is discarded rather than
+	 * allowed to put older content (and an older stamp) back. Only a stamp that
+	 * changed under the read counts: a stored stamp that is newer than the
+	 * file's from the start is the restored-from-backup case, which validation
+	 * re-indexes on purpose.
+	 */
+	private async indexFile(file: TFile): Promise<boolean> {
+		const mtime = file.stat.mtime;
+		const storedBefore = this.miniSearch.getDocumentMtime(file.path);
+		const content = await readIndexableContent(this.plugin.app.vault, file);
+		const storedAfter = this.miniSearch.getDocumentMtime(file.path);
+		if (storedAfter !== storedBefore && storedAfter !== undefined && storedAfter > mtime) return false;
+		this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
+		return true;
+	}
+
+	/**
 	 * Render bulk progress into the sticky notice. Same layout as the embedding
 	 * indexer's notice (VectorStoreService.updateNotice) so the two indexing
 	 * surfaces read as one feature.
@@ -307,6 +341,15 @@ export class LexicalSearchService {
 		});
 	}
 
+	/**
+	 * Reconcile the loaded index with the vault: drop documents whose file is
+	 * gone, and (re)index files that are missing *or stale*. Staleness is the
+	 * stored mtime differing from the file's — not merely older, so a note
+	 * restored from a backup with an earlier mtime is re-indexed too. A document
+	 * with no stored mtime (indexed before mtimes were tracked) counts as stale.
+	 * Presence alone was the old test, which left every note modified while
+	 * Obsidian was closed — the sync case — serving its pre-sync content.
+	 */
 	private async validateIndex(): Promise<void> {
 		const files = getIndexableVaultFiles(this.plugin.app.vault);
 		const vaultPaths = new Set(files.map((f) => f.path));
@@ -319,13 +362,18 @@ export class LexicalSearchService {
 			}
 		}
 
-		const missing = orderForBulkIndexing(files.filter((file) => !this.miniSearch.hasDocument(file.path)));
-		const added = await this.bulkIndexFiles(missing);
+		const pending = orderForBulkIndexing(files.filter((file) => this.needsIndexing(file)));
+		const added = await this.bulkIndexFiles(pending);
 
 		if (added > 0 || removed > 0) {
 			await this.miniSearch.flush();
-			Logger.log(`[LexicalSearch] Validated lexical index: added ${added}, removed ${removed} documents`);
+			Logger.log(`[LexicalSearch] Validated lexical index: indexed ${added}, removed ${removed} documents`);
 		}
+	}
+
+	private needsIndexing(file: TFile): boolean {
+		if (!this.miniSearch.hasDocument(file.path)) return true;
+		return this.miniSearch.getDocumentMtime(file.path) !== file.stat.mtime;
 	}
 
 	private registerEvents(): void {
@@ -340,9 +388,9 @@ export class LexicalSearchService {
 		);
 
 		this.plugin.registerEvent(
-			vault.on("modify", async (file) => {
+			vault.on("modify", (file) => {
 				if (file instanceof TFile && isIndexableFile(file)) {
-					await this.handleFileModify(file);
+					this.handleFileModify(file);
 				}
 			}),
 		);
@@ -350,6 +398,7 @@ export class LexicalSearchService {
 		this.plugin.registerEvent(
 			vault.on("delete", (file) => {
 				if (file instanceof TFile) {
+					this.cancelPendingModify(file.path);
 					this.miniSearch.removeDocument(file.path);
 				}
 			}),
@@ -369,23 +418,42 @@ export class LexicalSearchService {
 
 	private async handleFileCreate(file: TFile): Promise<void> {
 		try {
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to add ${file.path}:`, error);
 		}
 	}
 
-	private async handleFileModify(file: TFile): Promise<void> {
+	/** Re-index a modified note once its edits pause; each new save restarts the wait. */
+	private handleFileModify(file: TFile): void {
+		this.cancelPendingModify(file.path);
+		this.modifyTimers.set(
+			file.path,
+			window.setTimeout(() => {
+				this.modifyTimers.delete(file.path);
+				void this.reindexModifiedFile(file);
+			}, MODIFY_DEBOUNCE_MS),
+		);
+	}
+
+	private async reindexModifiedFile(file: TFile): Promise<void> {
 		try {
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to update ${file.path}:`, error);
 		}
 	}
 
+	/** Drop a pending debounced re-index of `path`: the file it would read is gone or renamed. */
+	private cancelPendingModify(path: string): void {
+		const timer = this.modifyTimers.get(path);
+		if (timer === undefined) return;
+		window.clearTimeout(timer);
+		this.modifyTimers.delete(path);
+	}
+
 	private async handleFileRename(file: TFile, oldPath: string): Promise<void> {
+		this.cancelPendingModify(oldPath);
 		// Always drop the old path, even when the destination is no longer
 		// indexable — otherwise the pre-rename document stays searchable forever.
 		this.miniSearch.removeDocument(oldPath);
@@ -393,8 +461,7 @@ export class LexicalSearchService {
 		if (!isIndexableFile(file)) return;
 
 		try {
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to rename ${oldPath} -> ${file.path}:`, error);
 		}
@@ -741,6 +808,8 @@ export class LexicalSearchService {
 
 	async cleanup(): Promise<void> {
 		try {
+			for (const timer of this.modifyTimers.values()) window.clearTimeout(timer);
+			this.modifyTimers.clear();
 			if (pendingInitPromise !== null) {
 				await pendingInitPromise.catch(() => {});
 			}
