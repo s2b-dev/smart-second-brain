@@ -50,7 +50,8 @@ jobs:
             # replace its assets in place: `gh release create` would either fail
             # on the existing tag or silently mint a second draft that only shows
             # up via the API. A PUBLISHED release is never touched — users may
-            # already have installed its bundle — so that case fails loudly.
+            # already have installed its bundle — so that case fails loudly, and
+            # a draft that gets published mid-upload is detected afterwards.
             # Only a 404 from the lookup means "no release yet"; any other lookup
             # failure (auth, rate limit, outage) also fails rather than creating.
             - name: Create or update draft release
@@ -67,6 +68,15 @@ jobs:
                     fi
                     echo "Draft release $tag exists; replacing its assets."
                     gh release upload "$tag" "${assets[@]}" --clobber
+                    # GitHub has no conditional upload, so a maintainer publishing
+                    # the draft during the seconds between the check above and the
+                    # upload cannot be prevented — only detected. Re-check and fail
+                    # loudly so a published release with swapped assets is never a
+                    # silent green run.
+                    if [ "$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .draft)" != "true" ]; then
+                      echo "::error::Release $tag was published while its assets were being replaced; verify the published bundle."
+                      exit 1
+                    fi
                   elif grep -q "HTTP 404" <<<"$lookup"; then
                     gh release create "$tag" \
                       --title="$tag" \
