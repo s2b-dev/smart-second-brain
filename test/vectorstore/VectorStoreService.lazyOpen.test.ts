@@ -307,6 +307,47 @@ describe("lazy open on mobile", () => {
 		expect(stores.get(INDEX)?.open).toHaveBeenCalledTimes(1);
 	});
 
+	it("leaves the graph index closed until the graph view asks for it, then validates it", async () => {
+		const GRAPH = "fake:graph-model";
+		indexIds = [INDEX, GRAPH];
+		fakeData.graphEmbedIndex = GRAPH;
+		vaultFiles = [file("a.md"), file("b.md")];
+		try {
+			platform.isMobile = false;
+			const svc = await startService();
+			await vi.advanceTimersByTimeAsync(1_000);
+			// The search index was opened and built; the graph index was not touched.
+			expect(stores.get(INDEX)?.docs.size).toBe(2);
+			expect(stores.has(GRAPH)).toBe(false);
+			const embedCalls = embedDocuments.mock.calls.length;
+
+			// The graph view's first request opens it, and its startup validation follows.
+			await svc.getOrCreateInstance(GRAPH);
+			expect(stores.get(GRAPH)?.open).toHaveBeenCalledTimes(1);
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(stores.get(GRAPH)?.docs.size).toBe(2);
+			expect(embedDocuments.mock.calls.length).toBeGreaterThan(embedCalls);
+		} finally {
+			fakeData.graphEmbedIndex = null;
+		}
+	});
+
+	it("the mobile catch-up opens only the search index", async () => {
+		const GRAPH = "fake:graph-model";
+		indexIds = [INDEX, GRAPH];
+		fakeData.graphEmbedIndex = GRAPH;
+		vaultFiles = [file("a.md")];
+		try {
+			platform.isMobile = true;
+			await startService();
+			await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS + 1_000);
+			expect(stores.get(INDEX)?.open).toHaveBeenCalledTimes(1);
+			expect(stores.has(GRAPH)).toBe(false);
+		} finally {
+			fakeData.graphEmbedIndex = null;
+		}
+	});
+
 	it("catches up after the boot delay on mobile, and a crashed attempt lengthens that delay", async () => {
 		platform.isMobile = true;
 		vaultStorage.set(MARKER_KEY, "1"); // the previous run died

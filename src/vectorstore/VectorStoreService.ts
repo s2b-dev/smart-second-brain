@@ -599,33 +599,34 @@ export class VectorStoreService {
 	/**
 	 * Internal initialization.
 	 *
-	 * Desktop opens the currently-referenced indexes (search + graph) right away.
-	 * Mobile opens nothing at boot: opening an index spawns its worker and loads
-	 * the id maps, and the first write or search then rehydrates the HNSW graph —
-	 * the whole vector set, resident in the WebContent process — which is the
-	 * #432 kill zone when it lands in the boot spike. Every consumer already goes
-	 * through `getOrCreateInstance`, so whatever comes first opens it: the first
-	 * search, the graph's semantic-edge request, an explicit reindex, or the
-	 * delayed catch-up scheduled here (which waits out the boot spike and backs
-	 * off after crashed attempts, like the lexical build).
+	 * Only the search index is brought up at boot. The graph index is opened —
+	 * and validated against the vault — when the graph view first asks for it
+	 * (`getOrCreateInstance`, via `waitForVectorStoreIndex`): opening it costs a
+	 * worker, a vault scan and, for every missing or stale note, a provider
+	 * round trip, on every launch, for a view that may not be opened that
+	 * session. When both purposes point at the same model there is one instance
+	 * and the search side opens it.
+	 *
+	 * Desktop opens the search index right away. Mobile opens nothing at boot:
+	 * opening an index spawns its worker and loads the id maps, and the first
+	 * write or search then rehydrates the HNSW graph — the whole vector set,
+	 * resident in the WebContent process — which is the #432 kill zone when it
+	 * lands in the boot spike. Every consumer already goes through
+	 * `getOrCreateInstance`, so whatever comes first opens it: the first search,
+	 * an explicit reindex, or the delayed catch-up scheduled here (which waits
+	 * out the boot spike and backs off after crashed attempts, like the lexical
+	 * build).
 	 */
 	private async init(): Promise<void> {
 		try {
 			const data = getData();
 			const searchIndex = data.searchEmbedIndex;
-			const graphIndex = data.graphEmbedIndex;
 
-			// Collect unique index IDs to initialize. When both purposes point at the
-			// same model this is a single instance — the Set dedupes it.
-			const indexIds = new Set<string>();
-			if (searchIndex) indexIds.add(searchIndex);
-			if (graphIndex) indexIds.add(graphIndex);
-
-			if (indexIds.size > 0 && Platform.isMobile) {
-				Logger.log(`[VectorStore] Mobile: deferring open of ${indexIds.size} index(es) to first use`);
-				scheduleBulkRun("VectorStore", this.bulkAttempts, () => this.catchUpDeferredIndexes(indexIds));
-			} else if (indexIds.size > 0) {
-				await Promise.all(Array.from(indexIds, (indexId) => this.initializeInstance(indexId)));
+			if (searchIndex && Platform.isMobile) {
+				Logger.log("[VectorStore] Mobile: deferring open of the search index to first use");
+				scheduleBulkRun("VectorStore", this.bulkAttempts, () => this.catchUpDeferredIndexes([searchIndex]));
+			} else if (searchIndex) {
+				await this.initializeInstance(searchIndex);
 			}
 
 			// Register vault events
