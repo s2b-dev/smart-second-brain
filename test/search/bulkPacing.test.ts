@@ -9,6 +9,7 @@ import {
 	bulkCheckpointPauseMs,
 	bulkStartDelayMs,
 	orderForBulkIndexing,
+	resetBulkRunQueue,
 	type VaultLocalStorage,
 	scheduleBulkRun,
 } from "../../src/search/bulkPacing";
@@ -39,6 +40,7 @@ let storage: ReturnType<typeof memoryStorage>;
 
 beforeEach(() => {
 	storage = memoryStorage();
+	resetBulkRunQueue();
 });
 
 afterEach(() => {
@@ -120,6 +122,45 @@ describe("scheduleBulkRun", () => {
 		scheduleBulkRun("Test", marker, work);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(work).toHaveBeenCalledTimes(1);
+	});
+
+	it("runs scheduled work one after another, and a failing run does not block the next", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = false;
+		const marker = new BulkAttemptMarker("embedding", storage);
+		const order: string[] = [];
+		let releaseFirst: (() => void) | null = null;
+		// Both indexers schedule on the same tick, as they do at layout-ready.
+		scheduleBulkRun(
+			"Lexical",
+			marker,
+			() =>
+				new Promise<void>((resolve) => {
+					order.push("lexical:start");
+					releaseFirst = () => {
+						order.push("lexical:end");
+						resolve();
+					};
+				}),
+		);
+		scheduleBulkRun("Embedding", marker, async () => {
+			order.push("embedding");
+		});
+		await vi.advanceTimersByTimeAsync(0);
+		expect(order).toEqual(["lexical:start"]);
+		if (!releaseFirst) throw new Error("first run never started");
+		(releaseFirst as () => void)();
+		await vi.advanceTimersByTimeAsync(0);
+		expect(order).toEqual(["lexical:start", "lexical:end", "embedding"]);
+
+		scheduleBulkRun("Broken", marker, async () => {
+			throw new Error("boom");
+		});
+		scheduleBulkRun("Next", marker, async () => {
+			order.push("next");
+		});
+		await vi.advanceTimersByTimeAsync(0);
+		expect(order.at(-1)).toBe("next");
 	});
 });
 

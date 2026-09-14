@@ -22,7 +22,6 @@ function doc(path: string, vector: number[], chunkIndex = 0, mtime = 1_000): Doc
 		id: `${path}#${chunkIndex}`,
 		path,
 		mtime,
-		checksum: "c",
 		chunkIndex,
 		vector: new Float32Array(vector),
 	};
@@ -282,7 +281,6 @@ describe("HNSWVectorStore — schema upgrade", () => {
 					id: "old.md#0",
 					path: "old.md",
 					mtime: 1,
-					checksum: "c",
 					vector: [1, 0, 0],
 					chunkIndex: 0,
 					hnswId: 0,

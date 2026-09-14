@@ -22,8 +22,6 @@ export interface DocumentVector {
 	path: string;
 	/** File modification time (Unix timestamp ms) for change detection */
 	mtime: number;
-	/** MD5 hash of content for change detection */
-	checksum: string;
 	/** Embedding vector as Float32Array for efficient computation */
 	vector: Float32Array;
 	/**
@@ -43,7 +41,6 @@ export interface SerializedDocument {
 	id: string;
 	path: string;
 	mtime: number;
-	checksum: string;
 	/** Vector as number array for serialization */
 	vector: number[];
 	chunkIndex?: number;
@@ -205,7 +202,7 @@ export interface IndexingProgress {
 }
 
 /** Reasons a file can be skipped during indexing */
-export type SkipReason = "excluded" | "privacy" | "too-large" | "not-indexed" | "read-error" | "embed-error";
+export type SkipReason = "excluded" | "privacy" | "not-indexed" | "read-error" | "embed-error";
 
 /** A file that was skipped during indexing, with its reason */
 export interface SkippedFile {

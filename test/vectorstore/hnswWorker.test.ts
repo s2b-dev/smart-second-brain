@@ -83,7 +83,7 @@ describe("hnswWorker protocol", () => {
 	it("passes a Float32Array vector through to upsert without converting it", async () => {
 		await send(1, "init", "v");
 		const vector = new Float32Array([1, 2, 3]);
-		await send(2, "upsert", { id: "a.md#0", path: "a.md", mtime: 1, checksum: "c", vector });
+		await send(2, "upsert", { id: "a.md#0", path: "a.md", mtime: 1, vector });
 
 		const upsert = calls.find((c) => c.method === "upsert");
 		expect((upsert?.args[0] as { vector: unknown }).vector).toBe(vector);

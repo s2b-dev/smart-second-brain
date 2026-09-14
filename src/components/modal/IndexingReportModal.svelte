@@ -18,7 +18,6 @@ let activeTab = $state<"indexed" | "skipped">("indexed");
 const skipReasonLabels: Record<SkipReason, string> = {
 	excluded: "Excluded by internal rules",
 	privacy: "Private (untrusted provider)",
-	"too-large": "Too large for embedding model",
 	"not-indexed": "Not yet indexed",
 	"read-error": "Failed to read file",
 	"embed-error": "Embedding failed",
@@ -27,7 +26,6 @@ const skipReasonLabels: Record<SkipReason, string> = {
 const skipReasonIcons: Record<SkipReason, string> = {
 	excluded: "folder-x",
 	privacy: "shield-check",
-	"too-large": "file-warning",
 	"not-indexed": "clock",
 	"read-error": "alert-triangle",
 	"embed-error": "zap-off",

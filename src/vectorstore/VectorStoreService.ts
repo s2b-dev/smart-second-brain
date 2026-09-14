@@ -248,6 +248,21 @@ interface IndexInstance {
 	isIndexing: boolean;
 	/** The full build in flight, so a second caller joins it instead of racing it. */
 	buildPromise: Promise<void> | null;
+	/**
+	 * The bulk run in flight — a full build or a validation's catch-up — so a
+	 * caller about to clear the store can abort it and wait for it to stop
+	 * writing (`stopBulkRun`). `buildPromise` covers only the build.
+	 */
+	activeBulkRun: Promise<unknown> | null;
+	/**
+	 * Notes the provider rejected, keyed by path with the mtime they failed at.
+	 * A note in here is left out of validation until its mtime changes, so a
+	 * deterministic rejection (a content filter, a chunk the server refuses) is
+	 * not retried on every launch — with a `Notice` each time. Mirrored in the
+	 * index config (`EmbeddingIndexConfig.failedNotes`) so it survives restarts;
+	 * `clearStore` drops it, so a rebuild tries everything again.
+	 */
+	failedNotes: Map<string, number>;
 	progress: IndexingProgress;
 	/** Timestamp (ms) when the current indexing run started, for ETA estimation */
 	indexingStartedAt: number | null;
@@ -385,7 +400,6 @@ interface ChunkEntry {
 	/** The note's mtime as of the read that produced `embedText` — see `stampForRead`. */
 	mtime: number;
 	chunkIndex: number;
-	checksum: string;
 	embedText: string;
 }
 
@@ -435,6 +449,20 @@ export class VectorStoreService {
 
 	/** Promise tracking initialization, awaited by cleanup to avoid closing mid-init. */
 	private initPromise: Promise<void> | null = null;
+	private unsubscribePrivacy: (() => void) | null = null;
+
+	/**
+	 * Mark every open index as needing validation and schedule it. Validation
+	 * compares the index against the vault *as filtered now*, so a note that
+	 * just became private is removed as an orphan and one that just became
+	 * allowed is embedded as missing.
+	 */
+	private revalidateAll(): void {
+		for (const inst of this.instances.values()) {
+			inst.hasValidatedThisSession = false;
+			this.scheduleValidation(inst);
+		}
+	}
 
 	/**
 	 * Create an IndexInstance for the given index ID.
@@ -453,6 +481,8 @@ export class VectorStoreService {
 			validationScheduled: false,
 			isIndexing: false,
 			buildPromise: null,
+			activeBulkRun: null,
+			failedNotes: new Map(Object.entries(getData().getEmbeddingIndex(indexId)?.failedNotes ?? {})),
 			progress: {
 				isIndexing: false,
 				total: 0,
@@ -574,6 +604,10 @@ export class VectorStoreService {
 
 			// Register vault events
 			this.registerEvents();
+			// Which notes an index may hold depends on the privacy rules and on the
+			// provider's trust; when either changes, every open index is out of
+			// date in both directions (notes to drop, notes now allowed in).
+			this.unsubscribePrivacy = data.onPrivacyRulesChange(() => this.revalidateAll());
 
 			this.isInitialized = true;
 			Logger.log("[VectorStore] Initialized");
@@ -842,11 +876,12 @@ export class VectorStoreService {
 		defaultModel: DefaultEmbedModel,
 	): Promise<void> {
 		if (inst.hasValidatedThisSession) return;
-		if (inst.isIndexing) {
-			// A full build is writing every note right now; validating alongside it
-			// would double-write the same chunks. `ensureIndex` marks the instance
-			// validated when the build completes.
-			Logger.log(`[VectorStore] Skipping validation of ${inst.indexId}: full build in progress`);
+		if (this.isBulkRunning(inst)) {
+			// A bulk run — a full build, or an earlier validation's catch-up — is
+			// writing right now; validating alongside it would double-write the
+			// same chunks. The flag stays cleared, so the run schedules this
+			// validation again when it completes (`settleValidationAfterBulkRun`).
+			Logger.log(`[VectorStore] Skipping validation of ${inst.indexId}: bulk run in progress`);
 			return;
 		}
 		inst.hasValidatedThisSession = true;
@@ -892,12 +927,23 @@ export class VectorStoreService {
 		const staleFiles: TFile[] = [];
 		const vaultPaths = new Set<string>();
 
+		let failedSkipped = 0;
 		for (const file of vaultFiles) {
 			vaultPaths.add(file.path);
 			const indexed = indexedMap.get(file.path);
 			if (!indexed) {
+				// A note the provider rejected at this very mtime is not retried;
+				// an edit (any mtime change) puts it back in play.
+				if (inst.failedNotes.get(file.path) === file.stat.mtime) {
+					failedSkipped++;
+					continue;
+				}
 				missingFiles.push(file);
-			} else if (indexed.mtime < file.stat.mtime) {
+			} else if (indexed.mtime !== file.stat.mtime) {
+				// Differing, not merely older: a note restored from a backup or a
+				// sync conflict comes back with an *earlier* mtime, and `<` left
+				// its previous content in the index for good. Same rule as the
+				// lexical side (`LexicalSearchService.needsIndexing`).
 				staleFiles.push(file);
 			}
 		}
@@ -905,6 +951,14 @@ export class VectorStoreService {
 		const orphanedPaths: string[] = [];
 		for (const path of indexedMap.keys()) {
 			if (!vaultPaths.has(path)) orphanedPaths.push(path);
+		}
+		// Entries for notes that are gone, or that changed since they failed, are
+		// dead weight; drop them here rather than carrying them for good.
+		this.pruneFailedNotes(inst, vaultFiles);
+		if (failedSkipped > 0) {
+			Logger.log(
+				`[VectorStore] ${inst.indexId}: leaving ${failedSkipped} note(s) the provider rejected unchanged`,
+			);
 		}
 
 		const totalUpdates = missingFiles.length + staleFiles.length + orphanedPaths.length;
@@ -956,14 +1010,17 @@ export class VectorStoreService {
 
 			let outcome: BulkEmbedOutcome;
 			try {
-				outcome = await this.embedFilesInBatches(inst, embeddings, defaultModel, filesToIndex, {
-					startingIndexedCount,
-					preFilterSkipped: 0,
-					// A stale note is re-indexed with a possibly different chunk count;
-					// its old chunks go first.
-					purgeExisting: true,
-					notice,
-				});
+				outcome = await this.trackBulkRun(
+					inst,
+					this.embedFilesInBatches(inst, embeddings, defaultModel, filesToIndex, {
+						startingIndexedCount,
+						preFilterSkipped: 0,
+						// A stale note is re-indexed with a possibly different chunk count;
+						// its old chunks go first.
+						purgeExisting: true,
+						notice,
+					}),
+				);
 				completed = !outcome.cancelled;
 			} catch (error) {
 				// An unexpected abort (not a per-file failure) — don't leave a stuck
@@ -1138,6 +1195,7 @@ export class VectorStoreService {
 	 * Inactive instances are marked for re-validation on next use.
 	 */
 	private async handleFileDelete(file: TFile): Promise<void> {
+		this.cancelPendingModify(file.path);
 		for (const inst of this.instances.values()) {
 			if (!this.isActiveIndex(inst.indexId)) {
 				inst.hasValidatedThisSession = false;
@@ -1148,8 +1206,17 @@ export class VectorStoreService {
 			// run schedules on completion removes such an orphan.
 			if (this.isBulkRunning(inst)) inst.hasValidatedThisSession = false;
 			await inst.store.remove(file.path);
+			this.clearNoteFailure(inst, file.path);
 			void this.notifyStatsChanged(inst);
 		}
+	}
+
+	/** Drop a pending debounced re-embed of `path`: the file it would read is gone or renamed. */
+	private cancelPendingModify(path: string): void {
+		const timer = this.modifyTimers.get(path);
+		if (timer === undefined) return;
+		window.clearTimeout(timer);
+		this.modifyTimers.delete(path);
 	}
 
 	/**
@@ -1157,6 +1224,7 @@ export class VectorStoreService {
 	 * Inactive instances are marked for re-validation on next use.
 	 */
 	private async handleFileRename(file: TFile, oldPath: string): Promise<void> {
+		this.cancelPendingModify(oldPath);
 		for (const inst of this.instances.values()) {
 			if (!this.isActiveIndex(inst.indexId)) {
 				inst.hasValidatedThisSession = false;
@@ -1165,6 +1233,7 @@ export class VectorStoreService {
 			// The old path's rows go regardless; the new path is written only when
 			// no bulk run is in flight (`canApplyEvent`), else left to validation.
 			await inst.store.remove(oldPath);
+			this.clearNoteFailure(inst, oldPath);
 			if (this.canApplyEvent(inst)) {
 				await this.indexDocumentForInstance(inst, file);
 			}
@@ -1440,13 +1509,23 @@ export class VectorStoreService {
 		try {
 			await inst.store.setMetadata(model.provider, model.model, INDEX_VERSION);
 
-			({ cancelled } = await this.embedFilesInBatches(inst, embeddings, model, files, {
-				startingIndexedCount: 0,
-				preFilterSkipped: skippedFiles.length,
-				purgeExisting: false,
-				notice,
-				report,
-			}));
+			// "Empty" is decided from `listNoteMeta`, which lists a note only through
+			// its chunk-0 row — so a store holding only the partial rows of an
+			// interrupted build reads as empty and lands here. Those rows must go
+			// before their notes are rewritten, or a note whose chunk count shrank
+			// keeps its excess old chunks (live mappings: they surface in search).
+			const purgeExisting = (await inst.store.count()) > 0;
+
+			({ cancelled } = await this.trackBulkRun(
+				inst,
+				this.embedFilesInBatches(inst, embeddings, model, files, {
+					startingIndexedCount: 0,
+					preFilterSkipped: skippedFiles.length,
+					purgeExisting,
+					notice,
+					report,
+				}),
+			));
 
 			// Save the indexing report
 			inst.report = { ...report, timestamp: Date.now() };
@@ -1506,6 +1585,26 @@ export class VectorStoreService {
 		this.scheduleValidation(inst);
 	}
 
+	/** Record `run` as the instance's bulk run in flight until it settles. */
+	private trackBulkRun<T>(inst: IndexInstance, run: Promise<T>): Promise<T> {
+		inst.activeBulkRun = run;
+		return run.finally(() => {
+			if (inst.activeBulkRun === run) inst.activeBulkRun = null;
+		});
+	}
+
+	/**
+	 * Abort the instance's bulk run, if any, and wait until it has stopped
+	 * writing. The store is about to be cleared or closed; a run still in its
+	 * loop would write into it afterwards (an `upsert` racing a `clear()` leaves
+	 * rows the cleared index then serves). The in-flight embedding call is raced
+	 * against the abort (`embedWithCancellation`), so this returns promptly.
+	 */
+	private async stopBulkRun(inst: IndexInstance): Promise<void> {
+		inst.abortController?.abort();
+		await inst.activeBulkRun?.catch(() => {});
+	}
+
 	/**
 	 * Embed `files` into `inst`: the one bulk loop behind both the full build and
 	 * the startup validation (they used to be near-identical copies). Paced and
@@ -1563,7 +1662,12 @@ export class VectorStoreService {
 			report?.skippedFiles.push({ path, reason });
 			if (skippedPaths.has(path)) return;
 			skippedPaths.add(path);
-			this.updateInstanceProgress(inst, { skipped: options.preFilterSkipped + skippedPaths.size });
+			// A skipped note leaves the run entirely: `total` shrinks with it so
+			// the bar can still reach 100 % (it stalled one short per failed note).
+			this.updateInstanceProgress(inst, {
+				skipped: options.preFilterSkipped + skippedPaths.size,
+				total: Math.max(0, inst.progress.total - 1),
+			});
 		};
 		const refreshNotice = () => {
 			if (notice) this.updateNotice(notice, inst.progress);
@@ -1586,14 +1690,16 @@ export class VectorStoreService {
 				id: makeChunkId(entry.file.path, entry.chunkIndex),
 				path: entry.file.path,
 				mtime: entry.mtime,
-				checksum: entry.checksum,
 				chunkIndex: entry.chunkIndex,
 				vector: new Float32Array(vector),
 			};
 			await inst.store.upsert(doc);
 			indexedChunks++;
 			// Chunk 0 is written last (see `orderChunksForWriting`), so its write completes the note.
-			if (entry.chunkIndex === 0) noteIndexed(entry.file.path);
+			if (entry.chunkIndex === 0) {
+				noteIndexed(entry.file.path);
+				this.clearNoteFailure(inst, entry.file.path);
+			}
 		};
 
 		// A note that lost any chunk must not get its chunk 0 written. Chunk 0 is
@@ -1604,9 +1710,16 @@ export class VectorStoreService {
 		// remaining chunks instead leaves it without `#0`, and the next validation
 		// pass re-indexes it whole.
 		const failedPaths = new Set<string>();
-		const noteFailed = (path: string, reason: SkipReason) => {
-			failedPaths.add(path);
-			noteSkipped(path, reason);
+		/**
+		 * `remember` records the note so validation leaves it alone until it
+		 * changes. Only a rejection of *this* note earns that: a transport failure
+		 * stops the run without marking anything, and a whole batch coming back
+		 * empty says something about the call, not about the notes in it.
+		 */
+		const noteFailed = (entry: ChunkEntry, reason: SkipReason, remember = true) => {
+			failedPaths.add(entry.file.path);
+			noteSkipped(entry.file.path, reason);
+			if (remember) this.recordNoteFailure(inst, entry.file.path, entry.mtime);
 		};
 
 		// Consecutive transport-level failures. Reset on any success, so a flaky
@@ -1635,14 +1748,14 @@ export class VectorStoreService {
 				consecutiveUnreachable = 0;
 				if (!vectors || vectors.length === 0) {
 					Logger.error(`[VectorStore] embedDocuments returned empty result for ${inst.indexId}`);
-					for (const entry of batch) noteFailed(entry.file.path, "embed-error");
+					for (const entry of batch) noteFailed(entry, "embed-error", false);
 					return true;
 				}
 				for (let j = 0; j < batch.length; j++) {
 					if (failedPaths.has(batch[j].file.path)) continue;
 					if (!vectors[j]) {
 						Logger.error(`[VectorStore] Empty vector for ${batch[j].file.path}`);
-						noteFailed(batch[j].file.path, "embed-error");
+						noteFailed(batch[j], "embed-error");
 						continue;
 					}
 					await writeVector(batch[j], vectors[j]);
@@ -1675,10 +1788,15 @@ export class VectorStoreService {
 					if (aborted()) return false;
 					if (failedPaths.has(entry.file.path)) continue;
 					try {
-						const vector = await this.embedWithCancellation(inst, embeddings.embedQuery(entry.embedText));
+						// A document, so `embedDocuments` — `embedQuery` is the query
+						// side of an asymmetric model and may be wrapped differently.
+						const [vector] = await this.embedWithCancellation(
+							inst,
+							embeddings.embedDocuments([entry.embedText]),
+						);
 						if (!vector || vector.length === 0) {
-							Logger.error(`[VectorStore] embedQuery returned empty result for ${entry.file.path}`);
-							noteFailed(entry.file.path, "embed-error");
+							Logger.error(`[VectorStore] embedDocuments returned empty result for ${entry.file.path}`);
+							noteFailed(entry, "embed-error");
 							continue;
 						}
 						await writeVector(entry, vector);
@@ -1690,7 +1808,7 @@ export class VectorStoreService {
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
-						noteFailed(entry.file.path, "embed-error");
+						noteFailed(entry, "embed-error");
 					}
 				}
 				return true;
@@ -1732,22 +1850,17 @@ export class VectorStoreService {
 			try {
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
-				const checksum = this.hashContent(content);
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				for (const chunk of orderChunksForWriting(chunks)) {
 					pending.push({
 						file,
 						mtime,
 						chunkIndex: chunk.chunkIndex,
-						checksum,
 						embedText: chunk.content,
 					});
 				}
 			} catch (error) {
 				Logger.error(`[VectorStore] Failed to read ${file.path}:`, error);
-				// An unreadable note leaves the run entirely: it is skipped, and
-				// `total` shrinks with it so the bar can still reach 100%.
-				this.updateInstanceProgress(inst, { total: Math.max(0, inst.progress.total - 1) });
 				noteSkipped(file.path, "read-error");
 				continue;
 			}
@@ -1861,25 +1974,31 @@ export class VectorStoreService {
 		if (!embeddings) return;
 
 		if (!this.shouldIndexFile(file, model.provider)) {
-			Logger.log(`[VectorStore] Skipping ${file.path}: excluded by internal rules`);
+			// A note that stopped being indexable — moved under the privacy filter,
+			// or its provider lost trust — must not stay searchable by its old
+			// content until the next launch's orphan sweep: drop what is stored.
+			Logger.log(`[VectorStore] Removing ${file.path}: excluded by internal rules`);
+			await inst.store.remove(file.path);
 			return;
 		}
 
+		const mtime = stampForRead(file);
 		try {
-			const mtime = stampForRead(file);
 			const content = await readIndexableContent(this.plugin.app.vault, file);
 			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
-			const checksum = this.hashContent(content);
 			const chunks = chunkText(content, file.basename, maxContentLength);
 
-			// Embed all chunks first; only touch the store once every embedding
-			// succeeded so a mid-way failure can't leave a note partially indexed.
+			// Embed all chunks first — as documents, in one call — and only touch
+			// the store once every embedding succeeded, so a mid-way failure can't
+			// leave a note partially indexed.
+			const raw = await embeddings.embedDocuments(chunks.map((chunk) => chunk.content));
 			const vectors: Float32Array[] = [];
-			for (const chunk of chunks) {
-				const vector = await embeddings.embedQuery(chunk.content);
+			for (let i = 0; i < chunks.length; i++) {
+				const vector = raw[i];
 				if (!vector || vector.length === 0) {
-					Logger.error(`[VectorStore] embedQuery returned empty result for ${file.path}`);
+					Logger.error(`[VectorStore] embedDocuments returned empty result for ${file.path}`);
 					new Notice(`Failed to embed ${file.basename}: empty result from model`);
+					this.recordNoteFailure(inst, file.path, mtime);
 					return;
 				}
 				vectors.push(new Float32Array(vector));
@@ -1893,19 +2012,51 @@ export class VectorStoreService {
 					id: makeChunkId(file.path, chunks[i].chunkIndex),
 					path: file.path,
 					mtime,
-					checksum,
 					chunkIndex: chunks[i].chunkIndex,
 					vector: vectors[i],
 				};
 				await inst.store.upsert(doc);
 			}
+			this.clearNoteFailure(inst, file.path);
 
 			Logger.log(`[VectorStore] Indexed: ${file.path} (${chunks.length} chunks, ${inst.indexId})`);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to index ${file.path} (${inst.indexId}):`, error);
 			const reason = error instanceof Error ? error.message : String(error);
 			new Notice(`Failed to embed ${file.basename}: ${reason}`);
+			// A dead provider is not this note's fault; anything else is, until it changes.
+			if (!isProviderUnreachableError(error)) this.recordNoteFailure(inst, file.path, mtime);
 		}
+	}
+
+	// ── Notes the provider rejected ────────────────────────────────────────
+
+	private recordNoteFailure(inst: IndexInstance, path: string, mtime: number): void {
+		if (inst.failedNotes.get(path) === mtime) return;
+		inst.failedNotes.set(path, mtime);
+		this.persistFailedNotes(inst);
+	}
+
+	private clearNoteFailure(inst: IndexInstance, path: string): void {
+		if (!inst.failedNotes.delete(path)) return;
+		this.persistFailedNotes(inst);
+	}
+
+	/** Forget failures of notes that are gone from the vault or have changed since. */
+	private pruneFailedNotes(inst: IndexInstance, vaultFiles: TFile[]): void {
+		if (inst.failedNotes.size === 0) return;
+		const current = new Map(vaultFiles.map((file) => [file.path, file.stat.mtime]));
+		let changed = false;
+		for (const [path, mtime] of inst.failedNotes) {
+			if (current.get(path) === mtime) continue;
+			inst.failedNotes.delete(path);
+			changed = true;
+		}
+		if (changed) this.persistFailedNotes(inst);
+	}
+
+	private persistFailedNotes(inst: IndexInstance): void {
+		getData().updateEmbeddingIndexStats(inst.indexId, { failedNotes: Object.fromEntries(inst.failedNotes) });
 	}
 
 	/**
@@ -2075,17 +2226,6 @@ export class VectorStoreService {
 	}
 
 	/**
-	 * Simple hash function for content change detection.
-	 */
-	private hashContent(content: string): string {
-		let hash = 5381;
-		for (let i = 0; i < content.length; i++) {
-			hash = (hash * 33) ^ (content.codePointAt(i) ?? 0);
-		}
-		return (hash >>> 0).toString(16);
-	}
-
-	/**
 	 * Get the current index stats for a specific index or the search index.
 	 */
 	async getStats(indexId?: string): Promise<{
@@ -2197,6 +2337,8 @@ export class VectorStoreService {
 			const reason = this.getFileSkipReason(file, provider);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
+			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
+				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				// File passed filters but isn't indexed yet
 				skippedFiles.push({ path: file.path, reason: "not-indexed" });
@@ -2339,7 +2481,8 @@ export class VectorStoreService {
 	 */
 	private async clearStore(inst: IndexInstance): Promise<void> {
 		await inst.store.clear();
-		getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: null, documentCount: 0 });
+		inst.failedNotes.clear();
+		getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: null, documentCount: 0, failedNotes: {} });
 	}
 
 	/**
@@ -2354,19 +2497,6 @@ export class VectorStoreService {
 			// it no longer waits out a request that may never return.
 			new Notice("Cancelling indexing…");
 		}
-	}
-
-	/**
-	 * Clear and rebuild a specific index.
-	 */
-	async rebuildIndex(indexId?: string): Promise<void> {
-		const data = getData();
-		const resolvedId = indexId ?? data.searchEmbedIndex;
-		if (!resolvedId) return;
-
-		const inst = await this.getOrCreateInstance(resolvedId);
-		await this.clearStore(inst);
-		await this.ensureIndex(resolvedId);
 	}
 
 	/**
@@ -2465,13 +2595,15 @@ export class VectorStoreService {
 
 			const indexId = `${provider}:${model}`;
 			const inst = await this.getOrCreateInstance(indexId);
+			// A validation may be writing this very index; it must not keep going
+			// under the clear below.
+			await this.stopBulkRun(inst);
 			await this.clearStore(inst);
 
 			const docs: DocumentVector[] = decoded.documents.map((d) => ({
 				id: d.id,
 				path: d.path,
 				mtime: d.mtime,
-				checksum: d.checksum,
 				vector: new Float32Array(d.vector),
 				chunkIndex: d.chunkIndex,
 			}));
@@ -2512,12 +2644,10 @@ export class VectorStoreService {
 	async deleteIndex(indexId: string): Promise<void> {
 		const inst = this.instances.get(indexId);
 		if (inst) {
-			// Abort any in-flight indexing run so it stops writing to the store
-			// we're about to clear, and flip progress off so listeners (e.g. the
-			// settings progress bar) hide immediately instead of lingering. Keep
-			// the abortController set (don't null it) so the loop's own
-			// `signal.aborted` checks fire and it breaks out on its next tick.
-			inst.abortController?.abort();
+			// Abort any in-flight indexing run and wait for it to stop writing to
+			// the store we're about to clear; its own `finally` flips the progress
+			// off, so listeners (e.g. the settings progress bar) hide with it.
+			await this.stopBulkRun(inst);
 			this.updateInstanceProgress(inst, { isIndexing: false, currentFile: null, etaMs: null });
 			inst.isIndexing = false;
 			await inst.store.clear();
@@ -2588,6 +2718,8 @@ export class VectorStoreService {
 		try {
 			for (const timer of this.modifyTimers.values()) window.clearTimeout(timer);
 			this.modifyTimers.clear();
+			this.unsubscribePrivacy?.();
+			this.unsubscribePrivacy = null;
 			// Wait for any in-progress initialization before cleaning up
 			if (this.initPromise) {
 				await this.initPromise.catch(() => {});

@@ -19,7 +19,7 @@ import {
 import type { DocumentVector } from "../../src/vectorstore/types";
 
 function doc(path: string, vector: number[]): DocumentVector {
-	return { id: `${path}#0`, path, mtime: 1, checksum: "c", chunkIndex: 0, vector: new Float32Array(vector) };
+	return { id: `${path}#0`, path, mtime: 1, chunkIndex: 0, vector: new Float32Array(vector) };
 }
 
 async function writeIndex(vaultId: string, indexId: string, docs: DocumentVector[]): Promise<void> {

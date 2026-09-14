@@ -13,7 +13,7 @@ import { HNSWVectorStore } from "../../src/vectorstore/HNSWVectorStore";
 import type { DocumentVector } from "../../src/vectorstore/types";
 
 function doc(path: string, vector: number[]): DocumentVector {
-	return { id: `${path}#0`, path, mtime: 1, checksum: "c", chunkIndex: 0, vector: new Float32Array(vector) };
+	return { id: `${path}#0`, path, mtime: 1, chunkIndex: 0, vector: new Float32Array(vector) };
 }
 
 async function openStore(): Promise<HNSWVectorStore> {
@@ -87,7 +87,6 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 			id: "big.md#1",
 			path: "big.md",
 			mtime: 5,
-			checksum: "c",
 			chunkIndex: 1,
 			vector: new Float32Array([0, 1]),
 		});
@@ -101,7 +100,6 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 			id: "big.md#0",
 			path: "big.md",
 			mtime: 5,
-			checksum: "c",
 			chunkIndex: 0,
 			vector: new Float32Array([1, 1]),
 		});
@@ -160,6 +158,28 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		expect(await second.count()).toBe(4);
 		const hits = await second.search(new Float32Array([1, 1, 0]), 1);
 		expect(hits.map((h) => h.path)).toEqual(["d.md"]);
+		await second.close();
+	});
+
+	it("loads the persisted graph once when a search and an upsert race to initialise it", async () => {
+		const first = await openForBuild();
+		await first.upsert(doc("a.md", [1, 0, 0]));
+		await first.flush();
+		await first.close();
+
+		// A reopened store has its dimensions but no graph yet; both calls try to
+		// load it. The upsert's load used to finish first and receive the new point,
+		// then the search's load replaced the whole graph and lost it for the session.
+		const second = await openStore();
+		const loads = vi.spyOn(second as unknown as { loadGraph: () => Promise<void> }, "loadGraph");
+		const [, hits] = await Promise.all([
+			second.upsert(doc("b.md", [0, 1, 0])),
+			second.search(new Float32Array([1, 0, 0]), 1),
+		]);
+		expect(loads).toHaveBeenCalledTimes(1);
+		expect(hits.map((h) => h.path)).toEqual(["a.md"]);
+		expect(graphNodeCount(second)).toBe(2);
+		expect((await second.search(new Float32Array([0, 1, 0]), 1)).map((h) => h.path)).toEqual(["b.md"]);
 		await second.close();
 	});
 

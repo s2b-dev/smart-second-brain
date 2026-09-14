@@ -31,6 +31,15 @@ import { getData } from "../stores/dataStore.svelte";
 
 const MAX_SNIPPET_LENGTH = 180;
 
+/**
+ * Debounce before re-indexing a modified note. Obsidian autosaves while the
+ * user types, and every save re-read, re-tokenized and re-added the note;
+ * the embedding path already waits (5 s, a provider round trip per save). The
+ * lexical index is cheap to update, so it waits less — an edit is searchable
+ * a couple of seconds after the last keystroke.
+ */
+const MODIFY_DEBOUNCE_MS = 2_000;
+
 interface ResolvedMatchMetadata {
 	badges?: SearchMatchBadge[];
 	explanation?: SearchMatchExplanation;
@@ -66,6 +75,8 @@ export class LexicalSearchService {
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-lexical-bulk-attempts`, vault-scoped). */
 	private readonly bulkAttempts: BulkAttemptMarker;
+	/** Pending debounced re-index per path (see `MODIFY_DEBOUNCE_MS`). */
+	private readonly modifyTimers = new Map<string, number>();
 
 	private constructor(plugin: SecondBrainPlugin) {
 		this.plugin = plugin;
@@ -377,9 +388,9 @@ export class LexicalSearchService {
 		);
 
 		this.plugin.registerEvent(
-			vault.on("modify", async (file) => {
+			vault.on("modify", (file) => {
 				if (file instanceof TFile && isIndexableFile(file)) {
-					await this.handleFileModify(file);
+					this.handleFileModify(file);
 				}
 			}),
 		);
@@ -387,6 +398,7 @@ export class LexicalSearchService {
 		this.plugin.registerEvent(
 			vault.on("delete", (file) => {
 				if (file instanceof TFile) {
+					this.cancelPendingModify(file.path);
 					this.miniSearch.removeDocument(file.path);
 				}
 			}),
@@ -412,7 +424,19 @@ export class LexicalSearchService {
 		}
 	}
 
-	private async handleFileModify(file: TFile): Promise<void> {
+	/** Re-index a modified note once its edits pause; each new save restarts the wait. */
+	private handleFileModify(file: TFile): void {
+		this.cancelPendingModify(file.path);
+		this.modifyTimers.set(
+			file.path,
+			window.setTimeout(() => {
+				this.modifyTimers.delete(file.path);
+				void this.reindexModifiedFile(file);
+			}, MODIFY_DEBOUNCE_MS),
+		);
+	}
+
+	private async reindexModifiedFile(file: TFile): Promise<void> {
 		try {
 			await this.indexFile(file);
 		} catch (error) {
@@ -420,7 +444,16 @@ export class LexicalSearchService {
 		}
 	}
 
+	/** Drop a pending debounced re-index of `path`: the file it would read is gone or renamed. */
+	private cancelPendingModify(path: string): void {
+		const timer = this.modifyTimers.get(path);
+		if (timer === undefined) return;
+		window.clearTimeout(timer);
+		this.modifyTimers.delete(path);
+	}
+
 	private async handleFileRename(file: TFile, oldPath: string): Promise<void> {
+		this.cancelPendingModify(oldPath);
 		// Always drop the old path, even when the destination is no longer
 		// indexable — otherwise the pre-rename document stays searchable forever.
 		this.miniSearch.removeDocument(oldPath);
@@ -775,6 +808,8 @@ export class LexicalSearchService {
 
 	async cleanup(): Promise<void> {
 		try {
+			for (const timer of this.modifyTimers.values()) window.clearTimeout(timer);
+			this.modifyTimers.clear();
 			if (pendingInitPromise !== null) {
 				await pendingInitPromise.catch(() => {});
 			}

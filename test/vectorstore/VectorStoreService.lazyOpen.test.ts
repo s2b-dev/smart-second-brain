@@ -16,7 +16,7 @@ import { Platform } from "obsidian";
  * run under jsdom), and the provider layer by a fake embeddings instance.
  */
 
-import { MOBILE_BULK_BASE_DELAY_MS } from "../../src/search/bulkPacing";
+import { MOBILE_BULK_BASE_DELAY_MS, resetBulkRunQueue } from "../../src/search/bulkPacing";
 import type { DocumentVector, IndexMetadata, NoteMeta, VectorStore } from "../../src/vectorstore/types";
 
 // ---- fakes ------------------------------------------------------------------
@@ -103,6 +103,10 @@ let vaultFiles: FakeFile[] = [];
 const embedDocuments = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 const embedQuery = vi.fn(async () => [1, 0, 0]);
 const indexStats: Record<string, unknown> = {};
+/** The privacy rules the fake data store answers with; tests flip them mid-run. */
+let providerTrusted = true;
+let privatePaths = new Set<string>();
+const privacyListeners = new Set<() => void>();
 
 const fakeData = {
 	vaultSlug: "vault-1",
@@ -117,11 +121,17 @@ const fakeData = {
 					batchSize: 2,
 					// Mirror the stats the service wrote, as the real config would.
 					lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
+					failedNotes: indexStats.failedNotes as Record<string, number> | undefined,
 				}
 			: undefined,
 	updateEmbeddingIndexStats: vi.fn((_id: string, stats: Record<string, unknown>) => Object.assign(indexStats, stats)),
-	isProviderTrusted: () => true,
-	isFilePrivate: () => false,
+	removeEmbeddingIndex: vi.fn(),
+	isProviderTrusted: () => providerTrusted,
+	isFilePrivate: (path: string) => privatePaths.has(path),
+	onPrivacyRulesChange: (listener: () => void) => {
+		privacyListeners.add(listener);
+		return () => privacyListeners.delete(listener);
+	},
 	getResolvedProviderAuth: () => null,
 };
 
@@ -205,10 +215,16 @@ async function startService(): Promise<VectorStoreService> {
 
 beforeEach(() => {
 	vi.useFakeTimers();
+	resetBulkRunQueue();
 	vaultStorage.clear();
 	stores.clear();
 	vaultFiles = [];
+	providerTrusted = true;
+	privatePaths = new Set();
+	privacyListeners.clear();
 	showActionNotice.mockClear();
+	embedDocuments.mockClear();
+	embedQuery.mockClear();
 	for (const key of Object.keys(indexStats)) delete indexStats[key];
 });
 
@@ -271,7 +287,6 @@ describe("bulk embed run", () => {
 			id: "d.md#1",
 			path: "d.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 1,
 			vector: new Float32Array(3),
 		});
@@ -279,7 +294,6 @@ describe("bulk embed run", () => {
 			id: "a.md#0",
 			path: "a.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 0,
 			vector: new Float32Array(3),
 		});
@@ -287,7 +301,6 @@ describe("bulk embed run", () => {
 			id: "c.md#0",
 			path: "c.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 0,
 			vector: new Float32Array(3),
 		});
@@ -295,7 +308,6 @@ describe("bulk embed run", () => {
 			id: "gone.md#0",
 			path: "gone.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 0,
 			vector: new Float32Array(3),
 		});
@@ -370,11 +382,13 @@ describe("bulk embed run", () => {
 		expect(await build).toBe(true);
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
 
-		// Rebuild: the first batch lands, the second hangs until cancelled.
+		// Rebuild — the model behind the index changed, so `ensureIndex` clears the
+		// store and builds again: the first batch lands, the second hangs until cancelled.
+		await stores.get(INDEX)?.setMetadata("fake", "previous-model", 2);
 		embedDocuments
 			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
 			.mockImplementationOnce(() => new Promise<number[][]>(() => {}));
-		const rebuild = svc.rebuildIndex(INDEX);
+		const rebuild = svc.ensureIndex(INDEX);
 		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(4));
 		svc.cancelIndexing(INDEX);
 		await vi.advanceTimersByTimeAsync(1_000);
@@ -396,7 +410,6 @@ describe("bulk embed run", () => {
 				id: `${path}#0`,
 				path,
 				mtime: 1_000,
-				checksum: "x",
 				chunkIndex: 0,
 				vector: new Float32Array(3),
 			});
@@ -472,7 +485,6 @@ describe("bulk embed run", () => {
 			id: "a.md#0",
 			path: "a.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 0,
 			vector: new Float32Array(3),
 		});
@@ -524,7 +536,6 @@ describe("bulk embed run", () => {
 			id: "a.md#0",
 			path: "a.md",
 			mtime: 1_000,
-			checksum: "x",
 			chunkIndex: 0,
 			vector: new Float32Array(3),
 		});
@@ -539,7 +550,14 @@ describe("bulk embed run", () => {
 });
 
 /** The service's private per-file hooks, reached directly: the fake vault registers no events. */
-type EventHooks = { handleFileModify(file: FakeFile): void };
+type EventHooks = {
+	handleFileModify(file: FakeFile): void;
+	handleFileCreate(file: FakeFile): Promise<void>;
+};
+
+function seeded(path: string, mtime: number, chunkIndex = 0): DocumentVector {
+	return { id: `${path}#${chunkIndex}`, path, mtime, chunkIndex, vector: new Float32Array(3) };
+}
 
 describe("vault events during a bulk run", () => {
 	it("stores the mtime the note was read at, not the one it has when the row is written", async () => {
@@ -717,5 +735,156 @@ describe("unreachable provider", () => {
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
 		const report = await service?.getReport(INDEX);
 		expect(report?.skippedFiles).toEqual([]);
+	});
+});
+
+describe("indexing review follow-ups", () => {
+	it("re-indexes a note whose stored mtime is newer than the file's (restored from a backup)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		await store.setMetadata("fake", "embed-model", 2);
+		// Indexed at 5_000, then the note was put back from a backup dated 1_000.
+		await store.upsert(seeded("a.md", 5_000));
+
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		expect(store.docs.get("a.md#0")?.mtime).toBe(1_000);
+	});
+
+	it("a note the provider rejects is left alone on later launches until it changes", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("ok.md", 1_000), file("bad.md", 1_000)];
+		const rejectBad = async (texts: string[]) => {
+			if (texts.some((text) => text.includes("content of bad.md"))) throw new Error("content policy");
+			return texts.map(() => [1, 0, 0]);
+		};
+		embedDocuments.mockImplementation(rejectBad);
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// The batch failed, the per-entry fallback wrote ok.md and gave up on bad.md.
+		const store = stores.get(INDEX);
+		expect(store?.docs.has("ok.md#0")).toBe(true);
+		expect(store?.docs.has("bad.md#0")).toBe(false);
+		expect(indexStats.failedNotes).toEqual({ "bad.md": 1_000 });
+		// The bar reaches 100 %: the failed note left the total.
+		expect(svc.getProgress(INDEX)).toMatchObject({ total: 1, indexed: 1, skipped: 1, percentage: 100 });
+		expect((await svc.getReport(INDEX))?.skippedFiles).toEqual([{ path: "bad.md", reason: "embed-error" }]);
+		const attempts = embedDocuments.mock.calls.length;
+
+		// Next launch: the note is missing from the index, but not retried.
+		await svc.cleanup();
+		service = null;
+		const relaunched = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(attempts);
+		expect((await relaunched.getReport(INDEX))?.skippedFiles).toEqual([{ path: "bad.md", reason: "embed-error" }]);
+
+		// An edit puts it back in play; it succeeds now and the entry is gone.
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+		vaultFiles[1].stat.mtime = 2_000;
+		await relaunched.cleanup();
+		service = null;
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.get("bad.md#0")?.mtime).toBe(2_000);
+		expect(indexStats.failedNotes).toEqual({});
+	});
+
+	it("a privacy-rule change re-validates: notes now private go, notes now allowed come in", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("secret.md")];
+		providerTrusted = false;
+		privatePaths = new Set(["secret.md"]);
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const store = stores.get(INDEX);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+
+		// The user swaps which note is private.
+		privatePaths = new Set(["a.md"]);
+		for (const listener of privacyListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["secret.md#0"]);
+	});
+
+	it("a note that stopped being indexable is dropped when its next event arrives", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.size).toBe(1);
+
+		providerTrusted = false;
+		privatePaths = new Set(["a.md"]);
+		vaultFiles[0].stat.mtime = 2_000;
+		(svc as unknown as EventHooks).handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(stores.get(INDEX)?.docs.size).toBe(0);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+	});
+
+	it("a full build over a store holding only an interrupted build's partial rows purges them first", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("big.md", 1_000)];
+		await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		await store.setMetadata("fake", "embed-model", 2);
+		// Killed after two of three chunks: rows exist, but no chunk 0 — so the
+		// index reads as empty and the full build runs. The note is one chunk now.
+		await store.upsert(seeded("big.md", 1_000, 1));
+		await store.upsert(seeded("big.md", 1_000, 2));
+
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...store.docs.keys()]).toEqual(["big.md#0"]);
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+	});
+
+	it("deleteIndex stops the run in flight and waits for it before clearing the store", async () => {
+		platform.isMobile = false;
+		// `deleteIndex` ends by dropping the IndexedDB databases; the fake store
+		// has none, so a request that succeeds at once stands in for the factory
+		// (fake-indexeddb runs on `setImmediate`, which the fake timers hold).
+		vi.stubGlobal("indexedDB", {
+			deleteDatabase: () => {
+				const request: { onsuccess?: () => void } = {};
+				queueMicrotask(() => request.onsuccess?.());
+				return request;
+			},
+		});
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(() => new Promise<number[][]>(() => {}));
+		const svc = await startService();
+		const build = svc.ensureIndex(INDEX);
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(2));
+		const store = stores.get(INDEX);
+		expect(store?.docs.size).toBe(2);
+
+		await svc.deleteIndex(INDEX);
+		// The run had settled before the store was cleared, so nothing lands after.
+		expect(await build).toBe(true);
+		expect(store?.docs.size).toBe(0);
+		expect(store?.close).toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(store?.docs.size).toBe(0);
+		expect(svc.getProgress(INDEX).isIndexing).toBe(false);
+	});
+
+	it("embeds a note through embedDocuments on the incremental path too, never embedQuery", async () => {
+		platform.isMobile = false;
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000); // nothing to validate
+		const created = file("a.md");
+		vaultFiles.push(created);
+		await (svc as unknown as EventHooks).handleFileCreate(created);
+		expect(embedQuery).not.toHaveBeenCalled();
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		expect(stores.get(INDEX)?.docs.has("a.md#0")).toBe(true);
 	});
 });

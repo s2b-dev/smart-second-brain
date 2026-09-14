@@ -76,7 +76,6 @@ interface StoredDocument {
 	id: string;
 	path: string;
 	mtime: number;
-	checksum: string;
 	vector: Float32Array;
 	chunkIndex?: number;
 	/** Numeric ID for HNSW index */
@@ -490,18 +489,34 @@ export class HNSWVectorStore implements VectorStore {
 		return new HNSW(this.M, this.efConstruction, null, "cosine", this.efSearch);
 	}
 
-	private async initHNSWIndex(): Promise<void> {
-		if (!this.dimensions || this.hnswIndex) return;
+	/**
+	 * The graph load in flight, so concurrent callers share one. The worker
+	 * handles messages concurrently, and the guard on `hnswIndex` alone is not
+	 * enough: a search arriving while the first `upsert` was still loading the
+	 * graph started a second load, and whichever finished last replaced the
+	 * graph — dropping every point the other had `addPoint`ed in between, for
+	 * the rest of the session.
+	 */
+	private graphLoad: Promise<void> | null = null;
 
-		const index = this.createEmptyGraph();
-		try {
-			await this.loadGraph(index);
-		} catch (error) {
-			// A graph that fails to load is not fatal: the rows are intact, and the
-			// next full rebuild (or incremental upserts) repopulate it.
-			Logger.error(`${LOG_PREFIX} Failed to load persisted HNSW graph; starting from an empty one:`, error);
-		}
-		this.hnswIndex = index;
+	private initHNSWIndex(): Promise<void> {
+		if (!this.dimensions || this.hnswIndex) return Promise.resolve();
+		if (this.graphLoad) return this.graphLoad;
+
+		this.graphLoad = (async () => {
+			const index = this.createEmptyGraph();
+			try {
+				await this.loadGraph(index);
+			} catch (error) {
+				// A graph that fails to load is not fatal: the rows are intact, and the
+				// next full rebuild (or incremental upserts) repopulate it.
+				Logger.error(`${LOG_PREFIX} Failed to load persisted HNSW graph; starting from an empty one:`, error);
+			}
+			this.hnswIndex = index;
+		})().finally(() => {
+			this.graphLoad = null;
+		});
+		return this.graphLoad;
 	}
 
 	private async ensureHNSWIndex(): Promise<void> {
@@ -787,7 +802,6 @@ export class HNSWVectorStore implements VectorStore {
 			id: doc.id,
 			path: doc.path,
 			mtime: doc.mtime,
-			checksum: doc.checksum,
 			vector: doc.vector,
 			chunkIndex: doc.chunkIndex,
 			hnswId,
@@ -951,7 +965,6 @@ export class HNSWVectorStore implements VectorStore {
 				id: s.id,
 				path: s.path,
 				mtime: s.mtime,
-				checksum: s.checksum,
 				vector: Array.from(s.vector),
 				chunkIndex: s.chunkIndex,
 			});
@@ -1069,7 +1082,6 @@ export class HNSWVectorStore implements VectorStore {
 					id: doc.id,
 					path: doc.path,
 					mtime: doc.mtime,
-					checksum: doc.checksum,
 					vector: doc.vector,
 					chunkIndex: doc.chunkIndex,
 					hnswId,
@@ -1094,6 +1106,8 @@ export class HNSWVectorStore implements VectorStore {
 	 */
 	async clear(): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
+		// A load still in flight would install the old graph over the cleared state.
+		if (this.graphLoad) await this.graphLoad.catch(() => {});
 
 		await this.clearStore(DOCUMENTS_STORE);
 		await this.clearStore(METADATA_STORE);
@@ -1321,7 +1335,6 @@ export class HNSWVectorStore implements VectorStore {
 			id: stored.id,
 			path: stored.path,
 			mtime: stored.mtime,
-			checksum: stored.checksum,
 			vector: stored.vector,
 			chunkIndex: stored.chunkIndex,
 		};

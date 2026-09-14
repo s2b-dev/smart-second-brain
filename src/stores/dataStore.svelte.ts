@@ -434,11 +434,32 @@ export class PluginDataStore {
 	setPrivacyMode(mode: PrivacyMode) {
 		this.#data.privacyMode = mode;
 		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
 	}
 
 	setPrivacyFilter(filter: PluginData["privacyFilter"]) {
 		this.#data.privacyFilter = filter;
 		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
+	}
+
+	/**
+	 * Listeners for changes to what `isFilePrivate` / `isProviderTrusted` answer.
+	 * The embedding indexer subscribes: which notes an index may hold follows
+	 * from these, so a change means every index needs re-validating against
+	 * the vault (notes to drop, notes now allowed in). A plain callback set
+	 * rather than a rune, because the subscriber is a service, not a component.
+	 */
+	readonly #privacyListeners = new Set<() => void>();
+
+	/** Subscribe to privacy-rule changes; returns the unsubscribe. */
+	onPrivacyRulesChange(listener: () => void): () => void {
+		this.#privacyListeners.add(listener);
+		return () => this.#privacyListeners.delete(listener);
+	}
+
+	private notifyPrivacyRulesChanged(): void {
+		for (const listener of this.#privacyListeners) listener();
 	}
 
 	isFilePrivate(filePath: string): boolean {
@@ -468,8 +489,10 @@ export class PluginDataStore {
 	setProviderTrusted(providerId: string, trusted: boolean) {
 		const config = this.#data.providerConfig[providerId];
 		if (!config) return;
+		if (config.trustedForPrivateData === trusted) return;
 		config.trustedForPrivateData = trusted;
 		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
 	}
 
 	private getAllVaultPaths(): Set<string> {
@@ -1361,7 +1384,12 @@ export class PluginDataStore {
 	 */
 	updateEmbeddingIndexStats(
 		indexId: string,
-		stats: { lastBuiltAt?: number | null; documentCount?: number; dimensions?: number },
+		stats: {
+			lastBuiltAt?: number | null;
+			documentCount?: number;
+			dimensions?: number;
+			failedNotes?: Record<string, number>;
+		},
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
 		if (!config) return;
@@ -1380,6 +1408,15 @@ export class PluginDataStore {
 		if (stats.dimensions !== undefined && config.dimensions !== stats.dimensions) {
 			config.dimensions = stats.dimensions;
 			changed = true;
+		}
+		if (stats.failedNotes !== undefined) {
+			// Written only when the set actually moved (the indexer diffs first);
+			// an empty record is dropped rather than stored.
+			const next = Object.keys(stats.failedNotes).length > 0 ? stats.failedNotes : undefined;
+			if (next !== undefined || config.failedNotes !== undefined) {
+				config.failedNotes = next;
+				changed = true;
+			}
 		}
 		if (changed) void this.saveSettings();
 	}

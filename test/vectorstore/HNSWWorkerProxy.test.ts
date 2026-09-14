@@ -73,7 +73,6 @@ describe("HNSWWorkerProxy.close", () => {
 				id: "a.md#0",
 				path: "a.md",
 				mtime: 1,
-				checksum: "c",
 				chunkIndex: 0,
 				vector: new Float32Array([1, 0]),
 			}),
