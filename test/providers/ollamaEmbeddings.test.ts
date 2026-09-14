@@ -36,6 +36,9 @@ describe("embedFailedAttempt", () => {
 		const cause = Object.assign(new Error("connect ECONNREFUSED ::1:11434"), { code: "ECONNREFUSED" });
 		expect(() => embedFailedAttempt(new TypeError("fetch failed", { cause }))).toThrow();
 		expect(() => embedFailedAttempt(new DOMException("Request timed out after 60000ms", "TimeoutError"))).toThrow();
+		const sdkTimeout = new Error("Request timed out.");
+		sdkTimeout.name = "APIConnectionTimeoutError";
+		expect(() => embedFailedAttempt(sdkTimeout)).toThrow();
 	});
 
 	it("keeps the default backoff for blips: 5xx, resets, a generic network failure", () => {
@@ -90,6 +93,28 @@ describe("createTransportedOpenAIEmbeddings", () => {
 		});
 
 		await expect(embeddings.embedDocuments(["a chunk"])).rejects.toThrow();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("createTransportedOpenAIEmbeddings — timeout", () => {
+	it("issues exactly one request when the fetch times out", async () => {
+		// `obsidianFetch` rejects with a `TimeoutError` DOMException; the OpenAI
+		// client turns it into its own `APIConnectionTimeoutError` (the original
+		// on `cause`) before LangChain's retry sees it. A named `Error` stands in
+		// for the DOMException here: jsdom's is not an `Error` subclass, which the
+		// SDK's `castToError` flattens to an empty `Error("{}")` — an artefact
+		// Electron and WebKit, where DOMException extends Error, do not have.
+		const fetchMock = vi.fn(async () => {
+			throw Object.assign(new Error("Request timed out after 60000ms"), { name: "TimeoutError" });
+		});
+		const embeddings = createTransportedOpenAIEmbeddings({
+			model: "text-embedding-3-small",
+			apiKey: "not-required",
+			configuration: { baseURL: "http://localhost:1/v1", fetch: fetchMock as unknown as typeof fetch },
+		});
+
+		await expect(embeddings.embedDocuments(["a chunk"])).rejects.toThrow(/timed out/i);
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });

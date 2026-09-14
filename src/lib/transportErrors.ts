@@ -53,18 +53,43 @@ function errorTexts(error: unknown): string[] {
 }
 
 /**
- * True when the request ran out the fetch-level timeout (`obsidianFetch`
- * rejects with a `TimeoutError` DOMException). Each such attempt has already
- * waited the full budget, so retrying it with backoff multiplies minutes.
+ * The request ran out its timeout. `obsidianFetch` rejects with a
+ * `TimeoutError` DOMException; the OpenAI client does not pass that through
+ * but throws its own `APIConnectionTimeoutError` ("Request timed out.") with
+ * no `cause`, and Electron reports a socket-level one as
+ * `ERR_CONNECTION_TIMED_OUT`. All three spellings must match, or an
+ * OpenAI-client provider's timeout would still burn the retry budget.
+ */
+const TIMEOUT_RE = /\btimed? ?out\b|ETIMEDOUT|ERR_CONNECTION_TIMED_OUT/i;
+
+/**
+ * True when the request ran out a timeout, however the client reports it.
+ * Each such attempt has already waited the full budget (60 s at the fetch
+ * level), so retrying it with backoff multiplies minutes.
  */
 export function isRequestTimeoutError(error: unknown): boolean {
-	return errorName(error) === "TimeoutError";
+	return (
+		errorNames(error).some((name) => name === "TimeoutError" || name === "APIConnectionTimeoutError") ||
+		errorTexts(error).some((text) => TIMEOUT_RE.test(text))
+	);
 }
 
 function errorName(error: unknown): string | undefined {
 	if (typeof error !== "object" || error === null) return undefined;
 	const name = (error as { name?: unknown }).name;
 	return typeof name === "string" ? name : undefined;
+}
+
+/** `name` of the error and of everything down its `cause` chain. */
+function errorNames(error: unknown): string[] {
+	const names: string[] = [];
+	let current: unknown = error;
+	for (let depth = 0; depth < 5 && typeof current === "object" && current !== null; depth++) {
+		const name = errorName(current);
+		if (name) names.push(name);
+		current = (current as { cause?: unknown }).cause;
+	}
+	return names;
 }
 
 /**

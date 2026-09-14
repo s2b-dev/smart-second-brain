@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isConnectionRefusedError, isProviderUnreachableError } from "../../src/lib/transportErrors";
+import {
+	isConnectionRefusedError,
+	isProviderUnreachableError,
+	isRequestTimeoutError,
+} from "../../src/lib/transportErrors";
 
 /*
  * One predicate for "the provider is not answering", shared by the embedding
@@ -33,6 +37,30 @@ describe("isConnectionRefusedError", () => {
 		);
 		expect(isConnectionRefusedError(new Error("socket hang up"))).toBe(false);
 		expect(isConnectionRefusedError(undefined)).toBe(false);
+	});
+});
+
+describe("isRequestTimeoutError", () => {
+	it("recognises a timeout however the client reports it", () => {
+		expect(isRequestTimeoutError(new DOMException("Request timed out after 60000ms", "TimeoutError"))).toBe(true);
+		// The OpenAI client's own wrapper: its name and message, no cause.
+		const sdkTimeout = new Error("Request timed out.");
+		sdkTimeout.name = "APIConnectionTimeoutError";
+		expect(isRequestTimeoutError(sdkTimeout)).toBe(true);
+		expect(isRequestTimeoutError(new Error("net::ERR_CONNECTION_TIMED_OUT"))).toBe(true);
+		expect(isRequestTimeoutError(new Error("connect ETIMEDOUT 10.0.0.1:443"))).toBe(true);
+		// Wrapped once more, with the DOMException on `cause`.
+		expect(
+			isRequestTimeoutError(
+				new Error("embedding failed", { cause: new DOMException("Request timed out", "TimeoutError") }),
+			),
+		).toBe(true);
+	});
+
+	it("does not fire for other failures", () => {
+		expect(isRequestTimeoutError(new Error("net::ERR_CONNECTION_REFUSED"))).toBe(false);
+		expect(isRequestTimeoutError(new Error("socket hang up"))).toBe(false);
+		expect(isRequestTimeoutError(new DOMException("Indexing cancelled", "AbortError"))).toBe(false);
 	});
 });
 
