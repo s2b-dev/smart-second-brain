@@ -611,7 +611,7 @@ describe("vault events during a bulk run", () => {
 		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
 	});
 
-	it("a cancelled build does not schedule a catch-up: the user asked for the writes to stop", async () => {
+	it("a cancelled build schedules no catch-up, but leaves the partial index unvalidated so a retry finishes it", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md", 1_000), file("b.md", 1_000), file("c.md", 1_000), file("d.md", 1_000)];
 		embedDocuments
@@ -628,8 +628,19 @@ describe("vault events during a bulk run", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		await run;
 
+		// The user asked for the writes to stop: nothing resumes on its own.
 		await vi.advanceTimersByTimeAsync(5_000);
 		expect(embedDocuments).toHaveBeenCalledTimes(2);
 		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+
+		// But a and b are not a validated index. The next `ensureIndex` — a
+		// search, or the settings row's re-index — schedules the validation that
+		// finishes the build: c and d are missing, a is stale.
+		expect(await svc.ensureIndex(INDEX)).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+		const resumed = embedDocuments.mock.calls.slice(2).flatMap(([texts]) => texts);
+		expect(resumed.map((text) => text.match(/content of (\S+)/)?.[1]).sort()).toEqual(["a.md", "c.md", "d.md"]);
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(2_000);
+		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
 	});
 });

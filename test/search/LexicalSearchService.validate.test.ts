@@ -19,12 +19,14 @@ function file(path: string, mtime: number): FakeFile {
 	return { path, basename: path.replace(/\.md$/, ""), extension: "md", stat: { mtime, size: 10 } };
 }
 
-/** What the fake index holds at load: path → stored mtime (undefined = indexed before mtimes existed). */
+/** What the fake index holds: path → stored mtime (undefined = indexed before mtimes existed). */
 let loaded: Map<string, number | undefined>;
 let vaultFiles: FakeFile[];
 const addDocument = vi.fn();
 const removeDocument = vi.fn();
 const flush = vi.fn(async () => {});
+/** Per-path gate on `readIndexableContent`; a path without one reads at once. */
+let readGates: Map<string, Promise<void>>;
 
 vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 	MiniSearchService: class {
@@ -45,8 +47,9 @@ vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 		getDocumentPaths() {
 			return loaded.keys();
 		}
-		addDocument(...args: unknown[]) {
-			addDocument(...args);
+		addDocument(path: string, title: string, content: string, tags: string[], mtime?: number) {
+			addDocument(path, title, content, tags, mtime);
+			loaded.set(path, mtime);
 		}
 		removeDocument(path: string) {
 			removeDocument(path);
@@ -63,15 +66,26 @@ vi.mock("../../src/utils/fileFiltering", () => ({
 	getIndexableVaultFiles: () => vaultFiles,
 	isIndexableFile: () => true,
 	isBinaryTextFile: () => false,
-	readIndexableContent: async (_vault: unknown, f: FakeFile) => `content of ${f.path}`,
+	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
+		await readGates.get(f.path);
+		return `content of ${f.path}@${f.stat.mtime}`;
+	},
 }));
 
 import { LexicalSearchService, waitForLexicalSearch } from "../../src/search/LexicalSearchService";
 
-function fakePlugin() {
+/** The layout-ready callback, when `fakePlugin` is told to hold it back. */
+let layoutReady: (() => void) | null = null;
+
+function fakePlugin(options: { deferLayoutReady?: boolean } = {}) {
 	return {
 		app: {
-			workspace: { onLayoutReady: (cb: () => void) => cb() },
+			workspace: {
+				onLayoutReady: (cb: () => void) => {
+					if (options.deferLayoutReady) layoutReady = cb;
+					else cb();
+				},
+			},
 			vault: { getFiles: () => vaultFiles, on: () => ({}) },
 			metadataCache: { getFileCache: () => null },
 			loadLocalStorage: () => null,
@@ -88,6 +102,8 @@ beforeEach(() => {
 	(Platform as { isMobile: boolean }).isMobile = false;
 	loaded = new Map();
 	vaultFiles = [];
+	readGates = new Map();
+	layoutReady = null;
 	addDocument.mockClear();
 	removeDocument.mockClear();
 	flush.mockClear();
@@ -123,12 +139,49 @@ describe("LexicalSearchService.validateIndex", () => {
 		expect(removeDocument).toHaveBeenCalledWith("gone.md");
 		const indexed = addDocument.mock.calls.map(([path, , content, , mtime]) => ({ path, content, mtime }));
 		expect(indexed).toEqual([
-			{ path: "synced.md", content: "content of synced.md", mtime: 2_000 },
-			{ path: "restored.md", content: "content of restored.md", mtime: 4_000 },
-			{ path: "pre-mtime.md", content: "content of pre-mtime.md", mtime: 1_000 },
-			{ path: "new.md", content: "content of new.md", mtime: 1_000 },
+			{ path: "synced.md", content: "content of synced.md@2000", mtime: 2_000 },
+			{ path: "restored.md", content: "content of restored.md@4000", mtime: 4_000 },
+			{ path: "pre-mtime.md", content: "content of pre-mtime.md@1000", mtime: 1_000 },
+			{ path: "new.md", content: "content of new.md@1000", mtime: 1_000 },
 		]);
 		expect(flush).toHaveBeenCalled();
+	});
+
+	it("a read that finishes after a newer snapshot was indexed is discarded, whichever writer it came from", async () => {
+		// The modify handler reads a.md while it is at mtime 2000, slowly. The
+		// note changes again (3000) and the startup validation indexes that
+		// snapshot first. When the handler's older read finally lands it must
+		// not put the 2000 content — and the 2000 stamp — back over it, or
+		// search serves the stale snapshot for the rest of the session.
+		loaded = new Map([["a.md", 1_000]]);
+		vaultFiles = [file("a.md", 2_000)];
+		let releaseHandlerRead: (() => void) | null = null;
+		readGates.set(
+			"a.md",
+			new Promise<void>((resolve) => {
+				releaseHandlerRead = resolve;
+			}),
+		);
+
+		service = LexicalSearchService.startInitialize(fakePlugin({ deferLayoutReady: true }));
+		expect(await waitForLexicalSearch()).toBe(true);
+		const handlerRead = (
+			service as unknown as { handleFileModify(file: FakeFile): Promise<void> }
+		).handleFileModify(vaultFiles[0]);
+
+		vaultFiles[0].stat.mtime = 3_000;
+		readGates.delete("a.md");
+		if (!layoutReady) throw new Error("layout-ready callback was not captured");
+		layoutReady();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument).toHaveBeenCalledTimes(1);
+		expect(addDocument).toHaveBeenLastCalledWith("a.md", "a", "content of a.md@3000", [], 3_000);
+
+		if (!releaseHandlerRead) throw new Error("handler read never started");
+		(releaseHandlerRead as () => void)();
+		await handlerRead;
+		expect(addDocument).toHaveBeenCalledTimes(1);
+		expect(loaded.get("a.md")).toBe(3_000);
 	});
 
 	it("leaves an index that matches the vault alone", async () => {

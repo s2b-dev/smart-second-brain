@@ -931,6 +931,9 @@ export class VectorStoreService {
 
 		const filesToIndex = [...missingFiles, ...staleFiles];
 		let cancelled = false;
+		// Until the run below has returned, an error thrown out of it counts as
+		// an incomplete run for `settleValidationAfterBulkRun`.
+		let completed = false;
 		if (filesToIndex.length > 0) {
 			const { startingIndexedCount, totalCount } = summarizeValidationProgressCounts({
 				eligibleFileCount: vaultFiles.length,
@@ -960,6 +963,7 @@ export class VectorStoreService {
 					purgeExisting: true,
 					notice,
 				});
+				completed = !outcome.cancelled;
 			} catch (error) {
 				// An unexpected abort (not a per-file failure) — don't leave a stuck
 				// notice behind on top of whatever surfaced the error.
@@ -968,6 +972,7 @@ export class VectorStoreService {
 			} finally {
 				inst.abortController = null;
 				this.updateInstanceProgress(inst, { isIndexing: false, currentFile: null });
+				this.settleValidationAfterBulkRun(inst, completed);
 			}
 			cancelled = outcome.cancelled;
 
@@ -986,7 +991,6 @@ export class VectorStoreService {
 		// `embedFilesInBatches`, cancelled or not.
 		if (!cancelled) this.markBuiltIfUnstamped(inst);
 		Logger.log(`[VectorStore] Validation complete for ${inst.indexId}`);
-		this.rescheduleValidationIfEventsDropped(inst, cancelled);
 	}
 
 	/**
@@ -1471,18 +1475,33 @@ export class VectorStoreService {
 			inst.isIndexing = false;
 			inst.abortController = null;
 			this.updateInstanceProgress(inst, { isIndexing: false, currentFile: null });
-			this.rescheduleValidationIfEventsDropped(inst, cancelled);
+			this.settleValidationAfterBulkRun(inst, !cancelled);
 		}
 	}
 
 	/**
-	 * After a bulk run: if a vault event was dropped while it ran (the flag was
-	 * cleared under it), schedule the validation that applies those changes.
-	 * Not after a cancelled run — the user asked for the writes to stop, and a
-	 * validation would resume them.
+	 * Settle the instance's validation state after a bulk run.
+	 *
+	 * A run that did not complete — cancelled by the user, stopped for an
+	 * unreachable provider, or thrown out of — leaves a partial index, and a
+	 * partial index is not validated: the flag is cleared so the next
+	 * `ensureIndex` (a search, or the settings row's re-index) schedules the
+	 * validation that finishes it. That is the "resume" the unreachable-provider
+	 * notice promises; before, a retry in the same session saw a non-empty,
+	 * validated store and did nothing until Obsidian restarted. No catch-up is
+	 * scheduled here for such a run, though: the user asked for the writes to
+	 * stop, and one would resume them on its own.
+	 *
+	 * A completed run whose flag was cleared under it (a vault event arrived
+	 * while it wrote, see `canApplyEvent`) schedules the catch-up that applies
+	 * those changes.
 	 */
-	private rescheduleValidationIfEventsDropped(inst: IndexInstance, cancelled: boolean): void {
-		if (cancelled || inst.hasValidatedThisSession) return;
+	private settleValidationAfterBulkRun(inst: IndexInstance, completed: boolean): void {
+		if (!completed) {
+			inst.hasValidatedThisSession = false;
+			return;
+		}
+		if (inst.hasValidatedThisSession) return;
 		if (this.instances.get(inst.indexId) !== inst) return;
 		Logger.log(`[VectorStore] Vault changed during the bulk run for ${inst.indexId}; scheduling a catch-up`);
 		this.scheduleValidation(inst);

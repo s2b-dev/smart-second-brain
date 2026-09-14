@@ -48,11 +48,18 @@ export class HNSWWorkerProxy implements VectorStore {
 			}
 		};
 		this.worker.onerror = (e) => {
+			// A script error inside the worker means no request in flight will be
+			// answered; settle them instead of leaving their callers hanging.
 			Logger.error("[VectorStore] [HNSW] Worker error:", e.message);
+			this.rejectPending(new Error(`Vector store worker failed: ${e.message}`));
 		};
 
-		// Initialize the store inside the worker (fire-and-forget, open() will await)
-		void this.call("init", [vaultId, indexId]);
+		// Initialize the store inside the worker (fire-and-forget, open() will
+		// await). A failure here is reported, not surfaced: `open()` is the call
+		// that fails visibly when the worker never came up.
+		this.call("init", [vaultId, indexId]).catch((error: unknown) => {
+			Logger.error("[VectorStore] [HNSW] Worker init failed:", error);
+		});
 	}
 
 	/**
@@ -77,6 +84,14 @@ export class HNSWWorkerProxy implements VectorStore {
 	}
 
 	/**
+	 * How long `close()` waits for the worker to acknowledge the close request
+	 * (which flushes the pending graph save) before terminating it regardless.
+	 * A worker that has died or is wedged never answers; without a bound the
+	 * close — and with it index deletion or plugin unload — would hang on it.
+	 */
+	private static readonly CLOSE_ACK_TIMEOUT_MS = 10_000;
+
+	/**
 	 * Close the store and terminate the worker.
 	 *
 	 * Every request still in flight is rejected, not dropped. `terminate()`
@@ -84,13 +99,30 @@ export class HNSWWorkerProxy implements VectorStore {
 	 * never settle: a bulk run whose `upsert` was in flight when its index was
 	 * deleted hung forever on that await — its `finally` never ran and the
 	 * progress notice stayed on screen for the rest of the session.
+	 *
+	 * The close request itself is awaited only up to {@link CLOSE_ACK_TIMEOUT_MS};
+	 * the worker is terminated and the pending requests rejected either way.
 	 */
 	async close(): Promise<void> {
 		if (this.closed) return;
 		this.closed = true;
+		let timer: number | null = null;
 		try {
-			await this.callUnchecked("close", []);
+			await Promise.race([
+				this.callUnchecked("close", []),
+				new Promise<void>((resolve) => {
+					timer = self.setTimeout(() => {
+						Logger.warn("[VectorStore] [HNSW] Worker did not acknowledge close; terminating it.");
+						resolve();
+					}, HNSWWorkerProxy.CLOSE_ACK_TIMEOUT_MS);
+				}),
+			]);
+		} catch (error) {
+			// The worker failed while closing (`onerror` rejected the request); it
+			// is terminated below regardless.
+			Logger.warn("[VectorStore] [HNSW] Close request failed:", error);
 		} finally {
+			if (timer !== null) self.clearTimeout(timer);
 			this.worker.terminate();
 			this.rejectPending(new Error("Vector store closed while the request was in flight"));
 		}

@@ -229,7 +229,6 @@ export class LexicalSearchService {
 
 	/** Index `files`, paced in batches and checkpointing every {@link BULK_CHECKPOINT_INTERVAL} additions. */
 	private async bulkIndexFiles(files: TFile[]): Promise<number> {
-		const { vault } = this.plugin.app;
 		let added = 0;
 		let processed = 0;
 		// Mark the attempt before the first read; cleared below only when the whole
@@ -241,13 +240,7 @@ export class LexicalSearchService {
 		try {
 			for (const file of files) {
 				try {
-					// Stamp before the read, for the same reason the embedding indexer
-					// does (`stampForRead`): an edit landing during the read must leave
-					// the stored mtime *older* than the file's, never equal to it.
-					const mtime = file.stat.mtime;
-					const content = await readIndexableContent(vault, file);
-					this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
-					added++;
+					if (await this.indexFile(file)) added++;
 				} catch (error) {
 					Logger.error(`[LexicalSearch] Failed to read ${file.path}:`, error);
 				}
@@ -278,6 +271,32 @@ export class LexicalSearchService {
 			this.miniSearch.resumeScheduledSaves();
 		}
 		return added;
+	}
+
+	/**
+	 * Read a file and (re)index it, stamped with the mtime it had *before* the
+	 * read. Returns whether the index was written.
+	 *
+	 * Stamping first is the same rule as the embedding indexer's `stampForRead`:
+	 * an edit landing during the read leaves the stored mtime older than the
+	 * file's, so the next validation repairs it — never equal, which would hide
+	 * it. The stamp also orders concurrent writers. The startup validation and a
+	 * vault event handler can both index one note, and their reads finish in
+	 * any order; the one that stamped later read the newer content, so a read
+	 * during which a *newer* stamp landed in the index is discarded rather than
+	 * allowed to put older content (and an older stamp) back. Only a stamp that
+	 * changed under the read counts: a stored stamp that is newer than the
+	 * file's from the start is the restored-from-backup case, which validation
+	 * re-indexes on purpose.
+	 */
+	private async indexFile(file: TFile): Promise<boolean> {
+		const mtime = file.stat.mtime;
+		const storedBefore = this.miniSearch.getDocumentMtime(file.path);
+		const content = await readIndexableContent(this.plugin.app.vault, file);
+		const storedAfter = this.miniSearch.getDocumentMtime(file.path);
+		if (storedAfter !== storedBefore && storedAfter !== undefined && storedAfter > mtime) return false;
+		this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
+		return true;
 	}
 
 	/**
@@ -387,9 +406,7 @@ export class LexicalSearchService {
 
 	private async handleFileCreate(file: TFile): Promise<void> {
 		try {
-			const mtime = file.stat.mtime;
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to add ${file.path}:`, error);
 		}
@@ -397,9 +414,7 @@ export class LexicalSearchService {
 
 	private async handleFileModify(file: TFile): Promise<void> {
 		try {
-			const mtime = file.stat.mtime;
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to update ${file.path}:`, error);
 		}
@@ -413,9 +428,7 @@ export class LexicalSearchService {
 		if (!isIndexableFile(file)) return;
 
 		try {
-			const mtime = file.stat.mtime;
-			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
+			await this.indexFile(file);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to rename ${oldPath} -> ${file.path}:`, error);
 		}
