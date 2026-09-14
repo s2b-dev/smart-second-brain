@@ -7,6 +7,11 @@ on:
 
 jobs:
     build:
+        # Publishing a draft from the GitHub UI while it still carries the
+        # placeholder name creates a real `untagged-<hash>` tag, which would
+        # re-trigger this workflow and fail on "tag_name already exists"
+        # (2.1.1). Those pushes are never a release; skip them outright.
+        if: ${{ !startsWith(github.ref_name, 'untagged-') }}
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -40,15 +45,24 @@ jobs:
                       build/prod/styles.css
 
             # The release is created as a draft so the maintainer can attach
-            # release notes and publish it by hand. Re-running on the same tag
-            # should `gh release upload --clobber` rather than create again.
-            - name: Create draft release
+            # release notes and publish it by hand. When a release for the tag
+            # already exists (a beta re-pushed to the same tag, or a re-run),
+            # replace its assets in place instead: `gh release create` would
+            # either fail on the existing tag or, worse, silently mint a second
+            # draft that only shows up via the API.
+            - name: Create or update draft release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   tag="${GITHUB_REF#refs/tags/}"
+                  assets=(build/prod/main.js manifest.json build/prod/styles.css)
 
-                  gh release create "$tag" \
-                    --title="$tag" \
-                    --draft \
-                    build/prod/main.js manifest.json build/prod/styles.css
+                  if gh release view "$tag" >/dev/null 2>&1; then
+                    echo "Release $tag exists; replacing its assets."
+                    gh release upload "$tag" "${assets[@]}" --clobber
+                  else
+                    gh release create "$tag" \
+                      --title="$tag" \
+                      --draft \
+                      "${assets[@]}"
+                  fi
