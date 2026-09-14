@@ -8,7 +8,7 @@ import {
 	voteUntilSettled,
 	type SemanticQueryStore,
 } from "../../src/utils/liveGraphPatch";
-import type { DocumentVector, ScoredDocument } from "../../src/vectorstore/types";
+import type { DocumentVector, SearchHit } from "../../src/vectorstore/types";
 
 function node(path: string, extra: Partial<GraphNode> = {}): GraphNode {
 	return { id: path, path, label: path.replace(/\.md$/, ""), x: 0, y: 0, degree: 0, highlighted: false, ...extra };
@@ -189,14 +189,14 @@ describe("queryNoteSemanticEdges", () => {
 		chunkIndex,
 	});
 
-	function fakeStore(chunks: DocumentVector[], hitsByChunkId: Record<string, ScoredDocument[]>): SemanticQueryStore {
+	function fakeStore(chunks: DocumentVector[], hitsByChunkId: Record<string, SearchHit[]>): SemanticQueryStore {
 		return {
 			getAllByPath: async (path) => chunks.filter((c) => c.path === path),
 			search: async () => Object.values(hitsByChunkId).flat(),
 		};
 	}
 
-	const hit = (path: string, score: number): ScoredDocument => ({ doc: chunk(path), score });
+	const hit = (path: string, score: number): SearchHit => ({ id: `${path}#0`, path, chunkIndex: 0, score });
 
 	it("emits the best hit per neighbour, capped at neighborCount", async () => {
 		const store = fakeStore([chunk("x.md")], {

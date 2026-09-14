@@ -59,11 +59,11 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 
 		const second = await openStore();
 		const hits = await second.search(new Float32Array([0, 0, 1]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["c.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["c.md"]);
 		expect(graphNodeCount(second)).toBe(3);
 		// And the earlier rows are still reachable through the graph.
 		const older = await second.search(new Float32Array([1, 0, 0]), 1);
-		expect(older.map((h) => h.doc.path)).toEqual(["a.md"]);
+		expect(older.map((h) => h.path)).toEqual(["a.md"]);
 		await second.close();
 	});
 
@@ -75,7 +75,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		const second = await openStore();
 		expect(await second.count()).toBe(2);
 		const hits = await second.search(new Float32Array([0, 1]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["b.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["b.md"]);
 		expect(graphNodeCount(second)).toBe(2);
 		await second.close();
 	});
@@ -123,10 +123,10 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		expect(await second.count()).toBe(3);
 		expect(graphNodeCount(second)).toBe(3);
 		const hits = await second.search(new Float32Array([0, 0, 1]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["c.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["c.md"]);
 		// a.md still resolves to its own row: no mapping was overwritten.
 		const older = await second.search(new Float32Array([1, 0, 0]), 1);
-		expect(older.map((h) => h.doc.path)).toEqual(["a.md"]);
+		expect(older.map((h) => h.path)).toEqual(["a.md"]);
 		await second.close();
 	});
 
@@ -159,7 +159,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		await expect(second.upsert(doc("d.md", [1, 1, 0]))).resolves.toBeUndefined();
 		expect(await second.count()).toBe(4);
 		const hits = await second.search(new Float32Array([1, 1, 0]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["d.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["d.md"]);
 		await second.close();
 	});
 

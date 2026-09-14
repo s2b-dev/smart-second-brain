@@ -91,16 +91,28 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 		await store.close();
 	});
 
-	it("searches through the graph and returns Float32Array vectors in the hits", async () => {
+	it("searches through the graph and returns chunk identity plus score, no vectors", async () => {
 		const store = await openStore();
 		await store.upsert(doc("x.md", [1, 0, 0]));
 		await store.upsert(doc("y.md", [0, 1, 0]));
 		await store.upsert(doc("z.md", [0, 0, 1]));
 
 		const hits = await store.search(new Float32Array([0.9, 0.1, 0]), 2);
-		expect(hits[0].doc.path).toBe("x.md");
-		expectFloat32(hits[0].doc.vector);
+		expect(hits[0]).toEqual({ id: "x.md#0", path: "x.md", chunkIndex: 0, score: expect.any(Number) });
 		expect(hits[0].score).toBeGreaterThan(hits[1].score);
+		// No row read, no vector cloned: the hit carries nothing but identity and score.
+		expect("vector" in hits[0]).toBe(false);
+		expect("doc" in hits[0]).toBe(false);
+		await store.close();
+	});
+
+	it("resolves a hit's path from its chunk id, even when the path itself contains '#'", async () => {
+		const store = await openStore();
+		await store.upsert(doc("notes/C# basics.md", [1, 0, 0], 3));
+		await store.upsert(doc("other.md", [0, 1, 0]));
+
+		const hits = await store.search(new Float32Array([1, 0, 0]), 1);
+		expect(hits).toEqual([{ id: "notes/C# basics.md#3", path: "notes/C# basics.md", chunkIndex: 3, score: 1 }]);
 		await store.close();
 	});
 
@@ -113,7 +125,7 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 		const second = await openStore();
 		const hits = await second.search(new Float32Array([0, 1, 0]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["y.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["y.md"]);
 
 		// The graph was rehydrated, not rebuilt: same node ids, vectors typed.
 		const graph = internals(second).hnswIndex;
@@ -133,8 +145,8 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 		const second = await openStore();
 		// Cosine against [0.6, 0.8]: c ≈ 0.99, b = 0.8, a = 0.6.
 		const hits = await second.search(new Float32Array([0.6, 0.8]), 3);
-		expect(hits.map((h) => h.doc.path)).toEqual(["c.md", "b.md", "a.md"]);
-		expect(hits.map((h) => h.doc.path).sort()).toEqual(["a.md", "b.md", "c.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["c.md", "b.md", "a.md"]);
+		expect(hits.map((h) => h.path).sort()).toEqual(["a.md", "b.md", "c.md"]);
 		await second.close();
 	});
 
@@ -153,7 +165,7 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 		// The removed note's rows are gone, so loadGraph() cannot (and must not) resurrect its nodes.
 		expect(internals(second).hnswIndex).toBeNull();
 		const hits = await second.search(new Float32Array([1, 0, 0]), 3);
-		expect(hits.map((h) => h.doc.path)).toEqual(["other.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["other.md"]);
 		expect(internals(second).hnswIndex?.nodes.size).toBe(1);
 		await second.close();
 	});
@@ -321,8 +333,7 @@ describe("HNSWVectorStore — schema upgrade", () => {
 		// The upgraded database is fully usable straight away.
 		await store.upsert(doc("new.md", [0, 1, 0]));
 		const hits = await store.search(new Float32Array([0, 1, 0]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["new.md"]);
-		expectFloat32(hits[0].doc.vector);
+		expect(hits.map((h) => h.path)).toEqual(["new.md"]);
 		await store.close();
 	});
 

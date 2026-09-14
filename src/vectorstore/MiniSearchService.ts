@@ -250,6 +250,13 @@ export class MiniSearchService {
 	private savesSuspended = false;
 	private saveTimeout: number | null = null;
 	private documentPaths = new Set<string>();
+	/**
+	 * Per-document `mtime` as of the read that produced its indexed content.
+	 * Persisted beside `paths` so the startup validation can tell a note that
+	 * changed while Obsidian was closed (every sync client's daily case) from
+	 * one that is current — presence alone said nothing about staleness.
+	 */
+	private documentMtimes = new Map<string, number>();
 	private documentTitles = new Map<string, string>();
 	private documentAliases = new Map<string, string[]>();
 	private documentTags = new Map<string, string[]>();
@@ -397,15 +404,24 @@ export class MiniSearchService {
 						});
 						// Rebuild paths set
 						this.documentPaths.clear();
+						this.documentMtimes.clear();
 						this.documentTitles.clear();
 						this.documentAliases.clear();
 						this.documentTags.clear();
 						this.documentFolders.clear();
 						this.tagUsageCount.clear();
 						this.folderUsageCount.clear();
+						// A record saved before mtimes were tracked has none: those
+						// documents read as "unknown age", which validation treats as
+						// stale and re-indexes once — the index stays searchable meanwhile,
+						// which a schema bump (full rebuild from empty) would not allow.
+						const mtimes: Record<string, unknown> =
+							data.mtimes && typeof data.mtimes === "object" ? data.mtimes : {};
 						if (data.paths && Array.isArray(data.paths)) {
 							for (const path of data.paths) {
 								this.documentPaths.add(path);
+								const mtime = mtimes[path];
+								if (typeof mtime === "number") this.documentMtimes.set(path, mtime);
 								const stored = this.index.getStoredFields(path) as
 									| { title?: string; aliases?: string; tags?: string }
 									| undefined;
@@ -452,11 +468,12 @@ export class MiniSearchService {
 		const generation = this.mutationGeneration;
 		const indexData = this.index.toJSON();
 		const paths = Array.from(this.documentPaths);
+		const mtimes = Object.fromEntries(this.documentMtimes);
 
 		return new Promise((resolve, reject) => {
 			const transaction = db.transaction(STORE_NAME, "readwrite");
 			const store = transaction.objectStore(STORE_NAME);
-			const request = store.put({ indexData, paths, schemaVersion: STORAGE_SCHEMA_VERSION }, INDEX_KEY);
+			const request = store.put({ indexData, paths, mtimes, schemaVersion: STORAGE_SCHEMA_VERSION }, INDEX_KEY);
 
 			request.onsuccess = () => {
 				if (this.mutationGeneration === generation) {
@@ -559,13 +576,19 @@ export class MiniSearchService {
 	 * @param path File path (used as unique ID)
 	 * @param title Document title (filename without extension)
 	 * @param content Document content
+	 * @param tags Tags from the metadata cache
+	 * @param mtime The file's mtime as of the read that produced `content`. Omitted
+	 *   (tests, callers without a file) the document has no known age and the next
+	 *   validation re-indexes it.
 	 */
-	addDocument(path: string, title: string, content: string, tags: string[] = []): void {
+	addDocument(path: string, title: string, content: string, tags: string[] = [], mtime?: number): void {
 		// Remove existing document if present
 		if (this.documentPaths.has(path)) {
 			this.removeDocumentAutocompleteMetadata(path);
 			this.index.discard(path);
 		}
+		if (mtime === undefined) this.documentMtimes.delete(path);
+		else this.documentMtimes.set(path, mtime);
 
 		const aliases = this.extractAliases(content);
 		const normalizedTags = this.normalizeStoredTags(tags);
@@ -596,6 +619,7 @@ export class MiniSearchService {
 			this.removeDocumentAutocompleteMetadata(path);
 			this.index.discard(path);
 			this.documentPaths.delete(path);
+			this.documentMtimes.delete(path);
 			this.documentTitles.delete(path);
 			this.documentAliases.delete(path);
 			this.scheduleSave();
@@ -607,6 +631,14 @@ export class MiniSearchService {
 	 */
 	hasDocument(path: string): boolean {
 		return this.documentPaths.has(path);
+	}
+
+	/**
+	 * The mtime the document was indexed at, or `undefined` when it is not
+	 * indexed or was indexed without one (a pre-mtime saved index).
+	 */
+	getDocumentMtime(path: string): number | undefined {
+		return this.documentMtimes.get(path);
 	}
 
 	/**
@@ -629,6 +661,7 @@ export class MiniSearchService {
 	clear(): void {
 		this.index = this.createIndex();
 		this.documentPaths.clear();
+		this.documentMtimes.clear();
 		this.documentTitles.clear();
 		this.documentAliases.clear();
 		this.documentTags.clear();

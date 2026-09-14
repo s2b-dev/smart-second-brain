@@ -63,7 +63,7 @@ describe("HNSWVectorStore.clear", () => {
 
 		const third = await openStore();
 		const hits = await third.search(new Float32Array([1, 1]), 10);
-		expect(hits.map((h) => h.doc.path)).toEqual(["c.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["c.md"]);
 		// The whole point: stale nodes from the first run must not be resurrected.
 		expect(internals(third).hnswIndex?.nodes.size).toBe(1);
 		await third.close();
@@ -76,7 +76,7 @@ describe("HNSWVectorStore.clear", () => {
 
 		await store.upsert(doc("b.md", [0, 1, 0]));
 		const hits = await store.search(new Float32Array([0, 1, 0]), 5);
-		expect(hits.map((h) => h.doc.path)).toEqual(["b.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["b.md"]);
 		await store.close();
 	});
 
@@ -99,7 +99,7 @@ describe("HNSWVectorStore.clear", () => {
 
 		await store.upsert(doc("b.md", [1, 0]));
 		const hits = await store.search(new Float32Array([1, 0]), 1);
-		expect(hits.map((h) => h.doc.path)).toEqual(["b.md"]);
+		expect(hits.map((h) => h.path)).toEqual(["b.md"]);
 		await store.close();
 	});
 

@@ -20,7 +20,7 @@
  */
 
 import type { GraphData, GraphEdge, GraphNode } from "../types/graph";
-import type { DocumentVector, ScoredDocument } from "../vectorstore/types";
+import type { DocumentVector, SearchHit } from "../vectorstore/types";
 import { computeNodeDegrees, edgeKey, isTagNode } from "./graphUtils";
 
 export interface WikiPatchResult {
@@ -285,7 +285,7 @@ export function voteUntilSettled(
 /** The slice of the vector store the incremental semantic query needs. */
 export interface SemanticQueryStore {
 	getAllByPath(path: string): Promise<DocumentVector[]>;
-	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]>;
+	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]>;
 }
 
 export interface NoteSemanticQueryOptions {
@@ -326,7 +326,7 @@ export async function queryNoteSemanticEdges(
 	for (const chunk of chunks) {
 		const hits = await store.search(chunk.vector, topK, threshold);
 		for (const hit of hits) {
-			const neighbor = hit.doc.path;
+			const neighbor = hit.path;
 			if (neighbor === path || !includePaths.has(neighbor)) continue;
 			if (options.excludeEdgeKeys?.has(edgeKey(path, neighbor))) continue;
 			if (!Number.isFinite(hit.score) || hit.score < threshold) continue;

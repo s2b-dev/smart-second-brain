@@ -249,6 +249,18 @@ export function makeChunkId(path: string, chunkIndex: number): string {
 }
 
 /**
+ * Inverse of {@link makeChunkId}. `#` is legal in a vault path, so the split
+ * is on the *last* `#`: the chunk index is numeric and always comes last.
+ */
+export function parseChunkId(id: string): { path: string; chunkIndex: number } {
+	const hash = id.lastIndexOf("#");
+	if (hash === -1) return { path: id, chunkIndex: 0 };
+	const chunkIndex = Number(id.slice(hash + 1));
+	if (!Number.isInteger(chunkIndex) || chunkIndex < 0) return { path: id, chunkIndex: 0 };
+	return { path: id.slice(0, hash), chunkIndex };
+}
+
+/**
  * Get the database name for a specific index ID and vault.
  * @param vaultId The vault identifier
  * @param indexId Optional "provider:model" composite key. If omitted, returns the base vault-scoped name.
@@ -319,11 +331,19 @@ export function deleteDatabase(name: string): Promise<DeleteDatabaseResult> {
 }
 
 /**
- * Result from a vector similarity search (internal use).
- * Contains the document and its similarity score.
+ * One chunk hit from a vector similarity search.
+ *
+ * Identity and score only, never the vector: the service aggregates hits to
+ * notes by `path` and the graph's live patch reads `path` too, so returning
+ * the row would deserialise and clone one vector per hit for nothing. With
+ * the tool's `topK` of 100 and the chunk over-fetch that was a thousand
+ * IndexedDB reads and several megabytes crossing the worker boundary per query.
  */
-export interface ScoredDocument {
-	doc: DocumentVector;
+export interface SearchHit {
+	/** Chunk row id (`makeChunkId`). */
+	id: string;
+	path: string;
+	chunkIndex: number;
 	score: number;
 }
 
@@ -481,7 +501,7 @@ export interface VectorStore {
 	 * @param queryVector The query vector to search for
 	 * @param topK Maximum number of results to return
 	 * @param threshold Minimum similarity score (0-1)
-	 * @returns Array of documents with their similarity scores
+	 * @returns Chunk hits (identity + score, no vectors), best first
 	 */
-	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]>;
+	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]>;
 }

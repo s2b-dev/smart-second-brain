@@ -528,3 +528,108 @@ describe("bulk embed run", () => {
 		expect(store.meta).toMatchObject({ providerId: "fake", modelId: "embed-model" });
 	});
 });
+
+/** The service's private per-file hooks, reached directly: the fake vault registers no events. */
+type EventHooks = { handleFileModify(file: FakeFile): void };
+
+describe("vault events during a bulk run", () => {
+	it("stores the mtime the note was read at, not the one it has when the row is written", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		let release: (() => void) | null = null;
+		embedDocuments.mockImplementationOnce(
+			(texts: string[]) =>
+				new Promise<number[][]>((resolve) => {
+					release = () => resolve(texts.map(() => [1, 0, 0]));
+				}),
+		);
+		const svc = await startService();
+
+		const run = svc.ensureIndex(INDEX); // empty index → full build
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(1));
+		// The note is edited while its embedding call is in flight: Obsidian
+		// updates the TFile's stat in place.
+		vaultFiles[0].stat.mtime = 2_000;
+		if (!release) throw new Error("embedding call never started");
+		(release as () => void)();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await run).toBe(true);
+
+		// The row carries the read-time stamp, so it reads as stale against the file …
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+
+		// … and the next launch's validation re-indexes it. (Stamping at write
+		// time stored 2_000 here, and the edit was never picked up.)
+		await svc.cleanup();
+		service = null;
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		expect(embedDocuments.mock.calls[1][0][0]).toContain("content of a.md");
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(2_000);
+	});
+
+	it("an edit dropped during a full build is applied by a catch-up validation once the build ends", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000), file("b.md", 1_000), file("c.md", 1_000), file("d.md", 1_000)];
+		// batchSize is 2: the first batch (a, b) lands, the second hangs until released.
+		let release: (() => void) | null = null;
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(
+				(texts: string[]) =>
+					new Promise<number[][]>((resolve) => {
+						release = () => resolve(texts.map(() => [1, 0, 0]));
+					}),
+			);
+		const svc = await startService();
+
+		const run = svc.ensureIndex(INDEX); // empty index → full build
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(2));
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+
+		// a.md — already written by the build — is edited while the build runs.
+		vaultFiles[0].stat.mtime = 2_000;
+		(svc as unknown as EventHooks).handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(5_000); // the modify debounce
+		// The event was not applied to a store a bulk run is writing …
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+
+		if (!release) throw new Error("embedding call never started");
+		(release as () => void)();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await run).toBe(true);
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+
+		// … but the build, once complete, scheduled a validation that repairs exactly that note.
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(3);
+		expect(embedDocuments.mock.calls[2][0]).toHaveLength(1);
+		expect(embedDocuments.mock.calls[2][0][0]).toContain("content of a.md");
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(2_000);
+		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
+	});
+
+	it("a cancelled build does not schedule a catch-up: the user asked for the writes to stop", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000), file("b.md", 1_000), file("c.md", 1_000), file("d.md", 1_000)];
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(() => new Promise<number[][]>(() => {}));
+		const svc = await startService();
+
+		const run = svc.ensureIndex(INDEX);
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(2));
+		vaultFiles[0].stat.mtime = 2_000;
+		(svc as unknown as EventHooks).handleFileModify(vaultFiles[0]);
+		await vi.advanceTimersByTimeAsync(5_000);
+		svc.cancelIndexing(INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+		await run;
+
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		expect(stores.get(INDEX)?.docs.get("a.md#0")?.mtime).toBe(1_000);
+	});
+});

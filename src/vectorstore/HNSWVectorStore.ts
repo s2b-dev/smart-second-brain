@@ -23,7 +23,7 @@ import {
 	type IndexMetadata,
 	type NoteMeta,
 	type NoteNeighbor,
-	type ScoredDocument,
+	type SearchHit,
 	type SemanticPairOptions,
 	type SerializedDocument,
 	type VectorStore,
@@ -32,7 +32,7 @@ import { cosineSimilarity } from "./similarity";
 import { ChunkBatchBuilder, computeSemanticPairs, type SemanticPair } from "../utils/semanticEdges";
 import { toError } from "../utils/toError";
 
-import { deleteDatabase, getDbName } from "./types";
+import { deleteDatabase, getDbName, parseChunkId } from "./types";
 import { Logger } from "../utils/logging";
 
 const LOG_PREFIX = "[VectorStore] [HNSW]";
@@ -1160,8 +1160,15 @@ export class HNSWVectorStore implements VectorStore {
 	/**
 	 * Search for similar vectors using HNSW approximate nearest neighbor.
 	 * O(log n) complexity - much faster than brute-force for large datasets.
+	 *
+	 * Hits are resolved from the id mapping alone: the chunk id encodes the
+	 * note path, and the score comes from the graph, so no document row is
+	 * read. (It used to fetch every hit's row — vector included — to return a
+	 * `path` the caller could have had for free.) A mapped id always has a row:
+	 * `upsert` writes the row before the graph node, and `remove` drops the
+	 * mapping first.
 	 */
-	async search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]> {
+	async search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]> {
 		await this.ensureHNSWIndex();
 		if (!this.hnswIndex) {
 			// Fall back to brute-force if HNSW not initialized
@@ -1171,25 +1178,19 @@ export class HNSWVectorStore implements VectorStore {
 		try {
 			// Use HNSW to get nearest neighbors (returns numeric IDs)
 			const hnswResults = this.hnswIndex.searchKNN(queryVector, topK);
-
-			// Fetch full documents using numeric -> string ID mapping
-			const results: ScoredDocument[] = [];
-			for (const result of hnswResults) {
-				const stringId = this.numericToId.get(result.id);
-				if (!stringId) continue;
-
-				const stored = await this.getById(stringId);
-				if (stored) {
-					const doc = this.toDocumentVector(stored);
-					// The hnsw package returns score (higher = more similar), not distance
-					const score = result.score;
-					results.push({ doc, score });
-				}
-			}
-
-			// Apply threshold if provided
 			const effectiveThreshold = threshold ?? 0;
-			return results.filter((r) => r.score >= effectiveThreshold);
+
+			const results: SearchHit[] = [];
+			for (const result of hnswResults) {
+				// The hnsw package returns score (higher = more similar), not distance
+				if (result.score < effectiveThreshold) continue;
+				const stringId = this.numericToId.get(result.id);
+				// A node with no mapping was removed; the library cannot delete it.
+				if (!stringId) continue;
+				const { path, chunkIndex } = parseChunkId(stringId);
+				results.push({ id: stringId, path, chunkIndex, score: result.score });
+			}
+			return results;
 		} catch {
 			// Fallback to brute-force if HNSW fails
 			return this.bruteForceSearch(queryVector, topK, threshold);
@@ -1200,13 +1201,9 @@ export class HNSWVectorStore implements VectorStore {
 	 * Fallback brute-force search if HNSW is not available. Streams the rows
 	 * past a bounded top-K list rather than materialising the whole store.
 	 */
-	private async bruteForceSearch(
-		queryVector: Float32Array,
-		topK: number,
-		threshold?: number,
-	): Promise<ScoredDocument[]> {
+	private async bruteForceSearch(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]> {
 		const effectiveThreshold = threshold ?? 0;
-		const results: ScoredDocument[] = [];
+		const results: SearchHit[] = [];
 		const trim = () => {
 			results.sort((a, b) => b.score - a.score);
 			results.length = Math.min(results.length, topK);
@@ -1216,7 +1213,7 @@ export class HNSWVectorStore implements VectorStore {
 			if (stored.vector.length !== queryVector.length) return;
 			const score = cosineSimilarity(queryVector, stored.vector);
 			if (score < effectiveThreshold) return;
-			results.push({ doc: this.toDocumentVector(stored), score });
+			results.push({ id: stored.id, path: stored.path, chunkIndex: stored.chunkIndex ?? 0, score });
 			if (results.length >= topK * 2) trim();
 		});
 
@@ -1231,15 +1228,6 @@ export class HNSWVectorStore implements VectorStore {
 	private requireDb(): IDBDatabase {
 		if (!this.db) throw new Error("Database not open");
 		return this.db;
-	}
-
-	private async getById(id: string): Promise<StoredDocument | null> {
-		if (!this.db) return null;
-		const db = this.db;
-
-		const tx = db.transaction(DOCUMENTS_STORE, "readonly");
-		const request = tx.objectStore(DOCUMENTS_STORE).get(id);
-		return awaitRequest(tx, request, (doc: StoredDocument | undefined) => doc ?? null);
 	}
 
 	private async getMetadataInternal(): Promise<StoredMetadata | null> {

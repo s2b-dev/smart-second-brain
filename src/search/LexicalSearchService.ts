@@ -241,8 +241,12 @@ export class LexicalSearchService {
 		try {
 			for (const file of files) {
 				try {
+					// Stamp before the read, for the same reason the embedding indexer
+					// does (`stampForRead`): an edit landing during the read must leave
+					// the stored mtime *older* than the file's, never equal to it.
+					const mtime = file.stat.mtime;
 					const content = await readIndexableContent(vault, file);
-					this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+					this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
 					added++;
 				} catch (error) {
 					Logger.error(`[LexicalSearch] Failed to read ${file.path}:`, error);
@@ -307,6 +311,15 @@ export class LexicalSearchService {
 		});
 	}
 
+	/**
+	 * Reconcile the loaded index with the vault: drop documents whose file is
+	 * gone, and (re)index files that are missing *or stale*. Staleness is the
+	 * stored mtime differing from the file's — not merely older, so a note
+	 * restored from a backup with an earlier mtime is re-indexed too. A document
+	 * with no stored mtime (indexed before mtimes were tracked) counts as stale.
+	 * Presence alone was the old test, which left every note modified while
+	 * Obsidian was closed — the sync case — serving its pre-sync content.
+	 */
 	private async validateIndex(): Promise<void> {
 		const files = getIndexableVaultFiles(this.plugin.app.vault);
 		const vaultPaths = new Set(files.map((f) => f.path));
@@ -319,13 +332,18 @@ export class LexicalSearchService {
 			}
 		}
 
-		const missing = orderForBulkIndexing(files.filter((file) => !this.miniSearch.hasDocument(file.path)));
-		const added = await this.bulkIndexFiles(missing);
+		const pending = orderForBulkIndexing(files.filter((file) => this.needsIndexing(file)));
+		const added = await this.bulkIndexFiles(pending);
 
 		if (added > 0 || removed > 0) {
 			await this.miniSearch.flush();
-			Logger.log(`[LexicalSearch] Validated lexical index: added ${added}, removed ${removed} documents`);
+			Logger.log(`[LexicalSearch] Validated lexical index: indexed ${added}, removed ${removed} documents`);
 		}
+	}
+
+	private needsIndexing(file: TFile): boolean {
+		if (!this.miniSearch.hasDocument(file.path)) return true;
+		return this.miniSearch.getDocumentMtime(file.path) !== file.stat.mtime;
 	}
 
 	private registerEvents(): void {
@@ -369,8 +387,9 @@ export class LexicalSearchService {
 
 	private async handleFileCreate(file: TFile): Promise<void> {
 		try {
+			const mtime = file.stat.mtime;
 			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to add ${file.path}:`, error);
 		}
@@ -378,8 +397,9 @@ export class LexicalSearchService {
 
 	private async handleFileModify(file: TFile): Promise<void> {
 		try {
+			const mtime = file.stat.mtime;
 			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to update ${file.path}:`, error);
 		}
@@ -393,8 +413,9 @@ export class LexicalSearchService {
 		if (!isIndexableFile(file)) return;
 
 		try {
+			const mtime = file.stat.mtime;
 			const content = await readIndexableContent(this.plugin.app.vault, file);
-			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file));
+			this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
 		} catch (error) {
 			Logger.error(`[LexicalSearch] Failed to rename ${oldPath} -> ${file.path}:`, error);
 		}

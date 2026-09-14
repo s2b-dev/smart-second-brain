@@ -363,9 +363,26 @@ export function orderChunksForWriting<T>(chunks: readonly T[]): T[] {
 	return [...chunks.slice(1), chunks[0]];
 }
 
+/**
+ * The mtime to store with a note's vectors: read *before* the content is.
+ *
+ * Obsidian updates `TFile.stat` in place, so reading it when the row is
+ * written — after the embedding round trip, the batch fill and the pacing
+ * pause — stamps a note edited in that window with its *new* mtime over its
+ * *old* content. Validation then compares equal mtimes and never repairs it.
+ * Reading the stamp first fails the other way: an edit that lands during the
+ * read leaves a stored mtime older than the file's, and the next validation
+ * re-indexes the note. That is the direction we can recover from.
+ */
+export function stampForRead(file: Pick<TFile, "stat">): number {
+	return file.stat.mtime;
+}
+
 /** One chunk of a note queued for embedding. */
 interface ChunkEntry {
 	file: TFile;
+	/** The note's mtime as of the read that produced `embedText` — see `stampForRead`. */
+	mtime: number;
 	chunkIndex: number;
 	checksum: string;
 	embedText: string;
@@ -969,6 +986,7 @@ export class VectorStoreService {
 		// `embedFilesInBatches`, cancelled or not.
 		if (!cancelled) this.markBuiltIfUnstamped(inst);
 		Logger.log(`[VectorStore] Validation complete for ${inst.indexId}`);
+		this.rescheduleValidationIfEventsDropped(inst, cancelled);
 	}
 
 	/**
@@ -1040,16 +1058,43 @@ export class VectorStoreService {
 	}
 
 	/**
+	 * Whether a bulk run — a full build or a startup validation — is writing to
+	 * the instance right now. The two set different flags: `isIndexing` is the
+	 * build's, `progress.isIndexing` is shared with validation.
+	 */
+	private isBulkRunning(inst: IndexInstance): boolean {
+		return inst.isIndexing || inst.progress.isIndexing;
+	}
+
+	/**
+	 * Whether a vault event can be applied to `inst` right now; when it cannot,
+	 * flag the instance so a validation picks the change up later.
+	 *
+	 * An inactive instance is never written incrementally. An instance with a
+	 * bulk run in flight is not either: the run is writing the same notes, and
+	 * a note it has already passed would keep the pre-edit vectors while a note
+	 * it has not reached yet would be embedded twice, with the purge of the
+	 * second write able to land between the first write's chunks. Both used to
+	 * be silent `continue`s; for a running build that dropped the edit for the
+	 * whole session, since nothing re-validated after the build. Now the flag
+	 * is cleared, and the run reschedules a validation on completion — that
+	 * compares per-note mtimes, so it repairs exactly the notes that changed.
+	 */
+	private canApplyEvent(inst: IndexInstance): boolean {
+		if (!this.isActiveIndex(inst.indexId) || this.isBulkRunning(inst) || !inst.embeddings) {
+			inst.hasValidatedThisSession = false;
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	 * Handle new file creation — forward to active instances only.
 	 * Inactive instances are marked for re-validation on next use.
 	 */
 	private async handleFileCreate(file: TFile): Promise<void> {
 		for (const inst of this.instances.values()) {
-			if (!this.isActiveIndex(inst.indexId)) {
-				inst.hasValidatedThisSession = false;
-				continue;
-			}
-			if (!inst.embeddings || inst.isIndexing) continue;
+			if (!this.canApplyEvent(inst)) continue;
 			await this.indexDocumentForInstance(inst, file);
 			void this.notifyStatsChanged(inst);
 		}
@@ -1075,11 +1120,7 @@ export class VectorStoreService {
 	/** Re-embed a modified note in every active instance whose stored copy is older. */
 	private async reindexModifiedFile(file: TFile): Promise<void> {
 		for (const inst of this.instances.values()) {
-			if (!this.isActiveIndex(inst.indexId)) {
-				inst.hasValidatedThisSession = false;
-				continue;
-			}
-			if (!inst.embeddings || inst.isIndexing) continue;
+			if (!this.canApplyEvent(inst)) continue;
 			const storedMtime = await inst.store.getDocumentMtime(file.path);
 			if (storedMtime && storedMtime >= file.stat.mtime) continue;
 			await this.indexDocumentForInstance(inst, file);
@@ -1097,6 +1138,10 @@ export class VectorStoreService {
 				inst.hasValidatedThisSession = false;
 				continue;
 			}
+			// Removal is safe alongside a bulk run, but the run may have read the
+			// note before it went and write it back afterwards; the validation the
+			// run schedules on completion removes such an orphan.
+			if (this.isBulkRunning(inst)) inst.hasValidatedThisSession = false;
 			await inst.store.remove(file.path);
 			void this.notifyStatsChanged(inst);
 		}
@@ -1112,8 +1157,10 @@ export class VectorStoreService {
 				inst.hasValidatedThisSession = false;
 				continue;
 			}
+			// The old path's rows go regardless; the new path is written only when
+			// no bulk run is in flight (`canApplyEvent`), else left to validation.
 			await inst.store.remove(oldPath);
-			if (inst.embeddings) {
+			if (this.canApplyEvent(inst)) {
 				await this.indexDocumentForInstance(inst, file);
 			}
 			void this.notifyStatsChanged(inst);
@@ -1190,8 +1237,9 @@ export class VectorStoreService {
 
 		const count = await inst.store.count();
 		if (count === 0 || modelChanged || versionStale) {
+			// The build marks the instance validated itself (`runFullBuild`), and
+			// only for as long as no vault event is dropped while it runs.
 			await this.buildFullIndex(inst, embeddings, model);
-			inst.hasValidatedThisSession = true;
 		} else if (!inst.hasValidatedThisSession) {
 			// Not awaited: the search proceeds on the stored index while the catch-up
 			// runs after the platform's bulk start delay (immediate on desktop).
@@ -1352,6 +1400,10 @@ export class VectorStoreService {
 	): Promise<void> {
 		inst.isIndexing = true;
 		inst.abortController = new AbortController();
+		// A full build covers every note as of now. A vault event that arrives
+		// while it runs cannot be applied (`canApplyEvent`) and clears this
+		// again, which is what makes the run schedule a catch-up on completion.
+		inst.hasValidatedThisSession = true;
 		const { vault } = this.plugin.app;
 		const allFiles = getEmbeddableVaultFiles(vault);
 
@@ -1381,16 +1433,17 @@ export class VectorStoreService {
 		const notice = new Notice("", 0);
 		this.updateNotice(notice, inst.progress);
 
+		let cancelled = true;
 		try {
 			await inst.store.setMetadata(model.provider, model.model, INDEX_VERSION);
 
-			const { cancelled } = await this.embedFilesInBatches(inst, embeddings, model, files, {
+			({ cancelled } = await this.embedFilesInBatches(inst, embeddings, model, files, {
 				startingIndexedCount: 0,
 				preFilterSkipped: skippedFiles.length,
 				purgeExisting: false,
 				notice,
 				report,
-			});
+			}));
 
 			// Save the indexing report
 			inst.report = { ...report, timestamp: Date.now() };
@@ -1418,7 +1471,21 @@ export class VectorStoreService {
 			inst.isIndexing = false;
 			inst.abortController = null;
 			this.updateInstanceProgress(inst, { isIndexing: false, currentFile: null });
+			this.rescheduleValidationIfEventsDropped(inst, cancelled);
 		}
+	}
+
+	/**
+	 * After a bulk run: if a vault event was dropped while it ran (the flag was
+	 * cleared under it), schedule the validation that applies those changes.
+	 * Not after a cancelled run — the user asked for the writes to stop, and a
+	 * validation would resume them.
+	 */
+	private rescheduleValidationIfEventsDropped(inst: IndexInstance, cancelled: boolean): void {
+		if (cancelled || inst.hasValidatedThisSession) return;
+		if (this.instances.get(inst.indexId) !== inst) return;
+		Logger.log(`[VectorStore] Vault changed during the bulk run for ${inst.indexId}; scheduling a catch-up`);
+		this.scheduleValidation(inst);
 	}
 
 	/**
@@ -1500,7 +1567,7 @@ export class VectorStoreService {
 			const doc: DocumentVector = {
 				id: makeChunkId(entry.file.path, entry.chunkIndex),
 				path: entry.file.path,
-				mtime: entry.file.stat.mtime,
+				mtime: entry.mtime,
 				checksum: entry.checksum,
 				chunkIndex: entry.chunkIndex,
 				vector: new Float32Array(vector),
@@ -1642,12 +1709,14 @@ export class VectorStoreService {
 				break;
 			}
 			try {
+				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
 				const checksum = this.hashContent(content);
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				for (const chunk of orderChunksForWriting(chunks)) {
 					pending.push({
 						file,
+						mtime,
 						chunkIndex: chunk.chunkIndex,
 						checksum,
 						embedText: chunk.content,
@@ -1663,6 +1732,10 @@ export class VectorStoreService {
 			}
 
 			while (pending.length >= batchSize) {
+				if (aborted()) {
+					stopped = true;
+					break;
+				}
 				const batch = pending.splice(0, batchSize);
 				if (!(await embedBatch(batch))) {
 					stopped = true;
@@ -1772,6 +1845,7 @@ export class VectorStoreService {
 		}
 
 		try {
+			const mtime = stampForRead(file);
 			const content = await readIndexableContent(this.plugin.app.vault, file);
 			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
 			const checksum = this.hashContent(content);
@@ -1797,7 +1871,7 @@ export class VectorStoreService {
 				const doc: DocumentVector = {
 					id: makeChunkId(file.path, chunks[i].chunkIndex),
 					path: file.path,
-					mtime: file.stat.mtime,
+					mtime,
 					checksum,
 					chunkIndex: chunks[i].chunkIndex,
 					vector: vectors[i],
@@ -1877,7 +1951,7 @@ export class VectorStoreService {
 			const rejectedByFilter = new Set<string>();
 
 			for (const r of results) {
-				const path = r.doc.path;
+				const path = r.path;
 				if (rejectedByFilter.has(path)) continue;
 
 				if (!passedFilter.has(path)) {
