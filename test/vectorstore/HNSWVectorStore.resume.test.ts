@@ -51,10 +51,10 @@ afterEach(() => {
 describe("HNSWVectorStore — resuming after an interrupted build", () => {
 	it("re-links rows written after the last checkpoint on the next open", async () => {
 		const first = await openForBuild();
-		await first.upsert(doc("a.md", [1, 0, 0]));
-		await first.upsert(doc("b.md", [0, 1, 0]));
+		await first.putNote([doc("a.md", [1, 0, 0])]);
+		await first.putNote([doc("b.md", [0, 1, 0])]);
 		await first.flush(); // checkpoint: a and b are in the persisted graph
-		await first.upsert(doc("c.md", [0, 0, 1])); // after the checkpoint; never saved
+		await first.putNote([doc("c.md", [0, 0, 1])]); // after the checkpoint; never saved
 		// No close(): the process died here.
 
 		const second = await openStore();
@@ -69,8 +69,8 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 
 	it("builds the graph from rows alone when no checkpoint was ever written", async () => {
 		const first = await openForBuild();
-		await first.upsert(doc("a.md", [1, 0]));
-		await first.upsert(doc("b.md", [0, 1]));
+		await first.putNote([doc("a.md", [1, 0])]);
+		await first.putNote([doc("b.md", [0, 1])]);
 
 		const second = await openStore();
 		expect(await second.count()).toBe(2);
@@ -80,30 +80,32 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		await second.close();
 	});
 
-	it("listNoteMeta omits a note whose chunk-0 row is missing (write interrupted mid-note)", async () => {
+	it("listNoteMeta omits a note whose chunk-0 row is missing (an older version's interrupted write)", async () => {
 		const store = await openForBuild();
-		// Bulk writers store chunk 0 last; a kill after chunk 1 leaves exactly this.
-		await store.upsert({
-			id: "big.md#1",
-			path: "big.md",
-			mtime: 5,
-			chunkIndex: 1,
-			vector: new Float32Array([0, 1]),
-		});
-		await store.upsert(doc("small.md", [1, 0]));
+		// Versions that wrote chunk by chunk stored chunk 0 last; a kill after
+		// chunk 1 left exactly this row. `putNote` never leaves such a note, but
+		// the store still reads one as absent so it gets re-indexed whole.
+		await store.putNote([
+			{
+				id: "big.md#1",
+				path: "big.md",
+				mtime: 5,
+				chunkIndex: 1,
+				vector: new Float32Array([0, 1]),
+			},
+		]);
+		await store.putNote([doc("small.md", [1, 0])]);
 
 		expect((await store.listNoteMeta()).map((n) => n.path)).toEqual(["small.md"]);
 		expect(await store.countNotes()).toBe(2);
 		expect(await store.count()).toBe(2);
 
-		await store.upsert({
-			id: "big.md#0",
-			path: "big.md",
-			mtime: 5,
-			chunkIndex: 0,
-			vector: new Float32Array([1, 1]),
-		});
+		await store.putNote([
+			{ id: "big.md#0", path: "big.md", mtime: 5, chunkIndex: 0, vector: new Float32Array([1, 1]) },
+			{ id: "big.md#1", path: "big.md", mtime: 5, chunkIndex: 1, vector: new Float32Array([0, 1]) },
+		]);
 		expect((await store.listNoteMeta()).map((n) => n.path).sort()).toEqual(["big.md", "small.md"]);
+		expect(await store.count()).toBe(3);
 		await store.close();
 	});
 
@@ -112,12 +114,12 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		// so nothing persisted the id counter. Reopening restored 0 and every new
 		// chunk collided with a live graph node ("Node with id N already exists").
 		const first = await openStore(); // no setMetadata: rows and graph only
-		await first.upsert(doc("a.md", [1, 0, 0]));
-		await first.upsert(doc("b.md", [0, 1, 0]));
+		await first.putNote([doc("a.md", [1, 0, 0])]);
+		await first.putNote([doc("b.md", [0, 1, 0])]);
 		await first.flush();
 
 		const second = await openStore();
-		await expect(second.upsert(doc("c.md", [0, 0, 1]))).resolves.toBeUndefined();
+		await expect(second.putNote([doc("c.md", [0, 0, 1])])).resolves.toBeUndefined();
 		expect(await second.count()).toBe(3);
 		expect(graphNodeCount(second)).toBe(3);
 		const hits = await second.search(new Float32Array([0, 0, 1]), 1);
@@ -133,9 +135,9 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		// between leaves c's row and graph node with no mapping. Its id must still
 		// be off limits on the next open, or the next upsert collides with it.
 		const first = await openStore();
-		await first.upsert(doc("a.md", [1, 0, 0]));
-		await first.upsert(doc("b.md", [0, 1, 0]));
-		await first.upsert(doc("c.md", [0, 0, 1])); // numeric id 2, the high-water mark
+		await first.putNote([doc("a.md", [1, 0, 0])]);
+		await first.putNote([doc("b.md", [0, 1, 0])]);
+		await first.putNote([doc("c.md", [0, 0, 1])]); // numeric id 2, the high-water mark
 		await first.flush();
 		const dbName = (first as unknown as { dbName: string }).dbName;
 		await new Promise<void>((resolve, reject) => {
@@ -154,7 +156,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		});
 
 		const second = await openStore();
-		await expect(second.upsert(doc("d.md", [1, 1, 0]))).resolves.toBeUndefined();
+		await expect(second.putNote([doc("d.md", [1, 1, 0])])).resolves.toBeUndefined();
 		expect(await second.count()).toBe(4);
 		const hits = await second.search(new Float32Array([1, 1, 0]), 1);
 		expect(hits.map((h) => h.path)).toEqual(["d.md"]);
@@ -163,7 +165,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 
 	it("loads the persisted graph once when a search and an upsert race to initialise it", async () => {
 		const first = await openForBuild();
-		await first.upsert(doc("a.md", [1, 0, 0]));
+		await first.putNote([doc("a.md", [1, 0, 0])]);
 		await first.flush();
 		await first.close();
 
@@ -173,7 +175,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 		const second = await openStore();
 		const loads = vi.spyOn(second as unknown as { loadGraph: () => Promise<void> }, "loadGraph");
 		const [, hits] = await Promise.all([
-			second.upsert(doc("b.md", [0, 1, 0])),
+			second.putNote([doc("b.md", [0, 1, 0])]),
 			second.search(new Float32Array([1, 0, 0]), 1),
 		]);
 		expect(loads).toHaveBeenCalledTimes(1);
@@ -185,7 +187,7 @@ describe("HNSWVectorStore — resuming after an interrupted build", () => {
 
 	it("flush() persists the pending graph immediately instead of on the debounce", async () => {
 		const first = await openForBuild();
-		await first.upsert(doc("a.md", [1, 0]));
+		await first.putNote([doc("a.md", [1, 0])]);
 		await first.flush();
 
 		// The persisted topology alone must describe the node — no re-link log.

@@ -367,19 +367,6 @@ export function summarizeValidationProgressCounts({
 }
 
 /**
- * Write order for a note's chunks: everything after chunk 0 first, chunk 0
- * last. `VectorStore.listNoteMeta` reports a note as indexed only through its
- * chunk-0 row, so writing that row last turns "all chunks stored" into a single
- * durable fact — a process killed part-way through a multi-chunk note leaves
- * rows that validation treats as absent and re-indexes, instead of chunks that
- * carry the current mtime and make the note look complete for good.
- */
-export function orderChunksForWriting<T>(chunks: readonly T[]): T[] {
-	if (chunks.length <= 1) return [...chunks];
-	return [...chunks.slice(1), chunks[0]];
-}
-
-/**
  * The mtime to store with a note's vectors: read *before* the content is.
  *
  * Obsidian updates `TFile.stat` in place, so reading it when the row is
@@ -414,8 +401,6 @@ interface BulkEmbedOptions {
 	startingIndexedCount: number;
 	/** Notes counted as skipped before the loop starts (excluded, privacy). */
 	preFilterSkipped: number;
-	/** Remove a note's stored chunks before writing new ones (re-index of a stale note). */
-	purgeExisting: boolean;
 	notice: Notice | null;
 	report?: BulkEmbedReport;
 }
@@ -1015,9 +1000,6 @@ export class VectorStoreService {
 					this.embedFilesInBatches(inst, embeddings, defaultModel, filesToIndex, {
 						startingIndexedCount,
 						preFilterSkipped: 0,
-						// A stale note is re-indexed with a possibly different chunk count;
-						// its old chunks go first.
-						purgeExisting: true,
 						notice,
 					}),
 				);
@@ -1222,6 +1204,12 @@ export class VectorStoreService {
 	/**
 	 * Handle file rename — forward to active instances only.
 	 * Inactive instances are marked for re-validation on next use.
+	 *
+	 * A rename changes no content, so an indexed note is re-keyed in the store
+	 * (`renameNote`: rows and id mappings move, the vectors and graph stay) with
+	 * no provider call — a folder move of 200 notes used to be 200 notes of
+	 * embedding requests. Only a note that was not indexed, or whose destination
+	 * cannot hold vectors, goes through the embed-or-remove path.
 	 */
 	private async handleFileRename(file: TFile, oldPath: string): Promise<void> {
 		this.cancelPendingModify(oldPath);
@@ -1230,11 +1218,22 @@ export class VectorStoreService {
 				inst.hasValidatedThisSession = false;
 				continue;
 			}
-			// The old path's rows go regardless; the new path is written only when
-			// no bulk run is in flight (`canApplyEvent`), else left to validation.
-			await inst.store.remove(oldPath);
+			// A bulk run may have read the note under its old path and write it
+			// back there afterwards; the validation the run schedules on
+			// completion removes such an orphan.
+			if (this.isBulkRunning(inst)) inst.hasValidatedThisSession = false;
 			this.clearNoteFailure(inst, oldPath);
-			if (this.canApplyEvent(inst)) {
+
+			const model = this.getModelForInstance(inst);
+			const indexable = model !== null && isEmbeddableFile(file) && this.shouldIndexFile(file, model.provider);
+			if (!indexable) {
+				// A non-embeddable extension, or a path the privacy rules exclude.
+				await inst.store.remove(oldPath);
+			} else if ((await inst.store.getDocumentMtime(oldPath)) !== undefined) {
+				// Same content, new key. A copy that was stale stays stale; the
+				// modify debounce or the next validation deals with that.
+				await inst.store.renameNote(oldPath, file.path);
+			} else if (this.canApplyEvent(inst)) {
 				await this.indexDocumentForInstance(inst, file);
 			}
 			void this.notifyStatsChanged(inst);
@@ -1513,19 +1512,11 @@ export class VectorStoreService {
 		try {
 			await inst.store.setMetadata(model.provider, model.model, INDEX_VERSION);
 
-			// "Empty" is decided from `listNoteMeta`, which lists a note only through
-			// its chunk-0 row — so a store holding only the partial rows of an
-			// interrupted build reads as empty and lands here. Those rows must go
-			// before their notes are rewritten, or a note whose chunk count shrank
-			// keeps its excess old chunks (live mappings: they surface in search).
-			const purgeExisting = (await inst.store.count()) > 0;
-
 			({ cancelled } = await this.trackBulkRun(
 				inst,
 				this.embedFilesInBatches(inst, embeddings, model, files, {
 					startingIndexedCount: 0,
 					preFilterSkipped: skippedFiles.length,
-					purgeExisting,
 					notice,
 					report,
 				}),
@@ -1621,11 +1612,12 @@ export class VectorStoreService {
 	 *   first embedding call — on the reference vault, the whole vault as strings.
 	 * - After every embedding batch the loop pauses (a real pause on mobile, a
 	 *   bare yield on desktop) so the WebView's GC keeps up.
-	 * - Every `upsert` is durable on its own; every {@link BULK_CHECKPOINT_INTERVAL}
-	 *   notes the graph topology is flushed too. A kill mid-run therefore costs at
-	 *   most one interval of re-linking on the next open (`HNSWVectorStore.loadGraph`),
-	 *   and the next validation resumes from what is stored — it compares per-note
-	 *   mtimes and only embeds what is missing or stale — instead of starting over.
+	 * - Every note is written whole and durably (`putNote`, one transaction);
+	 *   every {@link BULK_CHECKPOINT_INTERVAL} notes the graph topology is flushed
+	 *   too. A kill mid-run therefore costs at most one interval of re-linking on
+	 *   the next open (`HNSWVectorStore.loadGraph`), and the next validation
+	 *   resumes from what is stored — it compares per-note mtimes and only embeds
+	 *   what is missing or stale — instead of starting over.
 	 * - The crash marker is set before the first read and cleared when the run
 	 *   survives (completed or user-cancelled), so a run the OS killed lengthens
 	 *   the next scheduled start (`BulkAttemptMarker`).
@@ -1678,41 +1670,43 @@ export class VectorStoreService {
 		};
 		const aborted = () => inst.abortController?.signal.aborted === true;
 
-		// A note may have been indexed previously (stale re-index) with a
-		// different chunk count; drop its old chunks before writing new ones.
-		const purgedPaths = new Set<string>();
+		// A note is written whole, once every one of its chunks has a vector:
+		// `putNote` replaces whatever the store held for the path in one
+		// transaction, so a stale note's old chunk count needs no separate purge
+		// and a kill mid-run never leaves part of a note behind. A note's chunks
+		// may span batches, so their vectors wait here meanwhile — at most a
+		// batch's worth plus the note in progress.
+		const pendingNotes = new Map<string, { mtime: number; expected: number; vectors: Map<number, Float32Array> }>();
 		const writeVector = async (entry: ChunkEntry, vector: number[]) => {
-			if (options.purgeExisting && !purgedPaths.has(entry.file.path)) {
-				await inst.store.remove(entry.file.path);
-				purgedPaths.add(entry.file.path);
-			}
 			if (!dimensionsRecorded) {
 				dimensionsRecorded = true;
 				this.recordDimensions(inst.indexId, vector.length);
 			}
-			const doc: DocumentVector = {
-				id: makeChunkId(entry.file.path, entry.chunkIndex),
-				path: entry.file.path,
-				mtime: entry.mtime,
-				chunkIndex: entry.chunkIndex,
-				vector: new Float32Array(vector),
-			};
-			await inst.store.upsert(doc);
-			indexedChunks++;
-			// Chunk 0 is written last (see `orderChunksForWriting`), so its write completes the note.
-			if (entry.chunkIndex === 0) {
-				noteIndexed(entry.file.path);
-				this.clearNoteFailure(inst, entry.file.path);
-			}
+			const path = entry.file.path;
+			const note = pendingNotes.get(path);
+			if (!note) return; // a sibling chunk failed; the note is dropped whole
+			note.vectors.set(entry.chunkIndex, new Float32Array(vector));
+			if (note.vectors.size < note.expected) return;
+			pendingNotes.delete(path);
+
+			const docs: DocumentVector[] = [...note.vectors.entries()]
+				.sort(([a], [b]) => a - b)
+				.map(([chunkIndex, chunkVector]) => ({
+					id: makeChunkId(path, chunkIndex),
+					path,
+					mtime: note.mtime,
+					chunkIndex,
+					vector: chunkVector,
+				}));
+			await inst.store.putNote(docs);
+			indexedChunks += docs.length;
+			noteIndexed(path);
+			this.clearNoteFailure(inst, path);
 		};
 
-		// A note that lost any chunk must not get its chunk 0 written. Chunk 0 is
-		// the "note is indexed" marker (`orderChunksForWriting` puts it last), so
-		// writing it after a sibling failed would leave a partial note that startup
-		// validation reads as complete — its sections silently missing from
-		// retrieval for as long as the note's mtime holds. Dropping the note's
-		// remaining chunks instead leaves it without `#0`, and the next validation
-		// pass re-indexes it whole.
+		// A note that lost any chunk is not written at all: its remaining chunks
+		// are dropped from the run, nothing of it reaches the store, and the next
+		// validation pass re-indexes it whole.
 		const failedPaths = new Set<string>();
 		/**
 		 * `remember` records the note so validation leaves it alone until it
@@ -1724,6 +1718,7 @@ export class VectorStoreService {
 		 */
 		const noteFailed = async (entry: ChunkEntry, reason: SkipReason, remember = true) => {
 			failedPaths.add(entry.file.path);
+			pendingNotes.delete(entry.file.path);
 			noteSkipped(entry.file.path, reason);
 			if (remember) await this.rejectNote(inst, entry.file.path, entry.mtime);
 		};
@@ -1858,7 +1853,8 @@ export class VectorStoreService {
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
 				const chunks = chunkText(content, file.basename, maxContentLength);
-				for (const chunk of orderChunksForWriting(chunks)) {
+				pendingNotes.set(file.path, { mtime, expected: chunks.length, vectors: new Map() });
+				for (const chunk of chunks) {
 					pending.push({
 						file,
 						mtime,
@@ -1891,6 +1887,9 @@ export class VectorStoreService {
 			if (await embedBatch(pending)) await afterBatch();
 		}
 		pending = [];
+		// Notes whose chunks were not all embedded (a stopped run) were never
+		// written; the next validation finds them missing.
+		pendingNotes.clear();
 
 		const cancelled = aborted();
 		if (stopped && !cancelled) {
@@ -2029,19 +2028,16 @@ export class VectorStoreService {
 		}
 
 		try {
-			// Replace any prior version's chunks, then write the new ones — chunk 0
-			// last, so the note only reads as indexed once every chunk is stored.
-			await inst.store.remove(file.path);
-			for (const i of orderChunksForWriting(chunks.map((_, index) => index))) {
-				const doc: DocumentVector = {
-					id: makeChunkId(file.path, chunks[i].chunkIndex),
+			// One transaction replaces any prior version's chunks with the new ones.
+			await inst.store.putNote(
+				chunks.map((chunk, i) => ({
+					id: makeChunkId(file.path, chunk.chunkIndex),
 					path: file.path,
 					mtime,
-					chunkIndex: chunks[i].chunkIndex,
+					chunkIndex: chunk.chunkIndex,
 					vector: vectors[i],
-				};
-				await inst.store.upsert(doc);
-			}
+				})),
+			);
 			this.clearNoteFailure(inst, file.path);
 			Logger.log(`[VectorStore] Indexed: ${file.path} (${chunks.length} chunks, ${inst.indexId})`);
 		} catch (error) {

@@ -6,7 +6,7 @@
  * Every CPU-intensive operation (build, search, add) runs off the main thread.
  *
  * Writes transfer their vector buffers to the worker instead of cloning them
- * (see `upsert`/`bulkPut`), so a vector is never resident on both sides.
+ * (see `putNote`/`bulkPut`), so a vector is never resident on both sides.
  */
 
 import type {
@@ -96,7 +96,7 @@ export class HNSWWorkerProxy implements VectorStore {
 	 *
 	 * Every request still in flight is rejected, not dropped. `terminate()`
 	 * discards the worker's reply queue, so a promise left in `pending` would
-	 * never settle: a bulk run whose `upsert` was in flight when its index was
+	 * never settle: a bulk run whose `putNote` was in flight when its index was
 	 * deleted hung forever on that await — its `finally` never ran and the
 	 * progress notice stayed on screen for the rest of the session.
 	 *
@@ -162,12 +162,16 @@ export class HNSWWorkerProxy implements VectorStore {
 		return (await this.call("getMetadata", [])) as IndexMetadata | null;
 	}
 
-	async upsert(doc: DocumentVector): Promise<void> {
-		await this.call("upsert", [doc], vectorBuffers([doc]));
+	async putNote(chunks: DocumentVector[]): Promise<void> {
+		await this.call("putNote", [chunks], vectorBuffers(chunks));
 	}
 
 	async remove(path: string): Promise<void> {
 		await this.call("remove", [path]);
+	}
+
+	async renameNote(oldPath: string, newPath: string): Promise<void> {
+		await this.call("renameNote", [oldPath, newPath]);
 	}
 
 	async getByPath(path: string): Promise<DocumentVector | undefined> {

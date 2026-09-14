@@ -48,12 +48,25 @@ class FakeStore implements VectorStore {
 		if (!this.meta) return null;
 		return { ...this.meta, documentCount: this.docs.size, lastUpdated: 0 };
 	}
-	async upsert(doc: DocumentVector): Promise<void> {
-		this.docs.set(doc.id, doc);
-		if (this.meta) this.meta.dimensions = doc.vector.length;
+	/** Mirrors the real store: the path's rows are replaced as one. */
+	async putNote(chunks: DocumentVector[]): Promise<void> {
+		await this.remove(chunks[0].path);
+		for (const doc of chunks) {
+			this.docs.set(doc.id, doc);
+			if (this.meta) this.meta.dimensions = doc.vector.length;
+		}
 	}
 	async remove(path: string): Promise<void> {
 		for (const [id, doc] of this.docs) if (doc.path === path) this.docs.delete(id);
+	}
+	async renameNote(oldPath: string, newPath: string): Promise<void> {
+		await this.remove(newPath);
+		for (const [id, doc] of [...this.docs]) {
+			if (doc.path !== oldPath) continue;
+			this.docs.delete(id);
+			const chunkIndex = doc.chunkIndex ?? 0;
+			this.docs.set(`${newPath}#${chunkIndex}`, { ...doc, id: `${newPath}#${chunkIndex}`, path: newPath });
+		}
 	}
 	async getByPath(path: string): Promise<DocumentVector | undefined> {
 		return [...this.docs.values()].find((d) => d.path === path);
@@ -80,7 +93,7 @@ class FakeStore implements VectorStore {
 		return [];
 	}
 	async bulkPut(docs: DocumentVector[]): Promise<void> {
-		for (const doc of docs) await this.upsert(doc);
+		for (const doc of docs) this.docs.set(doc.id, doc);
 	}
 	async clear(): Promise<void> {
 		this.docs.clear();
@@ -102,6 +115,8 @@ const stores = new Map<string, FakeStore>();
 let vaultFiles: FakeFile[] = [];
 /** Paths whose `readIndexableContent` throws. */
 let readFailures = new Set<string>();
+/** Content served for `long.md`, when a test needs a multi-chunk note. */
+let longContent = "";
 const embedDocuments = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 const embedQuery = vi.fn(async () => [1, 0, 0]);
 const indexStats: Record<string, unknown> = {};
@@ -176,6 +191,7 @@ vi.mock("../../src/utils/fileFiltering", () => ({
 	isBinaryTextFile: (f: FakeFile) => f.extension === "pdf",
 	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
 		if (readFailures.has(f.path)) throw new Error(`cannot read ${f.path}`);
+		if (f.path === "long.md" && longContent) return longContent;
 		return `content of ${f.path}`;
 	},
 }));
@@ -225,6 +241,7 @@ beforeEach(() => {
 	stores.clear();
 	vaultFiles = [];
 	readFailures = new Set();
+	longContent = "";
 	providerTrusted = true;
 	privatePaths = new Set();
 	privacyListeners.clear();
@@ -289,34 +306,42 @@ describe("bulk embed run", () => {
 		// and d.md was killed mid-write: a chunk-1 row with the current mtime but no chunk 0.
 		vaultFiles.push(file("d.md", 1_000));
 		await store.setMetadata("fake", "embed-model", 2);
-		await store.upsert({
-			id: "d.md#1",
-			path: "d.md",
-			mtime: 1_000,
-			chunkIndex: 1,
-			vector: new Float32Array(3),
-		});
-		await store.upsert({
-			id: "a.md#0",
-			path: "a.md",
-			mtime: 1_000,
-			chunkIndex: 0,
-			vector: new Float32Array(3),
-		});
-		await store.upsert({
-			id: "c.md#0",
-			path: "c.md",
-			mtime: 1_000,
-			chunkIndex: 0,
-			vector: new Float32Array(3),
-		});
-		await store.upsert({
-			id: "gone.md#0",
-			path: "gone.md",
-			mtime: 1_000,
-			chunkIndex: 0,
-			vector: new Float32Array(3),
-		});
+		await store.putNote([
+			{
+				id: "d.md#1",
+				path: "d.md",
+				mtime: 1_000,
+				chunkIndex: 1,
+				vector: new Float32Array(3),
+			},
+		]);
+		await store.putNote([
+			{
+				id: "a.md#0",
+				path: "a.md",
+				mtime: 1_000,
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			},
+		]);
+		await store.putNote([
+			{
+				id: "c.md#0",
+				path: "c.md",
+				mtime: 1_000,
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			},
+		]);
+		await store.putNote([
+			{
+				id: "gone.md#0",
+				path: "gone.md",
+				mtime: 1_000,
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			},
+		]);
 
 		expect(await svc.ensureIndex(INDEX)).toBe(true);
 		await vi.advanceTimersByTimeAsync(1_000);
@@ -412,13 +437,15 @@ describe("bulk embed run", () => {
 		if (!store) throw new Error("store not opened");
 		await store.setMetadata("fake", "embed-model", 2);
 		for (const path of ["a.md", "gone.md"]) {
-			await store.upsert({
-				id: `${path}#0`,
-				path,
-				mtime: 1_000,
-				chunkIndex: 0,
-				vector: new Float32Array(3),
-			});
+			await store.putNote([
+				{
+					id: `${path}#0`,
+					path,
+					mtime: 1_000,
+					chunkIndex: 0,
+					vector: new Float32Array(3),
+				},
+			]);
 		}
 		// The cache still counts the note that has since left the vault.
 		indexStats.documentCount = 2;
@@ -487,13 +514,15 @@ describe("bulk embed run", () => {
 		if (!store) throw new Error("store not opened");
 		expect(indexStats.documentCount).toBe(0);
 		await store.setMetadata("fake", "embed-model", 2);
-		await store.upsert({
-			id: "a.md#0",
-			path: "a.md",
-			mtime: 1_000,
-			chunkIndex: 0,
-			vector: new Float32Array(3),
-		});
+		await store.putNote([
+			{
+				id: "a.md#0",
+				path: "a.md",
+				mtime: 1_000,
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			},
+		]);
 		await svc.cleanup();
 		service = null;
 
@@ -538,13 +567,15 @@ describe("bulk embed run", () => {
 		const store = stores.get(INDEX);
 		if (!store) throw new Error("store not opened");
 		// Built through the old validation path: a row, no record.
-		await store.upsert({
-			id: "a.md#0",
-			path: "a.md",
-			mtime: 1_000,
-			chunkIndex: 0,
-			vector: new Float32Array(3),
-		});
+		await store.putNote([
+			{
+				id: "a.md#0",
+				path: "a.md",
+				mtime: 1_000,
+				chunkIndex: 0,
+				vector: new Float32Array(3),
+			},
+		]);
 		expect(store.meta).toBeNull();
 
 		expect(await svc.ensureIndex(INDEX)).toBe(true);
@@ -559,6 +590,7 @@ describe("bulk embed run", () => {
 type EventHooks = {
 	handleFileModify(file: FakeFile): void;
 	handleFileCreate(file: FakeFile): Promise<void>;
+	handleFileRename(file: FakeFile, oldPath: string): Promise<void>;
 };
 
 function seeded(path: string, mtime: number, chunkIndex = 0): DocumentVector {
@@ -753,7 +785,7 @@ describe("indexing review follow-ups", () => {
 		if (!store) throw new Error("store not opened");
 		await store.setMetadata("fake", "embed-model", 2);
 		// Indexed at 5_000, then the note was put back from a backup dated 1_000.
-		await store.upsert(seeded("a.md", 5_000));
+		await store.putNote([seeded("a.md", 5_000)]);
 
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(embedDocuments).toHaveBeenCalledTimes(1);
@@ -870,14 +902,14 @@ describe("indexing review follow-ups", () => {
 		readFailures.clear();
 		const store = stores.get(INDEX);
 		if (!store) throw new Error("store not opened");
-		const upsert = store.upsert.bind(store);
-		store.upsert = async () => {
+		const putNote = store.putNote.bind(store);
+		store.putNote = async () => {
 			throw new Error("QuotaExceededError");
 		};
 		await (svc as unknown as EventHooks).handleFileCreate(unreadable);
 		expect(embedDocuments).toHaveBeenCalledTimes(1);
 		expect(indexStats.failedNotes).toBeUndefined();
-		store.upsert = upsert;
+		store.putNote = putNote;
 	});
 
 	it("a privacy-rule change re-validates: notes now private go, notes now allowed come in", async () => {
@@ -922,8 +954,8 @@ describe("indexing review follow-ups", () => {
 		await store.setMetadata("fake", "embed-model", 2);
 		// Killed after two of three chunks: rows exist, but no chunk 0 — so the
 		// index reads as empty and the full build runs. The note is one chunk now.
-		await store.upsert(seeded("big.md", 1_000, 1));
-		await store.upsert(seeded("big.md", 1_000, 2));
+		await store.putNote([seeded("big.md", 1_000, 1)]);
+		await store.putNote([seeded("big.md", 1_000, 2)]);
 
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect([...store.docs.keys()]).toEqual(["big.md#0"]);
@@ -972,5 +1004,80 @@ describe("indexing review follow-ups", () => {
 		expect(embedQuery).not.toHaveBeenCalled();
 		expect(embedDocuments).toHaveBeenCalledTimes(1);
 		expect(stores.get(INDEX)?.docs.has("a.md#0")).toBe(true);
+	});
+});
+
+describe("atomic notes and renames", () => {
+	it("a multi-chunk note whose chunks span batches is written once, whole", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("long.md"), file("short.md")];
+		// ~60k chars against a 24k-char chunk budget: three chunks, more than the batch size of 2.
+		longContent = "word ".repeat(12_000);
+		const svc = await startService();
+		const store = stores.get(INDEX);
+		if (!store) throw new Error("store not opened");
+		const putNote = vi.spyOn(store, "putNote");
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const longWrites = putNote.mock.calls.filter(([chunks]) => chunks[0].path === "long.md");
+		expect(longWrites).toHaveLength(1);
+		expect(longWrites[0][0].length).toBeGreaterThan(2);
+		expect(longWrites[0][0].map((c) => c.chunkIndex)).toEqual(longWrites[0][0].map((_, i) => i));
+		expect(embedDocuments.mock.calls.length).toBeGreaterThan(1);
+		expect(svc.getProgress(INDEX)).toMatchObject({ indexed: 2, total: 2, percentage: 100 });
+	});
+
+	it("a note that fails one chunk reaches the store not at all", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("long.md")];
+		longContent = "word ".repeat(6_000);
+		embedDocuments.mockImplementation(async (texts: string[]) => {
+			// The batch fails; on the per-entry retry the provider rejects every chunk of the note.
+			if (texts.length === 1) throw Object.assign(new Error("400 content policy"), { status: 400 });
+			throw new Error("batch failed");
+		});
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.size).toBe(0);
+		expect(indexStats.failedNotes).toEqual({ "long.md": 1_000 });
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+	});
+
+	it("a rename re-keys the stored rows without a provider call", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+
+		const renamed = file("folder/b.md", 1_000);
+		vaultFiles = [renamed];
+		await (svc as unknown as EventHooks).handleFileRename(renamed, "a.md");
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		const store = stores.get(INDEX);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["folder/b.md#0"]);
+		expect(store?.docs.get("folder/b.md#0")?.mtime).toBe(1_000);
+	});
+
+	it("a rename onto a private path drops the vectors; a rename of an unindexed note embeds it", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		providerTrusted = false;
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const hooks = svc as unknown as EventHooks;
+
+		privatePaths = new Set(["private/a.md"]);
+		const hidden = file("private/a.md", 1_000);
+		vaultFiles = [hidden];
+		await hooks.handleFileRename(hidden, "a.md");
+		expect(stores.get(INDEX)?.docs.size).toBe(0);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+
+		const back = file("a.md", 1_000);
+		vaultFiles = [back];
+		await hooks.handleFileRename(back, "private/a.md");
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		expect([...(stores.get(INDEX)?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
 	});
 });

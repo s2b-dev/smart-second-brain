@@ -403,18 +403,31 @@ export interface VectorStore {
 	getMetadata(): Promise<IndexMetadata | null>;
 
 	/**
-	 * Add or update a document in the store.
+	 * Write a note: every chunk of it, replacing whatever the store held for
+	 * that path, in one atomic transaction. All chunks share the note's `path`
+	 * and `mtime`; a note is either wholly present or wholly absent, never a
+	 * subset of its chunks, so a process kill mid-write costs nothing but the
+	 * note itself.
 	 *
-	 * The store takes ownership of `doc.vector`: the worker-backed implementation
-	 * transfers its buffer rather than copying it, so the caller's array is
-	 * detached (length 0) once this resolves. Build a fresh `Float32Array` per call.
+	 * The store takes ownership of every `chunk.vector`: the worker-backed
+	 * implementation transfers the buffers rather than copying them, so the
+	 * caller's arrays are detached (length 0) once this resolves. Build fresh
+	 * `Float32Array`s per call.
 	 */
-	upsert(doc: DocumentVector): Promise<void>;
+	putNote(chunks: DocumentVector[]): Promise<void>;
 
 	/**
-	 * Remove a document by path.
+	 * Remove a note (every chunk row of the path) in one transaction.
 	 */
 	remove(path: string): Promise<void>;
+
+	/**
+	 * Re-key a note's rows from `oldPath` to `newPath` without re-embedding:
+	 * the vectors, mtime and graph links are unchanged, only the ids move.
+	 * Rows already stored under `newPath` are replaced. A no-op when nothing
+	 * is stored under `oldPath`.
+	 */
+	renameNote(oldPath: string, newPath: string): Promise<void>;
 
 	/**
 	 * Get a document by path.
@@ -433,13 +446,14 @@ export interface VectorStore {
 	getDocumentMtime(path: string): Promise<number | undefined>;
 
 	/**
-	 * `{ path, mtime }` of every *completely* indexed note, one entry per note,
-	 * read without deserialising a single vector. A note counts as indexed only
-	 * once its chunk-0 row exists; bulk writers store that row last, so a note
-	 * whose write was interrupted is reported as absent and gets re-indexed.
-	 * This is the read to use for "what is indexed, and is it stale" questions —
-	 * there is deliberately no whole-set `getAll()`: materialising every vector
-	 * on the main thread is the memory spike #432 removes.
+	 * `{ path, mtime }` of every indexed note, one entry per note, read without
+	 * deserialising a single vector. `putNote` writes a note atomically, so a
+	 * listed note has all of its chunks; rows written chunk by chunk by older
+	 * versions are listed only when their chunk-0 row exists, so an interrupted
+	 * write of that era still reads as absent and gets re-indexed. This is the
+	 * read to use for "what is indexed, and is it stale" questions — there is
+	 * deliberately no whole-set `getAll()`: materialising every vector on the
+	 * main thread is the memory spike #432 removes.
 	 */
 	listNoteMeta(): Promise<NoteMeta[]>;
 
@@ -464,13 +478,13 @@ export interface VectorStore {
 
 	/**
 	 * Bulk insert documents (for loading from file). Takes ownership of every
-	 * `doc.vector` the same way `upsert` does.
+	 * `doc.vector` the same way `putNote` does.
 	 */
 	bulkPut(docs: DocumentVector[]): Promise<void>;
 
 	/**
 	 * Persist any in-memory index state that is still pending (the HNSW graph
-	 * topology, which `upsert` saves on a debounce). A bulk run calls this as
+	 * topology, which `putNote` saves on a debounce). A bulk run calls this as
 	 * its checkpoint so a process kill loses at most one interval's worth of
 	 * graph links; no-op when nothing is pending.
 	 */

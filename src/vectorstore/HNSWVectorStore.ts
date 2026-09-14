@@ -32,7 +32,7 @@ import { cosineSimilarity } from "./similarity";
 import { ChunkBatchBuilder, computeSemanticPairs, type SemanticPair } from "../utils/semanticEdges";
 import { toError } from "../utils/toError";
 
-import { deleteDatabase, getDbName, parseChunkId } from "./types";
+import { deleteDatabase, getDbName, makeChunkId, parseChunkId } from "./types";
 import { Logger } from "../utils/logging";
 
 const LOG_PREFIX = "[VectorStore] [HNSW]";
@@ -44,7 +44,12 @@ const ID_MAPPING_STORE = "id_mapping";
 const GRAPH_STORE = "hnsw_graph";
 /** Compound index over `documents` so per-note mtimes can be read without touching a vector. */
 const PATH_MTIME_INDEX = "path_mtime";
-/** Chunk id suffix of a note's first chunk (`makeChunkId(path, 0)`), the row that marks a note complete. */
+/**
+ * Chunk id suffix of a note's first chunk (`makeChunkId(path, 0)`). `putNote` writes a
+ * note atomically, so every note it stored has this row; the test is kept for rows
+ * written chunk by chunk by older versions, where a missing chunk 0 means the write
+ * was interrupted (see `listNoteMeta`).
+ */
 const FIRST_CHUNK_SUFFIX = "#0";
 
 /**
@@ -216,6 +221,14 @@ function awaitTransaction(tx: IDBTransaction, run: () => void): Promise<void> {
 	});
 }
 
+/** The graph nodes behind a set of ids, skipping ids the graph no longer has. */
+function* idsToNodes(index: HNSW, ids: Set<number>): IterableIterator<HnswNode> {
+	for (const id of ids) {
+		const node = index.nodes.get(id);
+		if (node) yield node;
+	}
+}
+
 /**
  * HNSW-backed vector store with O(log n) search complexity.
  * Uses pure TypeScript HNSW implementation with IndexedDB persistence.
@@ -228,6 +241,39 @@ export class HNSWVectorStore implements VectorStore {
 	private dimensions: number | null = null;
 	private nextHnswId = 0;
 	private readonly dbName: string;
+	/**
+	 * The metadata record as last read or written, so a note write can put the
+	 * updated record (the id counter, the timestamp) inside its own transaction
+	 * instead of a get-then-put in two more. Null until `setMetadata` writes one.
+	 */
+	private meta: StoredMetadata | null = null;
+
+	/**
+	 * Graph nodes whose topology changed since the last save, by numeric id.
+	 * The library rewires only the new node, the nodes it linked to, and the
+	 * nodes that lost a reciprocal link on an insert — all of which pass
+	 * through its `insertNeighbor` / `removeReciprocalLinks`, wrapped in
+	 * `trackGraph` — so a save puts these rows and nothing else. Rewriting the
+	 * whole store on every flush made a build's write volume quadratic in the
+	 * index size, and a single note edit a full rewrite.
+	 */
+	private dirtyNodes = new Set<number>();
+	/** The persisted topology no longer matches memory as a whole; the next save rewrites it. */
+	private graphNeedsFullSave = false;
+	/** How many nodes were last written by `saveGraph` (tests read it to prove the dirty set is used). */
+	private lastGraphSaveNodeCount = 0;
+
+	/**
+	 * Graph nodes with no id mapping — chunks removed or replaced this session.
+	 * The library cannot delete a node, so they stay in the graph until the next
+	 * open prunes them (`loadGraph` keeps only nodes whose row exists). Search
+	 * skips them, which used to shrink the effective k after a session of
+	 * edits: it asks for `k + deadNodes` instead, and past `COMPACT_DEAD_MIN`
+	 * dead nodes that also outnumber the live ones the graph is rebuilt in
+	 * place from the live vectors (`compactGraphIfNeeded`).
+	 */
+	private deadNodes = 0;
+	private static readonly COMPACT_DEAD_MIN = 1000;
 
 	/**
 	 * Debounced HNSW graph flush for the incremental path. `upsert` mutates the
@@ -281,6 +327,7 @@ export class HNSWVectorStore implements VectorStore {
 
 		// Load metadata to get dimensions
 		const meta = await this.getMetadataInternal();
+		this.meta = meta;
 		if (meta?.dimensions) {
 			this.dimensions = meta.dimensions;
 			this._providerId = meta.providerId;
@@ -461,32 +508,36 @@ export class HNSWVectorStore implements VectorStore {
 		});
 	}
 
-	private async saveIdMapping(stringId: string, numericId: number): Promise<void> {
-		if (!this.db) return;
-
-		const mapping: IdMapping = { numericId, stringId };
-		await this.putInStore(ID_MAPPING_STORE, mapping);
-		this.idToNumeric.set(stringId, numericId);
-		this.numericToId.set(numericId, stringId);
-	}
-
-	private async removeIdMapping(stringId: string): Promise<void> {
-		if (!this.db) return;
-		const db = this.db;
-
-		const numericId = this.idToNumeric.get(stringId);
-		if (numericId === undefined) return;
-
-		const tx = db.transaction(ID_MAPPING_STORE, "readwrite");
-		await awaitTransaction(tx, () => {
-			tx.objectStore(ID_MAPPING_STORE).delete(numericId);
-		});
-		this.idToNumeric.delete(stringId);
-		this.numericToId.delete(numericId);
-	}
-
 	private createEmptyGraph(): HNSW {
-		return new HNSW(this.M, this.efConstruction, null, "cosine", this.efSearch);
+		const index = new HNSW(this.M, this.efConstruction, null, "cosine", this.efSearch);
+		this.trackGraph(index);
+		return index;
+	}
+
+	/**
+	 * Wrap the two library methods through which every neighbour-list change
+	 * passes, so `saveGraph` knows which nodes to write. `insertNeighbor` is
+	 * called for the inserted node and for each neighbour it links to;
+	 * `removeReciprocalLinks` names the nodes that lost a back-link. Instance
+	 * properties shadow the prototype, so the library's own call sites pick
+	 * the wrappers up; the methods are `private` in its typings, hence the cast.
+	 */
+	private trackGraph(index: HNSW): void {
+		const tracked = index as unknown as {
+			insertNeighbor(node: HnswNode, neighborId: number, level: number): number[];
+			removeReciprocalLinks(node: HnswNode, removedIds: number[], level: number): void;
+		};
+		const insertNeighbor = tracked.insertNeighbor;
+		const removeReciprocalLinks = tracked.removeReciprocalLinks;
+		tracked.insertNeighbor = (node, neighborId, level) => {
+			const removed = insertNeighbor.call(index, node, neighborId, level);
+			this.dirtyNodes.add(node.id);
+			return removed;
+		};
+		tracked.removeReciprocalLinks = (node, removedIds, level) => {
+			removeReciprocalLinks.call(index, node, removedIds, level);
+			for (const id of removedIds) this.dirtyNodes.add(id);
+		};
 	}
 
 	/**
@@ -568,10 +619,12 @@ export class HNSWVectorStore implements VectorStore {
 			});
 		}
 
+		const persistedNodeCount = topology.size;
 		const nodes = new Map<number, HnswNode>();
 		/** Rows the persisted graph does not know about — see the doc comment. */
 		const unlinked: Array<{ id: number; vector: Float32Array }> = [];
 		let dim: number | null = null;
+		let dead = 0;
 		{
 			const tx = db.transaction(DOCUMENTS_STORE, "readonly");
 			const request = tx.objectStore(DOCUMENTS_STORE).openCursor();
@@ -587,6 +640,9 @@ export class HNSWVectorStore implements VectorStore {
 						level: node.level,
 						neighbors: node.neighbors,
 					});
+					// A row whose mapping is gone is mid-removal: its node is kept
+					// (its links are still in place) but it is unreachable by search.
+					if (!this.numericToId.has(stored.hnswId)) dead++;
 				} else if (this.numericToId.has(stored.hnswId)) {
 					// Only rows that still have an id mapping are live; a row whose
 					// mapping is gone is mid-removal and must not come back.
@@ -597,6 +653,7 @@ export class HNSWVectorStore implements VectorStore {
 			});
 		}
 		topology.clear();
+		this.deadNodes = dead;
 		if (nodes.size === 0 && unlinked.length === 0) return;
 
 		let pruned = 0;
@@ -632,42 +689,68 @@ export class HNSWVectorStore implements VectorStore {
 
 		if (unlinked.length > 0) {
 			for (const row of unlinked) await index.addPoint(row.id, row.vector);
-			// The re-linked graph is only in memory; schedule the save so the next
-			// open does not have to redo this.
-			this.hasPendingIndexSave = true;
-			this.scheduleIndexSave();
 			Logger.log(
 				`${LOG_PREFIX} Re-linked ${unlinked.length} vectors that were written after the last graph save (interrupted build).`,
 			);
+		}
+
+		// Memory now differs from disk when nodes were dropped (their rows are
+		// gone), neighbour lists were pruned, or rows were re-linked. A partial
+		// save cannot express a dropped node, so the next save rewrites the store
+		// in full; schedule it so the next open does not have to redo this.
+		if (nodes.size !== persistedNodeCount || pruned > 0 || unlinked.length > 0) {
+			this.graphNeedsFullSave = true;
+			this.dirtyNodes.clear();
+			this.hasPendingIndexSave = true;
+			this.scheduleIndexSave();
 		}
 	}
 
 	/**
 	 * Persist the in-memory graph's topology (levels, neighbour lists, entry point).
 	 * Vectors are deliberately not written here — the document rows already hold
-	 * them. One transaction replaces the whole store: the library rewires other
-	 * nodes' neighbour lists on every insert, so there is no cheap dirty set.
+	 * them. Normally one transaction puts only the nodes in `dirtyNodes`; after a
+	 * full rebuild, or a load that diverged from disk, it replaces the whole store.
+	 * The header (entry point, top level) is small and always rewritten.
 	 */
 	private async saveGraph(): Promise<void> {
 		const db = this.requireDb();
 		const index = this.hnswIndex;
 		if (!index) return;
 
+		// Snapshot the dirty set: a note written while this transaction runs
+		// dirties nodes the transaction cannot see, and they must survive it.
+		const full = this.graphNeedsFullSave;
+		const dirty = this.dirtyNodes;
+		this.dirtyNodes = new Set();
+		this.graphNeedsFullSave = false;
+
 		const tx = db.transaction([GRAPH_STORE, METADATA_STORE], "readwrite");
-		await awaitTransaction(tx, () => {
-			const graphStore = tx.objectStore(GRAPH_STORE);
-			graphStore.clear();
-			for (const node of index.nodes.values()) {
-				const stored: StoredGraphNode = { id: node.id, level: node.level, neighbors: node.neighbors };
-				graphStore.put(stored);
-			}
-			const header: StoredGraphHeader = {
-				key: "hnsw-graph",
-				levelMax: index.levelMax,
-				entryPointId: index.entryPointId,
-			};
-			tx.objectStore(METADATA_STORE).put(header);
-		});
+		try {
+			await awaitTransaction(tx, () => {
+				const graphStore = tx.objectStore(GRAPH_STORE);
+				const nodes = full ? index.nodes.values() : idsToNodes(index, dirty);
+				let written = 0;
+				if (full) graphStore.clear();
+				for (const node of nodes) {
+					const stored: StoredGraphNode = { id: node.id, level: node.level, neighbors: node.neighbors };
+					graphStore.put(stored);
+					written++;
+				}
+				this.lastGraphSaveNodeCount = written;
+				const header: StoredGraphHeader = {
+					key: "hnsw-graph",
+					levelMax: index.levelMax,
+					entryPointId: index.entryPointId,
+				};
+				tx.objectStore(METADATA_STORE).put(header);
+			});
+		} catch (error) {
+			// Nothing landed; the next save must cover the same nodes again.
+			for (const id of dirty) this.dirtyNodes.add(id);
+			this.graphNeedsFullSave ||= full;
+			throw error;
+		}
 	}
 
 	private async getGraphHeader(): Promise<StoredGraphHeader | null> {
@@ -749,13 +832,14 @@ export class HNSWVectorStore implements VectorStore {
 		};
 
 		await this.putInStore(METADATA_STORE, meta);
+		this.meta = meta;
 	}
 
 	/**
 	 * Get the current index metadata.
 	 */
 	async getMetadata(): Promise<IndexMetadata | null> {
-		const meta = await this.getMetadataInternal();
+		const meta = this.meta;
 		if (!meta) return null;
 
 		const count = await this.count();
@@ -770,56 +854,204 @@ export class HNSWVectorStore implements VectorStore {
 	}
 
 	/**
-	 * Add or update a document in the store.
+	 * Write a note: all of its chunks, replacing whatever the path held, in one
+	 * transaction over the rows, the id mappings and the metadata record. The
+	 * old rows are deleted and the new ones put inside that transaction, so the
+	 * store never holds a note in part. (Chunk by chunk, each in three to four
+	 * transactions, is what this replaces — and with it the "chunk 0 written
+	 * last" convention that stood in for atomicity.)
+	 *
+	 * The graph is updated in memory afterwards: the new chunks are inserted and
+	 * the replaced chunks' nodes become dead (the library cannot delete). The
+	 * topology save is debounced; a clean `close()` flushes anything pending.
 	 */
-	async upsert(doc: DocumentVector): Promise<void> {
-		// Initialize dimensions from first document
-		if (!this.dimensions) {
-			this.dimensions = doc.vector.length;
+	async putNote(chunks: DocumentVector[]): Promise<void> {
+		if (chunks.length === 0) throw new Error("putNote: a note has at least one chunk");
+		const path = chunks[0].path;
+		for (const chunk of chunks) {
+			if (chunk.path !== path) throw new Error(`putNote: chunk ${chunk.id} does not belong to ${path}`);
 		}
+		const db = this.requireDb();
+
+		if (!this.dimensions) this.dimensions = chunks[0].vector.length;
 		await this.ensureHNSWIndex();
 
-		// Remove the prior version of *this chunk* if updating.
-		//
-		// Must be keyed on the chunk id, not the path: `getByPath` returns only the
-		// first chunk of a note, so on a multi-chunk note re-upserting chunk #2 would
-		// drop chunk #0's mapping while #2's own stale mapping survived. Each such
-		// upsert then assigned a fresh numeric id and orphaned a graph node, leaving
-		// nodes with no `numericToId` entry — which `search()` silently skips,
-		// truncating results. (Observed after section-aware chunking turned
-		// single-chunk notes into multi-chunk ones: 2611 graph nodes vs 2281
-		// mappings, and a 50-result query returning 4.)
-		if (this.idToNumeric.has(doc.id)) {
-			await this.removeIdMapping(doc.id);
+		// Numeric ids are assigned up front so the metadata record put in the
+		// same transaction carries the counter past them.
+		const rows: StoredDocument[] = chunks.map((chunk) => ({
+			id: chunk.id,
+			path: chunk.path,
+			mtime: chunk.mtime,
+			vector: chunk.vector,
+			chunkIndex: chunk.chunkIndex,
+			hnswId: this.nextHnswId++,
+		}));
+
+		const replaced = await this.writeNote(db, path, rows);
+		this.retireIds(replaced);
+		for (const row of rows) {
+			this.idToNumeric.set(row.id, row.hnswId);
+			this.numericToId.set(row.hnswId, row.id);
 		}
 
-		// Assign numeric ID for HNSW
-		const hnswId = this.nextHnswId++;
-		await this.saveIdMapping(doc.id, hnswId);
-
-		// Store in IndexedDB
-		const stored: StoredDocument = {
-			id: doc.id,
-			path: doc.path,
-			mtime: doc.mtime,
-			vector: doc.vector,
-			chunkIndex: doc.chunkIndex,
-			hnswId,
-		};
-		await this.putInStore(DOCUMENTS_STORE, stored);
-
-		// Add to HNSW index with numeric ID. The library keeps a reference to the
-		// array it is given, so this Float32Array becomes the resident copy.
+		// The library keeps a reference to the array it is given, so each
+		// Float32Array becomes the resident copy.
 		if (this.hnswIndex) {
-			await this.hnswIndex.addPoint(hnswId, doc.vector);
+			for (const row of rows) {
+				await this.hnswIndex.addPoint(row.hnswId, row.vector);
+				// The first node of a graph gets no neighbour insertions; mark it by hand.
+				this.dirtyNodes.add(row.hnswId);
+			}
 		}
 
-		await this.updateLastUpdated();
-
-		// Persist the in-memory graph. Debounced so a burst of edits collapses
-		// into one save; a clean close() flushes anything still pending.
 		this.hasPendingIndexSave = true;
 		this.scheduleIndexSave();
+		await this.compactGraphIfNeeded();
+	}
+
+	/**
+	 * One readwrite transaction: delete every row and mapping stored under
+	 * `path`, put `rows` and their mappings, and refresh the metadata record.
+	 * Resolves with the numeric ids the deleted rows held.
+	 */
+	private writeNote(db: IDBDatabase, path: string, rows: StoredDocument[]): Promise<number[]> {
+		const replaced: number[] = [];
+		const tx = db.transaction([DOCUMENTS_STORE, ID_MAPPING_STORE, METADATA_STORE], "readwrite");
+		return awaitTransaction(tx, () => {
+			const docStore = tx.objectStore(DOCUMENTS_STORE);
+			const mappingStore = tx.objectStore(ID_MAPPING_STORE);
+			const request = docStore.index("path").openCursor(IDBKeyRange.only(path));
+			request.onsuccess = () => {
+				const cursor = request.result;
+				if (cursor) {
+					const stored = cursor.value as StoredDocument;
+					replaced.push(stored.hnswId);
+					mappingStore.delete(stored.hnswId);
+					cursor.delete();
+					cursor.continue();
+					return;
+				}
+				for (const row of rows) {
+					mappingStore.put({ numericId: row.hnswId, stringId: row.id } satisfies IdMapping);
+					docStore.put(row);
+				}
+				const meta = this.touchedMetadata();
+				if (meta) tx.objectStore(METADATA_STORE).put(meta);
+			};
+		}).then(() => replaced);
+	}
+
+	/**
+	 * The metadata record with the id counter, dimensions and timestamp brought
+	 * up to date, for a write transaction to put; null when no record exists yet
+	 * (a store written before its `setMetadata`, which validation repairs).
+	 * Persisting the counter on every write is what keeps a reload from reusing
+	 * a live id ("Node with id N already exists").
+	 */
+	private touchedMetadata(): StoredMetadata | null {
+		if (!this.meta) return null;
+		this.meta.lastUpdated = Date.now();
+		this.meta.nextHnswId = this.nextHnswId;
+		if (this.dimensions) this.meta.dimensions = this.dimensions;
+		return this.meta;
+	}
+
+	/** Forget the mappings of removed chunks; their graph nodes, if any, are now dead. */
+	private retireIds(numericIds: number[]): void {
+		for (const numericId of numericIds) {
+			const stringId = this.numericToId.get(numericId);
+			if (stringId !== undefined) this.idToNumeric.delete(stringId);
+			this.numericToId.delete(numericId);
+			if (this.hnswIndex?.nodes.has(numericId)) this.deadNodes++;
+		}
+	}
+
+	/**
+	 * Rebuild the graph from its live vectors once the dead nodes both exceed
+	 * {@link COMPACT_DEAD_MIN} and outnumber the live ones. Dead nodes cost
+	 * every search `k + dead` candidates; a session of heavy editing on a
+	 * long-lived window is the only way to reach this, and the next open would
+	 * prune them anyway. The vectors are already resident in the nodes, so no
+	 * row is read; the rebuilt topology is saved in full.
+	 */
+	private async compactGraphIfNeeded(): Promise<void> {
+		const index = this.hnswIndex;
+		if (!index || this.deadNodes < HNSWVectorStore.COMPACT_DEAD_MIN) return;
+		const live = index.nodes.size - this.deadNodes;
+		if (this.deadNodes < live) return;
+
+		const points: Array<{ id: number; vector: Float32Array }> = [];
+		for (const node of index.nodes.values()) {
+			if (this.numericToId.has(node.id)) points.push({ id: node.id, vector: node.vector as Float32Array });
+		}
+		Logger.log(`${LOG_PREFIX} Compacting graph: ${this.deadNodes} dead nodes, ${points.length} live.`);
+		await index.buildIndex(points);
+		this.deadNodes = 0;
+		this.dirtyNodes.clear();
+		this.graphNeedsFullSave = true;
+		this.hasPendingIndexSave = true;
+		this.scheduleIndexSave();
+	}
+
+	/**
+	 * Re-key a note's rows and mappings from `oldPath` to `newPath` in one
+	 * transaction. The numeric ids — and with them the graph — are untouched:
+	 * a rename moves nothing but the string ids, so no provider call and no
+	 * graph save is needed. Rows already under `newPath` are replaced.
+	 */
+	async renameNote(oldPath: string, newPath: string): Promise<void> {
+		if (oldPath === newPath) return;
+		const db = this.requireDb();
+
+		const moved: Array<{ from: string; to: string; hnswId: number }> = [];
+		const replaced: number[] = [];
+		const tx = db.transaction([DOCUMENTS_STORE, ID_MAPPING_STORE, METADATA_STORE], "readwrite");
+		await awaitTransaction(tx, () => {
+			const docStore = tx.objectStore(DOCUMENTS_STORE);
+			const mappingStore = tx.objectStore(ID_MAPPING_STORE);
+			const pathIndex = docStore.index("path");
+
+			// Whatever sits at the destination goes first; then the source rows
+			// are re-keyed. The put lands outside the cursor's range, so the walk
+			// over `oldPath` never sees it.
+			const clearing = pathIndex.openCursor(IDBKeyRange.only(newPath));
+			clearing.onsuccess = () => {
+				const cursor = clearing.result;
+				if (cursor) {
+					const stored = cursor.value as StoredDocument;
+					replaced.push(stored.hnswId);
+					mappingStore.delete(stored.hnswId);
+					cursor.delete();
+					cursor.continue();
+					return;
+				}
+				const moving = pathIndex.openCursor(IDBKeyRange.only(oldPath));
+				moving.onsuccess = () => {
+					const cursor = moving.result;
+					if (!cursor) {
+						if (moved.length > 0) {
+							const meta = this.touchedMetadata();
+							if (meta) tx.objectStore(METADATA_STORE).put(meta);
+						}
+						return;
+					}
+					const stored = cursor.value as StoredDocument;
+					const id = makeChunkId(newPath, stored.chunkIndex ?? 0);
+					moved.push({ from: stored.id, to: id, hnswId: stored.hnswId });
+					cursor.delete();
+					docStore.put({ ...stored, id, path: newPath } satisfies StoredDocument);
+					mappingStore.put({ numericId: stored.hnswId, stringId: id } satisfies IdMapping);
+					cursor.continue();
+				};
+			};
+		});
+
+		this.retireIds(replaced);
+		for (const { from, to, hnswId } of moved) {
+			this.idToNumeric.delete(from);
+			this.idToNumeric.set(to, hnswId);
+			this.numericToId.set(hnswId, to);
+		}
 	}
 
 	/** Checkpoint for bulk runs: persist the graph now rather than on the debounce. */
@@ -848,36 +1080,18 @@ export class HNSWVectorStore implements VectorStore {
 	}
 
 	/**
-	 * Remove a document by path.
-	 * A note may be stored as multiple chunk rows sharing the same `path`; this
-	 * deletes every one of them and drops each chunk's id-mapping.
+	 * Remove a note: every chunk row under `path` and each chunk's id mapping,
+	 * in one transaction (`writeNote` with nothing to put).
 	 *
 	 * The hnsw package doesn't support deletion, so the graph nodes stay until
-	 * the next full rebuild (`bulkPut`) or reload (`loadGraph` drops nodes whose
-	 * row is gone). Search tolerates them: numeric ids with no string mapping
-	 * are skipped.
+	 * the next full rebuild or reload (`loadGraph` drops nodes whose row is
+	 * gone); they count as dead meanwhile — see `deadNodes`.
 	 */
 	async remove(path: string): Promise<void> {
 		const db = this.requireDb();
-
-		// Drop id-mappings for ALL chunks of this note (getByPath returns only one).
-		const ids = await this.getIdsForPath(path);
-		for (const id of ids) {
-			await this.removeIdMapping(id);
-		}
-
-		const tx = db.transaction(DOCUMENTS_STORE, "readwrite");
-		await awaitTransaction(tx, () => {
-			const request = tx.objectStore(DOCUMENTS_STORE).index("path").openCursor(IDBKeyRange.only(path));
-			request.onsuccess = () => {
-				const cursor = request.result;
-				if (cursor) {
-					cursor.delete();
-					cursor.continue();
-				}
-			};
-		});
-		await this.updateLastUpdated();
+		const replaced = await this.writeNote(db, path, []);
+		this.retireIds(replaced);
+		await this.compactGraphIfNeeded();
 	}
 
 	/**
@@ -932,14 +1146,14 @@ export class HNSWVectorStore implements VectorStore {
 		const tx = db.transaction(DOCUMENTS_STORE, "readonly");
 		const request = tx.objectStore(DOCUMENTS_STORE).index(PATH_MTIME_INDEX).openKeyCursor();
 
-		// A note is listed only through its chunk-0 row. Bulk writers store a
-		// note's chunk 0 *last* (`VectorStoreService.embedFilesInBatches`), so a
-		// process killed between the chunks of a multi-chunk note leaves rows
-		// that carry the note's current mtime but no `#0` — and this read then
-		// reports the note as absent, which makes the next validation re-index
-		// it. Without that, the surviving chunks made the note look complete and
-		// its missing sections never came back. Key cursor only: `primaryKey`
-		// is the chunk id, so no row value (no vector) is ever deserialised.
+		// A note is listed only through its chunk-0 row. `putNote` stores a note
+		// whole, so every note it wrote has one; the test remains for rows
+		// written chunk by chunk by older versions, where a process killed
+		// between the chunks left rows that carry the note's current mtime but
+		// no `#0` — and this read then reports the note as absent, which makes
+		// the next validation re-index (and so replace) it. Key cursor only:
+		// `primaryKey` is the chunk id, so no row value (no vector) is ever
+		// deserialised.
 		const notes: NoteMeta[] = [];
 		return awaitCursor(tx, request, (cursor) => {
 			if (!cursor) return { done: true, value: notes };
@@ -1095,6 +1309,9 @@ export class HNSWVectorStore implements VectorStore {
 		// Rebuild HNSW index from all documents with numeric IDs
 		if (this.hnswIndex && hnswVectors.length > 0) {
 			await this.hnswIndex.buildIndex(hnswVectors);
+			this.deadNodes = 0;
+			this.dirtyNodes.clear();
+			this.graphNeedsFullSave = true;
 			await this.saveGraph();
 			this.hasPendingIndexSave = false;
 		}
@@ -1131,8 +1348,12 @@ export class HNSWVectorStore implements VectorStore {
 			Logger.error(`${LOG_PREFIX} Failed to delete persisted HNSW graph:`, e);
 		}
 		this.hasPendingIndexSave = false;
+		this.dirtyNodes.clear();
+		this.graphNeedsFullSave = false;
+		this.deadNodes = 0;
+		this.meta = null;
 
-		// A fresh graph; `upsert`/`bulkPut` re-derive the dimensions from the
+		// A fresh graph; `putNote`/`bulkPut` re-derive the dimensions from the
 		// first vector they see, which is what lets a model change land cleanly.
 		this.hnswIndex = null;
 		this.dimensions = null;
@@ -1179,8 +1400,11 @@ export class HNSWVectorStore implements VectorStore {
 	 * note path, and the score comes from the graph, so no document row is
 	 * read. (It used to fetch every hit's row — vector included — to return a
 	 * `path` the caller could have had for free.) A mapped id always has a row:
-	 * `upsert` writes the row before the graph node, and `remove` drops the
-	 * mapping first.
+	 * `putNote` writes row and mapping in one transaction, before the graph node.
+	 *
+	 * Dead nodes (removed or replaced this session) are still in the graph and
+	 * are skipped below; asking for `topK + deadNodes` keeps the number of live
+	 * hits from shrinking with every edit.
 	 */
 	async search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]> {
 		await this.ensureHNSWIndex();
@@ -1191,7 +1415,7 @@ export class HNSWVectorStore implements VectorStore {
 
 		try {
 			// Use HNSW to get nearest neighbors (returns numeric IDs)
-			const hnswResults = this.hnswIndex.searchKNN(queryVector, topK);
+			const hnswResults = this.hnswIndex.searchKNN(queryVector, topK + this.deadNodes);
 			const effectiveThreshold = threshold ?? 0;
 
 			const results: SearchHit[] = [];
@@ -1203,6 +1427,7 @@ export class HNSWVectorStore implements VectorStore {
 				if (!stringId) continue;
 				const { path, chunkIndex } = parseChunkId(stringId);
 				results.push({ id: stringId, path, chunkIndex, score: result.score });
+				if (results.length >= topK) break;
 			}
 			return results;
 		} catch {
@@ -1287,43 +1512,12 @@ export class HNSWVectorStore implements VectorStore {
 		return awaitRequest(tx, request, (docs: StoredDocument[]) => docs);
 	}
 
-	/** Chunk ids of a note, from the `path` index keys alone (no row values). */
-	private async getIdsForPath(path: string): Promise<string[]> {
-		const db = this.requireDb();
-
-		const tx = db.transaction(DOCUMENTS_STORE, "readonly");
-		const request = tx.objectStore(DOCUMENTS_STORE).index("path").openKeyCursor(IDBKeyRange.only(path));
-		const ids: string[] = [];
-		return awaitCursor(tx, request, (cursor) => {
-			if (!cursor) return { done: true, value: ids };
-			ids.push(cursor.primaryKey as string);
-			cursor.continue();
-			return undefined;
-		});
-	}
-
 	private async clearStore(storeName: string): Promise<void> {
 		const db = this.requireDb();
 		const tx = db.transaction(storeName, "readwrite");
 		await awaitTransaction(tx, () => {
 			tx.objectStore(storeName).clear();
 		});
-	}
-
-	private async updateLastUpdated(): Promise<void> {
-		const meta = await this.getMetadataInternal();
-		if (meta) {
-			meta.lastUpdated = Date.now();
-			// Persist the id high-water mark and dimensions on the incremental
-			// path too. `upsert` bumps `nextHnswId` in memory; if only
-			// `setMetadata` (full-rebuild path) persisted it, a reload would
-			// restore a stale counter and reassign an in-use id → `addPoint`
-			// throws "Node with id N already exists" and the note silently fails
-			// to index. Keep the persisted counter in lockstep with memory.
-			meta.nextHnswId = this.nextHnswId;
-			if (this.dimensions) meta.dimensions = this.dimensions;
-			await this.putInStore(METADATA_STORE, meta);
-		}
 	}
 
 	/**

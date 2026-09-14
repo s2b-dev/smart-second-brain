@@ -19,8 +19,8 @@ vi.mock("../../src/vectorstore/HNSWVectorStore", () => {
 		async open() {
 			calls.push({ method: "open", args: [] });
 		}
-		async upsert(doc: unknown) {
-			calls.push({ method: "upsert", args: [doc] });
+		async putNote(chunks: unknown) {
+			calls.push({ method: "putNote", args: [chunks] });
 		}
 		async listNoteMeta() {
 			calls.push({ method: "listNoteMeta", args: [] });
@@ -80,13 +80,13 @@ describe("hnswWorker protocol", () => {
 		expect(response.error).toMatch(/not initialized/i);
 	});
 
-	it("passes a Float32Array vector through to upsert without converting it", async () => {
+	it("passes a Float32Array vector through to putNote without converting it", async () => {
 		await send(1, "init", "v");
 		const vector = new Float32Array([1, 2, 3]);
-		await send(2, "upsert", { id: "a.md#0", path: "a.md", mtime: 1, vector });
+		await send(2, "putNote", [{ id: "a.md#0", path: "a.md", mtime: 1, vector }]);
 
-		const upsert = calls.find((c) => c.method === "upsert");
-		expect((upsert?.args[0] as { vector: unknown }).vector).toBe(vector);
+		const put = calls.find((c) => c.method === "putNote");
+		expect((put?.args[0] as Array<{ vector: unknown }>)[0].vector).toBe(vector);
 	});
 
 	it("dispatches the analytics operations with their arguments intact", async () => {

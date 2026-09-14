@@ -27,7 +27,7 @@ async function writeIndex(vaultId: string, indexId: string, docs: DocumentVector
 	await store.open();
 	const [provider, ...rest] = indexId.split(":");
 	await store.setMetadata(provider, rest.join(":"), 2);
-	for (const d of docs) await store.upsert(d);
+	for (const d of docs) await store.putNote([d]);
 	await store.close();
 }
 

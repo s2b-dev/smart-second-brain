@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /*
  * `close()` terminates the worker, which discards its reply queue. A request
  * still in flight at that moment must be rejected, not left pending forever:
- * a bulk run whose `upsert` was in flight when its index was deleted hung on
+ * a bulk run whose `putNote` was in flight when its index was deleted hung on
  * that await, so its `finally` never ran and the progress notice never cleared.
  */
 
@@ -69,16 +69,18 @@ describe("HNSWWorkerProxy.close", () => {
 		const proxy = new HNSWWorkerProxy("vault-1", "index-1");
 		const worker = workers[0];
 		const inFlight = settle(
-			proxy.upsert({
-				id: "a.md#0",
-				path: "a.md",
-				mtime: 1,
-				chunkIndex: 0,
-				vector: new Float32Array([1, 0]),
-			}),
+			proxy.putNote([
+				{
+					id: "a.md#0",
+					path: "a.md",
+					mtime: 1,
+					chunkIndex: 0,
+					vector: new Float32Array([1, 0]),
+				},
+			]),
 		);
 		const alsoInFlight = settle(proxy.count());
-		await vi.waitFor(() => expect(worker.posted.map((p) => p.method)).toEqual(["init", "upsert", "count"]));
+		await vi.waitFor(() => expect(worker.posted.map((p) => p.method)).toEqual(["init", "putNote", "count"]));
 
 		await proxy.close();
 
@@ -87,7 +89,7 @@ describe("HNSWWorkerProxy.close", () => {
 		expect(await alsoInFlight).toMatch(/closed/);
 		// Nothing is posted into a terminated worker; the call fails at once.
 		expect(await settle(proxy.count())).toMatch(/closed/);
-		expect(worker.posted.map((p) => p.method)).toEqual(["init", "upsert", "count", "close"]);
+		expect(worker.posted.map((p) => p.method)).toEqual(["init", "putNote", "count", "close"]);
 	});
 
 	it("terminates a worker that never acknowledges the close, after a bounded wait", async () => {

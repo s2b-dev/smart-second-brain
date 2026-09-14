@@ -68,7 +68,7 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 	it("stores and returns vectors as Float32Array with the same values", async () => {
 		const store = await openStore();
 		const values = [0.25, -0.5, 1, 0.125];
-		await store.upsert(doc("a.md", values));
+		await store.putNote([doc("a.md", values)]);
 
 		const byPath = await store.getByPath("a.md");
 		expectFloat32(byPath?.vector);
@@ -82,7 +82,7 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 	it("keeps the graph node's vector as the Float32Array it was given, not a double copy", async () => {
 		const store = await openStore();
-		await store.upsert(doc("a.md", [1, 0, 0]));
+		await store.putNote([doc("a.md", [1, 0, 0])]);
 
 		const nodes = internals(store).hnswIndex?.nodes;
 		expect(nodes?.size).toBe(1);
@@ -92,9 +92,9 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 	it("searches through the graph and returns chunk identity plus score, no vectors", async () => {
 		const store = await openStore();
-		await store.upsert(doc("x.md", [1, 0, 0]));
-		await store.upsert(doc("y.md", [0, 1, 0]));
-		await store.upsert(doc("z.md", [0, 0, 1]));
+		await store.putNote([doc("x.md", [1, 0, 0])]);
+		await store.putNote([doc("y.md", [0, 1, 0])]);
+		await store.putNote([doc("z.md", [0, 0, 1])]);
 
 		const hits = await store.search(new Float32Array([0.9, 0.1, 0]), 2);
 		expect(hits[0]).toEqual({ id: "x.md#0", path: "x.md", chunkIndex: 0, score: expect.any(Number) });
@@ -107,8 +107,8 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 	it("resolves a hit's path from its chunk id, even when the path itself contains '#'", async () => {
 		const store = await openStore();
-		await store.upsert(doc("notes/C# basics.md", [1, 0, 0], 3));
-		await store.upsert(doc("other.md", [0, 1, 0]));
+		await store.putNote([doc("notes/C# basics.md", [1, 0, 0], 3)]);
+		await store.putNote([doc("other.md", [0, 1, 0])]);
 
 		const hits = await store.search(new Float32Array([1, 0, 0]), 1);
 		expect(hits).toEqual([{ id: "notes/C# basics.md#3", path: "notes/C# basics.md", chunkIndex: 3, score: 1 }]);
@@ -117,8 +117,8 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 	it("round-trips the graph through close() and open(): a reopened store searches without rebuilding", async () => {
 		const first = await openStore();
-		await first.upsert(doc("x.md", [1, 0, 0]));
-		await first.upsert(doc("y.md", [0, 1, 0]));
+		await first.putNote([doc("x.md", [1, 0, 0])]);
+		await first.putNote([doc("y.md", [0, 1, 0])]);
 		await first.setMetadata("openai", "text-embedding-3-small", 2);
 		await first.close();
 
@@ -151,9 +151,8 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 
 	it("remove() drops every chunk of a note, and a reload prunes its nodes from the graph", async () => {
 		const first = await openStore();
-		await first.upsert(doc("multi.md", [1, 0, 0], 0));
-		await first.upsert(doc("multi.md", [0, 1, 0], 1));
-		await first.upsert(doc("other.md", [0, 0, 1]));
+		await first.putNote([doc("multi.md", [1, 0, 0], 0), doc("multi.md", [0, 1, 0], 1)]);
+		await first.putNote([doc("other.md", [0, 0, 1])]);
 		await first.setMetadata("openai", "text-embedding-3-small", 2);
 		await first.remove("multi.md");
 		expect(await first.count()).toBe(1);
@@ -173,9 +172,8 @@ describe("HNSWVectorStore — Float32Array round-trips", () => {
 describe("HNSWVectorStore — reads that never touch a vector", () => {
 	it("listNoteMeta yields one { path, mtime } per note, collapsing chunks", async () => {
 		const store = await openStore();
-		await store.upsert(doc("multi.md", [1, 0], 0, 5_000));
-		await store.upsert(doc("multi.md", [0, 1], 1, 5_000));
-		await store.upsert(doc("single.md", [1, 1], 0, 7_000));
+		await store.putNote([doc("multi.md", [1, 0], 0, 5_000), doc("multi.md", [0, 1], 1, 5_000)]);
+		await store.putNote([doc("single.md", [1, 1], 0, 7_000)]);
 
 		const notes = await store.listNoteMeta();
 		expect(notes).toEqual([
@@ -189,7 +187,7 @@ describe("HNSWVectorStore — reads that never touch a vector", () => {
 
 	it("getDocumentMtime answers from the index key and reports absent notes as undefined", async () => {
 		const store = await openStore();
-		await store.upsert(doc("a.md", [1, 0], 0, 4_200));
+		await store.putNote([doc("a.md", [1, 0], 0, 4_200)]);
 
 		expect(await store.getDocumentMtime("a.md")).toBe(4_200);
 		expect(await store.getDocumentMtime("missing.md")).toBeUndefined();
@@ -208,9 +206,20 @@ describe("HNSWVectorStore — analytics computed inside the store", () => {
 		doc("multi.md", [0, 0, 0.97, 0.03], 1),
 	];
 
+	/** Write the corpus note by note (a note's chunks go in one `putNote`), with fresh vectors each time. */
+	async function putCorpus(store: HNSWVectorStore): Promise<void> {
+		const byPath = new Map<string, DocumentVector[]>();
+		for (const d of corpus) {
+			const chunks = byPath.get(d.path) ?? [];
+			chunks.push({ ...d, vector: new Float32Array(d.vector) });
+			byPath.set(d.path, chunks);
+		}
+		for (const chunks of byPath.values()) await store.putNote(chunks);
+	}
+
 	it("semanticPairs matches the pure kernel run over the same rows", async () => {
 		const store = await openStore();
-		for (const d of corpus) await store.upsert({ ...d, vector: new Float32Array(d.vector) });
+		await putCorpus(store);
 
 		const paths = corpus.map((d) => d.path).filter((p, i, all) => all.indexOf(p) === i);
 		const options = { threshold: 0.5, neighborCount: 2, excludePairs: ["0:1"] };
@@ -234,7 +243,7 @@ describe("HNSWVectorStore — analytics computed inside the store", () => {
 
 	it("semanticPairs ignores notes outside the requested list and tolerates unknown paths", async () => {
 		const store = await openStore();
-		for (const d of corpus) await store.upsert({ ...d, vector: new Float32Array(d.vector) });
+		await putCorpus(store);
 
 		const pairs = await store.semanticPairs(["bio1.md", "not-indexed.md", "bio2.md"], { threshold: 0.5 });
 		expect(pairs).toEqual([{ source: 0, target: 2, score: expect.any(Number) }]);
@@ -244,7 +253,7 @@ describe("HNSWVectorStore — analytics computed inside the store", () => {
 
 	it("noteNeighbors ranks other notes by their best chunk against any chunk of the note", async () => {
 		const store = await openStore();
-		for (const d of corpus) await store.upsert({ ...d, vector: new Float32Array(d.vector) });
+		await putCorpus(store);
 
 		// multi.md's second chunk [0, 0, 0.97, 0.03] sits closer to type2 than to type1.
 		const neighbors = await store.noteNeighbors("multi.md", 0.5);
@@ -329,7 +338,7 @@ describe("HNSWVectorStore — schema upgrade", () => {
 		expect(internals(store).numericToId.size).toBe(0);
 
 		// The upgraded database is fully usable straight away.
-		await store.upsert(doc("new.md", [0, 1, 0]));
+		await store.putNote([doc("new.md", [0, 1, 0])]);
 		const hits = await store.search(new Float32Array([0, 1, 0]), 1);
 		expect(hits.map((h) => h.path)).toEqual(["new.md"]);
 		await store.close();
@@ -349,7 +358,7 @@ describe("HNSWVectorStore — schema upgrade", () => {
 
 	it("does not touch a database that is already at the current version", async () => {
 		const first = await openStore();
-		await first.upsert(doc("keep.md", [1, 0]));
+		await first.putNote([doc("keep.md", [1, 0])]);
 		await first.setMetadata("openai", "text-embedding-3-small", 2);
 		await first.close();
 

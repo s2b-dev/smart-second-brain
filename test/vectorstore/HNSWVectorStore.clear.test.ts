@@ -49,15 +49,15 @@ afterEach(() => {
 describe("HNSWVectorStore.clear", () => {
 	it("deletes the persisted graph rather than only dropping the in-memory handle", async () => {
 		const first = await openStore();
-		await first.upsert(doc("a.md", [1, 0]));
-		await first.upsert(doc("b.md", [0, 1]));
+		await first.putNote([doc("a.md", [1, 0])]);
+		await first.putNote([doc("b.md", [0, 1])]);
 		await first.setMetadata("p", "m", 2);
 		await first.close();
 
 		const second = await openStore();
 		await second.clear();
 		// Re-index with ids starting at 0 again, then reopen: only the new graph may exist.
-		await second.upsert(doc("c.md", [1, 1]));
+		await second.putNote([doc("c.md", [1, 1])]);
 		await second.setMetadata("p", "m", 2);
 		await second.close();
 
@@ -71,10 +71,10 @@ describe("HNSWVectorStore.clear", () => {
 
 	it("leaves a store that later upserts can insert into and search", async () => {
 		const store = await openStore();
-		await store.upsert(doc("a.md", [1, 0, 0]));
+		await store.putNote([doc("a.md", [1, 0, 0])]);
 		await store.clear();
 
-		await store.upsert(doc("b.md", [0, 1, 0]));
+		await store.putNote([doc("b.md", [0, 1, 0])]);
 		const hits = await store.search(new Float32Array([0, 1, 0]), 5);
 		expect(hits.map((h) => h.path)).toEqual(["b.md"]);
 		await store.close();
@@ -82,7 +82,7 @@ describe("HNSWVectorStore.clear", () => {
 
 	it("resets the numeric id counter that the deleted graph was keyed on", async () => {
 		const store = await openStore();
-		for (let i = 0; i < 5; i++) await store.upsert(doc(`n${i}.md`, [i, 1]));
+		for (let i = 0; i < 5; i++) await store.putNote([doc(`n${i}.md`, [i, 1])]);
 		expect(internals(store).nextHnswId).toBe(5);
 
 		await store.clear();
@@ -93,11 +93,11 @@ describe("HNSWVectorStore.clear", () => {
 
 	it("forgets the dimensions so a differently sized model can take over", async () => {
 		const store = await openStore();
-		await store.upsert(doc("a.md", [1, 0, 0]));
+		await store.putNote([doc("a.md", [1, 0, 0])]);
 		await store.clear();
 		expect(internals(store).dimensions).toBeNull();
 
-		await store.upsert(doc("b.md", [1, 0]));
+		await store.putNote([doc("b.md", [1, 0])]);
 		const hits = await store.search(new Float32Array([1, 0]), 1);
 		expect(hits.map((h) => h.path)).toEqual(["b.md"]);
 		await store.close();
@@ -109,7 +109,7 @@ describe("HNSWVectorStore.clear", () => {
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		try {
 			const store = await openStore();
-			await store.upsert(doc("a.md", [1, 0]));
+			await store.putNote([doc("a.md", [1, 0])]);
 			expect(internals(store).hasPendingIndexSave).toBe(true);
 
 			await store.clear();
@@ -130,7 +130,7 @@ describe("HNSWVectorStore.clear", () => {
 
 	it("clears metadata, mappings and rows together", async () => {
 		const store = await openStore();
-		await store.upsert(doc("a.md", [1, 0]));
+		await store.putNote([doc("a.md", [1, 0])]);
 		await store.setMetadata("p", "m", 2);
 
 		await store.clear();
