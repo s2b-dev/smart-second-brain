@@ -764,7 +764,8 @@ describe("indexing review follow-ups", () => {
 		platform.isMobile = false;
 		vaultFiles = [file("ok.md", 1_000), file("bad.md", 1_000)];
 		const rejectBad = async (texts: string[]) => {
-			if (texts.some((text) => text.includes("content of bad.md"))) throw new Error("content policy");
+			if (texts.some((text) => text.includes("content of bad.md")))
+				throw Object.assign(new Error("400 content policy"), { status: 400 });
 			return texts.map(() => [1, 0, 0]);
 		};
 		embedDocuments.mockImplementation(rejectBad);
@@ -810,7 +811,7 @@ describe("indexing review follow-ups", () => {
 		// The edit is rejected: the pre-edit vectors must not keep the note
 		// searchable, nor make validation see a stale note to retry.
 		embedDocuments.mockImplementation(async () => {
-			throw new Error("content policy");
+			throw Object.assign(new Error("400 content policy"), { status: 400 });
 		});
 		vaultFiles[0].stat.mtime = 2_000;
 		(svc as unknown as EventHooks).handleFileModify(vaultFiles[0]);
@@ -825,6 +826,33 @@ describe("indexing review follow-ups", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(embedDocuments).toHaveBeenCalledTimes(attempts);
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+	});
+
+	it("a provider-wide failure is not remembered against the note", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000), file("b.md", 1_000)];
+		// An expired key: every request fails, none of them says anything about a note.
+		embedDocuments.mockImplementation(async () => {
+			throw Object.assign(new Error("401 Incorrect API key provided"), { status: 401 });
+		});
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.size).toBe(0);
+		expect(indexStats.failedNotes).toBeUndefined();
+
+		// Same on the incremental path.
+		const created = file("c.md");
+		vaultFiles.push(created);
+		await (svc as unknown as EventHooks).handleFileCreate(created);
+		expect(indexStats.failedNotes).toBeUndefined();
+
+		// The key is fixed: the next launch indexes every note.
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+		await svc.cleanup();
+		service = null;
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await stores.get(INDEX)?.countNotes()).toBe(3);
 	});
 
 	it("a failed read or store write on the incremental path is not recorded as a rejection", async () => {

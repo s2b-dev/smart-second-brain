@@ -30,7 +30,7 @@ import { chunkText } from "../utils/chunkText";
 import { getEmbeddableVaultFiles, isEmbeddableFile, readIndexableContent } from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 import { matchesPathPrefix } from "../utils/pathUtils";
-import { isConnectionRefusedError, isProviderUnreachableError } from "../lib/transportErrors";
+import { isConnectionRefusedError, isDocumentRejectionError, isProviderUnreachableError } from "../lib/transportErrors";
 import {
 	configureEmbedIndexAction,
 	settingsAction,
@@ -1716,9 +1716,11 @@ export class VectorStoreService {
 		const failedPaths = new Set<string>();
 		/**
 		 * `remember` records the note so validation leaves it alone until it
-		 * changes. Only a rejection of *this* note earns that: a transport failure
-		 * stops the run without marking anything, and a whole batch coming back
-		 * empty says something about the call, not about the notes in it.
+		 * changes. Only a rejection of *this* note earns that
+		 * (`isDocumentRejectionError`): a transport failure stops the run without
+		 * marking anything, a provider-wide failure (an expired key, rate
+		 * limiting, a missing model) must stay retryable once the provider is
+		 * fixed, and an empty result says something about the call, not the note.
 		 */
 		const noteFailed = async (entry: ChunkEntry, reason: SkipReason, remember = true) => {
 			failedPaths.add(entry.file.path);
@@ -1804,12 +1806,12 @@ export class VectorStoreService {
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
-						await noteFailed(entry, "embed-error");
+						await noteFailed(entry, "embed-error", isDocumentRejectionError(entryError));
 						continue;
 					}
 					if (!vector || vector.length === 0) {
 						Logger.error(`[VectorStore] embedDocuments returned empty result for ${entry.file.path}`);
-						await noteFailed(entry, "embed-error");
+						await noteFailed(entry, "embed-error", false);
 						continue;
 					}
 					// The write is a local matter: a store failure throws out of the
@@ -2010,8 +2012,9 @@ export class VectorStoreService {
 			Logger.error(`[VectorStore] Failed to embed ${file.path} (${inst.indexId}):`, error);
 			const reason = error instanceof Error ? error.message : String(error);
 			new Notice(`Failed to embed ${file.basename}: ${reason}`);
-			// A dead provider is not this note's fault; anything else is, until it changes.
-			if (!isProviderUnreachableError(error)) await this.rejectNote(inst, file.path, mtime);
+			// Only a verdict on this document is remembered; a dead or misconfigured
+			// provider is not the note's fault, and the next validation retries it.
+			if (isDocumentRejectionError(error)) await this.rejectNote(inst, file.path, mtime);
 			return;
 		}
 		const vectors: Float32Array[] = [];
@@ -2020,7 +2023,6 @@ export class VectorStoreService {
 			if (!vector || vector.length === 0) {
 				Logger.error(`[VectorStore] embedDocuments returned empty result for ${file.path}`);
 				new Notice(`Failed to embed ${file.basename}: empty result from model`);
-				await this.rejectNote(inst, file.path, mtime);
 				return;
 			}
 			vectors.push(new Float32Array(vector));
