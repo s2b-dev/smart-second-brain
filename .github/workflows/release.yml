@@ -45,11 +45,14 @@ jobs:
                       build/prod/styles.css
 
             # The release is created as a draft so the maintainer can attach
-            # release notes and publish it by hand. When a release for the tag
-            # already exists (a beta re-pushed to the same tag, or a re-run),
-            # replace its assets in place instead: `gh release create` would
-            # either fail on the existing tag or, worse, silently mint a second
-            # draft that only shows up via the API.
+            # release notes and publish it by hand. If a DRAFT for the tag
+            # already exists (a re-run, or a tag re-pointed before publishing),
+            # replace its assets in place: `gh release create` would either fail
+            # on the existing tag or silently mint a second draft that only shows
+            # up via the API. A PUBLISHED release is never touched — users may
+            # already have installed its bundle — so that case fails loudly.
+            # Only a 404 from the lookup means "no release yet"; any other lookup
+            # failure (auth, rate limit, outage) also fails rather than creating.
             - name: Create or update draft release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,12 +60,19 @@ jobs:
                   tag="${GITHUB_REF#refs/tags/}"
                   assets=(build/prod/main.js manifest.json build/prod/styles.css)
 
-                  if gh release view "$tag" >/dev/null 2>&1; then
-                    echo "Release $tag exists; replacing its assets."
+                  if lookup=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" 2>&1); then
+                    if [ "$(jq -r .draft <<<"$lookup")" != "true" ]; then
+                      echo "::error::Release $tag is already published; refusing to replace its assets."
+                      exit 1
+                    fi
+                    echo "Draft release $tag exists; replacing its assets."
                     gh release upload "$tag" "${assets[@]}" --clobber
-                  else
+                  elif grep -q "HTTP 404" <<<"$lookup"; then
                     gh release create "$tag" \
                       --title="$tag" \
                       --draft \
                       "${assets[@]}"
+                  else
+                    echo "::error::Could not look up release $tag: $lookup"
+                    exit 1
                   fi
