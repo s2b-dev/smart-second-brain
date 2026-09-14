@@ -457,27 +457,88 @@ function isTransportFailure(error: unknown): boolean {
 	return looksLikeTransportFailureMessage(message);
 }
 
+/**
+ * Keep the renderer's `AbortSignal` out of Electron's main-process fetch.
+ *
+ * `electron.remote.net.fetch` runs in the main process, so every argument
+ * crosses the `@electron/remote` bridge and an `AbortSignal` arrives there as a
+ * remote proxy object. From Electron 40 (Node 24 / undici 7 — Obsidian
+ * installer 1.13.x ships Electron 43) undici brand-checks `RequestInit.signal`
+ * and rejects the proxy with `RequestInit: Expected signal (...) to be an
+ * instance of AbortSignal` (#472). Every streaming send then failed before it
+ * left the machine, surfacing as the OpenAI SDK's "Connection error." once its
+ * retries ran out. So the signal never travels: the request goes out without
+ * one, and cancellation is honoured on this side — the pending fetch rejects
+ * with an `AbortError` as native fetch would, and the response body is
+ * cancelled once (or if) it arrives, which tears down the main-process request.
+ */
+function abortErrorFor(signal: AbortSignal): unknown {
+	return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
+
+function cancelResponseBody(response: Response, reason: unknown): void {
+	try {
+		void response.body?.cancel(reason).catch(() => {});
+	} catch {
+		// A body that is already locked or consumed cannot be cancelled; nothing to tear down.
+	}
+}
+
+async function fetchWithLocalAbort(
+	fetchFn: typeof fetch,
+	url: string,
+	init: RequestInit,
+	signal: AbortSignal | null | undefined,
+): Promise<Response> {
+	if (!signal) return fetchFn(url, init);
+	if (signal.aborted) throw abortErrorFor(signal);
+
+	const pending = fetchFn(url, init);
+	let rejectOnAbort: () => void = () => {};
+	const aborted = new Promise<never>((_, reject) => {
+		rejectOnAbort = () => reject(abortErrorFor(signal));
+		signal.addEventListener("abort", rejectOnAbort, { once: true });
+	});
+
+	try {
+		const response = await Promise.race([pending, aborted]);
+		signal.removeEventListener("abort", rejectOnAbort);
+		signal.addEventListener("abort", () => cancelResponseBody(response, signal.reason), { once: true });
+		return response;
+	} catch (error) {
+		signal.removeEventListener("abort", rejectOnAbort);
+		if (signal.aborted) {
+			// The request may still complete in the main process; close it when it does.
+			pending.then(
+				(response) => cancelResponseBody(response, signal.reason),
+				() => {},
+			);
+		}
+		throw error;
+	}
+}
+
 async function performPrimaryFetch(normalized: NormalizedRequest): Promise<Response> {
 	const electronFetch = await getElectronNetFetch();
-	const primaryFetch = electronFetch ?? window.fetch.bind(window);
 	const parsedBody = parseRequestBody(normalized.init.body);
 	const normalizedBody =
 		parsedBody && normalized.url.includes("/chat/completions")
 			? normalizeChatCompletionMessages(parsedBody)
 			: undefined;
 	const requestBody = normalizedBody ? stringifyRequestBody(normalizedBody) : normalized.init.body;
-	const requestInit =
-		electronFetch && normalized.init.headers
-			? {
-					...normalized.init,
+	const { signal, ...initWithoutSignal } = normalized.init;
+	const response = electronFetch
+		? await fetchWithLocalAbort(
+				electronFetch,
+				normalized.url,
+				{
+					...initWithoutSignal,
 					body: requestBody,
-					headers: toHeaderRecord(normalized.init.headers),
-				}
-			: {
-					...normalized.init,
-					body: requestBody,
-				};
-	const response = await primaryFetch(normalized.url, requestInit);
+					headers: normalized.init.headers ? toHeaderRecord(normalized.init.headers) : undefined,
+				},
+				signal,
+			)
+		: await window.fetch(normalized.url, { ...normalized.init, body: requestBody });
 	if (!response.ok && normalized.url.includes("/chat/completions")) {
 		let responseText: string | undefined;
 		try {
