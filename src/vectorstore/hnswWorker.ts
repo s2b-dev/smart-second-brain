@@ -46,6 +46,10 @@ self.onmessage = async (e: MessageEvent<HNSWWorkerRequest>) => {
 				result = await requireStore().open();
 				break;
 			}
+			case "adoptDatabase": {
+				result = await requireStore().adoptDatabase(args[0] as string);
+				break;
+			}
 			case "close": {
 				result = await requireStore().close();
 				break;

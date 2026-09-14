@@ -33,10 +33,22 @@ function file(path: string, mtime = 1_000): FakeFile {
 }
 
 class FakeStore implements VectorStore {
+	constructor(private readonly indexId: string) {}
 	docs = new Map<string, DocumentVector>();
 	meta: { providerId: string; modelId: string; version: number; dimensions: number } | null = null;
 	open = vi.fn(async () => {});
 	close = vi.fn(async () => {});
+	/** Mirrors the real store: takes the other index's rows only while empty, then the other is gone. */
+	async adoptDatabase(fromIndexId: string): Promise<boolean> {
+		const from = stores.get(fromIndexId);
+		if (!from || from.docs.size === 0 || this.docs.size > 0) return false;
+		this.docs = new Map(from.docs);
+		const [providerId, modelId] = this.indexId.split(":");
+		this.meta = from.meta ? { ...from.meta, providerId, modelId } : null;
+		from.docs = new Map();
+		from.meta = null;
+		return true;
+	}
 	flush = vi.fn(async () => {});
 	providerId: string | null = null;
 	modelId: string | null = null;
@@ -125,22 +137,34 @@ let providerTrusted = true;
 let privatePaths = new Set<string>();
 const privacyListeners = new Set<() => void>();
 
+/** Configured index ids; a test that renames a provider swaps the entry. */
+let indexIds = [INDEX];
+const renameListeners = new Set<(oldId: string, newId: string) => Promise<void> | void>();
+
 const fakeData = {
 	vaultSlug: "vault-1",
 	searchEmbedIndex: INDEX as string | null,
 	graphEmbedIndex: null as string | null,
-	getEmbeddingIndex: (id: string) =>
-		id === INDEX
-			? {
-					id,
-					provider: "fake",
-					model: "embed-model",
-					batchSize: 2,
-					// Mirror the stats the service wrote, as the real config would.
-					lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
-					failedNotes: indexStats.failedNotes as Record<string, number> | undefined,
-				}
-			: undefined,
+	get embeddingIndexes() {
+		return indexIds.map((id) => fakeData.getEmbeddingIndex(id));
+	},
+	getEmbeddingIndex: (id: string) => {
+		if (!indexIds.includes(id)) return undefined;
+		const [provider, model] = id.split(":");
+		return {
+			id,
+			provider,
+			model,
+			batchSize: 2,
+			// Mirror the stats the service wrote, as the real config would.
+			lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
+			failedNotes: indexStats.failedNotes as Record<string, number> | undefined,
+		};
+	},
+	onProviderRenamed: (listener: (oldId: string, newId: string) => Promise<void> | void) => {
+		renameListeners.add(listener);
+		return () => renameListeners.delete(listener);
+	},
 	updateEmbeddingIndexStats: vi.fn((_id: string, stats: Record<string, unknown>) => Object.assign(indexStats, stats)),
 	removeEmbeddingIndex: vi.fn(),
 	isProviderTrusted: () => providerTrusted,
@@ -159,7 +183,7 @@ vi.mock("../../src/vectorstore/storeFactory", () => ({
 		// reopens what the previous one wrote, like IndexedDB does.
 		const existing = stores.get(indexId);
 		if (existing) return existing;
-		const store = new FakeStore();
+		const store = new FakeStore(indexId);
 		stores.set(indexId, store);
 		return store;
 	},
@@ -242,6 +266,9 @@ beforeEach(() => {
 	vaultFiles = [];
 	readFailures = new Set();
 	longContent = "";
+	indexIds = [INDEX];
+	fakeData.searchEmbedIndex = INDEX;
+	renameListeners.clear();
 	providerTrusted = true;
 	privatePaths = new Set();
 	privacyListeners.clear();
@@ -1119,5 +1146,31 @@ describe("atomic notes and renames", () => {
 		await hooks.handleFileRename(back, "private/a.md");
 		expect(embedDocuments).toHaveBeenCalledTimes(2);
 		expect([...(stores.get(INDEX)?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+	});
+});
+
+describe("provider rename", () => {
+	it("moves the index's vectors to the new id instead of rebuilding", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md")];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const oldStore = stores.get(INDEX);
+		expect(oldStore?.docs.size).toBe(3);
+		const embedCalls = embedDocuments.mock.calls.length;
+
+		// `renameProvider` re-keys the config first, then awaits the listeners.
+		const renamed = "fake-renamed:embed-model";
+		indexIds = [renamed];
+		fakeData.searchEmbedIndex = renamed;
+		await Promise.all([...renameListeners].map((listener) => listener("fake", "fake-renamed")));
+
+		expect(oldStore?.close).toHaveBeenCalled();
+		expect(stores.get(renamed)?.docs.size).toBe(3);
+		expect((await svc.getStats(renamed)).documentCount).toBe(3);
+		// Nothing was re-embedded, and the validation that follows finds nothing to do.
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(embedCalls);
+		expect(oldStore?.docs.size).toBe(0);
 	});
 });

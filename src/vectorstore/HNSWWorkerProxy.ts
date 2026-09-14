@@ -76,6 +76,10 @@ export class HNSWWorkerProxy implements VectorStore {
 		});
 	}
 
+	async adoptDatabase(fromIndexId: string): Promise<boolean> {
+		return (await this.call("adoptDatabase", [fromIndexId])) as boolean;
+	}
+
 	async open(): Promise<void> {
 		await this.call("open", []);
 		// Sync cached getters

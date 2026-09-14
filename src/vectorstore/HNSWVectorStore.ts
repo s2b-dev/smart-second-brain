@@ -221,6 +221,69 @@ function awaitTransaction(tx: IDBTransaction, run: () => void): Promise<void> {
 	});
 }
 
+/**
+ * Open a database only if it already exists. `indexedDB.open` without a version
+ * creates a missing database as an empty v1 shell, which is detectable through
+ * `upgradeneeded`; the shell is deleted again and `null` returned.
+ */
+function openExistingDatabase(name: string): Promise<IDBDatabase | null> {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(name);
+		let created = false;
+		request.onupgradeneeded = () => {
+			created = true;
+		};
+		request.onerror = () => reject(toError(request.error, `Failed to open "${name}".`));
+		request.onblocked = () => resolve(null);
+		request.onsuccess = () => {
+			const db = request.result;
+			if (!created) {
+				resolve(db);
+				return;
+			}
+			db.close();
+			void deleteDatabase(name);
+			resolve(null);
+		};
+	});
+}
+
+/**
+ * Copy every record of `name` from `source` to `target`, `batchSize` records
+ * per read cursor and write transaction. Resolves with the number copied.
+ */
+async function copyObjectStore(
+	source: IDBDatabase,
+	target: IDBDatabase,
+	name: string,
+	batchSize: number,
+): Promise<number> {
+	let lastKey: IDBValidKey | null = null;
+	let copied = 0;
+	for (;;) {
+		const readTx = source.transaction(name, "readonly");
+		const range = lastKey === null ? null : IDBKeyRange.lowerBound(lastKey, true);
+		const request = readTx.objectStore(name).openCursor(range);
+		const batch: unknown[] = [];
+		await awaitCursor<void>(readTx, request, (cursor) => {
+			if (!cursor || batch.length >= batchSize) return { done: true, value: undefined };
+			batch.push((cursor as IDBCursorWithValue).value);
+			lastKey = cursor.key;
+			cursor.continue();
+			return undefined;
+		});
+		if (batch.length === 0) return copied;
+
+		const writeTx = target.transaction(name, "readwrite");
+		await awaitTransaction(writeTx, () => {
+			const store = writeTx.objectStore(name);
+			for (const value of batch) store.put(value);
+		});
+		copied += batch.length;
+		if (batch.length < batchSize) return copied;
+	}
+}
+
 /** The graph nodes behind a set of ids, skipping ids the graph no longer has. */
 function* idsToNodes(index: HNSW, ids: Set<number>): IterableIterator<HnswNode> {
 	for (const id of ids) {
@@ -241,6 +304,8 @@ export class HNSWVectorStore implements VectorStore {
 	private dimensions: number | null = null;
 	private nextHnswId = 0;
 	private readonly dbName: string;
+	private readonly vaultId: string;
+	private readonly indexId: string | undefined;
 	/**
 	 * The metadata record as last read or written, so a note write can put the
 	 * updated record (the id counter, the timestamp) inside its own transaction
@@ -312,7 +377,72 @@ export class HNSWVectorStore implements VectorStore {
 	private readonly efSearch = 100; // Search time accuracy
 
 	constructor(vaultId: string, indexId?: string) {
+		this.vaultId = vaultId;
+		this.indexId = indexId;
 		this.dbName = getDbName(DB_NAME_PREFIX, vaultId, indexId);
+	}
+
+	/** Rows copied per transaction by `adoptDatabase`, bounding what is resident at once. */
+	private static readonly ADOPT_BATCH_SIZE = 250;
+
+	/**
+	 * See `VectorStore.adoptDatabase`. The old database is opened at whatever
+	 * version it has: one behind the current schema would be dropped by the
+	 * upgrade anyway, so it is left for the orphan cleanup instead of copied.
+	 * Each object store is streamed in batches — a cursor cannot outlive an
+	 * `await`, so every batch reopens it past the last key — and put into this
+	 * database's stores in one transaction per batch. The metadata record is
+	 * then restamped with this index's provider and model: the service clears
+	 * an index whose record names another provider.
+	 */
+	async adoptDatabase(fromIndexId: string): Promise<boolean> {
+		if (this.db) throw new Error("adoptDatabase must run before open()");
+		const fromName = getDbName(DB_NAME_PREFIX, this.vaultId, fromIndexId);
+		if (fromName === this.dbName) return false;
+
+		const source = await openExistingDatabase(fromName);
+		if (!source) return false;
+		const stores = [DOCUMENTS_STORE, ID_MAPPING_STORE, GRAPH_STORE, METADATA_STORE];
+		if (source.version !== DB_VERSION || stores.some((name) => !source.objectStoreNames.contains(name))) {
+			Logger.warn(`${LOG_PREFIX} Not adopting "${fromName}": schema v${source.version} ≠ v${DB_VERSION}.`);
+			source.close();
+			return false;
+		}
+
+		await this.openIndexedDB();
+		const target = this.requireDb();
+		try {
+			const existing = await this.count();
+			if (existing > 0) {
+				Logger.warn(
+					`${LOG_PREFIX} Not adopting "${fromName}": "${this.dbName}" already holds ${existing} rows.`,
+				);
+				return false;
+			}
+			let copied = 0;
+			for (const name of stores)
+				copied += await copyObjectStore(source, target, name, HNSWVectorStore.ADOPT_BATCH_SIZE);
+			const meta = await this.getMetadataInternal();
+			if (meta && this.indexId) {
+				const [provider = "", ...modelParts] = this.indexId.split(":");
+				meta.providerId = provider;
+				meta.modelId = modelParts.join(":");
+				await this.putInStore(METADATA_STORE, meta);
+			}
+			Logger.log(`${LOG_PREFIX} Adopted "${fromName}" as "${this.dbName}" (${copied} records).`);
+		} finally {
+			source.close();
+			target.close();
+			this.db = null;
+		}
+
+		const deleted = await deleteDatabase(fromName);
+		if (deleted.status === "error") {
+			Logger.error(`${LOG_PREFIX} Adopted "${fromName}" but could not delete it:`, deleted.error);
+		} else if (deleted.status === "blocked") {
+			Logger.warn(`${LOG_PREFIX} Adopted "${fromName}"; it is held open elsewhere and goes once that closes.`);
+		}
+		return true;
 	}
 
 	/**

@@ -462,6 +462,21 @@ export class PluginDataStore {
 		for (const listener of this.#privacyListeners) listener();
 	}
 
+	/**
+	 * Listeners for a provider rename, awaited by `renameProvider` before it
+	 * resolves. Embedding indexes are keyed `provider:model`, and so are their
+	 * IndexedDB databases: the embedding indexer moves each renamed index's
+	 * vectors to the new name, and must have done so before the UI — which
+	 * awaits the rename — opens the index under its new id.
+	 */
+	readonly #providerRenameListeners = new Set<(oldId: string, newId: string) => Promise<void> | void>();
+
+	/** Subscribe to provider renames; returns the unsubscribe. */
+	onProviderRenamed(listener: (oldId: string, newId: string) => Promise<void> | void): () => void {
+		this.#providerRenameListeners.add(listener);
+		return () => this.#providerRenameListeners.delete(listener);
+	}
+
 	isFilePrivate(filePath: string): boolean {
 		const listed = this.isFileListedInPrivacyFilter(filePath);
 		if (this.#data.privacyMode === "private-by-default") {
@@ -2057,6 +2072,9 @@ export class PluginDataStore {
 		syncAllProviders(this);
 
 		await this.saveSettingsOrThrow();
+		// The config is saved either way; a listener that fails logs and leaves
+		// the index to rebuild, which is what happened before on every rename.
+		await Promise.all([...this.#providerRenameListeners].map((listener) => listener(oldId, newId)));
 	}
 
 	/**

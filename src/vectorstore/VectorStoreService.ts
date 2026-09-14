@@ -435,6 +435,47 @@ export class VectorStoreService {
 	/** Promise tracking initialization, awaited by cleanup to avoid closing mid-init. */
 	private initPromise: Promise<void> | null = null;
 	private unsubscribePrivacy: (() => void) | null = null;
+	private unsubscribeRename: (() => void) | null = null;
+
+	/**
+	 * A provider was renamed, so every index it owns has a new id — and the
+	 * IndexedDB name derives from the id. Left alone, the vectors stayed behind
+	 * under the old name as an orphan and the index rebuilt from scratch, with
+	 * nothing telling the user why. Each such index now adopts its old database
+	 * (`VectorStore.adoptDatabase`), after any instance still open under the old
+	 * id is stopped and closed. Awaited by `renameProvider`, so the index is in
+	 * place before anything opens it under the new id. Never throws: a failed
+	 * adoption is logged and the index rebuilds, as it always did.
+	 */
+	private async adoptRenamedIndexes(oldProviderId: string, newProviderId: string): Promise<void> {
+		for (const config of getData().embeddingIndexes) {
+			if (config.provider !== newProviderId) continue;
+			const oldIndexId = `${oldProviderId}:${config.model}`;
+			try {
+				const old = this.instances.get(oldIndexId);
+				if (old) {
+					await this.stopBulkRun(old);
+					this.instances.delete(oldIndexId);
+					await old.store.close();
+				}
+				const store = createVectorStore(this.vaultId, config.id);
+				let adopted = false;
+				try {
+					adopted = await store.adoptDatabase(oldIndexId);
+				} finally {
+					await store.close();
+				}
+				Logger.log(
+					adopted
+						? `[VectorStore] Moved the vectors of ${oldIndexId} to ${config.id}`
+						: `[VectorStore] No stored vectors to move from ${oldIndexId} to ${config.id}`,
+				);
+				if (old || this.isActiveIndex(config.id)) await this.getOrCreateInstance(config.id);
+			} catch (error) {
+				Logger.error(`[VectorStore] Could not move the vectors of ${oldIndexId} to ${config.id}:`, error);
+			}
+		}
+	}
 
 	/**
 	 * Mark every open index as needing validation and schedule it. Validation
@@ -593,6 +634,7 @@ export class VectorStoreService {
 			// provider's trust; when either changes, every open index is out of
 			// date in both directions (notes to drop, notes now allowed in).
 			this.unsubscribePrivacy = data.onPrivacyRulesChange(() => this.revalidateAll());
+			this.unsubscribeRename = data.onProviderRenamed((oldId, newId) => this.adoptRenamedIndexes(oldId, newId));
 
 			this.isInitialized = true;
 			Logger.log("[VectorStore] Initialized");
@@ -2770,6 +2812,8 @@ export class VectorStoreService {
 			this.modifyTimers.clear();
 			this.unsubscribePrivacy?.();
 			this.unsubscribePrivacy = null;
+			this.unsubscribeRename?.();
+			this.unsubscribeRename = null;
 			// Wait for any in-progress initialization before cleaning up
 			if (this.initPromise) {
 				await this.initPromise.catch(() => {});

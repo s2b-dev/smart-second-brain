@@ -378,6 +378,18 @@ export interface VectorStore {
 	open(): Promise<void>;
 
 	/**
+	 * Take over the database of another index id — the one this index had
+	 * before its provider was renamed — by copying its stored rows, mappings,
+	 * graph and metadata into this index's database and deleting the old one.
+	 * Must run before `open()`, and only when this index's database is still
+	 * empty; resolves false (and copies nothing) when there is nothing to take
+	 * over, the old database is of another schema version, or this one already
+	 * holds rows. Without it a rename orphaned the old database and the index
+	 * silently rebuilt from scratch.
+	 */
+	adoptDatabase(fromIndexId: string): Promise<boolean>;
+
+	/**
 	 * Close the database connection.
 	 */
 	close(): Promise<void>;
