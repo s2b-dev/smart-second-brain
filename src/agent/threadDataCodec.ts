@@ -172,12 +172,6 @@ function inflateNode(value: unknown, table: unknown[]): unknown {
 }
 
 /**
- * Produce the JSON-ready v2 representation of a thread: messages interned into
- * `messageTable`, occurrences replaced by refs. Does not mutate `data` — the
- * in-memory thread keeps its inflated shape (table entries are shared with it,
- * not copied).
- */
-/**
  * Drop runtime-only fields from a checkpoint entry's `parentConfig` before it is
  * written to disk. LangChain populates `parentConfig` with `callbacks` (the live
  * `StreamMessagesHandler` and its ever-growing `seen` map) and `tags` — objects
@@ -197,6 +191,12 @@ function stripRuntimeConfig(entry: CheckpointEntry): CheckpointEntry {
 	return { ...entry, parentConfig: { configurable: pc.configurable } };
 }
 
+/**
+ * Produce the JSON-ready v2 representation of a thread: messages interned into
+ * `messageTable`, occurrences replaced by refs. Does not mutate `data` — the
+ * in-memory thread keeps its inflated shape (table entries are shared with it,
+ * not copied).
+ */
 export function deflateThreadData(data: ThreadData): Record<string, unknown> {
 	const interner = new MessageInterner();
 
