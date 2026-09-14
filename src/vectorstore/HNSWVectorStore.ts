@@ -997,7 +997,9 @@ export class HNSWVectorStore implements VectorStore {
 	 * Re-key a note's rows and mappings from `oldPath` to `newPath` in one
 	 * transaction. The numeric ids — and with them the graph — are untouched:
 	 * a rename moves nothing but the string ids, so no provider call and no
-	 * graph save is needed. Rows already under `newPath` are replaced.
+	 * graph save is needed. Rows already under `newPath` are replaced — but
+	 * only when there is something to move: a rename whose source is gone (a
+	 * stale event, a race with a removal) leaves the destination alone.
 	 */
 	async renameNote(oldPath: string, newPath: string): Promise<void> {
 		if (oldPath === newPath) return;
@@ -1011,37 +1013,40 @@ export class HNSWVectorStore implements VectorStore {
 			const mappingStore = tx.objectStore(ID_MAPPING_STORE);
 			const pathIndex = docStore.index("path");
 
-			// Whatever sits at the destination goes first; then the source rows
-			// are re-keyed. The put lands outside the cursor's range, so the walk
-			// over `oldPath` never sees it.
-			const clearing = pathIndex.openCursor(IDBKeyRange.only(newPath));
-			clearing.onsuccess = () => {
-				const cursor = clearing.result;
+			// The source rows come out first (a note's worth, held in memory);
+			// nothing else happens when there are none. Then the destination is
+			// cleared, and finally the rows go back in under the new key.
+			const rows: StoredDocument[] = [];
+			const taking = pathIndex.openCursor(IDBKeyRange.only(oldPath));
+			taking.onsuccess = () => {
+				const cursor = taking.result;
 				if (cursor) {
-					const stored = cursor.value as StoredDocument;
-					replaced.push(stored.hnswId);
-					mappingStore.delete(stored.hnswId);
+					rows.push(cursor.value as StoredDocument);
 					cursor.delete();
 					cursor.continue();
 					return;
 				}
-				const moving = pathIndex.openCursor(IDBKeyRange.only(oldPath));
-				moving.onsuccess = () => {
-					const cursor = moving.result;
-					if (!cursor) {
-						if (moved.length > 0) {
-							const meta = this.touchedMetadata();
-							if (meta) tx.objectStore(METADATA_STORE).put(meta);
-						}
+				if (rows.length === 0) return;
+
+				const clearing = pathIndex.openCursor(IDBKeyRange.only(newPath));
+				clearing.onsuccess = () => {
+					const cursor = clearing.result;
+					if (cursor) {
+						const stored = cursor.value as StoredDocument;
+						replaced.push(stored.hnswId);
+						mappingStore.delete(stored.hnswId);
+						cursor.delete();
+						cursor.continue();
 						return;
 					}
-					const stored = cursor.value as StoredDocument;
-					const id = makeChunkId(newPath, stored.chunkIndex ?? 0);
-					moved.push({ from: stored.id, to: id, hnswId: stored.hnswId });
-					cursor.delete();
-					docStore.put({ ...stored, id, path: newPath } satisfies StoredDocument);
-					mappingStore.put({ numericId: stored.hnswId, stringId: id } satisfies IdMapping);
-					cursor.continue();
+					for (const stored of rows) {
+						const id = makeChunkId(newPath, stored.chunkIndex ?? 0);
+						moved.push({ from: stored.id, to: id, hnswId: stored.hnswId });
+						docStore.put({ ...stored, id, path: newPath } satisfies StoredDocument);
+						mappingStore.put({ numericId: stored.hnswId, stringId: id } satisfies IdMapping);
+					}
+					const meta = this.touchedMetadata();
+					if (meta) tx.objectStore(METADATA_STORE).put(meta);
 				};
 			};
 		});

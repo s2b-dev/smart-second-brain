@@ -1059,6 +1059,46 @@ describe("atomic notes and renames", () => {
 		expect(store?.docs.get("folder/b.md#0")?.mtime).toBe(1_000);
 	});
 
+	it("a rename during a bulk run waits for the run, so a note the run writes back moves too", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000), file("b.md", 1_000), file("c.md", 1_000), file("d.md", 1_000)];
+		// batchSize 2: the first batch (a, b) lands, the second hangs until released.
+		let release: (() => void) | null = null;
+		embedDocuments
+			.mockImplementationOnce(async (texts: string[]) => texts.map(() => [1, 0, 0]))
+			.mockImplementationOnce(
+				(texts: string[]) =>
+					new Promise<number[][]>((resolve) => {
+						release = () => resolve(texts.map(() => [1, 0, 0]));
+					}),
+			);
+		const svc = await startService();
+		const build = svc.ensureIndex(INDEX);
+		await vi.waitFor(() => expect(embedDocuments).toHaveBeenCalledTimes(2));
+
+		// c.md — read by the run, not yet written — is renamed while the batch is in flight.
+		const renamed = file("moved/c.md", 1_000);
+		vaultFiles = [vaultFiles[0], vaultFiles[1], renamed, vaultFiles[3]];
+		const rename = (svc as unknown as EventHooks).handleFileRename(renamed, "c.md");
+		await vi.advanceTimersByTimeAsync(10);
+		// Deferred: nothing moved yet, and the run still owns the store.
+		expect(stores.get(INDEX)?.docs.has("moved/c.md#0")).toBe(false);
+
+		if (!release) throw new Error("embedding call never started");
+		(release as () => void)();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(await build).toBe(true);
+		await rename;
+		// The run wrote c.md under its old path; the rename moved it, leaving no orphan.
+		expect([...(stores.get(INDEX)?.docs.keys() ?? [])].sort()).toEqual([
+			"a.md#0",
+			"b.md#0",
+			"d.md#0",
+			"moved/c.md#0",
+		]);
+		expect(embedDocuments).toHaveBeenCalledTimes(2);
+	});
+
 	it("a rename onto a private path drops the vectors; a rename of an unindexed note embeds it", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md", 1_000)];

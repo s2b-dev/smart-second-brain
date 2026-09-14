@@ -1209,19 +1209,34 @@ export class VectorStoreService {
 	 * (`renameNote`: rows and id mappings move, the vectors and graph stay) with
 	 * no provider call — a folder move of 200 notes used to be 200 notes of
 	 * embedding requests. Only a note that was not indexed, or whose destination
-	 * cannot hold vectors, goes through the embed-or-remove path.
+	 * cannot hold vectors, still goes through the embed-or-remove path.
+	 *
+	 * Renames are applied one at a time, and each waits for the bulk run in
+	 * flight to settle first: the run may have read the note under its old path
+	 * and would write it back there after an immediate rename, and a cancelled
+	 * run schedules no catch-up validation to remove that orphan. Applied after
+	 * the run, the rename moves whatever the run wrote. Serialising them keeps
+	 * two quick renames of one note (a → b → c) from interleaving their checks.
 	 */
-	private async handleFileRename(file: TFile, oldPath: string): Promise<void> {
+	private handleFileRename(file: TFile, oldPath: string): Promise<void> {
 		this.cancelPendingModify(oldPath);
+		this.renameQueue = this.renameQueue
+			.then(() => this.applyFileRename(file, oldPath))
+			.catch((error: unknown) => Logger.error(`[VectorStore] Rename ${oldPath} → ${file.path} failed:`, error));
+		return this.renameQueue;
+	}
+
+	/** Renames in flight, applied in order (see `handleFileRename`). */
+	private renameQueue: Promise<void> = Promise.resolve();
+
+	private async applyFileRename(file: TFile, oldPath: string): Promise<void> {
 		for (const inst of this.instances.values()) {
 			if (!this.isActiveIndex(inst.indexId)) {
 				inst.hasValidatedThisSession = false;
 				continue;
 			}
-			// A bulk run may have read the note under its old path and write it
-			// back there afterwards; the validation the run schedules on
-			// completion removes such an orphan.
-			if (this.isBulkRunning(inst)) inst.hasValidatedThisSession = false;
+			await inst.activeBulkRun?.catch(() => {});
+			if (this.instances.get(inst.indexId) !== inst) continue; // deleted meanwhile
 			this.clearNoteFailure(inst, oldPath);
 
 			const model = this.getModelForInstance(inst);

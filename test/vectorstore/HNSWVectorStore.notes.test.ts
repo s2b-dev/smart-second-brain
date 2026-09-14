@@ -218,6 +218,12 @@ describe("HNSWVectorStore.renameNote", () => {
 
 		await store.renameNote("nope.md", "x.md");
 		expect(await store.count()).toBe(1);
+
+		// A stale rename whose source is gone must not erase what sits at the destination.
+		await store.putNote([chunk("c.md", [1, 1])]);
+		await store.renameNote("nope.md", "c.md");
+		expect((await store.getAllByPath("c.md")).length).toBe(1);
+		expect(await store.count()).toBe(2);
 		await store.close();
 	});
 });
