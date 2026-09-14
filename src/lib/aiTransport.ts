@@ -468,20 +468,78 @@ function isTransportFailure(error: unknown): boolean {
  * instance of AbortSignal` (#472). Every streaming send then failed before it
  * left the machine, surfacing as the OpenAI SDK's "Connection error." once its
  * retries ran out. So the signal never travels: the request goes out without
- * one, and cancellation is honoured on this side — the pending fetch rejects
- * with an `AbortError` as native fetch would, and the response body is
- * cancelled once (or if) it arrives, which tears down the main-process request.
+ * one, and cancellation is honoured on this side instead — see
+ * `fetchWithLocalAbort`.
  */
 function abortErrorFor(signal: AbortSignal): unknown {
 	return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
 }
 
-function cancelResponseBody(response: Response, reason: unknown): void {
-	try {
-		void response.body?.cancel(reason).catch(() => {});
-	} catch {
-		// A body that is already locked or consumed cannot be cancelled; nothing to tear down.
+/**
+ * Re-wrap a response so an abort tears the stream (and thus the main-process
+ * request) down even after a consumer has started reading.
+ *
+ * The signal no longer reaches Electron's fetch, so we own cancellation. We
+ * cannot call `response.body.cancel()` on abort because the OpenAI SDK acquires
+ * a reader as soon as the response arrives, which *locks* the body — `cancel()`
+ * on a locked stream throws and the underlying request keeps running (the P1 in
+ * review). Instead we pipe the source body through a stream we hold the only
+ * reader of: the SDK reads our readable, and on abort we cancel the source
+ * reader (never locked by anyone else, so this always tears down the
+ * main-process request) and error our readable so the SDK's in-flight read
+ * rejects with the abort reason. A body-less response is returned unchanged.
+ */
+function withAbortableBody(response: Response, signal: AbortSignal): Response {
+	const source = response.body;
+	if (!source) {
+		// No stream to tear down, but still surface the abort to a waiting caller.
+		signal.addEventListener("abort", () => {}, { once: true });
+		return response;
 	}
+
+	const reader = source.getReader();
+	let onAbort: () => void = () => {};
+	const readable = new ReadableStream<Uint8Array>({
+		start(controller) {
+			onAbort = () => {
+				void reader.cancel(signal.reason).catch(() => {});
+				try {
+					controller.error(abortErrorFor(signal));
+				} catch {
+					// Already closed/errored; nothing to do.
+				}
+			};
+			if (signal.aborted) {
+				onAbort();
+				return;
+			}
+			signal.addEventListener("abort", onAbort, { once: true });
+		},
+		async pull(controller) {
+			try {
+				const { done, value } = await reader.read();
+				if (done) {
+					signal.removeEventListener("abort", onAbort);
+					controller.close();
+					return;
+				}
+				controller.enqueue(value);
+			} catch (error) {
+				signal.removeEventListener("abort", onAbort);
+				controller.error(error);
+			}
+		},
+		cancel(reason) {
+			signal.removeEventListener("abort", onAbort);
+			return reader.cancel(reason);
+		},
+	});
+
+	return new Response(readable, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	});
 }
 
 async function fetchWithLocalAbort(
@@ -489,8 +547,9 @@ async function fetchWithLocalAbort(
 	url: string,
 	init: RequestInit,
 	signal: AbortSignal | null | undefined,
+	afterResponse: (response: Response) => Response,
 ): Promise<Response> {
-	if (!signal) return fetchFn(url, init);
+	if (!signal) return afterResponse(await fetchFn(url, init));
 	if (signal.aborted) throw abortErrorFor(signal);
 
 	const pending = fetchFn(url, init);
@@ -503,14 +562,17 @@ async function fetchWithLocalAbort(
 	try {
 		const response = await Promise.race([pending, aborted]);
 		signal.removeEventListener("abort", rejectOnAbort);
-		signal.addEventListener("abort", () => cancelResponseBody(response, signal.reason), { once: true });
-		return response;
+		// Normalize headers on the raw Electron response first, then wrap so an
+		// abort can tear down the (now standard) stream.
+		return withAbortableBody(afterResponse(response), signal);
 	} catch (error) {
 		signal.removeEventListener("abort", rejectOnAbort);
 		if (signal.aborted) {
 			// The request may still complete in the main process; close it when it does.
 			pending.then(
-				(response) => cancelResponseBody(response, signal.reason),
+				(response) => {
+					void response.body?.cancel(signal.reason).catch(() => {});
+				},
 				() => {},
 			);
 		}
@@ -526,33 +588,42 @@ async function performPrimaryFetch(normalized: NormalizedRequest): Promise<Respo
 			? normalizeChatCompletionMessages(parsedBody)
 			: undefined;
 	const requestBody = normalizedBody ? stringifyRequestBody(normalizedBody) : normalized.init.body;
-	const { signal, ...initWithoutSignal } = normalized.init;
-	const response = electronFetch
-		? await fetchWithLocalAbort(
-				electronFetch,
-				normalized.url,
-				{
-					...initWithoutSignal,
-					body: requestBody,
-					headers: normalized.init.headers ? toHeaderRecord(normalized.init.headers) : undefined,
-				},
-				signal,
-			)
-		: await window.fetch(normalized.url, { ...normalized.init, body: requestBody });
-	if (!response.ok && normalized.url.includes("/chat/completions")) {
-		let responseText: string | undefined;
-		try {
-			responseText = await response.clone().text();
-		} catch {
-			responseText = undefined;
-		}
-		Logger.debug("aiTransport.response_error", {
-			url: normalized.url,
-			status: response.status,
-			body: responseText,
-		});
+
+	// Non-2xx `/chat/completions` bodies are small; logging them clones the raw
+	// response before any abort wrapping so it never contends with the reader.
+	const logIfError = (response: Response): void => {
+		if (response.ok || !normalized.url.includes("/chat/completions")) return;
+		void response
+			.clone()
+			.text()
+			.then(
+				(body) =>
+					Logger.debug("aiTransport.response_error", { url: normalized.url, status: response.status, body }),
+				() => {},
+			);
+	};
+
+	if (!electronFetch) {
+		const response = await window.fetch(normalized.url, { ...normalized.init, body: requestBody });
+		logIfError(response);
+		return response;
 	}
-	return electronFetch ? normalizeFetchLikeResponse(response) : response;
+
+	const { signal, ...initWithoutSignal } = normalized.init;
+	return fetchWithLocalAbort(
+		electronFetch,
+		normalized.url,
+		{
+			...initWithoutSignal,
+			body: requestBody,
+			headers: normalized.init.headers ? toHeaderRecord(normalized.init.headers) : undefined,
+		},
+		signal,
+		(response) => {
+			logIfError(response);
+			return normalizeFetchLikeResponse(response);
+		},
+	);
 }
 
 export async function performAiFetch(
