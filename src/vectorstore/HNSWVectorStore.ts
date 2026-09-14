@@ -111,6 +111,20 @@ interface StoredGraphHeader {
 	entryPointId: number;
 }
 
+/**
+ * Written to the metadata store while `adoptDatabase` copies another index's
+ * database in, and removed when the copy is complete. A store that still
+ * carries it on `open()` holds a partial copy — the process stopped mid-way —
+ * and is either completed from the source (still there: it is deleted only
+ * after the marker) or emptied when the source is gone.
+ */
+interface StoredAdoptionMarker {
+	key: "adopting";
+	/** IndexedDB name of the database being copied from. */
+	from: string;
+}
+const ADOPTION_MARKER_KEY = "adopting";
+
 /** One HNSW node's topology — its level and per-level neighbour lists, no vector. */
 interface StoredGraphNode {
 	id: number;
@@ -219,6 +233,25 @@ function awaitTransaction(tx: IDBTransaction, run: () => void): Promise<void> {
 			reject(toError(error));
 		}
 	});
+}
+
+/** The object stores `adoptDatabase` copies, in copy order. */
+const ADOPTED_STORES = [DOCUMENTS_STORE, ID_MAPPING_STORE, GRAPH_STORE, METADATA_STORE] as const;
+
+/**
+ * Open a database to copy from: it must exist and be at the current schema
+ * (one behind would be dropped by the upgrade anyway, so it is left for the
+ * orphan cleanup). Resolves null otherwise, with nothing left behind.
+ */
+async function openAdoptableDatabase(name: string): Promise<IDBDatabase | null> {
+	const db = await openExistingDatabase(name);
+	if (!db) return null;
+	if (db.version !== DB_VERSION || ADOPTED_STORES.some((store) => !db.objectStoreNames.contains(store))) {
+		Logger.warn(`${LOG_PREFIX} Not adopting "${name}": schema v${db.version} ≠ v${DB_VERSION}.`);
+		db.close();
+		return null;
+	}
+	return db;
 }
 
 /**
@@ -389,60 +422,138 @@ export class HNSWVectorStore implements VectorStore {
 	 * See `VectorStore.adoptDatabase`. The old database is opened at whatever
 	 * version it has: one behind the current schema would be dropped by the
 	 * upgrade anyway, so it is left for the orphan cleanup instead of copied.
-	 * Each object store is streamed in batches — a cursor cannot outlive an
-	 * `await`, so every batch reopens it past the last key — and put into this
-	 * database's stores in one transaction per batch. The metadata record is
-	 * then restamped with this index's provider and model: the service clears
-	 * an index whose record names another provider.
+	 * The copy itself (`copyFrom`) runs under an adoption marker, so a target
+	 * left partial by an interruption is retried here rather than refused, and
+	 * completed or emptied by the next `open()` (`settleInterruptedAdoption`).
 	 */
 	async adoptDatabase(fromIndexId: string): Promise<boolean> {
 		if (this.db) throw new Error("adoptDatabase must run before open()");
 		const fromName = getDbName(DB_NAME_PREFIX, this.vaultId, fromIndexId);
 		if (fromName === this.dbName) return false;
 
-		const source = await openExistingDatabase(fromName);
+		const source = await openAdoptableDatabase(fromName);
 		if (!source) return false;
-		const stores = [DOCUMENTS_STORE, ID_MAPPING_STORE, GRAPH_STORE, METADATA_STORE];
-		if (source.version !== DB_VERSION || stores.some((name) => !source.objectStoreNames.contains(name))) {
-			Logger.warn(`${LOG_PREFIX} Not adopting "${fromName}": schema v${source.version} ≠ v${DB_VERSION}.`);
-			source.close();
-			return false;
-		}
 
 		await this.openIndexedDB();
-		const target = this.requireDb();
 		try {
+			const marker = await this.getAdoptionMarker();
 			const existing = await this.count();
-			if (existing > 0) {
+			if (existing > 0 && !marker) {
 				Logger.warn(
 					`${LOG_PREFIX} Not adopting "${fromName}": "${this.dbName}" already holds ${existing} rows.`,
 				);
 				return false;
 			}
-			let copied = 0;
-			for (const name of stores)
-				copied += await copyObjectStore(source, target, name, HNSWVectorStore.ADOPT_BATCH_SIZE);
-			const meta = await this.getMetadataInternal();
-			if (meta && this.indexId) {
-				const [provider = "", ...modelParts] = this.indexId.split(":");
-				meta.providerId = provider;
-				meta.modelId = modelParts.join(":");
-				await this.putInStore(METADATA_STORE, meta);
-			}
-			Logger.log(`${LOG_PREFIX} Adopted "${fromName}" as "${this.dbName}" (${copied} records).`);
+			await this.copyFrom(source, fromName);
 		} finally {
 			source.close();
-			target.close();
+			this.requireDb().close();
 			this.db = null;
 		}
+		await this.deleteAdopted(fromName);
+		return true;
+	}
 
+	/**
+	 * Copy every record of `source` into this (open) database under the
+	 * adoption marker: the marker is put first, the four stores are emptied
+	 * (a retry may find a partial copy) and streamed in — each object store in
+	 * batches, since a cursor cannot outlive an `await`, one write transaction
+	 * per batch — the metadata record is restamped with this index's provider
+	 * and model (the service clears an index whose record names another), and
+	 * the marker goes last. Only then is it safe to delete the source.
+	 */
+	private async copyFrom(source: IDBDatabase, fromName: string): Promise<void> {
+		const target = this.requireDb();
+		await this.putInStore(METADATA_STORE, {
+			key: ADOPTION_MARKER_KEY,
+			from: fromName,
+		} satisfies StoredAdoptionMarker);
+		await this.clearAllStores({ keepAdoptionMarker: true });
+		let copied = 0;
+		for (const name of ADOPTED_STORES) {
+			copied += await copyObjectStore(source, target, name, HNSWVectorStore.ADOPT_BATCH_SIZE);
+		}
+		const meta = await this.getMetadataInternal();
+		if (meta && this.indexId) {
+			const [provider = "", ...modelParts] = this.indexId.split(":");
+			meta.providerId = provider;
+			meta.modelId = modelParts.join(":");
+			await this.putInStore(METADATA_STORE, meta);
+		}
+		await this.deleteFromStore(METADATA_STORE, ADOPTION_MARKER_KEY);
+		Logger.log(`${LOG_PREFIX} Adopted "${fromName}" as "${this.dbName}" (${copied} records).`);
+	}
+
+	private async deleteAdopted(fromName: string): Promise<void> {
 		const deleted = await deleteDatabase(fromName);
 		if (deleted.status === "error") {
 			Logger.error(`${LOG_PREFIX} Adopted "${fromName}" but could not delete it:`, deleted.error);
 		} else if (deleted.status === "blocked") {
 			Logger.warn(`${LOG_PREFIX} Adopted "${fromName}"; it is held open elsewhere and goes once that closes.`);
 		}
-		return true;
+	}
+
+	/**
+	 * A store still carrying the adoption marker on open holds a partial copy.
+	 * The source is deleted only after the marker, so it is normally still
+	 * there and the copy is finished now; if it is gone, the partial rows are
+	 * unusable (mappings or graph may be missing) and the store is emptied so
+	 * the index rebuilds from the vault.
+	 */
+	private async settleInterruptedAdoption(): Promise<void> {
+		const marker = await this.getAdoptionMarker();
+		if (!marker) return;
+		Logger.warn(`${LOG_PREFIX} "${this.dbName}" holds an interrupted copy of "${marker.from}"; finishing it.`);
+		const source = await openAdoptableDatabase(marker.from);
+		if (source) {
+			try {
+				await this.copyFrom(source, marker.from);
+			} finally {
+				source.close();
+			}
+			await this.deleteAdopted(marker.from);
+			return;
+		}
+		Logger.warn(`${LOG_PREFIX} Source "${marker.from}" is gone; emptying "${this.dbName}" so the index rebuilds.`);
+		await this.clearAllStores({ keepAdoptionMarker: false });
+	}
+
+	private async getAdoptionMarker(): Promise<StoredAdoptionMarker | null> {
+		const db = this.requireDb();
+		const tx = db.transaction(METADATA_STORE, "readonly");
+		const request = tx.objectStore(METADATA_STORE).get(ADOPTION_MARKER_KEY);
+		return awaitRequest(tx, request, (marker: StoredAdoptionMarker | undefined) => marker ?? null);
+	}
+
+	/** Empty all four stores in one transaction, optionally leaving the adoption marker in place. */
+	private async clearAllStores(options: { keepAdoptionMarker: boolean }): Promise<void> {
+		const db = this.requireDb();
+		const tx = db.transaction(ADOPTED_STORES, "readwrite");
+		await awaitTransaction(tx, () => {
+			for (const name of ADOPTED_STORES) {
+				if (name === METADATA_STORE && options.keepAdoptionMarker) {
+					const store = tx.objectStore(name);
+					const request = store.openKeyCursor();
+					request.onsuccess = () => {
+						const cursor = request.result;
+						if (!cursor) return;
+						if (cursor.primaryKey !== ADOPTION_MARKER_KEY) store.delete(cursor.primaryKey);
+						cursor.continue();
+					};
+					continue;
+				}
+				tx.objectStore(name).clear();
+			}
+		});
+	}
+
+	private async deleteFromStore(storeName: string, key: IDBValidKey): Promise<void> {
+		const db = this.requireDb();
+		const tx = db.transaction(storeName, "readwrite");
+		await awaitTransaction(tx, () => {
+			tx.objectStore(storeName).delete(key);
+		});
 	}
 
 	/**
@@ -451,6 +562,7 @@ export class HNSWVectorStore implements VectorStore {
 	async open(): Promise<void> {
 		const upgradedFrom = await this.openIndexedDB();
 		if (upgradedFrom !== null) await this.discardLegacySidecar(upgradedFrom);
+		await this.settleInterruptedAdoption();
 
 		// Load ID mappings
 		await this.loadIdMappings();
