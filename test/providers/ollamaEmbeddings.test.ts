@@ -31,14 +31,18 @@ describe("embedFailedAttempt", () => {
 		expect(() => embedFailedAttempt(ollamaError(404, "model not found"))).toThrow();
 	});
 
-	it("stops retrying when the provider is unreachable", () => {
+	it("stops retrying when nothing is listening, or the request already timed out", () => {
 		expect(() => embedFailedAttempt(new Error("net::ERR_CONNECTION_REFUSED"))).toThrow();
-		expect(() => embedFailedAttempt(new TypeError("fetch failed"))).toThrow();
+		const cause = Object.assign(new Error("connect ECONNREFUSED ::1:11434"), { code: "ECONNREFUSED" });
+		expect(() => embedFailedAttempt(new TypeError("fetch failed", { cause }))).toThrow();
 		expect(() => embedFailedAttempt(new DOMException("Request timed out after 60000ms", "TimeoutError"))).toThrow();
 	});
 
-	it("keeps retrying on 5xx", () => {
+	it("keeps the default backoff for blips: 5xx, resets, a generic network failure", () => {
 		expect(() => embedFailedAttempt(ollamaError(500, "model runner has unexpectedly stopped"))).not.toThrow();
+		expect(() => embedFailedAttempt(Object.assign(new Error("Bad gateway"), { status: 502 }))).not.toThrow();
+		expect(() => embedFailedAttempt(new Error("socket hang up"))).not.toThrow();
+		expect(() => embedFailedAttempt(new TypeError("fetch failed"))).not.toThrow();
 		expect(() => embedFailedAttempt(undefined)).not.toThrow();
 	});
 

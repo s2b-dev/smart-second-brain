@@ -1337,10 +1337,16 @@ export class VectorStoreService {
 	 * unresolvable host (`isConnectionRefusedError`) stops the run on the first
 	 * failure: nothing is listening, and a second batch against it only adds the
 	 * retry budget's wait to the notice's delay. Softer failures — a timeout, a
-	 * reset, a 502 under load — get one more chance, so a single blip still
-	 * takes the per-entry retry path; two in a row is no longer a blip.
+	 * reset, a 502 under load — get one more chance: the *same* batch is retried
+	 * after a short pause (`UNREACHABLE_RETRY_PAUSE_MS`), so a single blip costs
+	 * nothing, and only a second consecutive failure stops the run. Marking the
+	 * blipped batch's notes as skipped instead — the previous rule — let a build
+	 * that then recovered report success with those notes missing.
 	 */
 	private readonly UNREACHABLE_FAILURE_LIMIT = 2;
+
+	/** Pause before the one retry of a batch that hit a soft transport failure. */
+	private readonly UNREACHABLE_RETRY_PAUSE_MS = 2_000;
 
 	private abortForUnreachableProvider(inst: IndexInstance, error: unknown, consecutiveFailures: number): boolean {
 		if (!isProviderUnreachableError(error)) return false;
@@ -1650,15 +1656,18 @@ export class VectorStoreService {
 				Logger.warn(`[VectorStore] Batch ${batchNumber} failed, falling back to sequential:`, error);
 				// A transport failure will hit every remaining chunk the same way,
 				// so retrying this batch entry-by-entry is pure waste. Give the
-				// connection one more chance, then stop the whole run.
+				// connection one more chance with the same batch, then stop the
+				// whole run; a batch is never written off as skipped for a
+				// transport failure, so a blip cannot drop notes from a build that
+				// goes on to report success.
 				if (isProviderUnreachableError(error)) {
 					consecutiveUnreachable++;
 					if (this.abortForUnreachableProvider(inst, error, consecutiveUnreachable)) return false;
-					// Account for the batch before skipping the per-entry retry, so
-					// the notes are reported as skipped rather than silently dropped
-					// from a run that still claims success.
-					for (const entry of batch) noteFailed(entry.file.path, "embed-error");
-					return true;
+					Logger.warn(`[VectorStore] Retrying batch ${batchNumber} once after a transport failure`);
+					await bulkPause(this.UNREACHABLE_RETRY_PAUSE_MS);
+					if (aborted()) return false;
+					batchNumber--;
+					return embedBatch(queued);
 				}
 				consecutiveUnreachable = 0;
 

@@ -12,7 +12,7 @@ import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { ChatOllama, OllamaEmbeddings } from "@langchain/ollama";
 import { createAiProviderFetch, createBufferedAiProviderFetch } from "../lib/aiTransport";
 import { createObsidianFetch } from "../lib/obsidianFetch";
-import { isProviderUnreachableError } from "../lib/transportErrors";
+import { isConnectionRefusedError, isRequestTimeoutError } from "../lib/transportErrors";
 import { AsyncCaller } from "@langchain/core/utils/async_caller";
 import { Logger } from "../utils/logging";
 import { ChatOpenAIResponses, type ChatOpenAIResponsesConfig } from "./langchainOpenAIResponses";
@@ -429,16 +429,18 @@ const defaultFailedAttempt = new (class extends AsyncCaller {
  *
  * Every embedding call runs through LangChain's `AsyncCaller`, which retries
  * six times with exponential backoff (roughly one to two minutes in total)
- * before the failure reaches the indexer. Two failures must not spend that
+ * before the failure reaches the indexer. Three failures must not spend that
  * budget:
  *
- * - **An unreachable provider.** A refused connection, an unresolvable host or
- *   a timed-out request is not a blip that backoff waits out; a stopped local
- *   server stays stopped until the user starts it. With the default policy the
- *   bulk indexer waited a minute per batch, then — because the failure was not
- *   recognised as transport-level either — another minute per *entry* of that
- *   batch. Seen live: a build sat at 375/378 for the better part of half an
- *   hour against an oMLX that had not been started.
+ * - **A host that is not there.** A refused connection or an unresolvable
+ *   address is not a blip that backoff waits out; a stopped local server stays
+ *   stopped until the user starts it. With the default policy the bulk indexer
+ *   waited a minute per batch, then — because the failure was not recognised
+ *   as transport-level either — another minute per *entry* of that batch. Seen
+ *   live: a build sat at 375/378 for the better part of half an hour against
+ *   an oMLX that had not been started.
+ * - **A timed-out request.** Each attempt has already waited the fetch-level
+ *   timeout (60 s); six retries of it is six minutes per call.
  * - **A 4xx the default handler cannot see.** It reads the status from
  *   `status` / `statusCode` / `response.status`, and the Ollama client's
  *   `ResponseError` carries it as `status_code`. So a permanent rejection —
@@ -446,12 +448,15 @@ const defaultFailedAttempt = new (class extends AsyncCaller {
  *   times: 7 requests and ~85 s of idle GPU per call, repeated by the bulk
  *   indexer for every entry of the failed batch (#485).
  *
- * Everything else — 5xx, rate limits with their retry-after hints — is left to
- * the default rules by delegation, not restatement.
+ * Everything else — a 5xx under load, a reset, a rate limit with its
+ * retry-after hint — is a blip worth the default backoff, and is left to the
+ * default rules by delegation, not restatement. (The indexer then gives a
+ * batch that still failed one more try before it stops the run, so a blip
+ * never drops notes from a build that reports success.)
  */
 export function embedFailedAttempt(error: unknown): void {
 	if (typeof error !== "object" || error === null) return;
-	if (isProviderUnreachableError(error)) throw error;
+	if (isConnectionRefusedError(error) || isRequestTimeoutError(error)) throw error;
 	const { status_code: statusCode } = error as { status_code?: unknown };
 	if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) throw error;
 	defaultFailedAttempt(error);

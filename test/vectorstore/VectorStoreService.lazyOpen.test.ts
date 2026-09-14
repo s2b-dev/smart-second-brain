@@ -682,18 +682,40 @@ describe("unreachable provider", () => {
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 
-	it("a timeout gets one more batch before the run stops", async () => {
+	it("a timeout gets the same batch retried once before the run stops", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md"), file("e.md"), file("f.md")];
 		embedDocuments.mockImplementation(async () => {
 			throw new DOMException("Request timed out after 60000ms", "TimeoutError");
 		});
 		await startService();
-		await vi.advanceTimersByTimeAsync(1_000);
+		await vi.advanceTimersByTimeAsync(10_000);
 
 		expect(embedDocuments).toHaveBeenCalledTimes(2);
+		// The retry is of the batch that failed, not the next one.
+		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
 		expect(embedQuery).not.toHaveBeenCalled();
 		expect(showActionNotice).toHaveBeenCalledTimes(1);
+		expect(await stores.get(INDEX)?.countNotes()).toBe(0);
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+	});
+
+	it("a single blip drops no notes: the batch is retried and the build completes whole", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
+		embedDocuments.mockImplementationOnce(async () => {
+			throw new DOMException("Request timed out after 60000ms", "TimeoutError");
+		});
+		await startService();
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		// Batch 1 failed once and was retried; batch 2 went through first time.
+		expect(embedDocuments).toHaveBeenCalledTimes(3);
+		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
+		expect(showActionNotice).not.toHaveBeenCalled();
+		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
+		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
+		const report = await service?.getReport(INDEX);
+		expect(report?.skippedFiles).toEqual([]);
 	});
 });

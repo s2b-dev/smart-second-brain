@@ -52,6 +52,15 @@ function errorTexts(error: unknown): string[] {
 	return texts;
 }
 
+/**
+ * True when the request ran out the fetch-level timeout (`obsidianFetch`
+ * rejects with a `TimeoutError` DOMException). Each such attempt has already
+ * waited the full budget, so retrying it with backoff multiplies minutes.
+ */
+export function isRequestTimeoutError(error: unknown): boolean {
+	return errorName(error) === "TimeoutError";
+}
+
 function errorName(error: unknown): string | undefined {
 	if (typeof error !== "object" || error === null) return undefined;
 	const name = (error as { name?: unknown }).name;
@@ -78,7 +87,7 @@ export function isConnectionRefusedError(error: unknown): boolean {
  */
 export function isProviderUnreachableError(error: unknown): boolean {
 	if (errorName(error) === "AbortError") return false;
-	if (errorName(error) === "TimeoutError") return true;
+	if (isRequestTimeoutError(error)) return true;
 	if (isConnectionRefusedError(error)) return true;
 	return errorTexts(error).some((text) => UNREACHABLE_RE.test(text));
 }
