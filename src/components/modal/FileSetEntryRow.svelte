@@ -78,7 +78,7 @@ function lazyFileIcon(node: HTMLElement, options: LazyFileIconOptions) {
 	let currentOptions = options;
 	let observer: IntersectionObserver | null = null;
 	let idleCallbackHandle: number | null = null;
-	let timeoutHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+	let timeoutHandle: number | null = null;
 	let hasRendered = false;
 
 	const clearPending = () => {
@@ -86,12 +86,12 @@ function lazyFileIcon(node: HTMLElement, options: LazyFileIconOptions) {
 			observer.disconnect();
 			observer = null;
 		}
-		if (idleCallbackHandle !== null && "cancelIdleCallback" in globalThis) {
-			globalThis.cancelIdleCallback(idleCallbackHandle);
+		if (idleCallbackHandle !== null && typeof window.cancelIdleCallback === "function") {
+			window.cancelIdleCallback(idleCallbackHandle);
 			idleCallbackHandle = null;
 		}
 		if (timeoutHandle !== null) {
-			globalThis.clearTimeout(timeoutHandle);
+			window.clearTimeout(timeoutHandle);
 			timeoutHandle = null;
 		}
 	};
@@ -110,8 +110,11 @@ function lazyFileIcon(node: HTMLElement, options: LazyFileIconOptions) {
 
 	const scheduleRender = () => {
 		if (hasRendered || idleCallbackHandle !== null || timeoutHandle !== null) return;
-		if ("requestIdleCallback" in globalThis) {
-			idleCallbackHandle = globalThis.requestIdleCallback(
+		// typeof, not `in`: `requestIdleCallback` is non-optional on the `Window` type,
+		// so an `in` check narrows the else branch to `never` and stops compiling. The
+		// runtime guard is still wanted — older iOS WebViews don't implement it.
+		if (typeof window.requestIdleCallback === "function") {
+			idleCallbackHandle = window.requestIdleCallback(
 				() => {
 					idleCallbackHandle = null;
 					renderIcon();
@@ -119,7 +122,7 @@ function lazyFileIcon(node: HTMLElement, options: LazyFileIconOptions) {
 				{ timeout: 250 },
 			);
 		} else {
-			timeoutHandle = globalThis.setTimeout(() => {
+			timeoutHandle = window.setTimeout(() => {
 				timeoutHandle = null;
 				renderIcon();
 			}, 0);
@@ -179,11 +182,11 @@ function handleFileLinkClick(event: MouseEvent): void {
  * request as soon as it leaves, so only the row actually rested on previews.
  */
 const HOVER_PREVIEW_DELAY_MS = 220;
-let hoverPreviewHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
+let hoverPreviewHandle: number | null = null;
 
 function cancelPendingPreview(): void {
 	if (hoverPreviewHandle === null) return;
-	globalThis.clearTimeout(hoverPreviewHandle);
+	window.clearTimeout(hoverPreviewHandle);
 	hoverPreviewHandle = null;
 }
 
@@ -203,7 +206,7 @@ function previewFileLink(event: Event): void {
 	if (!(target instanceof HTMLElement)) return;
 
 	cancelPendingPreview();
-	hoverPreviewHandle = globalThis.setTimeout(() => {
+	hoverPreviewHandle = window.setTimeout(() => {
 		hoverPreviewHandle = null;
 		// The row can be torn down (list re-filtered, modal closed) during the
 		// delay; a detached element has nothing to anchor a popup to.

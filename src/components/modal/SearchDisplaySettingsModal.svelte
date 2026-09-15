@@ -19,10 +19,16 @@ const pluginData = getData();
 
 let { modal }: Props = $props();
 
+// Tags are suppressed in phone search results — the strip is `max-content` wide
+// and crushes the note name. Mirror that here so the preview and the toggle tell
+// the truth about what the user will actually see.
+const tagsAvailable = !Platform.isPhone;
+const showTags = $derived(pluginData.searchShowTags && tagsAvailable);
+
 const enabledCount = $derived.by(() => {
 	let count = 0;
 	if (pluginData.searchShowPath) count += 1;
-	if (pluginData.searchShowTags) count += 1;
+	if (showTags) count += 1;
 	if (pluginData.searchShowMatchBadges) count += 1;
 	if (pluginData.searchShowMatchContext) count += 1;
 	if (pluginData.searchShowKeyboardHints) count += 1;
@@ -41,7 +47,9 @@ const enabledCount = $derived.by(() => {
   <div class="search-display-settings-preview-panel">
     <div class="search-display-settings-preview-header">
       <div class="search-display-settings-preview-title">Preview</div>
-      <div class="search-display-settings-preview-count">{enabledCount} of 5 enabled</div>
+      <div class="search-display-settings-preview-count">
+        {enabledCount} of {tagsAvailable ? 5 : 4} enabled
+      </div>
     </div>
 
     <div class="search-display-settings-preview-card">
@@ -54,14 +62,14 @@ const enabledCount = $derived.by(() => {
               Neural Networks Deep Dive
             </span>
 
-            {#if pluginData.searchShowPath || pluginData.searchShowTags}
+            {#if pluginData.searchShowPath || showTags}
               <div class="s2b-search-result-title-secondary">
                 {#if pluginData.searchShowPath}
                   <span class="s2b-search-result-separator">•</span>
                   <span class="s2b-search-result-path" title="Research/AI">Research/AI</span>
                 {/if}
 
-                {#if pluginData.searchShowTags}
+                {#if showTags}
                   <div class="s2b-search-result-tags">
                     <span class="s2b-search-result-tag">
                       <span class="s2b-search-result-tag-label">ml</span>
@@ -140,9 +148,15 @@ const enabledCount = $derived.by(() => {
     />
   </SettingContainer>
 
-  <SettingContainer name="Tags" desc="Show file tags inline in search results.">
+  <SettingContainer
+    name="Tags"
+    desc={tagsAvailable
+      ? "Show file tags inline in search results."
+      : "Show file tags inline in search results. Unavailable on phones, where the tag strip would crowd out the note name."}
+  >
     <Toggle
-      checked={pluginData.searchShowTags}
+      checked={showTags}
+      disabled={!tagsAvailable}
       onchange={(checked) => (pluginData.searchShowTags = checked)}
     />
   </SettingContainer>

@@ -479,7 +479,8 @@ export function buildGrepMatcher(pattern: string, isRegex: boolean, caseSensitiv
 					if (matchesEmpty) return 0;
 					if (text.length > MAX_REGEX_INPUT_LENGTH) return 0;
 					let n = 0;
-					for (const _ of text.matchAll(new RegExp(source.source, globalFlags))) n++;
+					const matches = text.matchAll(new RegExp(source.source, globalFlags));
+					while (!matches.next().done) n++;
 					return n;
 				},
 				hasZeroWidthMatch: (text: string) => {

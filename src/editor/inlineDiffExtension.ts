@@ -20,10 +20,10 @@ const refreshPendingChanges = StateEffect.define();
  * The diff detail below is always shown (no collapse).
  */
 function createEditActionBar(entryId: string, groupIndex: number, groupTotal: number, stale: boolean): HTMLElement {
-	const bar = document.createElement("div");
+	const bar = createDiv();
 	bar.className = "s2b-diff-action-bar-widget";
 
-	const label = document.createElement("span");
+	const label = createSpan();
 	label.className = "s2b-diff-actions-label";
 	label.textContent = "Pending change";
 	bar.appendChild(label);
@@ -33,10 +33,12 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 	// inline diff renders a single entry's groups, so groupIndex/groupTotal is a
 	// per-file position (see buildDecorations).
 	if (groupTotal > 1) {
-		const position = document.createElement("span");
+		const position = createSpan();
 		position.className = "s2b-diff-position-indicator";
 		position.textContent = `${groupIndex + 1}/${groupTotal}`;
 		bar.appendChild(position);
+		// The indicator takes over the label's auto-margin (see styles.css).
+		label.classList.add("s2b-diff-actions-label-with-indicator");
 	}
 
 	// Prev/next chevrons: step through this chat thread's pending changes across
@@ -48,7 +50,7 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 	// lone pending change makes both chevrons no-ops that land right back on
 	// this bar — omit them rather than show two dead controls.
 	const makeNavBtn = (iconName: string, ariaLabel: string, direction: "next" | "prev"): HTMLButtonElement => {
-		const btn = document.createElement("button");
+		const btn = createEl("button");
 		btn.className = "s2b-diff-nav-btn";
 		btn.setAttribute("aria-label", ariaLabel);
 		setIcon(btn, iconName);
@@ -75,7 +77,7 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 	}
 
 	// Toggle view mode icon (visible on hover via CSS)
-	const toggleBtn = document.createElement("button");
+	const toggleBtn = createEl("button");
 	toggleBtn.className = "s2b-diff-toggle-btn";
 	toggleBtn.setAttribute("aria-label", "Toggle diff view");
 	let currentMode: DiffViewMode;
@@ -145,7 +147,7 @@ function appendWordDiffContent(container: HTMLElement, removedText: string, adde
 	const parts = diffWords(removedText, addedText);
 
 	for (const part of parts) {
-		const span = document.createElement("span");
+		const span = createSpan();
 		span.textContent = part.value;
 		if (part.removed) {
 			span.className = "s2b-diff-word-removed";
@@ -171,18 +173,18 @@ function buildDetailBody(
 	sourcePath: string,
 	onCleanup: (fn: () => void) => void,
 ): HTMLElement {
-	const body = document.createElement("div");
+	const body = createDiv();
 	body.className = "s2b-diff-detail";
 
 	if (mode === "two-pane") {
-		const panes = document.createElement("div");
+		const panes = createDiv();
 		panes.className = "s2b-diff-two-pane";
 
 		// Only the new content is shown. The original lines are already visible
 		// (and tinted red) in the document above/around this widget, so a removed
 		// pane would just duplicate them.
 		if (addedText) {
-			const added = document.createElement("div");
+			const added = createDiv();
 			added.className = "s2b-diff-pane-added";
 			if (app) {
 				// Render markdown so the pane matches the reading-view two-pane
@@ -192,7 +194,7 @@ function buildDetailBody(
 				onCleanup(() => component.unload());
 				void MarkdownRenderer.render(app, addedText.trimEnd(), added, sourcePath, component);
 			} else {
-				const pre = document.createElement("pre");
+				const pre = createEl("pre");
 				pre.textContent = addedText;
 				added.appendChild(pre);
 			}
@@ -201,7 +203,7 @@ function buildDetailBody(
 
 		body.appendChild(panes);
 	} else {
-		const preview = document.createElement("div");
+		const preview = createDiv();
 		preview.className = "s2b-diff-edit-word-preview";
 		appendWordDiffContent(preview, removedText, addedText);
 		body.appendChild(preview);
@@ -284,7 +286,7 @@ function getWidgetClasses(): WidgetClasses {
 		}
 
 		toDOM(): HTMLElement {
-			const container = document.createElement("div");
+			const container = createDiv();
 			container.className = "s2b-diff-edit-group";
 
 			container.appendChild(createEditActionBar(this.entryId, this.groupIndex, this.groupTotal, this.stale));
@@ -329,7 +331,7 @@ function getWidgetClasses(): WidgetClasses {
 		}
 
 		toDOM(): HTMLElement {
-			const banner = document.createElement("div");
+			const banner = createDiv();
 			banner.className = "s2b-diff-cross-thread-banner";
 			const chat = this.otherCount === 1 ? "chat has" : "chats have";
 			banner.textContent = `${this.otherCount} other ${chat} a pending edit to this file. Only the latest is shown here; whichever is accepted first wins and the others may then fail to apply.`;
@@ -625,7 +627,7 @@ const inlineDiffSideEffects = ViewPlugin.fromClass(
 		private initialized = false;
 		private refreshAttempts = 0;
 		private lastFilePath: string | null = null;
-		private docRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+		private docRefreshTimer: number | null = null;
 
 		constructor(view: EditorView) {
 			this.view = view;
@@ -642,7 +644,7 @@ const inlineDiffSideEffects = ViewPlugin.fromClass(
 		}
 
 		private scheduleInitialRefresh() {
-			requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				if (this.initialized) return;
 
 				const hasFilePath = getEditorFilePath(this.view.state) !== null;
@@ -676,8 +678,8 @@ const inlineDiffSideEffects = ViewPlugin.fromClass(
 			// once per keystroke. The mapped set stays visually correct meanwhile;
 			// the rebuild re-verifies group text and updates the bars' stale state.
 			if (update.docChanged) {
-				if (this.docRefreshTimer) clearTimeout(this.docRefreshTimer);
-				this.docRefreshTimer = setTimeout(() => {
+				if (this.docRefreshTimer) window.clearTimeout(this.docRefreshTimer);
+				this.docRefreshTimer = window.setTimeout(() => {
 					this.docRefreshTimer = null;
 					this.refreshHandler();
 				}, 250);
@@ -685,7 +687,7 @@ const inlineDiffSideEffects = ViewPlugin.fromClass(
 		}
 
 		destroy() {
-			if (this.docRefreshTimer) clearTimeout(this.docRefreshTimer);
+			if (this.docRefreshTimer) window.clearTimeout(this.docRefreshTimer);
 			document.removeEventListener("s2b-pending-changes-updated", this.refreshHandler);
 			document.removeEventListener("s2b-diff-mode-changed", this.refreshHandler);
 		}

@@ -26,7 +26,7 @@ export type PluginSettingsTabId = "general" | "search" | "agents" | "graph" | "t
 /** A single labelled link rendered inside a notice. */
 export type NoticeAction = {
 	label: string;
-	run: () => void;
+	run: () => void | Promise<void>;
 };
 
 type SettingsNoticeOptions = {
@@ -81,7 +81,7 @@ export function showActionNotice(message: string, actions: NoticeAction | Notice
 	const list = (Array.isArray(actions) ? actions : [actions]).filter(Boolean);
 
 	const notice = new Notice("", duration);
-	const el = notice.noticeEl;
+	const el = notice.messageEl;
 	el.empty();
 	el.appendText(list.length > 0 ? `${message} ` : message);
 
@@ -95,7 +95,7 @@ export function showActionNotice(message: string, actions: NoticeAction | Notice
 			// click reaches that handler and the toast can tear down around us.
 			evt.stopPropagation();
 			notice.hide();
-			action.run();
+			void action.run();
 		});
 	});
 
@@ -258,7 +258,7 @@ export function configureEmbedIndexAction(
 				onSave: (selectedModel, batchSize) => {
 					data.setEmbedIndex(purpose, selectedModel.provider, selectedModel.model, { batchSize });
 					if (vectorStore.isVectorStoreInitialized()) {
-						vectorStore
+						void vectorStore
 							.getVectorStoreService()
 							.ensureIndex(`${selectedModel.provider}:${selectedModel.model}`);
 					}
@@ -300,7 +300,7 @@ export function openNoteAction(path: string, label = "Open note"): NoticeAction 
 		label,
 		run: () => {
 			const plugin = tryGetPlugin();
-			plugin?.app.workspace.openLinkText(path, "", true);
+			void plugin?.app.workspace.openLinkText(path, "", true);
 		},
 	};
 }
@@ -317,7 +317,7 @@ export function openChatAction(label = "Open chat"): NoticeAction {
 			const { workspace } = plugin.app;
 			const existing = workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
 			if (existing) {
-				workspace.revealLeaf(existing);
+				await workspace.revealLeaf(existing);
 				return;
 			}
 			await plugin.createNewChat();

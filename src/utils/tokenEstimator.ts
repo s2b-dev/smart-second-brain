@@ -1,5 +1,5 @@
 import type { BaseMessage } from "@langchain/core/messages";
-import { isAIMessage, isHumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 const TOKENS_PER_WORD = 1.3; // Conservative estimate for English text
 const PER_MESSAGE_OVERHEAD = 80; // Separators, metadata, framing
@@ -237,7 +237,7 @@ function estimateBaseMessagePayloadTokens(messages: BaseMessage[]): {
 	let toolTokens = 0;
 
 	for (const message of messages) {
-		if (isHumanMessage(message)) {
+		if (HumanMessage.isInstance(message)) {
 			humanTokens += estimateTextTokens(message.text || "");
 			const attachments = message.additional_kwargs?.attachments;
 			if (Array.isArray(attachments)) {
@@ -262,7 +262,7 @@ function estimateBaseMessagePayloadTokens(messages: BaseMessage[]): {
 			continue;
 		}
 
-		if (isAIMessage(message)) {
+		if (AIMessage.isInstance(message)) {
 			assistantTokens += estimateTextTokens(message.text || "");
 			assistantTokens += PER_MESSAGE_OVERHEAD;
 

@@ -197,7 +197,7 @@ async function readBoundedBody(
 export function createFetchUrlTool() {
 	const pluginData = getData();
 	const getToolConfig = () => pluginData.getSelectedAgent().toolsConfig.fetch_url;
-	const fetchImpl = createObsidianFetch(globalThis.fetch);
+	const fetchImpl = createObsidianFetch(window.fetch.bind(window));
 
 	const fetchUrlFn = async ({ url }: { url: string }): Promise<string> => {
 		const trimmed = url?.trim();
@@ -217,7 +217,7 @@ export function createFetchUrlTool() {
 		const maxContentLength = contextWindowToCharBudget(contextWindow, READ_CONTENT_BUDGET_FRACTION);
 
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+		const timeout = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
 		try {
 			// Follow redirects manually so we can re-validate each hop's target
@@ -297,7 +297,7 @@ export function createFetchUrlTool() {
 			Logger.error(`[fetch_url] Failed to fetch ${currentUrl.href}`, error);
 			return `Error fetching "${currentUrl.href}": ${message}`;
 		} finally {
-			clearTimeout(timeout);
+			window.clearTimeout(timeout);
 		}
 	};
 

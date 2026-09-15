@@ -61,30 +61,34 @@ const VENDOR_LOGO_COMPONENTS: Record<string, VendorLogoComponent> = Object.fromE
 );
 
 /**
- * Serialized `<svg>` markup per vendor, built on first request.
+ * A prototype `<svg>` element per vendor, built on first request.
  *
  * The logos are Svelte components but the mobile model picker is a plain
  * `SuggestModal` that re-renders hundreds of rows per keystroke. Mounting a
  * component per row would be wasteful, so each logo is mounted once into a
- * detached node, its markup cached, and clones handed out from then on.
+ * detached node and the resulting element cached; callers get clones of it.
+ *
+ * The cache holds the element rather than its serialized markup so handing out
+ * a clone never has to reparse a string — `cloneNode` copies the live node
+ * directly, and no `innerHTML` write is involved.
  */
-const svgCache = new Map<string, string | null>();
+const svgCache = new Map<string, SVGElement | null>();
 
-function renderVendorLogoSvg(vendorId: string): string | null {
+function renderVendorLogoSvg(vendorId: string): SVGElement | null {
 	const LogoComponent = VENDOR_LOGO_COMPONENTS[vendorId];
 	if (!LogoComponent) return null;
 
-	const host = document.createElement("div");
+	const host = createDiv();
 	const instance = mount(LogoComponent, {
 		target: host,
 		props: { width: 16, height: 16 },
 	});
-	const markup = host.querySelector("svg")?.outerHTML ?? null;
+	const svg = host.querySelector("svg");
+	// Detach before unmounting so Svelte's cleanup cannot touch the node we keep.
+	svg?.remove();
 	void unmount(instance);
-	return markup;
+	return svg;
 }
-
-/** Whether this vendor has artwork, without paying for the render. */
 
 /**
  * A detached `<svg>` element for the vendor, or null when unknown. Each call
@@ -97,11 +101,6 @@ export function createVendorLogoElement(vendorId: string | null | undefined): SV
 		svgCache.set(vendorId, renderVendorLogoSvg(vendorId));
 	}
 
-	const markup = svgCache.get(vendorId);
-	if (!markup) return null;
-
-	const template = document.createElement("div");
-	template.innerHTML = markup;
-	const svg = template.querySelector("svg");
-	return svg ? (svg.cloneNode(true) as SVGElement) : null;
+	const prototype = svgCache.get(vendorId);
+	return prototype ? (prototype.cloneNode(true) as SVGElement) : null;
 }

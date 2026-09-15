@@ -84,7 +84,7 @@ export function createObsidianFetch(
 		// it instead — the request keeps running in the background but stops holding
 		// the caller hostage.
 		const timeoutController = new AbortController();
-		const timeoutId = setTimeout(() => {
+		const timeoutId = window.setTimeout(() => {
 			timeoutController.abort(
 				new DOMException(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`, "TimeoutError"),
 			);
@@ -101,7 +101,7 @@ export function createObsidianFetch(
 		}
 		const settled = timeoutController.signal;
 		const cleanup = () => {
-			clearTimeout(timeoutId);
+			window.clearTimeout(timeoutId);
 			callerSignal?.removeEventListener("abort", onCallerAbort);
 		};
 
@@ -248,7 +248,7 @@ async function requestWithFallback(
 		const response = await Promise.race([requestUrl(requestParams), rejectOnAbort(settled)]);
 
 		const responseHeaders: Record<string, string> = {
-			...(response.headers as Record<string, string>),
+			...response.headers,
 		};
 
 		// Obsidian's requestUrl may strip the content-type header from responses.
@@ -289,12 +289,14 @@ async function requestWithFallback(
  * so concurrent users are safe. `release()` is idempotent.
  */
 let patchDepth = 0;
-let savedFetch: typeof globalThis.fetch | null = null;
+let savedFetch: typeof fetch | null = null;
+/** The window's `fetch` slot, typed as a plain function property: it is swapped, never called via `this`. */
+const fetchSlot = window as { fetch: typeof fetch };
 
 export function installObsidianFetch(): { release: () => void } {
 	if (patchDepth === 0) {
-		savedFetch = globalThis.fetch;
-		globalThis.fetch = createObsidianFetch(savedFetch);
+		savedFetch = fetchSlot.fetch;
+		fetchSlot.fetch = createObsidianFetch(savedFetch);
 	}
 	patchDepth++;
 
@@ -305,7 +307,7 @@ export function installObsidianFetch(): { release: () => void } {
 			released = true;
 			patchDepth--;
 			if (patchDepth === 0 && savedFetch) {
-				globalThis.fetch = savedFetch;
+				fetchSlot.fetch = savedFetch;
 				savedFetch = null;
 			}
 		},

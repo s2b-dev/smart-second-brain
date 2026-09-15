@@ -182,6 +182,7 @@ describe("Agent streamTokens subagent-content suppression", () => {
 		return {
 			id,
 			content,
+			type: "ai",
 			getType: () => "ai",
 		};
 	}

@@ -31,10 +31,14 @@ export type ComputeWorkerResponse =
 	  }
 	| { id: number; type: "error"; error: string };
 
-const workerScope = globalThis as typeof globalThis & {
+interface ComputeWorkerScope {
 	postMessage: (message: ComputeWorkerResponse, transfer?: Transferable[]) => void;
 	onmessage: ((event: MessageEvent<ComputeWorkerRequest>) => void | Promise<void>) | null;
-};
+}
+
+// This module is a Web Worker entry: `self` is the DedicatedWorkerGlobalScope, whose
+// `postMessage(message, transfer?)` differs from the Window overloads the DOM lib types give `self`.
+const workerScope = self as unknown as ComputeWorkerScope;
 
 workerScope.onmessage = async (e: MessageEvent<ComputeWorkerRequest>) => {
 	const msg = e.data;

@@ -334,7 +334,7 @@ export async function approximateSemanticPairs(
 	};
 	internals.similarityFunction = (a, b) => {
 		let dot = 0;
-		for (let i = 0; i < a.length; i++) dot += (a[i] as number) * (b[i] as number);
+		for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
 		return dot;
 	};
 

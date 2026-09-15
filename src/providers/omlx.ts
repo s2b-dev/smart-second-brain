@@ -16,7 +16,6 @@
  * default; the field may be left empty only if the user disabled it), headers (optional).
  */
 
-import { ChatOpenAI } from "@langchain/openai";
 import { requestUrl } from "obsidian";
 import OmlxLogo from "../components/ui/logos/OmlxLogo.svelte";
 import type {
@@ -236,7 +235,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
 			}
-			return createTransportedChatOpenAI(instanceId, chatConfig as ConstructorParameters<typeof ChatOpenAI>[0]);
+			return createTransportedChatOpenAI(instanceId, chatConfig);
 		},
 
 		createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
@@ -248,10 +247,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
 			}
-			return createBufferedTransportedChatOpenAI(
-				instanceId,
-				chatConfig as ConstructorParameters<typeof ChatOpenAI>[0],
-			);
+			return createBufferedTransportedChatOpenAI(instanceId, chatConfig);
 		},
 
 		createEmbeddingInstance: (auth: AuthObject, modelId: string) => {

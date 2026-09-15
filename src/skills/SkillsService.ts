@@ -197,9 +197,10 @@ export class SkillsService {
 		return LEGACY_VAULT_SKILLS_DIR;
 	}
 	private getLegacyConfigSkillsDir(): string {
-		const vault = this.plugin.app.vault as { configDir?: string };
-		const configDir = vault.configDir || ".obsidian";
-		return `${configDir}/${LEGACY_CONFIG_SKILLS_DIR}`;
+		// `configDir` is a documented non-optional string and honours a user-relocated
+		// config folder, so it needs neither the widening cast nor a ".obsidian" fallback
+		// (which would have pointed at the wrong folder for anyone who moved theirs).
+		return `${this.plugin.app.vault.configDir}/${LEGACY_CONFIG_SKILLS_DIR}`;
 	}
 
 	/**

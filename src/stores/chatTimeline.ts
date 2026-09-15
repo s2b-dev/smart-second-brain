@@ -7,14 +7,7 @@
  * turn. None of it holds reactive state; `ChatSession` / `SessionRegistry` in
  * chatStore.svelte.ts own that and call in here.
  */
-import {
-	AIMessage,
-	type BaseMessage,
-	ToolMessage,
-	isAIMessage,
-	isHumanMessage,
-	isToolMessage,
-} from "@langchain/core/messages";
+import { AIMessage, type BaseMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import type { CheckpointHistoryItem } from "../agent/Agent";
 import type { ChatModelConfig } from "../providers/index";
 import type { ChatAttachment, ReviewStatusRef } from "../types/shared";
@@ -371,7 +364,7 @@ function findFirstHumanInBranch(graph: CheckpointGraphState, startId: string): s
 		const node = graph.nodes.get(current);
 		if (!node) continue;
 		const lastMessage = node.messages.at(-1);
-		if (lastMessage && isHumanMessage(lastMessage)) {
+		if (lastMessage && HumanMessage.isInstance(lastMessage)) {
 			return current;
 		}
 
@@ -613,7 +606,7 @@ function buildDerivedBranchInfo(graph: CheckpointGraphState): {
 		const sortedChildren = [...forkPoint.children].sort((a, b) => a.localeCompare(b));
 		const branchTips = sortedChildren.map((childId) => findDeterministicTipFrom(graph, childId));
 		const forkLastMessage = forkPoint.messages.at(-1);
-		const isEditFork = !forkLastMessage || !isHumanMessage(forkLastMessage);
+		const isEditFork = !forkLastMessage || !HumanMessage.isInstance(forkLastMessage);
 
 		for (let index = 0; index < sortedChildren.length; index++) {
 			const childId = sortedChildren[index];
@@ -676,17 +669,17 @@ function buildCheckpointMessageMappingFromGraph(
 	for (const node of activePath) {
 		const lastMessage = node.messages.at(-1);
 
-		if (!lastMessage || isAIMessage(lastMessage)) {
+		if (!lastMessage || AIMessage.isInstance(lastMessage)) {
 			lastAiCheckpointId = node.checkpointId;
 
-			if (pendingHumanMessageId && lastMessage && isAIMessage(lastMessage)) {
+			if (pendingHumanMessageId && lastMessage && AIMessage.isInstance(lastMessage)) {
 				aiAfterHumanCheckpoints.set(pendingHumanMessageId, node.checkpointId);
 				pendingHumanMessageId = undefined;
 			}
 			continue;
 		}
 
-		if (!isHumanMessage(lastMessage)) {
+		if (!HumanMessage.isInstance(lastMessage)) {
 			continue;
 		}
 
@@ -744,7 +737,7 @@ function recoverSummarizedHistory(
 	tipMessages: BaseMessage[],
 ): BaseMessage[] {
 	const hasSummary = tipMessages.some(
-		(msg) => isHumanMessage(msg) && isHiddenHumanSource(msg.additional_kwargs?.lc_source),
+		(msg) => HumanMessage.isInstance(msg) && isHiddenHumanSource(msg.additional_kwargs?.lc_source),
 	);
 	if (!hasSummary) return tipMessages;
 
@@ -771,10 +764,10 @@ function recoverSummarizedHistory(
 			seen.add(msg.id);
 
 			const rendered = tipById.get(msg.id) ?? msg;
-			if (isHumanMessage(msg) && msg.additional_kwargs?.lc_source === "summarization") {
+			if (HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization") {
 				let insertAt = display.length;
 				for (let i = display.length - 1; i >= 0; i--) {
-					if (isHumanMessage(display[i])) {
+					if (HumanMessage.isInstance(display[i])) {
 						insertAt = i;
 						break;
 					}
@@ -969,9 +962,8 @@ function extractGenerationFromMetadata(rawMetadata: unknown): MessageGeneration 
 }
 
 function extractGenerationFromAssistantMessage(msg: BaseMessage): MessageGeneration | undefined {
-	if (!isAIMessage(msg)) return undefined;
-	const aiMessage = msg as AIMessage & { response_metadata?: unknown };
-	return extractGenerationFromMetadata(aiMessage.response_metadata);
+	if (!AIMessage.isInstance(msg)) return undefined;
+	return extractGenerationFromMetadata(msg.response_metadata);
 }
 
 /**
@@ -980,8 +972,8 @@ function extractGenerationFromAssistantMessage(msg: BaseMessage): MessageGenerat
  * Returns undefined for non-AI messages or turns with no stored duration.
  */
 function extractThinkingDurationFromMessage(msg: BaseMessage): number | undefined {
-	if (!isAIMessage(msg)) return undefined;
-	const meta = (msg as AIMessage & { response_metadata?: unknown }).response_metadata;
+	if (!AIMessage.isInstance(msg)) return undefined;
+	const meta: unknown = msg.response_metadata;
 	if (!meta || typeof meta !== "object" || Array.isArray(meta)) return undefined;
 	const value = (meta as Record<string, unknown>).thinking_duration_ms;
 	return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -1124,15 +1116,15 @@ function buildSubAgentParentMap(messages: BaseMessage[]): Map<string, string> {
 	const taskChildCounts = new Map<string, number>();
 
 	for (const msg of messages) {
-		if (isHumanMessage(msg)) {
+		if (HumanMessage.isInstance(msg)) {
 			registeredTaskCallIds.clear();
 			closedTaskCallIds.length = 0;
 			taskChildCounts.clear();
 			continue;
 		}
 
-		if (isToolMessage(msg)) {
-			const tcId = (msg as ToolMessage).tool_call_id;
+		if (ToolMessage.isInstance(msg)) {
+			const tcId = msg.tool_call_id;
 			if (tcId && registeredTaskCallIds.has(tcId)) {
 				closedTaskCallIds.push(tcId);
 				taskChildCounts.set(tcId, 0);
@@ -1140,8 +1132,8 @@ function buildSubAgentParentMap(messages: BaseMessage[]): Map<string, string> {
 			continue;
 		}
 
-		if (isAIMessage(msg)) {
-			const aiMsg = msg as AIMessage;
+		if (AIMessage.isInstance(msg)) {
+			const aiMsg = msg;
 			const tc = aiMsg.tool_calls ?? [];
 			const hasTaskCalls = tc.some((c) => c.name === "task");
 			const hasAnyToolCalls = tc.length > 0;
@@ -1184,8 +1176,8 @@ function buildSubAgentParentMap(messages: BaseMessage[]): Map<string, string> {
 function buildToolOutputsMap(messages: BaseMessage[]): Map<string, { content: unknown; status: ToolCallStatus }> {
 	const toolOutputs = new Map<string, { content: unknown; status: ToolCallStatus }>();
 	for (const msg of messages) {
-		if (isToolMessage(msg)) {
-			const toolMsg = msg as ToolMessage;
+		if (ToolMessage.isInstance(msg)) {
+			const toolMsg = msg;
 			const toolCallId = toolMsg.tool_call_id;
 			if (toolCallId) {
 				toolOutputs.set(toolCallId, {
@@ -1212,8 +1204,8 @@ export function baseMessageToAssistantMessage(
 	// Extract tool calls if present (only on AIMessage)
 	let toolCalls: ToolCallState[] | undefined;
 
-	if (isAIMessage(msg)) {
-		const aiMsg = msg as AIMessage;
+	if (AIMessage.isInstance(msg)) {
+		const aiMsg = msg;
 		const rawToolCalls = aiMsg.tool_calls;
 
 		if (Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
@@ -1252,9 +1244,7 @@ export function baseMessageToAssistantMessage(
 				// reconstruct nested children. We can still label the `task` call with
 				// the subagent it delegated to, recovered from its `subagent_type` arg.
 				const subAgentName =
-					tc.name === "task" && typeof input.subagent_type === "string"
-						? (input.subagent_type as string)
-						: undefined;
+					tc.name === "task" && typeof input.subagent_type === "string" ? input.subagent_type : undefined;
 				return {
 					id: tc.id || "",
 					name: tc.name,
@@ -1399,7 +1389,7 @@ export function baseMessagesToMessagePairs(
 	const subAgentParentMap = buildSubAgentParentMap(messages);
 
 	// Filter to just user (human) and assistant (ai) messages
-	const conversationMessages = messages.filter((msg) => isHumanMessage(msg) || isAIMessage(msg));
+	const conversationMessages = messages.filter((msg) => HumanMessage.isInstance(msg) || AIMessage.isInstance(msg));
 
 	// Track remaining errors locally to avoid reassigning parameter
 	let remainingErrors = errorCount;
@@ -1408,7 +1398,7 @@ export function baseMessagesToMessagePairs(
 	while (i < conversationMessages.length) {
 		const msg = conversationMessages[i];
 
-		if (isHumanMessage(msg)) {
+		if (HumanMessage.isInstance(msg)) {
 			const lcSource = msg.additional_kwargs?.lc_source;
 			if (isHiddenHumanSource(lcSource)) {
 				const lastPair = messagePairs.at(-1);
@@ -1418,7 +1408,7 @@ export function baseMessagesToMessagePairs(
 					messagePairs.push(createSummarizationMarker(lcSource));
 				}
 				let j = i + 1;
-				while (j < conversationMessages.length && isAIMessage(conversationMessages[j])) {
+				while (j < conversationMessages.length && AIMessage.isInstance(conversationMessages[j])) {
 					j++;
 				}
 				i = j;
@@ -1444,7 +1434,7 @@ export function baseMessagesToMessagePairs(
 			// Look ahead for assistant response(s)
 			const assistantMessages: BaseMessage[] = [];
 			let j = i + 1;
-			while (j < conversationMessages.length && isAIMessage(conversationMessages[j])) {
+			while (j < conversationMessages.length && AIMessage.isInstance(conversationMessages[j])) {
 				assistantMessages.push(conversationMessages[j]);
 				j++;
 			}
@@ -1576,16 +1566,16 @@ export function baseMessagesToMessagePairs(
 export function collectAbandonedToolCallIds(forkMessages: BaseMessage[], tipMessages: BaseMessage[]): Set<string> {
 	const keptIds = new Set<string>();
 	for (const msg of forkMessages) {
-		if (!isAIMessage(msg)) continue;
-		for (const tc of (msg as AIMessage).tool_calls ?? []) {
+		if (!AIMessage.isInstance(msg)) continue;
+		for (const tc of msg.tool_calls ?? []) {
 			if (tc.id) keptIds.add(tc.id);
 		}
 	}
 
 	const abandoned = new Set<string>();
 	for (const msg of tipMessages) {
-		if (!isAIMessage(msg)) continue;
-		for (const tc of (msg as AIMessage).tool_calls ?? []) {
+		if (!AIMessage.isInstance(msg)) continue;
+		for (const tc of msg.tool_calls ?? []) {
 			if (tc.id && !keptIds.has(tc.id)) abandoned.add(tc.id);
 		}
 	}

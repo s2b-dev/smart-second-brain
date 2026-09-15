@@ -7,6 +7,11 @@
  * - **wiki** — authored `[[links]]` from Obsidian's `resolvedLinks`.
  * - **semantic** — inferred top-K embedding neighbours ({@link buildSemanticEdges}).
  *
+ * A third, optional layer draws each tag as a node linked to the notes that
+ * carry it ({@link buildTagLayer}). Tag edges are authored structure and join
+ * the Leiden input alongside wiki links (damped by tag breadth, see the view's
+ * `leidenWeightFor`); the semantic scan never sees them.
+ *
  * The fusion matters because most vaults are link-sparse: with wiki links alone
  * the great majority of notes have degree 0, so community detection cannot place
  * them and they render as an unstructured cloud. Semantic edges give every
@@ -36,7 +41,7 @@ import {
 	type SegmentBy,
 	type SpaceSegment,
 } from "../../types/graph";
-import { edgeKey, splitEdgeKey } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, isTagNode, splitEdgeKey, tagNodeId } from "../../utils/graphUtils";
 import { MIN_TOPIC_SIZE } from "../../utils/topicHierarchy";
 
 // ============================================================================
@@ -102,6 +107,56 @@ function buildWikiEdges(app: App, filteredPathSet: Set<string>): GraphEdge[] {
 	}
 
 	return edges;
+}
+
+// ============================================================================
+// Tag layer
+// ============================================================================
+
+/**
+ * Tags as nodes: one node per distinct tag across the given notes, and one
+ * `tag` edge from each note to every tag it carries — the same picture as
+ * Obsidian's own graph with its "Tags" filter on.
+ *
+ * Tags are matched case-insensitively (as Obsidian treats them) with the
+ * first-seen casing kept for the label. Nested tags stay whole: `#a/b` is its
+ * own node, not a child of `#a`. Only the notes passed in contribute, so every
+ * folder/tag/extension filter and the private-note exclusion already applied
+ * to them carries over to the tags shown.
+ *
+ * Tags shape topics but are never topic *members*: {@link resolveSegments}
+ * keeps them out of every segment's `paths`, so they carry no `cluster`, no
+ * topic colour, and never fold into a collapsed bubble. A tag can still name
+ * a topic — see the representative rule in `resolveSegmentsByLeiden`.
+ */
+function buildTagLayer(app: App, files: TFile[]): { nodes: GraphNode[]; edges: GraphEdge[] } {
+	const labelById = new Map<string, string>();
+	const edges: GraphEdge[] = [];
+	for (const file of files) {
+		if (file.extension !== "md") continue;
+		const cache = app.metadataCache.getFileCache(file);
+		if (!cache) continue;
+		const seen = new Set<string>();
+		for (const tag of getAllTags(cache) ?? []) {
+			const id = tagNodeId(tag);
+			// A note that mentions a tag twice still links to it once.
+			if (seen.has(id)) continue;
+			seen.add(id);
+			if (!labelById.has(id)) labelById.set(id, tag);
+			edges.push({ source: file.path, target: id, weight: 1, type: "tag" });
+		}
+	}
+	const nodes: GraphNode[] = [...labelById.entries()].map(([id, label]) => ({
+		id,
+		path: id,
+		label,
+		x: 0,
+		y: 0,
+		degree: 0,
+		highlighted: false,
+		kind: "tag",
+	}));
+	return { nodes, edges };
 }
 
 // ============================================================================
@@ -182,15 +237,6 @@ export async function buildSemanticEdges(
 		weight: pair.score,
 		type: "semantic" as const,
 	}));
-}
-
-function buildDegreeMap(edges: GraphEdge[]): Map<string, number> {
-	const degreeMap = new Map<string, number>();
-	for (const edge of edges) {
-		degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
-		degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
-	}
-	return degreeMap;
 }
 
 function createWikiNodes(filteredFiles: TFile[], degreeMap: Map<string, number>): GraphNode[] {
@@ -279,18 +325,29 @@ export function deriveClusterRepresentativesFromGraph(graphData: GraphData): Clu
 /** Result of building a wiki-link-only graph (no semantic edges). */
 export interface WikiGraphResult {
 	graphData: GraphData;
+	/** The note paths in the graph — never tag node ids. */
 	filteredPaths: string[];
 }
 
+export interface WikiGraphOptions {
+	/** Draw each tag as a node linked to the notes carrying it ({@link buildTagLayer}). */
+	includeTags?: boolean;
+}
+
 /**
- * Build a graph using only Obsidian wiki-link edges. Nodes start at (0,0) and
- * are positioned by d3-force.
+ * Build a graph using only Obsidian wiki-link edges (plus the tag layer when
+ * asked for). Nodes start at (0,0) and are positioned by d3-force.
  *
  * @param constrainToPaths — When provided, only include files whose path is in
  *   this set. Used to keep the wiki graph's node set identical to the smart
  *   graph's so mode transitions don't add/remove nodes.
  */
-export function buildWikiGraph(app: App, filter?: GraphFilter, constrainToPaths?: Set<string>): WikiGraphResult {
+export function buildWikiGraph(
+	app: App,
+	filter?: GraphFilter,
+	constrainToPaths?: Set<string>,
+	options: WikiGraphOptions = {},
+): WikiGraphResult {
 	let filteredFiles = getIndexableVaultFiles(app.vault);
 	if (constrainToPaths) {
 		filteredFiles = filteredFiles.filter((file) => constrainToPaths.has(file.path));
@@ -305,9 +362,15 @@ export function buildWikiGraph(app: App, filter?: GraphFilter, constrainToPaths?
 
 	const filteredPaths = filteredFiles.map((file) => file.path);
 	const filteredPathSet = new Set(filteredPaths);
-	const edges = buildWikiEdges(app, filteredPathSet);
-	const degreeMap = buildDegreeMap(edges);
-	const nodes = createWikiNodes(filteredFiles, degreeMap);
+	const tagLayer = options.includeTags ? buildTagLayer(app, filteredFiles) : { nodes: [], edges: [] };
+	const edges = [...buildWikiEdges(app, filteredPathSet), ...tagLayer.edges];
+	// A tag's degree is how many notes carry it; a note's degree ignores its
+	// tags (see computeNodeDegrees for why).
+	const degreeMap = computeNodeDegrees(edges);
+	const nodes = [
+		...createWikiNodes(filteredFiles, degreeMap),
+		...tagLayer.nodes.map((node) => ({ ...node, degree: degreeMap.get(node.id) ?? 0 })),
+	];
 
 	const nodeIds = new Set(nodes.map((n) => n.id));
 	const filteredEdges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
@@ -345,7 +408,9 @@ export function resolveSegments(
  * Communities are derived purely from link topology — notes that heavily
  * interlink end up in the same community regardless of content similarity.
  * Nodes with no wiki links are not assigned to any community and keep the
- * default node color.
+ * default node color. Tag nodes may appear in `communities` (they take part in
+ * detection) but never in a segment's `paths`; the ones that live in the topic
+ * are listed in `tagIds` instead.
  *
  * `communities` is a pre-computed node-id → community-id map produced by
  * `leidenAsync` in the compute worker.
@@ -378,27 +443,53 @@ function resolveSegmentsByLeiden(
 		internalDegree.set(edge.target, (internalDegree.get(edge.target) ?? 0) + 1);
 	}
 
+	// Tags sit in the community map (they took part in detection) but a topic
+	// is its notes: tags don't count toward its size and don't become members.
+	const isNoteId = (id: string) => {
+		const node = nodeById.get(id);
+		return node !== undefined && !isTagNode(node);
+	};
+	const noteCount = new Map<number, number>();
+	for (const [communityId, nodeIds] of communityNodes) {
+		noteCount.set(communityId, nodeIds.filter(isNoteId).length);
+	}
+
 	// Sort communities by size descending so the largest get the most prominent colors.
 	// Groups below MIN_TOPIC_SIZE are dropped: a lone note isn't a topic, it's a note
 	// that failed to join one, and listing hundreds of them buries the real topics.
 	// Those notes still render — they simply keep the default colour and no label.
+	const sizeOf = (communityId: number) => noteCount.get(communityId) ?? 0;
 	const sorted = [...communityNodes.entries()]
-		.filter(([, nodeIds]) => nodeIds.length >= MIN_TOPIC_SIZE)
-		.sort((a, b) => b[1].length - a[1].length || a[0] - b[0]);
+		.filter(([communityId]) => sizeOf(communityId) >= MIN_TOPIC_SIZE)
+		.sort((a, b) => sizeOf(b[0]) - sizeOf(a[0]) || a[0] - b[0]);
 	if (sorted.length === 0) return [];
 	// Palette size is fixed rather than sized to the current topic count: a hashed
 	// slot must land the same way at every granularity level, and `colors.length` would
 	// otherwise change with the number of topics and remap every colour.
 	const colors = generateClusterColors(Math.max(TOPIC_COLOR_SLOTS, sorted.length), themeColors);
 
+	// A tag *lives* in a community when at least half of the notes carrying it
+	// are inside. That is the bar for a tag to count as one of the topic's own
+	// (drawn inside its region, pulled to its centre) and to be allowed to name
+	// it — for a vault organised by tags, `#cooking` is the best name that
+	// topic can have. A broad tag spread across many topics would otherwise win
+	// the internal-degree contest in whichever one it happened to land, and
+	// label a group it doesn't describe.
+	const tagLivesHere = (id: string) => {
+		const node = nodeById.get(id);
+		if (node === undefined || !isTagNode(node)) return false;
+		return (internalDegree.get(id) ?? 0) * 2 >= (node.degree ?? 0);
+	};
+
 	// Representative first (it anchors both label and colour), then build segments.
 	const withRepresentative = sorted.map(([communityId, nodeIds], i) => {
-		let bestId = nodeIds[0];
+		let bestId = nodeIds.find(isNoteId) ?? nodeIds[0];
 		let bestInternal = Number.NEGATIVE_INFINITY;
 		let bestTotal = Number.NEGATIVE_INFINITY;
 		for (const id of nodeIds) {
 			const internal = internalDegree.get(id) ?? 0;
 			const total = nodeById.get(id)?.degree ?? 0;
+			if (!isNoteId(id) && !tagLivesHere(id)) continue;
 			if (internal > bestInternal || (internal === bestInternal && total > bestTotal)) {
 				bestInternal = internal;
 				bestTotal = total;
@@ -438,14 +529,21 @@ function resolveSegmentsByLeiden(
 
 	return withRepresentative.map(({ communityId, nodeIds, bestId, index }) => {
 		const label = nodeById.get(bestId)?.label ?? nodeById.get(bestId)?.path ?? `Community ${index + 1}`;
-		const paths = new Set(nodeIds.map((id) => nodeById.get(id)?.path).filter((p): p is string => p != null));
+		const paths = new Set(
+			nodeIds
+				.filter(isNoteId)
+				.map((id) => nodeById.get(id)?.path)
+				.filter((p): p is string => p != null),
+		);
+		const tagIds = new Set(nodeIds.filter(tagLivesHere));
 
 		return {
 			id: `leiden:${index}`,
 			label,
 			color: colorByAnchor.get(anchorOf(bestId, communityId)) ?? colors[index],
-			source: "leiden" as SegmentBy,
+			source: "leiden",
 			paths,
+			tagIds,
 			communityId,
 		};
 	});

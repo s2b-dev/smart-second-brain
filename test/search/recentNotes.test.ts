@@ -9,7 +9,7 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 import { installAgentPathSource } from "../../src/utils/agentPathSource";
 installAgentPathSource({ agentFolder: () => mockAgentFolder, agentName: () => undefined });
 
-import type { App } from "obsidian";
+import { type App, TFile } from "obsidian";
 import { getRecentNoteBoost, getRecentNotes, MAX_RECENT_BOOST } from "../../src/search/recentNotes";
 import { RECENT_NOTE_WINDOW_MS } from "../../src/types/plugin";
 
@@ -22,7 +22,7 @@ function createApp(): App {
 		vault: {
 			getAbstractFileByPath(path: string) {
 				const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-				return { path, extension: "md", basename };
+				return Object.assign(new TFile(), { path, extension: "md", basename });
 			},
 		},
 		metadataCache: {

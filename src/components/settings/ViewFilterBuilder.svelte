@@ -81,7 +81,7 @@ let comboOpen = $state(false);
 let comboQuery = $state("");
 // Track which field is open: "leaf" | "live" | null
 let comboTarget: "leaf" | "live" | null = $state(null);
-let closeTimeout: ReturnType<typeof setTimeout> | null = null;
+let closeTimeout: number | null = null;
 
 function getSuggestionPool(type: LeafType): string[] {
 	if (type === "folder") return availableFolders;
@@ -110,7 +110,7 @@ function showsEmptyPoolHint(type: LeafType): boolean {
 
 function openCombo(target: "leaf" | "live", currentValue: string) {
 	if (closeTimeout) {
-		clearTimeout(closeTimeout);
+		window.clearTimeout(closeTimeout);
 		closeTimeout = null;
 	}
 	comboTarget = target;
@@ -125,7 +125,7 @@ function closeCombo() {
 
 function handleComboBlur() {
 	// Delay so a suggestion click fires before we close
-	closeTimeout = setTimeout(closeCombo, 150);
+	closeTimeout = window.setTimeout(closeCombo, 150);
 }
 
 function handleComboFocus(target: "leaf" | "live", currentValue: string) {
@@ -134,7 +134,7 @@ function handleComboFocus(target: "leaf" | "live", currentValue: string) {
 
 function pickSuggestion(value: string, target: "leaf" | "live") {
 	if (closeTimeout) {
-		clearTimeout(closeTimeout);
+		window.clearTimeout(closeTimeout);
 		closeTimeout = null;
 	}
 	if (target === "leaf") {

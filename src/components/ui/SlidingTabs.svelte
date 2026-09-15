@@ -101,9 +101,9 @@ $effect(() => {
 		measure();
 		// indicator.ready flips true on the first successful (non-zero) measure.
 		if (indicator.ready || frames++ > 30) return;
-		raf = requestAnimationFrame(tick);
+		raf = window.requestAnimationFrame(tick);
 	};
-	raf = requestAnimationFrame(tick);
+	raf = window.requestAnimationFrame(tick);
 	return () => cancelAnimationFrame(raf);
 });
 
@@ -112,7 +112,7 @@ $effect(() => {
 // every later tab switch glides. Runs once — `animate` guards the re-entry.
 $effect(() => {
 	if (!indicator.ready || animate) return;
-	const raf = requestAnimationFrame(() => {
+	const raf = window.requestAnimationFrame(() => {
 		animate = true;
 	});
 	return () => cancelAnimationFrame(raf);
@@ -139,7 +139,7 @@ $effect(() => {
 function registerTrigger(node: HTMLElement, id: T) {
 	triggerEls.set(id, node);
 	resizeObserver?.observe(node);
-	requestAnimationFrame(measure);
+	window.requestAnimationFrame(measure);
 	return () => {
 		triggerEls.delete(id);
 		resizeObserver?.unobserve(node);

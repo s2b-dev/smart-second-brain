@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
 	canReuseCachedEmbeddings,
 	formatEta,
-	orderChunksForWriting,
 	summarizeValidationProgressCounts,
 } from "../../src/vectorstore/VectorStoreService";
 import { getDefaultEmbeddingBatchSize, normalizeEmbeddingBatchSize } from "../../src/vectorstore/batchSize";
@@ -113,13 +112,5 @@ describe("canReuseCachedEmbeddings", () => {
 		// Guards the sentinel: `null` means "never built", which must not collide with
 		// the registry's initial generation of 0.
 		expect(canReuseCachedEmbeddings({ ...cached, authGeneration: null }, want, 0)).toBe(false);
-	});
-});
-
-describe("orderChunksForWriting", () => {
-	it("writes chunk 0 last so the note is complete exactly when its first row exists", () => {
-		expect(orderChunksForWriting([0, 1, 2, 3])).toEqual([1, 2, 3, 0]);
-		expect(orderChunksForWriting([0])).toEqual([0]);
-		expect(orderChunksForWriting([])).toEqual([]);
 	});
 });

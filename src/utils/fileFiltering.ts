@@ -537,7 +537,7 @@ function extractChatContent(raw: string): string {
 				answer = "";
 			};
 
-			for (const msg of selectActiveMessages(checkpoints as Record<string, unknown>)) {
+			for (const msg of selectActiveMessages(checkpoints)) {
 				// An unrecognised shape has no class to check; indexing it risks
 				// re-admitting tool output, so skip it.
 				const messageClass = getMessageClass(msg);

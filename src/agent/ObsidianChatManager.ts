@@ -143,7 +143,7 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		const raw = await this.adapter.readBinary(path);
 		const decompressed = await gunzipToString(raw);
 		// Yield after decompression so JSON.parse doesn't block the same frame.
-		await new Promise<void>((resolve) => setTimeout(resolve, 0));
+		await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 		const parsed = JSON.parse(decompressed) as ThreadData;
 		if ((parsed.version ?? 0) > THREAD_DATA_VERSION) {
 			Logger.warn(
@@ -545,7 +545,7 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 
 	private saveDebounced = debounce(
 		(threadId: string) => {
-			this.saveThread(threadId);
+			void this.saveThread(threadId);
 		},
 		2000,
 		true,

@@ -152,7 +152,7 @@ export function subscribeProviderState(provider: string, onChange?: () => void):
  */
 export function invalidateProviderState(provider: string) {
 	const plugin = getPlugin();
-	plugin.queryClient.invalidateQueries({
+	void plugin.queryClient.invalidateQueries({
 		queryKey: ["provider", provider],
 	});
 }
@@ -162,7 +162,7 @@ export function invalidateProviderState(provider: string) {
  */
 export function invalidateAllProviders() {
 	const plugin = getPlugin();
-	plugin.queryClient.invalidateQueries({
+	void plugin.queryClient.invalidateQueries({
 		queryKey: ["provider"],
 	});
 }
@@ -200,11 +200,11 @@ export function createAuthStateQuery(provider: () => string) {
  */
 export function invalidateAuthState(provider: string) {
 	const plugin = getPlugin();
-	plugin.queryClient.invalidateQueries({
+	void plugin.queryClient.invalidateQueries({
 		queryKey: ["authState", provider],
 	});
 	// Also invalidate the combined provider state
-	plugin.queryClient.invalidateQueries({
+	void plugin.queryClient.invalidateQueries({
 		queryKey: ["provider", provider],
 	});
 }

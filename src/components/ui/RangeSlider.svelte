@@ -50,7 +50,7 @@ function handleInput(e: Event) {
 	value = Number(target.value);
 	if (!onchange) return;
 	if (liveFrame !== null) cancelAnimationFrame(liveFrame);
-	liveFrame = requestAnimationFrame(() => {
+	liveFrame = window.requestAnimationFrame(() => {
 		liveFrame = null;
 		onchange?.(value);
 	});

@@ -1,5 +1,12 @@
 import type { Change } from "diff";
-import { MarkdownRenderer, setIcon, type MarkdownPostProcessorContext, type Plugin } from "obsidian";
+import {
+	type Component,
+	MarkdownRenderChild,
+	type MarkdownPostProcessorContext,
+	MarkdownRenderer,
+	type Plugin,
+	setIcon,
+} from "obsidian";
 import { diffLines, diffWords } from "diff";
 import { canNavigate, createResolveButton } from "../lib/diffActionButton";
 import { navigateToPendingChange } from "../lib/pendingChangeNavigation";
@@ -78,7 +85,7 @@ function renderWordDiff(el: HTMLElement, oldText: string, newText: string): void
 	const wordChanges = diffWords(oldText.trimEnd(), newText.trimEnd());
 
 	for (const part of wordChanges) {
-		const span = document.createElement("span");
+		const span = createSpan();
 		span.textContent = part.value;
 		if (part.removed) {
 			span.className = "s2b-reading-diff-word-removed";
@@ -199,7 +206,7 @@ function applyInlineWordDiff(container: HTMLElement, changes: Change[], lineStar
 	const { sectionOld, sectionNew } = extractSectionTexts(changes, lineStart, lineEnd);
 	if (sectionOld === sectionNew) return;
 
-	const diffContent = document.createElement("div");
+	const diffContent = createDiv();
 	diffContent.className = "s2b-diff-content";
 	renderWordDiff(diffContent, sectionOld, sectionNew);
 	container.appendChild(diffContent);
@@ -220,20 +227,21 @@ async function applyTwoPaneDiff(
 	lineEnd: number,
 	sourcePath: string,
 	plugin: Plugin,
+	component: Component,
 	isCurrent: () => boolean,
 ): Promise<void> {
 	const { sectionOld, sectionNew } = extractSectionTexts(changes, lineStart, lineEnd);
 	if (sectionOld === sectionNew) return;
 
-	const diffContent = document.createElement("div");
+	const diffContent = createDiv();
 	diffContent.className = "s2b-diff-content";
 
-	const paneWrap = document.createElement("div");
+	const paneWrap = createDiv();
 	paneWrap.className = "s2b-diff-two-pane";
 
-	const newPane = document.createElement("div");
+	const newPane = createDiv();
 	newPane.className = "s2b-diff-pane-added";
-	await MarkdownRenderer.render(plugin.app, sectionNew.trimEnd(), newPane, sourcePath, plugin);
+	await MarkdownRenderer.render(plugin.app, sectionNew.trimEnd(), newPane, sourcePath, component);
 	// A newer render may have superseded this one while we awaited — bail so we
 	// don't append a stale pane into a container the newer render already owns.
 	if (!isCurrent()) return;
@@ -250,6 +258,12 @@ interface DiffRenderContext {
 	origLineEnd: number;
 	filePath: string;
 	plugin: Plugin;
+	/**
+	 * Owner of anything `MarkdownRenderer.render` registers for the two-pane
+	 * preview. Tied to the section via `ctx.addChild`, so it unloads with the
+	 * section instead of living as long as the plugin.
+	 */
+	component: Component;
 }
 
 /**
@@ -277,6 +291,7 @@ function renderDetailInto(container: HTMLElement, ctx: DiffRenderContext, mode: 
 			ctx.origLineEnd,
 			ctx.filePath,
 			ctx.plugin,
+			ctx.component,
 			() => renderTokens.get(container) === token,
 		).catch(() => {
 			// Only fall back if this render is still the current one — a superseded
@@ -299,14 +314,14 @@ function createReadingDiffActionBar(
 	groupTotal: number,
 	renderCtx: DiffRenderContext,
 ): HTMLElement {
-	const wrap = document.createElement("div");
+	const wrap = createDiv();
 	wrap.className = "s2b-diff-reading-group";
 
-	const bar = document.createElement("div");
+	const bar = createDiv();
 	bar.className = "s2b-diff-actions-bar";
 	wrap.appendChild(bar);
 
-	const detail = document.createElement("div");
+	const detail = createDiv();
 	detail.className = "s2b-diff-detail";
 	wrap.appendChild(detail);
 
@@ -320,7 +335,7 @@ function createReadingDiffActionBar(
 		renderDetailInto(detail, renderCtx, mode);
 	};
 
-	const label = document.createElement("span");
+	const label = createSpan();
 	label.className = "s2b-diff-actions-label";
 	label.textContent = "Pending change";
 	bar.appendChild(label);
@@ -328,10 +343,12 @@ function createReadingDiffActionBar(
 	// Position among this note's pending change groups (e.g. "2/3"). Only shown
 	// when there's more than one — mirrors createEditActionBar so both views match.
 	if (groupTotal > 1) {
-		const position = document.createElement("span");
+		const position = createSpan();
 		position.className = "s2b-diff-position-indicator";
 		position.textContent = `${groupIndex + 1}/${groupTotal}`;
 		bar.appendChild(position);
+		// The indicator takes over the label's auto-margin (see styles.css).
+		label.classList.add("s2b-diff-actions-label-with-indicator");
 	}
 
 	// Prev/next chevrons: step through this chat thread's pending changes across
@@ -339,7 +356,7 @@ function createReadingDiffActionBar(
 	// commands. Mirrors createEditActionBar in inlineDiffExtension.ts (reading +
 	// edit views have parallel action bars).
 	const makeNavBtn = (iconName: string, ariaLabel: string, direction: "next" | "prev"): HTMLButtonElement => {
-		const btn = document.createElement("button");
+		const btn = createEl("button");
 		btn.className = "s2b-diff-nav-btn";
 		btn.setAttribute("aria-label", ariaLabel);
 		setIcon(btn, iconName);
@@ -364,7 +381,7 @@ function createReadingDiffActionBar(
 	}
 
 	// Toggle view mode icon (visible on hover via CSS)
-	const toggleBtn = document.createElement("button");
+	const toggleBtn = createEl("button");
 	toggleBtn.className = "s2b-diff-toggle-btn";
 	toggleBtn.setAttribute("aria-label", "Toggle diff view");
 	let currentMode: DiffViewMode;
@@ -619,6 +636,7 @@ function processSection(
 	el: HTMLElement,
 	entry: PendingChangeEntry,
 	plugin: Plugin,
+	component: Component,
 	filePath: string,
 	sectionInfo: { text: string; lineStart: number; lineEnd: number },
 ): void {
@@ -668,7 +686,7 @@ function processSection(
 
 	const groupIndex = computeGroupIndexForSection(changes, origLineStart, origLineEnd);
 	if (groupIndex === -1) return;
-	const renderCtx: DiffRenderContext = { changes, origLineStart, origLineEnd, filePath, plugin };
+	const renderCtx: DiffRenderContext = { changes, origLineStart, origLineEnd, filePath, plugin, component };
 	const groupEl = createReadingDiffActionBar(entry.id, groupIndex, countGroups(changes), renderCtx);
 	el.insertBefore(groupEl, el.firstChild);
 
@@ -740,8 +758,13 @@ export function createReadingViewDiffPostProcessor(plugin: Plugin) {
 		const sectionInfo = ctx.getSectionInfo(el);
 		if (!sectionInfo) return;
 
+		// Anything the section renders (the two-pane markdown preview) is owned by
+		// a child of the section's own render context, so it unloads with the
+		// section rather than with the plugin.
+		const component = new MarkdownRenderChild(el);
+		ctx.addChild(component);
 		try {
-			processSection(el, entry, plugin, filePath, sectionInfo);
+			processSection(el, entry, plugin, component, filePath, sectionInfo);
 		} catch {
 			// Silently recover — don't break Obsidian's rendering pipeline
 		}

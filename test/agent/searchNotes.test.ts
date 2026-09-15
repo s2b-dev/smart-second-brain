@@ -117,7 +117,7 @@ vi.mock("../../src/stores/pendingChangesStore.svelte", () => ({
 	}),
 }));
 
-import type { App } from "obsidian";
+import { type App, TFile } from "obsidian";
 // The payload type is imported rather than re-declared here: this file used to keep its own
 // copy, which drifted from the real interface (it was missing `requestedAlgorithm` and typed
 // `algorithm` as a required string) and so quietly type-checked assertions against a shape
@@ -204,7 +204,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -269,7 +269,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -325,7 +325,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -369,7 +369,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -400,7 +400,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -451,7 +451,7 @@ describe("performSearch lexical startup behavior", () => {
 		const app = {
 			vault: {
 				getAbstractFileByPath(path: string) {
-					return { path, extension: "canvas", basename: "recent-diagram" };
+					return Object.assign(new TFile(), { path, extension: "canvas", basename: "recent-diagram" });
 				},
 			},
 			metadataCache: {
@@ -483,7 +483,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {
@@ -747,7 +747,7 @@ describe("performSearch lexical startup behavior", () => {
 			vault: {
 				getAbstractFileByPath(path: string) {
 					const basename = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-					return { path, extension: "md", basename };
+					return Object.assign(new TFile(), { path, extension: "md", basename });
 				},
 			},
 			metadataCache: {

@@ -650,18 +650,6 @@ function toggleMCPServer(serverId: string) {
 }
 
 function buildMCPConfig(serverId: string, config: MCPServerConfig) {
-	if (config.transport === "stdio") {
-		return {
-			mcpServers: {
-				[serverId]: {
-					transport: "stdio" as const,
-					command: config.command,
-					args: config.args,
-					env: config.env,
-				},
-			},
-		};
-	}
 	return {
 		mcpServers: {
 			[serverId]: { transport: "http" as const, url: config.url, headers: config.headers },
@@ -1146,18 +1134,11 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               <ManagedEntityItem
                 class="mcp-entity"
                 name={config.displayName}
-                desc={config.transport === "stdio"
-                  ? `${config.command} ${config.args.join(" ")}`
-                  : config.url}
-                meta={config.transport === "stdio"
-                  ? "Local stdio MCP server"
-                  : "Remote HTTP MCP server"}
+                desc={config.url}
+                meta="Remote HTTP MCP server"
               >
                 {#snippet badges()}
-                  <Badge
-                    label={config.transport === "stdio" ? "Local" : "HTTP"}
-                    tone={config.transport === "stdio" ? "success" : "accent"}
-                  />
+                  <Badge label="HTTP" tone="accent" />
                   <Badge
                     interactive
                     onclick={() => toggleToolsList(serverId)}

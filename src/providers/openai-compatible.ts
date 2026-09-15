@@ -5,7 +5,6 @@
  * OpenAI-compatible API endpoints.
  */
 
-import { ChatOpenAI } from "@langchain/openai";
 import { requestUrl } from "obsidian";
 import {
 	createBufferedTransportedChatOpenAI,
@@ -82,7 +81,7 @@ export function createOpenAICompatibleProvider(
 	const baseDefinition: BaseProviderDefinition = {
 		id: config.id,
 		displayName: config.displayName,
-		logo: config.logo as typeof OpenAILogo | undefined,
+		logo: config.logo,
 		setupInstructions: config.setupInstructions ?? {
 			steps: [
 				"Enter the base URL for your OpenAI-compatible API endpoint",
@@ -133,7 +132,7 @@ export function createOpenAICompatibleProvider(
 				chatConfig.temperature = options.temperature;
 			}
 
-			return createTransportedChatOpenAI(config.id, chatConfig as ConstructorParameters<typeof ChatOpenAI>[0]);
+			return createTransportedChatOpenAI(config.id, chatConfig);
 		},
 		createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
 			const resolvedBaseUrl = sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl);
@@ -149,10 +148,7 @@ export function createOpenAICompatibleProvider(
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
 			}
-			return createBufferedTransportedChatOpenAI(
-				config.id,
-				chatConfig as ConstructorParameters<typeof ChatOpenAI>[0],
-			);
+			return createBufferedTransportedChatOpenAI(config.id, chatConfig);
 		},
 		validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {
 			const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;

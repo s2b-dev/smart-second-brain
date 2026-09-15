@@ -5,9 +5,10 @@ import {
 	queryNoteSemanticEdges,
 	replaceSemanticEdgesForPaths,
 	voteNodeCommunity,
+	voteUntilSettled,
 	type SemanticQueryStore,
 } from "../../src/utils/liveGraphPatch";
-import type { DocumentVector, ScoredDocument } from "../../src/vectorstore/types";
+import type { DocumentVector, SearchHit } from "../../src/vectorstore/types";
 
 function node(path: string, extra: Partial<GraphNode> = {}): GraphNode {
 	return { id: path, path, label: path.replace(/\.md$/, ""), x: 0, y: 0, degree: 0, highlighted: false, ...extra };
@@ -183,19 +184,18 @@ describe("queryNoteSemanticEdges", () => {
 		id: `${path}#${chunkIndex}`,
 		path,
 		mtime: 0,
-		checksum: "",
 		vector: new Float32Array([1, 0]),
 		chunkIndex,
 	});
 
-	function fakeStore(chunks: DocumentVector[], hitsByChunkId: Record<string, ScoredDocument[]>): SemanticQueryStore {
+	function fakeStore(chunks: DocumentVector[], hitsByChunkId: Record<string, SearchHit[]>): SemanticQueryStore {
 		return {
 			getAllByPath: async (path) => chunks.filter((c) => c.path === path),
 			search: async () => Object.values(hitsByChunkId).flat(),
 		};
 	}
 
-	const hit = (path: string, score: number): ScoredDocument => ({ doc: chunk(path), score });
+	const hit = (path: string, score: number): SearchHit => ({ id: `${path}#0`, path, chunkIndex: 0, score });
 
 	it("emits the best hit per neighbour, capped at neighborCount", async () => {
 		const store = fakeStore([chunk("x.md")], {
@@ -230,5 +230,104 @@ describe("queryNoteSemanticEdges", () => {
 			threshold: 0.55,
 		});
 		expect(edges).toEqual([]);
+	});
+});
+
+describe("applyWikiPatch — tag layer", () => {
+	const tagNode = (tag: string): GraphNode => ({
+		id: `tag:${tag}`,
+		path: `tag:${tag}`,
+		label: tag,
+		x: 5,
+		y: 5,
+		degree: 1,
+		highlighted: false,
+		kind: "tag",
+	});
+	const tagEdge = (source: string, tag: string): GraphEdge => ({
+		source,
+		target: `tag:${tag}`,
+		weight: 1,
+		type: "tag",
+	});
+
+	it("reports no change when the tag layer is identical", () => {
+		const cur = graph(
+			[node("a.md", { cluster: 0 }), node("b.md", { cluster: 0 }), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo"), semantic("a.md", "b.md")],
+		);
+		const fresh = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo")],
+		);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(false);
+		expect(result.data).toBe(cur);
+	});
+
+	it("counts a tag change as structural but never reports tag nodes as note paths", () => {
+		const cur = graph([node("a.md", { cluster: 0 }), node("b.md", { cluster: 0 })], [wiki("a.md", "b.md")]);
+		const fresh = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo")],
+			[wiki("a.md", "b.md"), tagEdge("a.md", "#foo")],
+		);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(true);
+		expect(result.addedPaths).toEqual([]);
+		expect(result.removedPaths).toEqual([]);
+		// The note whose tags changed is worth a re-vote; the tag itself is not.
+		expect(result.touchedPaths).toEqual(["a.md"]);
+		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "b.md", "tag:#foo"]);
+		// The note's degree ignores the new tag edge; the tag's counts it.
+		expect(result.data.nodes.find((n) => n.id === "a.md")?.degree).toBe(1);
+		expect(result.data.nodes.find((n) => n.id === "tag:#foo")?.degree).toBe(1);
+		// Presentation state survives on the notes as usual.
+		expect(result.data.nodes.find((n) => n.id === "a.md")?.cluster).toBe(0);
+	});
+
+	it("drops a tag node with its last note and keeps the surviving tag in place", () => {
+		const cur = graph(
+			[node("a.md"), node("b.md"), tagNode("#foo"), tagNode("#bar")],
+			[tagEdge("a.md", "#foo"), tagEdge("b.md", "#bar")],
+		);
+		const fresh = graph([node("a.md"), { ...tagNode("#foo"), x: 0, y: 0 }], [tagEdge("a.md", "#foo")]);
+
+		const result = applyWikiPatch(cur, fresh);
+		expect(result.changed).toBe(true);
+		expect(result.removedPaths).toEqual(["b.md"]);
+		expect(result.touchedPaths).toEqual([]);
+		const foo = result.data.nodes.find((n) => n.id === "tag:#foo");
+		expect(result.data.nodes.map((n) => n.id).sort()).toEqual(["a.md", "tag:#foo"]);
+		// The tag keeps its layout position across the patch like any other node.
+		expect(foo).toMatchObject({ x: 5, y: 5, kind: "tag" });
+	});
+});
+
+describe("voteUntilSettled", () => {
+	const weightOf = () => 1;
+	const tagEdge = (source: string, tag: string): GraphEdge => ({ source, target: tag, weight: 1, type: "tag" });
+
+	it("lands a new note that hinges on a new tag, whichever is listed first", () => {
+		// Existing a.md/b.md sit in topic 0. One patch adds a brand-new tag to
+		// them and a new note whose only edge is that tag.
+		const edges = [tagEdge("a.md", "tag:#new"), tagEdge("b.md", "tag:#new"), tagEdge("new.md", "tag:#new")];
+		for (const order of [
+			["new.md", "tag:#new"],
+			["tag:#new", "new.md"],
+		]) {
+			const communities: Record<string, number> = { "a.md": 0, "b.md": 0 };
+			const landed = voteUntilSettled(order, edges, communities, weightOf);
+			expect(landed.sort()).toEqual(["new.md", "tag:#new"]);
+			expect(communities).toEqual({ "a.md": 0, "b.md": 0, "tag:#new": 0, "new.md": 0 });
+		}
+	});
+
+	it("leaves a pair with no assigned neighbour unsorted and terminates", () => {
+		const communities: Record<string, number> = {};
+		const landed = voteUntilSettled(["new.md", "tag:#new"], [tagEdge("new.md", "tag:#new")], communities, weightOf);
+		expect(landed).toEqual([]);
+		expect(communities).toEqual({});
 	});
 });

@@ -74,7 +74,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 	}
 
 	onOpen(): void {
-		super.onOpen();
+		void super.onOpen();
 		this.buildFilterBar();
 		applyPromptSafeArea(this.modalEl);
 	}
@@ -113,13 +113,13 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 			if (vendor) presentVendors.add(vendor);
 		}
 
-		const bar = document.createElement("div");
+		const bar = createDiv();
 		bar.className = "s2b-model-filter-bar";
 
-		const favBtn = document.createElement("button");
+		const favBtn = createEl("button");
 		favBtn.type = "button";
 		favBtn.className = "s2b-pill s2b-pill--interactive s2b-model-filter-fav";
-		const favIcon = document.createElement("span");
+		const favIcon = createSpan();
 		favIcon.className = "s2b-model-filter-icon";
 		setIcon(favIcon, "star");
 		favBtn.appendChild(favIcon);
@@ -136,7 +136,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 
 		for (const vendor of VENDOR_CATALOG) {
 			if (!presentVendors.has(vendor.id)) continue;
-			const btn = document.createElement("button");
+			const btn = createEl("button");
 			btn.type = "button";
 			btn.className = "s2b-pill s2b-pill--interactive";
 			btn.dataset.vendorId = vendor.id;
@@ -147,7 +147,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 			// colour (muted at rest, accent while active) alongside the label.
 			const vendorLogo = createVendorLogoElement(vendor.id);
 			if (vendorLogo) {
-				const logoWrap = document.createElement("span");
+				const logoWrap = createSpan();
 				logoWrap.className = "s2b-model-filter-icon s2b-model-filter-icon--vendor";
 				logoWrap.appendChild(vendorLogo);
 				btn.appendChild(logoWrap);

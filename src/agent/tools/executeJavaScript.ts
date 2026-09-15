@@ -21,12 +21,12 @@ async function executeInWorker(code: string, input?: unknown): Promise<JavaScrip
 		const finish = (callback: () => void) => {
 			if (settled) return;
 			settled = true;
-			globalThis.clearTimeout(timeoutId);
+			window.clearTimeout(timeoutId);
 			worker.terminate();
 			callback();
 		};
 
-		const timeoutId = globalThis.setTimeout(() => {
+		const timeoutId = window.setTimeout(() => {
 			finish(() => reject(new Error(`JavaScript execution timed out after ${EXECUTION_TIMEOUT_MS}ms.`)));
 		}, EXECUTION_TIMEOUT_MS);
 

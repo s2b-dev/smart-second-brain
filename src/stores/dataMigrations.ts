@@ -1,7 +1,7 @@
 import type { PluginData } from "../types/plugin";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 12;
+export const CURRENT_SCHEMA_VERSION = 13;
 
 type Migration = (data: PluginData) => void;
 
@@ -172,6 +172,21 @@ const MIGRATIONS: Migration[] = [
 			const grepNotes = agent.toolsConfig?.grep_notes as unknown as Record<string, unknown> | undefined;
 			if (grepNotes) {
 				grepNotes.settings = undefined;
+			}
+		}
+	},
+	// v12 → v13: the stdio MCP transport was removed — it spawned local processes
+	//            (`child_process`), i.e. shell access the plugin no longer ships. Any
+	//            stdio server entry is dropped; the transport type is `"http"` only from
+	//            here on, so a leftover entry would fail type narrowing everywhere it is read.
+	(data) => {
+		for (const agent of Object.values(data.agents ?? {})) {
+			const servers = agent.mcpServers as unknown as
+				| Record<string, { transport?: string } | undefined>
+				| undefined;
+			if (!servers) continue;
+			for (const [id, server] of Object.entries(servers)) {
+				if (server?.transport === "stdio") delete servers[id];
 			}
 		}
 	},

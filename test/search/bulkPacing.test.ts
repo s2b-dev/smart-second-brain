@@ -9,6 +9,8 @@ import {
 	bulkCheckpointPauseMs,
 	bulkStartDelayMs,
 	orderForBulkIndexing,
+	resetBulkRunQueue,
+	type VaultLocalStorage,
 	scheduleBulkRun,
 } from "../../src/search/bulkPacing";
 
@@ -20,29 +22,29 @@ import {
  * silently drop the backoff.
  */
 
-function memoryStorage(): Storage {
-	const map = new Map<string, string>();
+/** In-memory stand-in for Obsidian's vault-scoped `App.loadLocalStorage` / `saveLocalStorage`. */
+function memoryStorage(): VaultLocalStorage & { raw: Map<string, unknown> } {
+	const raw = new Map<string, unknown>();
 	return {
-		getItem: (key: string) => map.get(key) ?? null,
-		setItem: (key: string, value: string) => void map.set(key, value),
-		removeItem: (key: string) => void map.delete(key),
-		clear: () => map.clear(),
-		key: () => null,
-		get length() {
-			return map.size;
+		raw,
+		loadLocalStorage: (key: string) => raw.get(key) ?? null,
+		saveLocalStorage: (key: string, data: unknown | null) => {
+			if (data === null) raw.delete(key);
+			else raw.set(key, data);
 		},
-	} as Storage;
+	};
 }
 
 const platform = Platform as { isMobile: boolean };
+let storage: ReturnType<typeof memoryStorage>;
 
 beforeEach(() => {
-	vi.stubGlobal("localStorage", memoryStorage());
+	storage = memoryStorage();
+	resetBulkRunQueue();
 });
 
 afterEach(() => {
 	platform.isMobile = false;
-	vi.unstubAllGlobals();
 	vi.useRealTimers();
 });
 
@@ -74,23 +76,23 @@ describe("bulkStartDelayMs", () => {
 });
 
 describe("BulkAttemptMarker", () => {
-	it("keys per indexer and vault, counts attempts, and clears on completion", () => {
-		const marker = new BulkAttemptMarker("embedding", "vault-1");
+	it("keys per indexer, counts attempts, and clears on completion", () => {
+		const marker = new BulkAttemptMarker("embedding", storage);
 		expect(marker.read()).toBe(0);
 		marker.markAttempt();
-		expect(localStorage.getItem("s2b-embedding-bulk-attempts:vault-1")).toBe("1");
+		expect(storage.raw.get("s2b-embedding-bulk-attempts")).toBe("1");
 		marker.markAttempt();
 		expect(marker.read()).toBe(2);
 		// A different indexer on the same vault backs off independently.
-		expect(new BulkAttemptMarker("lexical", "vault-1").read()).toBe(0);
+		expect(new BulkAttemptMarker("lexical", storage).read()).toBe(0);
 		marker.clear();
 		expect(marker.read()).toBe(0);
-		expect(localStorage.getItem("s2b-embedding-bulk-attempts:vault-1")).toBeNull();
+		expect(storage.raw.has("s2b-embedding-bulk-attempts")).toBe(false);
 	});
 
 	it("treats garbage as no crashed attempts", () => {
-		localStorage.setItem("s2b-embedding-bulk-attempts:vault-1", "nope");
-		expect(new BulkAttemptMarker("embedding", "vault-1").read()).toBe(0);
+		storage.saveLocalStorage("s2b-embedding-bulk-attempts", "nope");
+		expect(new BulkAttemptMarker("embedding", storage).read()).toBe(0);
 	});
 });
 
@@ -98,7 +100,7 @@ describe("scheduleBulkRun", () => {
 	it("waits the backed-off delay on mobile before starting the work", async () => {
 		vi.useFakeTimers();
 		platform.isMobile = true;
-		const marker = new BulkAttemptMarker("embedding", "vault-1");
+		const marker = new BulkAttemptMarker("embedding", storage);
 		marker.markAttempt();
 		marker.markAttempt(); // two crashed attempts → 4× base delay
 
@@ -114,12 +116,73 @@ describe("scheduleBulkRun", () => {
 	it("starts at once on desktop", async () => {
 		vi.useFakeTimers();
 		platform.isMobile = false;
-		const marker = new BulkAttemptMarker("embedding", "vault-1");
+		const marker = new BulkAttemptMarker("embedding", storage);
 		marker.markAttempt();
 		const work = vi.fn(async () => {});
 		scheduleBulkRun("Test", marker, work);
 		await vi.advanceTimersByTimeAsync(0);
 		expect(work).toHaveBeenCalledTimes(1);
+	});
+
+	it("runs scheduled work one after another, and a failing run does not block the next", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = false;
+		const marker = new BulkAttemptMarker("embedding", storage);
+		const order: string[] = [];
+		let releaseFirst: (() => void) | null = null;
+		// Both indexers schedule on the same tick, as they do at layout-ready.
+		scheduleBulkRun(
+			"Lexical",
+			marker,
+			() =>
+				new Promise<void>((resolve) => {
+					order.push("lexical:start");
+					releaseFirst = () => {
+						order.push("lexical:end");
+						resolve();
+					};
+				}),
+		);
+		scheduleBulkRun("Embedding", marker, async () => {
+			order.push("embedding");
+		});
+		// Each run yields through a timer before starting, hence the small advances.
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order).toEqual(["lexical:start"]);
+		if (!releaseFirst) throw new Error("first run never started");
+		(releaseFirst as () => void)();
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order).toEqual(["lexical:start", "lexical:end", "embedding"]);
+
+		scheduleBulkRun("Broken", marker, async () => {
+			throw new Error("boom");
+		});
+		scheduleBulkRun("Next", marker, async () => {
+			order.push("next");
+		});
+		await vi.advanceTimersByTimeAsync(10);
+		expect(order.at(-1)).toBe("next");
+	});
+
+	it("keeps scheduling order when a later run has the shorter backoff", async () => {
+		vi.useFakeTimers();
+		platform.isMobile = true;
+		const lexical = new BulkAttemptMarker("lexical", storage);
+		lexical.markAttempt(); // crashed once: 2× the base delay
+		const embedding = new BulkAttemptMarker("embedding", storage); // clean: 1×
+		const order: string[] = [];
+		scheduleBulkRun("Lexical", lexical, async () => {
+			order.push("lexical");
+		});
+		scheduleBulkRun("Embedding", embedding, async () => {
+			order.push("embedding");
+		});
+
+		// The embedding run's own delay has elapsed, but it is behind the lexical run.
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS + 10);
+		expect(order).toEqual([]);
+		await vi.advanceTimersByTimeAsync(MOBILE_BULK_BASE_DELAY_MS);
+		expect(order).toEqual(["lexical", "embedding"]);
 	});
 });
 

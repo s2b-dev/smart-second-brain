@@ -58,10 +58,13 @@ async function makeResolved(agent: Agent): Promise<ResolvedRun> {
 
 /** An AI message delta as the `messages` stream mode delivers it. */
 function aiDelta(id: string, content: string, toolCalls?: { id: string }[]) {
-	return ["messages", [{ getType: () => "ai", id, content, tool_calls: toolCalls }, {} as Record<string, unknown>]];
+	return [
+		"messages",
+		[{ type: "ai", getType: () => "ai", id, content, tool_calls: toolCalls }, {} as Record<string, unknown>],
+	];
 }
 
-const FINAL_VALUES = ["values", { messages: [{ getType: () => "ai", text: "final", content: "final" }] }];
+const FINAL_VALUES = ["values", { messages: [{ type: "ai", getType: () => "ai", text: "final", content: "final" }] }];
 
 async function collect(stream: AsyncGenerator<AgentStreamChunk>): Promise<AgentStreamChunk[]> {
 	const out: AgentStreamChunk[] = [];
@@ -150,7 +153,10 @@ describe("stream loop parity across the three entry points", () => {
 			aiDelta("m1", "parent "),
 			// A subagent token is tagged with lc_agent_name and must not append to the
 			// parent message — otherwise the subagent's answer leaks into it twice.
-			["messages", [{ getType: () => "ai", id: "m2", content: "SUBAGENT" }, { lc_agent_name: "worker" }]],
+			[
+				"messages",
+				[{ type: "ai", getType: () => "ai", id: "m2", content: "SUBAGENT" }, { lc_agent_name: "worker" }],
+			],
 			aiDelta("m1", "tail"),
 			FINAL_VALUES,
 		);

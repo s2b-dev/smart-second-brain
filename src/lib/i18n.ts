@@ -1,10 +1,11 @@
-import { init, addMessages } from "svelte-i18n";
+import { getLanguage } from "obsidian";
+import { addMessages, init } from "svelte-i18n";
 
 import en from "./en.json";
 
 addMessages("en", en);
 
-init({
+void init({
 	fallbackLocale: "en",
-	initialLocale: window.localStorage.getItem("language"),
+	initialLocale: getLanguage(),
 });

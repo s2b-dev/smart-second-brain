@@ -5,8 +5,7 @@
  * SearchModal and any other consumer without importing the agent layer.
  */
 
-import { getAllTags } from "obsidian";
-import type { App, TFile } from "obsidian";
+import { type App, TFile, getAllTags } from "obsidian";
 import { compileFilter, matchesSearchFilter } from "./searchFilters";
 import { getData } from "../stores/dataStore.svelte";
 import { isAgentFilePath } from "../utils/fileFiltering";
@@ -49,19 +48,6 @@ function getCachedTags(cache: Parameters<typeof getAllTags>[0] | null | undefine
 	return Array.from(new Set((getAllTags(cache) ?? []).filter((tag) => tag.length > 0)));
 }
 
-function isRecentNoteFile(file: unknown): file is Pick<TFile, "path" | "extension" | "basename"> {
-	return (
-		typeof file === "object" &&
-		file !== null &&
-		"path" in file &&
-		typeof file.path === "string" &&
-		"extension" in file &&
-		typeof file.extension === "string" &&
-		"basename" in file &&
-		typeof file.basename === "string"
-	);
-}
-
 /**
  * Map a note's age to its boost. Returns 0 outside the window, which is the
  * signal callers use to drop the note from the recent set entirely.
@@ -84,8 +70,8 @@ export function getRecentNoteBoost(ageMs: number): number {
 
 function getRecentlyOpenedNotes(app: App, filter?: SearchFilter): SearchResult[] {
 	const pluginData = getData();
-	const getAbstractFileByPath = app.vault?.getAbstractFileByPath;
-	if (typeof getAbstractFileByPath !== "function") return [];
+	const vault = app.vault;
+	if (typeof vault?.getAbstractFileByPath !== "function") return [];
 
 	const compiled = filter ? compileFilter(filter) : undefined;
 	const results: SearchResult[] = [];
@@ -98,15 +84,15 @@ function getRecentlyOpenedNotes(app: App, filter?: SearchFilter): SearchResult[]
 		// Outside the window: not recent, regardless of how few notes precede it.
 		if (recentBoost <= 0) continue;
 
-		const file = getAbstractFileByPath.call(app.vault, entry.path);
-		if (!isRecentNoteFile(file)) continue;
+		const file = vault.getAbstractFileByPath(entry.path);
+		if (!(file instanceof TFile)) continue;
 		// `file-open` records every file, including agent machinery (a user opening a
 		// skill or prompt note from the editor). Those are excluded from indexing and
 		// search, so recency must not resurface them either. Filtered at read time
 		// rather than record time so already-persisted entries are covered too.
 		if (isAgentFilePath(file.path)) continue;
 
-		const cache = app.metadataCache.getFileCache(file as TFile);
+		const cache = app.metadataCache.getFileCache(file);
 		const docTags = getCachedTags(cache);
 		if (!matchesSearchFilter(file.path, docTags, compiled ?? filter)) continue;
 

@@ -45,6 +45,11 @@ interface Props {
 	lassoMode?: boolean;
 	onLassoModeChange?: (active: boolean) => void;
 	graphData?: GraphData;
+	/**
+	 * False when no graph embedding index is selected (or its config is gone),
+	 * so no inferred edge can exist regardless of the toggle's stored value.
+	 */
+	hasGraphIndex?: boolean;
 	nodeCount?: number;
 	// Segments (community list)
 	segments?: SpaceSegment[];
@@ -64,6 +69,13 @@ interface Props {
 	isImmersed?: boolean;
 	/** Leave immerse and return to the full graph. */
 	onExitImmerse?: () => void;
+	/**
+	 * Live width of the toolbar row, so siblings sharing the top strip (the
+	 * mobile immerse banner) can reserve exactly the space it takes. Measured
+	 * rather than assumed: the button count changes with mode (immerse adds an
+	 * exit button) and the row wraps on narrow phones.
+	 */
+	onToolbarWidth?: (width: number) => void;
 }
 
 let {
@@ -87,6 +99,7 @@ let {
 	lassoMode = false,
 	onLassoModeChange,
 	graphData = { nodes: [], edges: [] },
+	hasGraphIndex = true,
 	nodeCount = 0,
 	segments = [],
 	focusedSegmentIds = new Set<string>(),
@@ -96,7 +109,16 @@ let {
 	isCollapsed = $bindable(true),
 	isImmersed = false,
 	onExitImmerse,
+	onToolbarWidth,
 }: Props = $props();
+
+/** Measured width of the toolbar row; reported up so the immerse banner can
+ *  cap itself against it instead of hardcoding a button-count guess. */
+let toolbarWidth = $state(0);
+
+$effect(() => {
+	onToolbarWidth?.(toolbarWidth);
+});
 
 let isDevCollapsed = $state(true);
 
@@ -164,6 +186,9 @@ let inferredLinksOn = $derived(!(settings.linkOnlyTopics ?? false) && (settings.
  */
 let inferredLinksHint = $derived.by(() => {
 	const total = graphData.nodes.length;
+	if (!hasGraphIndex) {
+		return "Connect notes by meaning as well as by the links you wrote. Needs a graph embedding index — pick one in the plugin's Graph settings.";
+	}
 	if (!inferredLinksOn) {
 		// Only report link coverage when topics really are link-only. A stored
 		// half-state (hidden but still grouping) would make that number a lie.
@@ -309,7 +334,7 @@ $effect(() => {
   view-header actions instead, which is a different, denser pattern, and at this
   size the rail read as undersized against the canvas.
 -->
-<div class="graph-toolbar">
+<div class="graph-toolbar" bind:clientWidth={toolbarWidth}>
   <!-- Mobile only. Immersion is a mode rather than a transient result — it
        persists while you pan, select and immerse further — so its exit has to
        persist too without covering the canvas, which a bottom sheet would.
@@ -464,8 +489,13 @@ $effect(() => {
          number is still there without this row growing an extra line and an
          affordance nothing else in the panel has. -->
     <SettingContainer name="Inferred links" desc={inferredLinksHint} compact>
+      <!-- Disabled, not hidden, without a graph index: the stored value is kept
+           (flipping it would silently rewrite settings on every open), the
+           hint says what's missing, and the switch comes alive the moment an
+           index is picked. -->
       <Toggle
         checked={!(settings.linkOnlyTopics ?? false) && (settings.showSemanticLinks ?? true)}
+        disabled={!hasGraphIndex}
         onchange={(value) =>
           onSettingsChange({ linkOnlyTopics: !value, showSemanticLinks: value })}
       />
@@ -530,6 +560,16 @@ $effect(() => {
         onchange={(value) => onSettingsChange({ markdownOnly: value })}
       />
     </SettingContainer>
+    <SettingContainer
+      name="Tags"
+      desc="Draw each tag as a node linked to the notes that carry it; shared tags also help shape topics"
+      compact
+    >
+      <Toggle
+        checked={settings.showTags ?? false}
+        onchange={(value) => onSettingsChange({ showTags: value })}
+      />
+    </SettingContainer>
       </div>
     </div>
 
@@ -567,6 +607,29 @@ $effect(() => {
       <Toggle
         checked={settings.directedWikiEdges}
         onchange={(value) => onSettingsChange({ directedWikiEdges: value })}
+      />
+    </SettingContainer>
+    <!-- Inferred edges are already dashed, but at overview zoom the dashes sit a
+         few pixels apart and read as solid, so the two kinds of connection blur
+         together exactly where the question "what did inference add?" is being
+         asked. Colour survives that zoom-out where the dash pattern doesn't.
+
+         Disabled rather than hidden when inferred links are off: a row that
+         vanishes leaves the user hunting for a control they saw a moment ago,
+         and the hint says which switch to flip to get it back. -->
+    <SettingContainer
+      name="Highlight inferred links"
+      desc={!hasGraphIndex
+        ? "Draw inferred links in the accent color. Needs a graph embedding index — pick one in the plugin's Graph settings."
+        : inferredLinksOn
+          ? "Draw inferred links in the accent color so they stand apart from the links you wrote"
+          : "Draw inferred links in the accent color. Needs Inferred links (under Topics) turned on."}
+      compact
+    >
+      <Toggle
+        checked={settings.highlightSemanticLinks ?? false}
+        disabled={!hasGraphIndex || !inferredLinksOn}
+        onchange={(value) => onSettingsChange({ highlightSemanticLinks: value })}
       />
     </SettingContainer>
     <SettingContainer

@@ -1,4 +1,4 @@
-import { type BaseMessage, HumanMessage, isHumanMessage } from "@langchain/core/messages";
+import { type BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { Notice, type TFile } from "obsidian";
 import { SvelteMap } from "svelte/reactivity";
 import type { AgentStreamChunk, ThreadHistory } from "../agent/Agent";
@@ -335,7 +335,7 @@ export class ChatSession {
 
 		const node = this.graphState.nodes.get(checkpointId);
 		const lastMessage = node?.messages.at(-1);
-		if (!lastMessage || !isHumanMessage(lastMessage)) {
+		if (!lastMessage || !HumanMessage.isInstance(lastMessage)) {
 			return undefined;
 		}
 
@@ -616,6 +616,12 @@ export class ChatSession {
 		const signal = this.abortController.signal;
 		this.touch();
 
+		// Marks the point past which the answer is durable: the stream completed
+		// and the checkpointer wrote it. Post-success bookkeeping (graph sync,
+		// reload, duration persistence) can still throw, but must degrade the
+		// view rather than retract a turn the user has already read.
+		let streamSucceeded = false;
+
 		try {
 			this.messageState = MessageState.answering;
 			this.summarizingHistory = options.predictedSummarization ?? false;
@@ -630,6 +636,11 @@ export class ChatSession {
 
 			await this.consumeStream(pair.assistantMessage, getStream(signal));
 			pair.assistantMessage.state = AssistantState.success;
+			// The turn has succeeded and the checkpointer has persisted the answer.
+			// Everything below is bookkeeping over that already-durable result, so
+			// from here on a throw must not be reported as a failed turn — see the
+			// post-success block after this try.
+			streamSucceeded = true;
 
 			// Stamp the elapsed time so the "Thought for Ns" label shows immediately
 			// (before any reload) and reads back from persistence later. This is the
@@ -701,6 +712,16 @@ export class ChatSession {
 		} catch (_err) {
 			if (this.cancelled) {
 				pair.assistantMessage.state = AssistantState.cancelled;
+			} else if (streamSucceeded) {
+				// Post-success bookkeeping failed. The answer streamed to completion
+				// and the checkpointer persisted it, so the turn stands: marking it
+				// `error` here would retract a reply the user is already reading and
+				// offer a pointless "retry" of work that actually succeeded. That is
+				// exactly what a rename-invalidated `onNeedReload` used to do.
+				//
+				// What is lost is view freshness (the checkpoint graph may not reflect
+				// this turn until the next load), not content — so log and move on.
+				Logger.error("[ChatSession] Post-run bookkeeping failed (answer preserved):", _err);
 			} else {
 				pair.assistantMessage.state = AssistantState.error;
 				pair.assistantMessage.errorCode = extractErrorMessage(_err);
@@ -1357,6 +1378,18 @@ export class SessionRegistry {
 	 * shows up in whichever chat the user switches to while it stays selected.
 	 * Per-chat exclusions are tracked locally in each ContextTray. */
 	graphSelection: string[] = $state([]);
+	/** Name of the topic(s) `graphSelection` exactly matches, or null if the
+	 * selection isn't a whole topic (lasso, panel row, or a topic selection
+	 * the user has since edited by hand). Mirrors `graphSelection`'s ambient
+	 * scope — set alongside it everywhere it's assigned. */
+	graphSelectionTopicLabel: string | null = $state(null);
+	/** True when the current `graphSelection` value was republished by background
+	 * vault maintenance (a live patch pruning deleted notes out of the existing
+	 * selection) rather than a new user gesture. A chat tray's per-note dismissals
+	 * must survive maintenance pruning but reset on every real selection change —
+	 * and that distinction can't be inferred from the paths alone, since a user
+	 * picking a smaller selection also shrinks the path set. */
+	graphSelectionIsMaintenance: boolean = $state(false);
 	pendingAttachmentPaths: string[] | null = $state(null);
 	pendingAutoSubmit: boolean = $state(false);
 	/** When set, only the Input bound to this thread path consumes the pending
@@ -1598,6 +1631,10 @@ export class SessionRegistry {
 		const isEmpty = await this.#agentManager.isThreadEmpty(id);
 		if (!isLatest()) return; // A newer switch superseded this load.
 		if (isEmpty) this.isLoadingSession = false;
+		// Forward-declared so callbacks wired below can hold the session instance
+		// rather than the load-time path. `id` stops being a valid map key the
+		// moment the auto-title rename rekeys this session.
+		let session: ChatSession | undefined;
 		try {
 			const [history, checkpointHistory] = await Promise.all([
 				this.#agentManager.getThreadHistory(id),
@@ -1614,8 +1651,12 @@ export class SessionRegistry {
 			if (checkpointHistory.length === 0 && !isEmpty) {
 				this.#agentManager.onNextInitialized(() => {
 					// Only reload if this thread's session is still around (its view
-					// may have closed and the session been evicted meanwhile).
-					if (this.sessions.has(id)) void this.reloadSession(id);
+					// may have closed and the session been evicted meanwhile). Checked
+					// by identity, not by the load-time path: an auto-title rename in
+					// the meantime rekeys the map, and a path-keyed lookup would find
+					// nothing and silently skip the reload the user is waiting on.
+					if (!session || this.sessions.get(session.id) !== session) return;
+					void this.reloadSessionInstance(session);
 				});
 			}
 
@@ -1638,9 +1679,7 @@ export class SessionRegistry {
 				targetCheckpointId,
 			});
 
-			const historyWithError = history as
-				| (ThreadHistory & { lastError?: ThreadError; errorCount?: number })
-				| null;
+			const historyWithError = history;
 			const bootstrapMessages = historyWithError?.messages || [];
 			const errorCount = historyWithError?.errorCount || 0;
 			const lastErrorMessage = historyWithError?.lastError?.message;
@@ -1654,7 +1693,7 @@ export class SessionRegistry {
 
 			if (!isLatest()) return;
 
-			const session = new ChatSession(
+			session = new ChatSession(
 				id,
 				this.buildSessionOptions({
 					graphState: graph,
@@ -1662,9 +1701,14 @@ export class SessionRegistry {
 					lastErrorMessage,
 					bootstrapMessages,
 					selectedAgentId: restoredAgentId,
-					// Reload against this specific session/thread, not whatever is
-					// active when a backgrounded run finishes later.
-					onNeedReload: async () => this.reloadSession(id),
+					// Reload against this specific session, not whatever is active
+					// when a backgrounded run finishes later — and not via the
+					// load-time path, which the auto-title rename invalidates
+					// mid-run (the rename happens inside `runStream`, just before
+					// this callback fires for `reloadAfter`).
+					onNeedReload: async () => {
+						if (session) await this.reloadSessionInstance(session);
+					},
 				}),
 			);
 			this.sessions.set(id, session);
@@ -1685,7 +1729,18 @@ export class SessionRegistry {
 		if (!session) {
 			throw new Error("No session to reload");
 		}
+		await this.reloadSessionInstance(session, targetCheckpointId);
+	}
 
+	/** Reload a session identified by object rather than by map key.
+	 *
+	 * Callbacks handed to a ChatSession outlive its registry key: the auto-title
+	 * rename after the first message rekeys the map (`rekeySession`) and updates
+	 * `session.id` in place, so any closure that captured the load-time path is
+	 * pointing at a key that no longer exists. Holding the instance keeps those
+	 * callbacks correct across renames; `session.id` is read live below for the
+	 * thread-scoped fetches. */
+	private async reloadSessionInstance(session: ChatSession, targetCheckpointId?: string): Promise<void> {
 		// Capture load token: a thread switch during the awaits below can replace
 		// this session; applying stale history to a newer session would show
 		// the wrong chat's checkpoints.
@@ -1721,7 +1776,7 @@ export class SessionRegistry {
 			targetCheckpointId,
 		});
 
-		const historyWithError = history as (ThreadHistory & { lastError?: ThreadError; errorCount?: number }) | null;
+		const historyWithError = history;
 		session.applyGraphState(
 			graph,
 			historyWithError?.errorCount || 0,
@@ -1756,7 +1811,7 @@ export class SessionRegistry {
 		graph.activeCheckpointId = checkpointId;
 		graph.lastPersistedActiveCheckpointId = this.getLastViewedCheckpointId(history);
 
-		const historyWithError = history as (ThreadHistory & { lastError?: ThreadError; errorCount?: number }) | null;
+		const historyWithError = history;
 		session.applyGraphState(
 			graph,
 			historyWithError?.errorCount || 0,

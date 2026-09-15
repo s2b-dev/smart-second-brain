@@ -2,6 +2,7 @@ import { MarkdownView, type EventRef, type WorkspaceLeaf } from "obsidian";
 import { getPlugin } from "../stores/state.svelte";
 import { getData } from "../stores/dataStore.svelte";
 import { clearSelectionHighlight, setSelectionHighlight } from "../editor/selectionHighlightExtension";
+import { getEditorView } from "../lib/editor";
 import { SELECTION_BUDGET_FRACTION, contextWindowToCharBudget, truncateToBudget } from "../utils/contentBudget";
 
 /** Serializable snapshot of user-selected text. Persisted in HumanMessage additional_kwargs. */
@@ -39,8 +40,7 @@ function hasCollapsedSelectionInLeaf(leaf: WorkspaceLeaf): boolean {
 	// Markdown edit mode: inspect the CM6 state selection.
 	if (view instanceof MarkdownView && view.getMode() === "source") {
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-			const cm = (view.editor as any).cm;
+			const cm = getEditorView(view.editor);
 			if (!cm?.state) return false;
 			// A collapsed main range with editor focus means a cursor is placed but nothing is selected.
 			return cm.hasFocus && cm.state.selection.main.empty;
@@ -79,8 +79,7 @@ function getSelectionFromLeaf(leaf: WorkspaceLeaf): CapturedSelection | undefine
 	// --- Markdown edit mode: use CM6 selection API ---
 	if (view instanceof MarkdownView && view.getMode() === "source") {
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-			const cm = (view.editor as any).cm;
+			const cm = getEditorView(view.editor);
 			if (!cm?.state) return undefined;
 			const sel = cm.state.selection;
 			const ranges = sel.ranges.filter((r: { from: number; to: number }) => r.from !== r.to);
@@ -195,14 +194,17 @@ export class SelectionTracker {
 
 	#scheduleRefresh() {
 		if (this.#refreshFrame !== undefined) return;
-		this.#refreshFrame = requestAnimationFrame(() => {
+		this.#refreshFrame = window.requestAnimationFrame(() => {
 			this.#refreshFrame = undefined;
 			this.#refresh();
 		});
 	}
 
 	#refresh() {
-		const activeLeaf = this.#workspace.activeLeaf;
+		// `activeLeaf` is deprecated; the most recently focused leaf is the one the
+		// active-leaf-change event just fired for, and it is not always a markdown
+		// view (PDFs count), so `getActiveViewOfType` alone is not enough.
+		const activeLeaf = this.#workspace.getMostRecentLeaf();
 		if (!activeLeaf) return;
 
 		// Check if we're in a note/PDF leaf (not the chat sidebar)
@@ -253,10 +255,9 @@ export class SelectionTracker {
 		// CM6 edit mode: dispatch decoration marks
 		if (captured.cmRanges?.length) {
 			try {
-				const activeLeaf = this.#workspace.activeLeaf;
-				if (activeLeaf?.view instanceof MarkdownView) {
-					// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-					const cm = (activeLeaf.view.editor as any).cm;
+				const activeView = this.#workspace.getActiveViewOfType(MarkdownView);
+				if (activeView) {
+					const cm = getEditorView(activeView.editor);
 					if (cm) setSelectionHighlight(cm, captured.cmRanges);
 				}
 			} catch {
@@ -311,8 +312,7 @@ export class SelectionTracker {
 				const view = leaf.view;
 				if (!(view instanceof MarkdownView) || view.getMode() !== "source") continue;
 				if (view.file?.path !== path) continue;
-				// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-				const cm = (view.editor as any).cm;
+				const cm = getEditorView(view.editor);
 				if (cm?.state && !cm.state.selection.main.empty) {
 					cm.dispatch({ selection: { anchor: cm.state.selection.main.head } });
 				}
@@ -354,8 +354,7 @@ export class SelectionTracker {
 		try {
 			for (const leaf of this.#workspace.getLeavesOfType("markdown")) {
 				if (leaf.view instanceof MarkdownView) {
-					// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-					const cm = (leaf.view.editor as any).cm;
+					const cm = getEditorView(leaf.view.editor);
 					if (cm) clearSelectionHighlight(cm);
 				}
 			}

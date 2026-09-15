@@ -10,7 +10,7 @@ export class PrivacyListModal extends SvelteModal {
 		// surfaces read as the same feature.
 		this.setTitle("Manage Note Access Policy");
 		this.titleEl.addClass("s2b-privacy-modal-title");
-		const titleIconEl = document.createElement("span");
+		const titleIconEl = createSpan();
 		titleIconEl.addClass("s2b-privacy-modal-title-icon");
 		setIcon(titleIconEl, "shield-check");
 		titleIconEl.setAttribute("aria-hidden", "true");

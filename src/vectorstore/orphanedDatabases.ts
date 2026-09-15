@@ -18,6 +18,7 @@
  */
 
 import { Logger } from "../utils/logging";
+import { toError } from "../utils/toError";
 import { type DeleteDatabaseResult, deleteDatabase, getDbName } from "./types";
 
 /** Prefix shared by every HNSW vector database (`HNSWVectorStore`'s `DB_NAME_PREFIX`). */
@@ -115,8 +116,8 @@ async function probeDatabase(name: string): Promise<ProbeResult | null> {
 			const tx = db.transaction(["metadata", "documents"], "readonly");
 			let meta: ProbedMetadata | undefined;
 			let chunkCount = 0;
-			tx.onerror = () => reject(tx.error);
-			tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted."));
+			tx.onerror = () => reject(toError(tx.error, "IndexedDB transaction failed."));
+			tx.onabort = () => reject(toError(tx.error, "IndexedDB transaction aborted."));
 			tx.oncomplete = () => {
 				if (!meta) {
 					resolve(null);

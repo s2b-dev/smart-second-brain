@@ -9,7 +9,6 @@
  * Authentication: apiKey (required), baseUrl (optional), headers (optional)
  */
 
-import { ChatAnthropic } from "@langchain/anthropic";
 import { requestUrl } from "obsidian";
 import AnthropicLogo from "../components/ui/logos/AnthropicLogo.svelte";
 import type {
@@ -146,12 +145,11 @@ export const anthropicProvider: BaseProviderDefinition = {
 
 		// Forward Anthropic-specific `thinking` config when provided (e.g. to
 		// disable extended thinking for lightweight tasks like cluster labeling).
-		const extra = options as Record<string, unknown> | undefined;
-		if (extra?.thinking !== undefined) {
-			config.thinking = extra.thinking;
+		if (options && "thinking" in options && options.thinking !== undefined) {
+			config.thinking = options.thinking;
 		}
 
-		return createTransportedChatAnthropic("anthropic", config as ConstructorParameters<typeof ChatAnthropic>[0]);
+		return createTransportedChatAnthropic("anthropic", config);
 	},
 
 	createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
@@ -164,14 +162,10 @@ export const anthropicProvider: BaseProviderDefinition = {
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;
 		}
-		const extra = options as Record<string, unknown> | undefined;
-		if (extra?.thinking !== undefined) {
-			config.thinking = extra.thinking;
+		if (options && "thinking" in options && options.thinking !== undefined) {
+			config.thinking = options.thinking;
 		}
-		return createBufferedTransportedChatAnthropic(
-			"anthropic",
-			config as ConstructorParameters<typeof ChatAnthropic>[0],
-		);
+		return createBufferedTransportedChatAnthropic("anthropic", config);
 	},
 
 	validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {

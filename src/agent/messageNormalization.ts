@@ -2,7 +2,7 @@ import {
 	AIMessage,
 	type BaseMessage,
 	HumanMessage,
-	type MessageContentComplex,
+	type ContentBlock,
 	SystemMessage,
 	ToolMessage,
 } from "@langchain/core/messages";
@@ -48,7 +48,7 @@ function normalizeMessage(msg: Record<string, unknown>): BaseMessage | undefined
 	// Handle StoredMessage format: { type: string, data: { content: string, ... } }
 	if (typeof msg.type === "string" && msg.data && typeof msg.data === "object") {
 		const data = msg.data as Record<string, unknown>;
-		return convertPlainMessage(msg.type as string, {
+		return convertPlainMessage(msg.type, {
 			...data,
 			type: msg.type,
 		});
@@ -109,7 +109,7 @@ function convertSerializedLangChainMessage(msg: Record<string, unknown>): BaseMe
 	// Determine type from class name in id array
 	const className = readLangChainClassName(msg.id);
 
-	// Cast content — constructors handle both string and MessageContentComplex[] at runtime
+	// Cast content — constructors handle both string and ContentBlock[] at runtime
 	const c = content as string;
 
 	switch (className) {
@@ -163,7 +163,7 @@ function convertPlainMessage(type: string, msg: Record<string, unknown>): BaseMe
 	const additionalKwargs = asPlainRecord(msg.additional_kwargs);
 	const responseMetadata = asPlainRecord(msg.response_metadata);
 
-	// Cast content — constructors handle both string and MessageContentComplex[] at runtime
+	// Cast content — constructors handle both string and ContentBlock[] at runtime
 	const c = content as string;
 
 	switch (type.toLowerCase()) {
@@ -226,7 +226,7 @@ function asPlainRecord(value: unknown): Record<string, unknown> | undefined {
 	return value as Record<string, unknown>;
 }
 
-function extractContent(obj: Record<string, unknown>): string | MessageContentComplex[] {
+function extractContent(obj: Record<string, unknown>): string | ContentBlock[] {
 	const content = obj.content;
 	if (typeof content === "string") return content;
 	if (Array.isArray(content)) {
@@ -244,7 +244,7 @@ function extractContent(obj: Record<string, unknown>): string | MessageContentCo
 			(c) => c && typeof c === "object" && (c as { s2b_attachment?: unknown }).s2b_attachment === true,
 		);
 		if (hasNonTextItems || hasAttachmentBlock) {
-			return content as MessageContentComplex[];
+			return content as ContentBlock[];
 		}
 		// Text-only arrays (no attachments) can be joined into a single string
 		return content

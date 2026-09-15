@@ -30,7 +30,7 @@ interface LongPressOptions {
 }
 
 export function longPress(node: HTMLElement, options: LongPressOptions) {
-	let timer: ReturnType<typeof setTimeout> | null = null;
+	let timer: number | null = null;
 	let fired = false;
 	let startX = 0;
 	let startY = 0;
@@ -38,7 +38,7 @@ export function longPress(node: HTMLElement, options: LongPressOptions) {
 
 	function cancel() {
 		if (timer !== null) {
-			clearTimeout(timer);
+			window.clearTimeout(timer);
 			timer = null;
 		}
 		node.classList.remove(PRESSING_CLASS);
@@ -53,7 +53,7 @@ export function longPress(node: HTMLElement, options: LongPressOptions) {
 		startY = e.clientY;
 		cancel();
 		node.classList.add(PRESSING_CLASS);
-		timer = setTimeout(() => {
+		timer = window.setTimeout(() => {
 			timer = null;
 			fired = true;
 			node.classList.remove(PRESSING_CLASS);

@@ -13,6 +13,20 @@ provider and skill recipes) live in [CONTRIBUTING.md](CONTRIBUTING.md). CI (`.gi
 runs the Biome format and lint checks, `bun run check`, `bun run test`, and `bun run build` on every pull request; a
 change that fails any of those locally will fail there too.
 
+**Disclose AI involvement; never hide it.** Most of this repo is written by coding agents
+working from the maintainer's briefs, and the history should say so:
+- Commits made from Claude Code carry a `Co-Authored-By: Claude <noreply@anthropic.com>`
+  trailer, configured in `.claude/settings.json` (it overrides the user-level setting). Keep
+  the trailer. If you commit through another agent, add a trailer naming *that* agent instead;
+  never attribute a change to an agent that did not make it.
+- Every PR body follows `.github/PULL_REQUEST_TEMPLATE.md`, including the italic
+  `_AI assistance: ..._` line under "How I tested it". Fill it in honestly in one sentence: which agent wrote the
+  change, from what brief, and what the human reviewed and tested. Do not leave the line out.
+  "none" is the right answer only for a change no agent touched, which a change you are making
+  is not.
+- Replies to review-bot findings are written by whoever is driving the loop, agent or human;
+  that is fine. Replies to a *person's* review are the maintainer's to write.
+
 ## Commands
 
 Use `bun` (not npm/yarn). The lockfile is `bun.lock`.
@@ -123,6 +137,11 @@ August 2026; recover it from git history if useful, but do not trust it.)
 - **Worker offload:** Graph projection/clustering and HNSW operations run in workers (`hnswWorker.ts`, `computeWorker.ts`) to keep the UI fluid.
 - **Capability-driven multimodal:** Vision/PDF support is resolved per model at runtime — do not hard-code provider assumptions.
 - **Secrets:** `dataStore` holds secret IDs, not raw values; raw values resolve through `secretStorage.ts`.
+- **AsyncLocalStorage:** `lib/asyncLocalStorage.ts` is the only ALS source, and on desktop it is a port of
+  Node 22's `async_hooks`-based implementation. Never hand LangChain (or anything else) Node's own
+  `AsyncLocalStorage` class in the renderer: from Node 24 (Electron 40+, Obsidian installer 1.13+) it keeps
+  its frame in V8's continuation-preserved embedder data, the slot Blink's task-attribution scheduler also
+  writes, and the first `getStore()` inside an interaction-attributed task aborts the renderer (#478, #481).
 - **No runtime import cycles.** `bunx madge --circular --extensions ts src/main.ts` with a `.madgerc` of `{"detectiveOptions":{"ts":{"skipTypeImports":true,"skipAsyncImports":true}}}` reports none; keep it that way. The seams that make this hold: `providers/*` never import `stores/dataStore` (they read through `getPlugin()` from the leaf `state.svelte.ts`, and `providerRuntime` announces Codex session changes via `onCodexSessionChange`, which `main.ts` wires to query invalidation); `utils/agentPaths` and `utils/fileFiltering` read the agent folder from `utils/agentPathSource.ts`, which `PluginDataStore` installs on construction; UI-opening helpers in `utils/actionNotice.ts` use dynamic `import()` for the modals and services they open. Built-in tool metadata (display name, UI summary, stored default `ToolConfig`) has exactly one table, `agent/tools/builtInToolDefaults.ts`.
 
 ## Build
@@ -189,7 +208,7 @@ s2b-dev/
    and prints its worktree dir and vault name. If none is free, ask the user
    rather than working in the main checkout. `--status` lists holders.
 2. `cd` into the slot worktree. It sits on a detached HEAD; create your task
-   branch there (`git fetch && git switch -c <branch> origin/dev`). Run
+   branch there (`git fetch && git switch -c <branch> origin/main`). Run
    `bun install --frozen-lockfile` if deps changed.
 3. Build with a **one-shot** `bunx vite build --mode development` (never a
    `--watch` — lingering watchers were the historical source of corrupt

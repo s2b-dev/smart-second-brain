@@ -87,9 +87,9 @@ That means:
 - You have checked that the change actually addresses the issue, rather than something that
   pattern-matches to it.
 
-**Disclose it.** The PR template has an "AI assistance" field. Say what you used and roughly how
-much of the change it produced. Disclosure never counts against a contribution; it tells reviewers
-where to look harder. Not disclosing, and being found out, does count against it.
+**Disclose it.** The PR template has an "AI assistance:" line. Say in one sentence what you used
+and roughly how much of the change it produced. Disclosure never counts against a contribution; it
+tells reviewers where to look harder. Not disclosing, and being found out, does count against it.
 
 **Do not:**
 
@@ -107,7 +107,11 @@ where to look harder. Not disclosing, and being found out, does count against it
 build commands, and the architecture notes. If your change makes something in AGENTS.md wrong,
 update AGENTS.md in the same PR.
 
-Maintainers hold themselves to the same rules. If you see a maintainer PR that reads like
+Maintainers hold themselves to the same rules: maintainer commits made with an agent carry a
+`Co-Authored-By` trailer naming that agent (`Co-Authored-By: Claude <noreply@anthropic.com>`
+for Claude Code), and maintainer PRs fill in the same "AI assistance:" line. PRs merged before
+[#488](https://github.com/s2b-dev/smart-second-brain/pull/488) predate this policy; the ones
+from the agent era carry a backfilled line. If you see a maintainer PR that reads like
 unreviewed output, say so.
 
 ## Recipes

@@ -73,7 +73,7 @@ let didRevealSelection = false;
 $effect(() => {
 	if (didRevealSelection || !currentSelection || models.length === 0) return;
 	didRevealSelection = true;
-	requestAnimationFrame(() => {
+	window.requestAnimationFrame(() => {
 		modelsListEl?.querySelector(".model-card.selected")?.scrollIntoView({ block: "center" });
 	});
 });

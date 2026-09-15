@@ -1,14 +1,14 @@
 <script lang="ts">
 import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import { Notice, Platform } from "obsidian";
+import { Notice } from "obsidian";
 import { onMount } from "svelte";
 import { installObsidianFetch } from "../../lib/obsidianFetch";
 import type SecondBrainPlugin from "../../main";
-import type { MCPHTTPServerConfig, MCPServerConfig, MCPStdioServerConfig, MCPTransportType } from "../../types/plugin";
+import type { MCPServerConfig } from "../../types/plugin";
 import { getData } from "../../stores/dataStore.svelte";
 import { Logger } from "../../utils/logging";
 import Button from "../ui/Button.svelte";
-import Dropdown from "../ui/Dropdown.svelte";
+import CircularLoader from "../ui/CircularLoader.svelte";
 import Icon from "../ui/Icon.svelte";
 import Text from "../ui/Text.svelte";
 import { confirmDelete } from "./ConfirmModal";
@@ -61,24 +61,13 @@ let name = $state(initialConfig?.displayName ?? "");
 // owns that toggle. Carry the existing value through so saving an edit to a
 // disabled server doesn't silently re-enable it; new servers start enabled.
 const enabled = (() => initialConfig?.enabled ?? true)();
-// stdio is desktop-only; if a mobile user opens an existing stdio server
-// (e.g. synced from desktop), fall back to http so the dropdown selection
-// stays valid rather than showing an absent option.
-let transport = $state<MCPTransportType>(Platform.isDesktopApp ? (initialConfig?.transport ?? "http") : "http");
 
-// stdio-specific fields
-let command = $state((initialConfig as MCPStdioServerConfig)?.command ?? "");
-let args = $state((initialConfig as MCPStdioServerConfig)?.args?.join(" ") ?? "");
-let envVars = $state(
-	Object.entries((initialConfig as MCPStdioServerConfig)?.env ?? {})
-		.map(([k, v]) => `${k}=${v}`)
-		.join("\n"),
-);
-
-// HTTP-specific fields
-let url = $state((initialConfig as MCPHTTPServerConfig)?.url ?? "");
+// HTTP is the only transport: a stdio server would spawn a local process, which
+// is shell access the plugin deliberately does not ship (see the stdio shim in
+// src/lib/shims/). Pasted configs describing one are rejected with a message.
+let url = $state(initialConfig?.url ?? "");
 let headers = $state(
-	Object.entries((initialConfig as MCPHTTPServerConfig)?.headers ?? {})
+	Object.entries(initialConfig?.headers ?? {})
 		.map(([k, v]) => `${k}: ${v}`)
 		.join("\n"),
 );
@@ -90,10 +79,6 @@ let headers = $state(
 // pre-paste values are snapshotted so the banner can offer a one-click undo.
 type FormSnapshot = {
 	name: string;
-	transport: MCPTransportType;
-	command: string;
-	args: string;
-	envVars: string;
 	url: string;
 	headers: string;
 };
@@ -102,80 +87,103 @@ let importError = $state<string | null>(null);
 let importUndo = $state<FormSnapshot | null>(null);
 
 function snapshotForm(): FormSnapshot {
-	return { name, transport, command, args, envVars, url, headers };
+	return { name, url, headers };
 }
 
 function restoreForm(snapshot: FormSnapshot) {
 	name = snapshot.name;
-	transport = snapshot.transport;
-	command = snapshot.command;
-	args = snapshot.args;
-	envVars = snapshot.envVars;
 	url = snapshot.url;
 	headers = snapshot.headers;
 }
 
-// Test connection state
-let isTesting = $state(false);
-let testError = $state<string | null>(null);
-let discoveredTools = $state<{ name: string; description?: string }[]>([]);
-let testSuccess = $state(false);
+// Connection probe. There is no "Test connection" button: like the provider
+// setup modal, the connection is checked automatically whenever the URL or
+// headers change, and the verdict lives in the footer next to the actions.
+//
+// The probe fires when a field is *left* (blur / Enter), not per keystroke: the
+// headers may carry a bearer token, and probing every intermediate value while
+// a URL is typed would hand that token to whichever host each prefix happens
+// to name. `url` is only committed on blur (see the field), and the headers
+// the probe sends are the last committed textarea value, `probeHeaders`.
+//
+// Editing adds one more guard: if the URL now points at a different origin
+// than the saved server and there are headers, the probe is held until the
+// user asks for it, so credentials stored for host A are never sent to host B
+// as a side effect of retyping the URL. Saving, and every agent run after it,
+// sends them anyway — that is the user's explicit decision; the hold only
+// covers the moment before it.
+//
+// `probeKey` identifies the config being checked; a result is only shown while
+// it still matches, so a stale probe finishing late can never mislabel the
+// current form, and a pending probe reads as "checking" rather than as a
+// verdict for a config that was never probed.
+type DiscoveredTool = { name: string; description?: string };
+type ProbeResult = { key: string; ok: boolean; error?: string; tools: DiscoveredTool[] };
+type ConnectionStatus = "idle" | "held" | "checking" | "connected" | "failed";
 
-// Transport options. stdio spawns a local process (Node child_process), which
-// is desktop-only — AgentManager skips all MCP loading on mobile, so don't let
-// mobile users configure a transport that would silently never load.
-const transportOptions = [
-	{ display: "Remote Server (HTTP)", value: "http" as MCPTransportType },
-	...(Platform.isDesktopApp ? [{ display: "Local Command (stdio)", value: "stdio" as MCPTransportType }] : []),
-];
+let probe = $state<ProbeResult | null>(null);
+// Seeded from the initial headers on purpose (IIFE, as the other captured initial values above).
+let probeHeaders = $state((() => headers)());
+/** Key of a cross-origin config the user explicitly asked to check anyway. */
+let heldKeyReleased = $state<string | null>(null);
+
+function originOf(value: string): string | null {
+	try {
+		return new URL(value).origin;
+	} catch {
+		return null;
+	}
+}
+const savedOrigin = (() => (initialConfig ? originOf(initialConfig.url) : null))();
+
+const probeTarget = $derived.by(() => {
+	const trimmed = url.trim();
+	return trimmed && originOf(trimmed) !== null ? trimmed : null;
+});
+const probeKey = $derived(probeTarget === null ? null : `${probeTarget}\n${probeHeaders}`);
+const probeHeld = $derived(
+	probeKey !== null &&
+		probeTarget !== null &&
+		savedOrigin !== null &&
+		probeHeaders.trim().length > 0 &&
+		originOf(probeTarget) !== savedOrigin &&
+		heldKeyReleased !== probeKey,
+);
+const connectionStatus = $derived.by<ConnectionStatus>(() => {
+	if (probeKey === null) return "idle";
+	if (probeHeld) return "held";
+	if (probe?.key !== probeKey) return "checking";
+	return probe.ok ? "connected" : "failed";
+});
+const discoveredTools = $derived(connectionStatus === "connected" && probe ? probe.tools : []);
+// Like the provider modal's Done: the confirm button only unlocks once the
+// connection has actually validated, so a server can't be saved on a URL that
+// was never reached — and a held (cross-origin) probe has to be released first.
+// The one exception is an edit that leaves the connection alone (a rename, or
+// no change at all): that must stay saveable while the server happens to be
+// down, so it is gated on the *saved* config being untouched rather than on a
+// live probe of it.
+function normalizeHeaders(record: Record<string, string> | undefined): string {
+	return JSON.stringify(Object.entries(record ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+}
+const connectionUnchanged = $derived(
+	initialConfig !== null &&
+		url.trim() === initialConfig.url &&
+		normalizeHeaders(parseHeaders(headers)) === normalizeHeaders(initialConfig.headers),
+);
+const canSave = $derived(connectionStatus === "connected" || (isEditing && connectionUnchanged));
+
+$effect(() => {
+	const key = probeKey;
+	const target = probeTarget;
+	const headerText = probeHeaders;
+	if (key === null || target === null || probeHeld) return;
+	void probeConnection(key, target, headerText);
+});
 
 onMount(() => {
 	modal.setTitle(isEditing ? `Edit MCP Server: ${capturedExistingConfig?.displayName}` : "Add MCP Server");
 });
-
-function parseArgs(input: string): string[] {
-	// Split by spaces, but respect quoted strings
-	const result: string[] = [];
-	let current = "";
-	let inQuote = false;
-	let quoteChar = "";
-
-	for (const char of input) {
-		if ((char === '"' || char === "'") && !inQuote) {
-			inQuote = true;
-			quoteChar = char;
-		} else if (char === quoteChar && inQuote) {
-			inQuote = false;
-			quoteChar = "";
-		} else if (char === " " && !inQuote) {
-			if (current) {
-				result.push(current);
-				current = "";
-			}
-		} else {
-			current += char;
-		}
-	}
-	if (current) {
-		result.push(current);
-	}
-	return result;
-}
-
-function parseEnvVars(input: string): Record<string, string> {
-	const result: Record<string, string> = {};
-	for (const line of input.split("\n")) {
-		const trimmed = line.trim();
-		if (!trimmed || !trimmed.includes("=")) continue;
-		const eqIndex = trimmed.indexOf("=");
-		const key = trimmed.slice(0, eqIndex).trim();
-		const value = trimmed.slice(eqIndex + 1).trim();
-		if (key) {
-			result[key] = value;
-		}
-	}
-	return result;
-}
 
 function parseHeaders(input: string): Record<string, string> {
 	const result: Record<string, string> = {};
@@ -200,7 +208,8 @@ function parseHeaders(input: string): Record<string, string> {
  * (or `mcp.servers`) and spells the transport `type` rather than `transport`.
  * A bare single-server object (no wrapper) is accepted too, since that's what
  * people often copy out of a README. Everything is normalised onto our own
- * `MCPServerConfig` shape.
+ * `MCPServerConfig` shape. Only remote (HTTP/SSE) entries qualify; a local
+ * command (stdio) entry is refused with an explanation.
  *
  * This only fills the fields — it doesn't save. The user still reviews and
  * confirms, so a malformed or hostile snippet can't configure a server behind
@@ -260,14 +269,11 @@ function applyImportedJson(text: string): string | null {
 	// the URL still lands somewhere useful rather than being dropped silently.
 	const isStdio = declared === "stdio" || (!declared && !hasUrl && hasCommand);
 
-	if (isStdio && !Platform.isDesktopApp) {
-		return "This is a local (stdio) server, which is desktop-only";
+	if (isStdio) {
+		return "This is a local command (stdio) server. Smart Second Brain only connects to MCP servers over HTTP.";
 	}
-	if (!isStdio && !hasUrl) {
+	if (!hasUrl) {
 		return "Remote server entry is missing a `url`";
-	}
-	if (isStdio && !hasCommand) {
-		return "Local server entry is missing a `command`";
 	}
 
 	// Only name an unnamed form — never clobber a name the user already typed.
@@ -279,21 +285,10 @@ function applyImportedJson(text: string): string | null {
 		name = displayName ?? entryKey ?? "";
 	}
 
-	if (isStdio) {
-		transport = "stdio";
-		command = (entry.command as string).trim();
-		args = Array.isArray(entry.args) ? entry.args.filter((a): a is string => typeof a === "string").join(" ") : "";
-		envVars = stringifyRecord(entry.env, "=");
-	} else {
-		transport = "http";
-		url = (entry.url as string).trim();
-		headers = stringifyRecord(entry.headers, ": ");
-	}
+	url = (entry.url as string).trim();
+	headers = stringifyRecord(entry.headers, ": ");
+	probeHeaders = headers;
 
-	// A pasted config describes a different server than the one just probed.
-	testSuccess = false;
-	testError = null;
-	discoveredTools = [];
 	return null;
 }
 
@@ -385,25 +380,20 @@ function validateForm(): string | null {
 		}
 	}
 
-	if (transport === "stdio") {
-		if (!command.trim()) {
-			return "Command is required for stdio transport";
-		}
-	} else {
-		if (!url.trim()) {
-			return "URL is required for HTTP transport";
-		}
-		try {
-			new URL(url.trim());
-		} catch {
-			return "Invalid URL format";
-		}
+	if (!url.trim()) {
+		return "URL is required";
+	}
+	try {
+		new URL(url.trim());
+	} catch {
+		return "Invalid URL format";
 	}
 
 	return null;
 }
 
 function handleSave() {
+	if (!canSave) return;
 	const error = validateForm();
 	if (error) {
 		new Notice(error);
@@ -412,25 +402,13 @@ function handleSave() {
 
 	const newServerId = generateServerId(name);
 
-	let config: MCPServerConfig;
-	if (transport === "stdio") {
-		config = {
-			displayName: name.trim(),
-			transport: "stdio",
-			enabled,
-			command: command.trim(),
-			args: parseArgs(args),
-			env: parseEnvVars(envVars),
-		};
-	} else {
-		config = {
-			displayName: name.trim(),
-			transport: "http",
-			enabled,
-			url: url.trim(),
-			headers: parseHeaders(headers),
-		};
-	}
+	const config: MCPServerConfig = {
+		displayName: name.trim(),
+		transport: "http",
+		enabled,
+		url: url.trim(),
+		headers: parseHeaders(headers),
+	};
 
 	onSave(newServerId, config);
 	modal.close();
@@ -445,63 +423,29 @@ async function handleDelete() {
 }
 
 /**
- * Build a config object for testing from current form state
+ * The adapter wraps transport failures as `Failed to connect to streamable HTTP
+ * server "<id>, url: <url>": Error: <cause>` — the id is our internal probe
+ * label and the URL is the field right above the status, so only the cause is
+ * worth showing.
  */
-function buildTestConfig() {
-	const testServerId = "test-server";
-
-	if (transport === "stdio") {
-		return {
-			mcpServers: {
-				[testServerId]: {
-					transport: "stdio" as const,
-					command: command.trim(),
-					args: parseArgs(args),
-					env: parseEnvVars(envVars),
-				},
-			},
-		};
-	}
-	if (transport === "http") {
-		return {
-			mcpServers: {
-				[testServerId]: {
-					transport: "http" as const,
-					url: url.trim(),
-					headers: parseHeaders(headers),
-				},
-			},
-		};
-	}
-
-	return {
-		mcpServers: {
-			[testServerId]: {
-				transport: "http" as const,
-				url: url.trim(),
-				headers: parseHeaders(headers),
-			},
-		},
-	};
+function describeProbeError(err: unknown): string {
+	const message = err instanceof Error ? err.message : String(err);
+	const cause = message.replace(/^Failed to connect to [^"]*"[^"]*":\s*/, "").replace(/^Error:\s*/, "");
+	return cause.trim() || "Connection failed";
 }
 
 /**
- * Test the MCP server connection and discover tools
+ * Probe the server described by `target` + `headerText` and record the verdict
+ * under `key`. The result is dropped if the form has moved on by the time it
+ * lands (see `probeKey`).
  */
-async function handleTestConnection() {
-	// Validate form first
-	const error = validateForm();
-	if (error) {
-		new Notice(error);
-		return;
-	}
-
-	// Reset state
-	isTesting = true;
-	testError = null;
-	discoveredTools = [];
-	testSuccess = false;
-
+async function probeConnection(key: string, target: string, headerText: string): Promise<void> {
+	const config = {
+		mcpServers: {
+			"probe-server": { transport: "http" as const, url: target, headers: parseHeaders(headerText) },
+		},
+	};
+	let result: ProbeResult;
 	try {
 		// Ref-counted global-fetch patch for CORS bypass — safe under concurrency
 		// (unlike the old _originalFetch flag + finally-restore, which corrupted
@@ -509,37 +453,29 @@ async function handleTestConnection() {
 		const patch = installObsidianFetch();
 		let mcpClient: MultiServerMCPClient | undefined;
 		try {
-			const config = buildTestConfig();
-			Logger.log("Testing MCP connection with config:", config);
-
+			Logger.debug("Probing MCP connection:", config);
 			const { MultiServerMCPClient } = await import("@langchain/mcp-adapters");
 			mcpClient = new MultiServerMCPClient(config);
 			const tools = await mcpClient.getTools();
-
-			discoveredTools = tools.map((t) => ({
-				name: t.name,
-				description: (t as { description?: string }).description,
-			}));
-			testSuccess = true;
-
-			new Notice(`Connection successful! Found ${tools.length} tool(s).`);
+			result = {
+				key,
+				ok: true,
+				tools: tools.map((t) => ({ name: t.name, description: (t as { description?: string }).description })),
+			};
 		} finally {
-			// Close the client so a stdio server's spawned child process / open
-			// session doesn't dangle after a one-off connection test.
+			// Close the client so the open session doesn't dangle after a one-off probe.
 			try {
 				await mcpClient?.close();
 			} catch (closeErr) {
-				Logger.debug("MCP client close failed after test:", closeErr);
+				Logger.debug("MCP client close failed after probe:", closeErr);
 			}
 			patch.release();
 		}
 	} catch (err) {
-		Logger.error("MCP connection test failed:", err);
-		testError = err instanceof Error ? err.message : "Connection failed";
-		new Notice(`Connection failed: ${testError}`);
-	} finally {
-		isTesting = false;
+		Logger.debug("MCP connection probe failed:", err);
+		result = { key, ok: false, error: describeProbeError(err), tools: [] };
 	}
+	if (key === probeKey) probe = result;
 }
 </script>
 
@@ -584,59 +520,6 @@ async function handleTestConnection() {
       />
     </SettingContainer>
 
-    <!-- Only worth asking when there's a real choice: stdio is desktop-only, so
-         on mobile this is a single-option dropdown. -->
-    {#if transportOptions.length > 1}
-      <SettingContainer name="Transport" desc="How to connect to this server">
-        <Dropdown
-          id="mcp-server-transport"
-          type="options"
-          dropdown={transportOptions}
-          selected={transport}
-          onchange={(v) => (transport = v)}
-        />
-      </SettingContainer>
-    {/if}
-
-    {#if transport === "stdio"}
-      <SettingContainer
-        class="mcp-row--stacked"
-        name="Command"
-        desc="The executable to run, plus its arguments — or paste the server's JSON config to fill this form"
-      >
-        <div class="mcp-command-row">
-          <Text
-            id="mcp-server-command"
-            inputType="text"
-            class="mcp-command-input"
-            value={command}
-            placeholder="npx"
-            onblur={(v) => (command = v)}
-          />
-          <Text
-            id="mcp-server-arguments"
-            inputType="text"
-            class="mcp-args-input"
-            value={args}
-            placeholder="-y @modelcontextprotocol/server-filesystem /path"
-            onblur={(v) => (args = v)}
-          />
-        </div>
-      </SettingContainer>
-
-      <SettingContainer
-        class="mcp-row--stacked"
-        name="Environment variables"
-        desc="Optional — one per line, KEY=VALUE"
-      >
-        <TextArea
-          id="mcp-server-env"
-          class="mcp-textarea"
-          bind:value={envVars}
-          placeholder={"API_KEY=your-key\nDEBUG=true"}
-        />
-      </SettingContainer>
-    {:else}
       <!-- Import is advertised in the description rather than with a control:
            ⌘V into any field already does it, so a button would occupy permanent
            space to duplicate a shortcut people reach for by reflex. -->
@@ -645,11 +528,14 @@ async function handleTestConnection() {
         name="Server URL"
         desc="The URL of the MCP server — or paste the server's JSON config to fill this form"
       >
+        <!-- Committed on blur/Enter, not per keystroke — see the probe notes in
+             the script for why the connection check must not chase typing. -->
         <Text
           id="mcp-server-url"
           inputType="text"
           value={url}
           placeholder="https://mcp.example.com/mcp"
+          onchange={(v) => (url = v)}
           onblur={(v) => (url = v)}
         />
       </SettingContainer>
@@ -663,29 +549,16 @@ async function handleTestConnection() {
           id="mcp-server-headers"
           class="mcp-textarea"
           bind:value={headers}
+          onblur={(v) => (probeHeaders = v)}
           placeholder={"Authorization: Bearer token\nX-Custom-Header: value"}
         />
       </SettingContainer>
-    {/if}
   </SettingGroup>
 
-  <!-- Test sits directly above its own results, so the outcome appears where the
-       user just clicked rather than at the far end of the modal. -->
-  <div class="mcp-test-row">
-    <Button
-      buttonText={isTesting ? "Testing…" : "Test connection"}
-      onClick={handleTestConnection}
-      disabled={isTesting}
-    />
-  </div>
-
-  <!-- Test Results -->
-  {#if testSuccess && discoveredTools.length > 0}
-    <div class="mcp-test-results success">
-      <div class="mcp-test-header">
-        <Icon name="check-circle" />
-        <span>Connection successful - {discoveredTools.length} tool(s) available</span>
-      </div>
+  <!-- Discovered tools. Shown only once the probe connects, so the panel doubles
+       as the visible proof that the URL and headers are right. -->
+  {#if connectionStatus === "connected" && discoveredTools.length > 0}
+    <div class="mcp-tools-panel">
       <div class="mcp-tools-list">
         {#each discoveredTools as tool (tool.name)}
           <div class="mcp-tool-item">
@@ -697,35 +570,51 @@ async function handleTestConnection() {
         {/each}
       </div>
     </div>
-  {:else if testSuccess && discoveredTools.length === 0}
-    <div class="mcp-test-results warning">
-      <div class="mcp-test-header">
-        <Icon name="alert-triangle" />
-        <span>Connected but no tools found</span>
-      </div>
-    </div>
-  {:else if testError}
-    <div class="mcp-test-results error">
-      <div class="mcp-test-header">
-        <Icon name="x-circle" />
-        <span>Connection failed</span>
-      </div>
-      <p class="mcp-test-error">{testError}</p>
-    </div>
   {/if}
 
-  <!-- Actions. `modal-button-container` is Obsidian's own footer class, so these
-       sit where a core modal's buttons do. Only the three verbs that resolve the
-       modal live here — Delete at the left edge, away from the confirm button so
-       a destructive click isn't adjacent to the one people aim for. Testing is a
-       form action, not a way out of the modal, so it sits with the fields above. -->
+  <!-- Footer. `modal-button-container` is Obsidian's own footer class, so the
+       buttons sit where a core modal's do. The connection verdict takes the
+       space between Delete and Cancel/Save, the same place the provider setup
+       modal reports its status: it is checked automatically, so nothing here
+       needs pressing. Delete stays at the left edge, away from the confirm
+       button, so a destructive click isn't adjacent to the one people aim for. -->
   <div class="modal-button-container mcp-actions">
     {#if isEditing}
       <Button buttonText="Delete" styles="mod-warning" onClick={handleDelete} />
     {/if}
-    <div class="flex-1"></div>
-    <Button buttonText="Cancel" onClick={() => modal.close()} />
-    <Button buttonText={isEditing ? "Save" : "Add Server"} cta={true} onClick={handleSave} />
+    <div class="mcp-connection-status" role="status" aria-live="polite">
+      {#if connectionStatus === "held"}
+        <span class="mcp-connection-icon is-muted"><Icon name="shield-alert" size="xs" /></span>
+        <span class="mcp-connection-text is-muted">
+          Different host than the saved server — headers are not sent until you
+          <button type="button" class="mcp-connection-link" onclick={() => (heldKeyReleased = probeKey)}>
+            check now
+          </button>
+          or save.
+        </span>
+      {:else if connectionStatus === "checking"}
+        <CircularLoader size={16} color="var(--text-muted)" />
+        <span class="mcp-connection-text">Checking connection…</span>
+      {:else if connectionStatus === "connected"}
+        <span class="mcp-connection-icon is-success"><Icon name="check-circle" size="xs" /></span>
+        <span class="mcp-connection-text is-success">
+          {discoveredTools.length === 0
+            ? "Connected — no tools offered"
+            : `Connected — ${discoveredTools.length} tool${discoveredTools.length === 1 ? "" : "s"}`}
+        </span>
+      {:else if connectionStatus === "failed"}
+        <span class="mcp-connection-icon is-error"><Icon name="x-circle" size="xs" /></span>
+        <span class="mcp-connection-text is-error">{probe?.error ?? "Connection failed"}</span>
+      {:else}
+        <span class="mcp-connection-text is-muted">Enter the server URL — the connection is checked automatically.</span>
+      {/if}
+    </div>
+    <!-- Kept together so a long status wraps its own text instead of splitting
+         the confirm pair onto two lines. -->
+    <div class="mcp-actions-primary">
+      <Button buttonText="Cancel" onClick={() => modal.close()} />
+      <Button buttonText={isEditing ? "Save" : "Add Server"} cta={canSave} disabled={!canSave} onClick={handleSave} />
+    </div>
   </div>
 </div>
 
@@ -734,7 +623,9 @@ async function handleTestConnection() {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 8px 0;
+    /* Top only: the modal's own padding already separates the footer from the
+       bottom edge, and the flex gap spaces the rows. */
+    padding: 8px 0 0;
   }
 
   /* Import banner. Transient feedback for a paste — colour comes from Obsidian's
@@ -783,11 +674,6 @@ async function handleTestConnection() {
     background: var(--background-modifier-hover);
   }
 
-  .mcp-test-row {
-    display: flex;
-    justify-content: flex-start;
-  }
-
   /* Wide-control settings row: keep the native label/description column, but let
      the control take the full width on its own line beneath it. Obsidian already
      does exactly this on phones; this opts specific desktop rows into the same
@@ -810,33 +696,6 @@ async function handleTestConnection() {
     width: 100%;
   }
 
-  /* Command + args on one line: the executable is short and fixed-ish, the
-     argument list is long, so give the args the remaining space. */
-  .mcp-command-row {
-    display: flex;
-    gap: 8px;
-    width: 100%;
-  }
-
-  .mcp-command-row :global(.mcp-command-input) {
-    flex: 0 1 30%;
-    min-width: 0;
-  }
-
-  .mcp-command-row :global(.mcp-args-input) {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  /* Phone: two inputs side by side get too narrow to read. */
-  :global(.is-phone) .mcp-command-row {
-    flex-direction: column;
-  }
-
-  :global(.is-phone) .mcp-command-row :global(.mcp-command-input) {
-    flex: 1 1 auto;
-  }
-
   :global(.mcp-textarea) {
     width: 100%;
     min-height: 80px;
@@ -857,13 +716,16 @@ async function handleTestConnection() {
   }
 
   /* `modal-button-container` supplies the border, padding and spacing; this only
-     adds what it doesn't: a flex row so the `.flex-1` spacer can push Cancel/Save
-     right while Delete/Test stay left, and wrapping for narrow panes. */
+     adds what it doesn't: a flex row so the status can fill the middle and push
+     Cancel/Save right while Delete stays left, and wrapping for narrow panes. */
   .mcp-actions {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
     gap: 8px;
+    /* Core gives the footer a large top margin for modals whose body sits flush
+       against it; here the flex gap already provides the spacing, so the two
+       stacked and left a visible hole between "Test connection" and the buttons. */
+    margin-top: 0;
   }
 
   /* Phone: core stacks `.modal-button-container` into a column; the row-oriented
@@ -873,56 +735,86 @@ async function handleTestConnection() {
     align-items: stretch;
   }
 
-  /* Test Results Styles */
-  .mcp-test-results {
+  :global(.is-phone) .mcp-actions-primary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Connection verdict in the footer — mirrors `.provider-connection-status`
+     in the provider setup modal. Takes the free space between the button
+     groups and wraps long error messages instead of pushing the buttons out. */
+  .mcp-connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    /* Zero basis: the status takes whatever is left and wraps its text, rather
+       than claiming its content width and forcing the buttons onto a new line. */
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .mcp-actions-primary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Inline "check now" inside the held-status sentence: reads as a link, not a control. */
+  .mcp-connection-link {
+    display: inline;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    color: var(--text-accent);
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .mcp-connection-link:hover {
+    color: var(--text-accent-hover);
+    background: transparent;
+  }
+
+  .mcp-connection-icon {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .mcp-connection-icon.is-muted {
+    color: var(--text-muted);
+  }
+
+  .mcp-connection-text {
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
+  }
+
+  .mcp-connection-text.is-muted {
+    color: var(--text-muted);
+  }
+
+  .is-success {
+    color: var(--text-success, #4caf50);
+  }
+
+  .mcp-connection-text.is-success {
+    font-weight: 500;
+  }
+
+  .is-error {
+    color: var(--text-error, #f44336);
+  }
+
+  .mcp-tools-panel {
     padding: 12px;
     border-radius: 6px;
     border: 1px solid var(--background-modifier-border);
   }
 
-  .mcp-test-results.success {
-    background: rgba(var(--color-green-rgb, 76, 175, 80), 0.1);
-    border-color: var(--text-success, #4caf50);
-  }
-
-  .mcp-test-results.warning {
-    background: rgba(var(--color-yellow-rgb, 255, 193, 7), 0.1);
-    border-color: var(--text-warning, #ffc107);
-  }
-
-  .mcp-test-results.error {
-    background: rgba(var(--color-red-rgb, 244, 67, 54), 0.1);
-    border-color: var(--text-error, #f44336);
-  }
-
-  .mcp-test-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 500;
-  }
-
-  .mcp-test-results.success .mcp-test-header {
-    color: var(--text-success, #4caf50);
-  }
-
-  .mcp-test-results.warning .mcp-test-header {
-    color: var(--text-warning, #ffc107);
-  }
-
-  .mcp-test-results.error .mcp-test-header {
-    color: var(--text-error, #f44336);
-  }
-
-  .mcp-test-error {
-    margin: 8px 0 0 0;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-family: var(--font-monospace);
-  }
-
   .mcp-tools-list {
-    margin-top: 12px;
     display: flex;
     flex-direction: column;
     gap: 6px;

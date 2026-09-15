@@ -8,7 +8,7 @@
  * stale (deleted / renamed) paths are reported separately.
  */
 
-import { type App, type TFile, getAllTags } from "obsidian";
+import { type App, TFile, getAllTags } from "obsidian";
 import type { ViewFilter, ViewFilterGroup, ViewFilterLeaf } from "../types/viewFilter";
 import { matchesPathPrefix, normalizeVaultPath } from "../utils/pathUtils";
 
@@ -509,8 +509,8 @@ function matchesPrivacyMembershipRulePath(app: App, rule: PrivacyMembershipRule,
 		}
 		case "tag": {
 			const file = app.vault.getAbstractFileByPath(filePath);
-			if (!file || !("extension" in file)) return false;
-			const cache = app.metadataCache.getFileCache(file as TFile);
+			if (!(file instanceof TFile)) return false;
+			const cache = app.metadataCache.getFileCache(file);
 			const fileTags = cache ? (getAllTags(cache) ?? []) : [];
 			const normalizedFilter = rule.value.startsWith("#") ? rule.value : `#${rule.value}`;
 			return fileTags.some((tag) => {
@@ -618,8 +618,8 @@ function resolveTag(app: App, tag: string, universe: Set<string>): ResolvedView 
 	const paths = new Set<string>();
 	for (const p of universe) {
 		const file = app.vault.getAbstractFileByPath(p);
-		if (!file || !("extension" in file)) continue;
-		const cache = app.metadataCache.getFileCache(file as TFile);
+		if (!(file instanceof TFile)) continue;
+		const cache = app.metadataCache.getFileCache(file);
 		const fileTags = cache ? (getAllTags(cache) ?? []) : [];
 		const normalizedDocTags = fileTags.map((t) => (t.startsWith("#") ? t : `#${t}`));
 		const matches = normalizedDocTags.some(
@@ -677,9 +677,9 @@ function matchesPropertyLeaf(app: App, filePath: string, key: string, values: st
 	if (!trimmedKey) return false;
 
 	const file = app.vault.getAbstractFileByPath(filePath);
-	if (!file || !("extension" in file)) return false;
+	if (!(file instanceof TFile)) return false;
 
-	const frontmatter = app.metadataCache.getFileCache(file as TFile)?.frontmatter;
+	const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
 	if (!frontmatter) return false;
 
 	// Property keys are matched case-insensitively to mirror how users type them.

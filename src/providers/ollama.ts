@@ -10,7 +10,7 @@
  * Ollama runs locally on the user's machine, defaulting to http://localhost:11434
  */
 
-import { ChatOllama } from "@langchain/ollama";
+import { Logger } from "../utils/logging";
 import OllamaLogo from "../components/ui/logos/OllamaLogo.svelte";
 import type {
 	AuthObject,
@@ -18,7 +18,7 @@ import type {
 	ChatModelConfig,
 	EmbeddingProviderDefinition,
 } from "../types/provider/index";
-import { fetchOllamaModelsInfo } from "./ollamaModels";
+import { fetchOllamaModelsInfo, OLLAMA_EMBED_NUM_CTX } from "./ollamaModels";
 import { createTransportedChatOllama, createTransportedOllamaEmbeddings } from "./chatProviders";
 
 // =============================================================================
@@ -133,7 +133,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 			config.numCtx = options.contextWindow;
 		}
 
-		return createTransportedChatOllama("ollama", config as ConstructorParameters<typeof ChatOllama>[0]);
+		return createTransportedChatOllama("ollama", config);
 	},
 
 	createEmbeddingInstance: (auth: AuthObject, modelId: string) => {
@@ -144,6 +144,15 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 		return createTransportedOllamaEmbeddings({
 			model: modelId,
 			baseUrl: sanitizeBaseUrl(auth.baseUrl),
+			// The server bounds embed input by min(num_ctx, model context), and
+			// its num_ctx default is a VRAM-dependent 4k+ the client cannot read.
+			// Pin it, so the chunk budget (`hydrateEmbeddingModel` caps Ollama
+			// models to the same number) is the limit the server enforces (#485).
+			requestOptions: { numCtx: OLLAMA_EMBED_NUM_CTX },
+			// Backstop for chunks denser than the chars-per-token estimate (JSON,
+			// code): a truncated vector still finds the note by its opening,
+			// whereas a rejected one drops the note from the index entirely.
+			truncate: true,
 		});
 	},
 
@@ -156,7 +165,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 
 		let response: Response;
 		try {
-			response = await globalThis.fetch(`${baseUrl}/api/tags`, {
+			response = await window.fetch(`${baseUrl}/api/tags`, {
 				method: "GET",
 				headers: {
 					"Content-Type": "application/json",
@@ -187,7 +196,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 
 		const baseUrl = sanitizeBaseUrl(auth.baseUrl);
 
-		const response = await globalThis.fetch(`${baseUrl}/api/tags`, {
+		const response = await window.fetch(`${baseUrl}/api/tags`, {
 			method: "GET",
 			headers: {
 				"Content-Type": "application/json",
@@ -209,7 +218,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 		// Fetch and cache model metadata in the background
 		// This populates the cache for the modal without blocking
 		fetchOllamaModelsInfo(baseUrl, modelNames).catch((err) => {
-			console.warn("Failed to fetch Ollama model metadata:", err);
+			Logger.warn("Failed to fetch Ollama model metadata:", err);
 		});
 
 		return modelNames;

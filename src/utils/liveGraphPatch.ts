@@ -20,31 +20,29 @@
  */
 
 import type { GraphData, GraphEdge, GraphNode } from "../types/graph";
-import type { DocumentVector, ScoredDocument } from "../vectorstore/types";
-import { edgeKey } from "./graphUtils";
+import type { DocumentVector, SearchHit } from "../vectorstore/types";
+import { computeNodeDegrees, edgeKey, isTagNode } from "./graphUtils";
 
 export interface WikiPatchResult {
 	data: GraphData;
-	/** Note paths present in the fresh wiki graph but not in the current one. */
+	/** Note paths present in the fresh wiki graph but not in the current one (never tag nodes). */
 	addedPaths: string[];
-	/** Note paths that left the graph (deleted, renamed away, filtered out). */
+	/** Note paths that left the graph (deleted, renamed away, filtered out; never tag nodes). */
 	removedPaths: string[];
 	/**
-	 * Surviving paths whose incident wiki edges changed — candidates for a
-	 * community re-vote, since their neighbourhood is no longer what Leiden saw.
+	 * Surviving note paths whose incident authored edges (wiki or tag) changed —
+	 * candidates for a community re-vote, since their neighbourhood is no longer
+	 * what Leiden saw. (A tag change can't move a note's vote, since tag edges
+	 * are not topic edges, but the vote is cheap and the filter stays simple.)
 	 */
 	touchedPaths: string[];
 	/** False when the fresh wiki structure is identical — callers should no-op. */
 	changed: boolean;
 }
 
-/** Recompute per-node degree over the fused edge set (wiki + semantic). */
+/** Recompute per-node degree over the fused edge set, by the shared rule in `computeNodeDegrees`. */
 function withRecomputedDegrees(nodes: GraphNode[], edges: GraphEdge[]): GraphNode[] {
-	const degrees = new Map<string, number>();
-	for (const edge of edges) {
-		degrees.set(edge.source, (degrees.get(edge.source) ?? 0) + 1);
-		degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + 1);
-	}
+	const degrees = computeNodeDegrees(edges);
 	return nodes.map((node) => {
 		const degree = degrees.get(node.path) ?? 0;
 		return node.degree === degree ? node : { ...node, degree };
@@ -54,11 +52,12 @@ function withRecomputedDegrees(nodes: GraphNode[], edges: GraphEdge[]): GraphNod
 /**
  * Fold a freshly built wiki graph into the current (fused) graph data.
  *
- * The wiki structure — node set and authored edges — is taken wholesale from
- * `freshWiki`; it's cheap to build and diffing per-event edge cases (renames,
- * links resolving against a newly created note) out of vault events would be
- * far more fragile than rebuilding it. What's preserved from `current` is
- * everything the wiki rebuild can't produce:
+ * The wiki structure — node set (notes and, when shown, tags) and authored
+ * edges (wiki and tag) — is taken wholesale from `freshWiki`; it's cheap to
+ * build and diffing per-event edge cases (renames, links resolving against a
+ * newly created note) out of vault events would be far more fragile than
+ * rebuilding it. What's preserved from `current` is everything the wiki
+ * rebuild can't produce:
  *
  * - semantic edges whose endpoints both survive (a pair the user has since
  *   linked by hand loses its inferred edge — the authored link supersedes it),
@@ -70,14 +69,26 @@ function withRecomputedDegrees(nodes: GraphNode[], edges: GraphEdge[]): GraphNod
 export function applyWikiPatch(current: GraphData, freshWiki: GraphData): WikiPatchResult {
 	const currentByPath = new Map(current.nodes.map((node) => [node.path, node]));
 	const freshPaths = new Set(freshWiki.nodes.map((node) => node.path));
-	const addedPaths = freshWiki.nodes.filter((node) => !currentByPath.has(node.path)).map((node) => node.path);
-	const removedPaths = current.nodes.filter((node) => !freshPaths.has(node.path)).map((node) => node.path);
+	// Tag nodes come and go with the notes that carry them; they have no
+	// community to vote on and no selection to prune, so the caller only hears
+	// about notes. They still count as a structural change below.
+	const addedPaths = freshWiki.nodes
+		.filter((node) => !isTagNode(node) && !currentByPath.has(node.path))
+		.map((node) => node.path);
+	const removedPaths = current.nodes
+		.filter((node) => !isTagNode(node) && !freshPaths.has(node.path))
+		.map((node) => node.path);
+	const tagNodesChanged =
+		freshWiki.nodes.some((node) => isTagNode(node) && !currentByPath.has(node.path)) ||
+		current.nodes.some((node) => isTagNode(node) && !freshPaths.has(node.path));
 
-	// Diff the wiki edge sets by canonical key + weight, collecting the
-	// endpoints of every difference — those notes' neighbourhoods changed.
+	// Diff the authored edge sets (wiki and tag) by canonical key + weight,
+	// collecting the endpoints of every difference — those notes' neighbourhoods
+	// changed. A wiki and a tag edge can never share a pair (one joins two
+	// notes, the other a note and a tag), so one key space serves both.
 	const currentWikiWeights = new Map<string, number>();
 	for (const edge of current.edges) {
-		if (edge.type === "wiki") currentWikiWeights.set(edgeKey(edge.source, edge.target), edge.weight);
+		if (edge.type !== "semantic") currentWikiWeights.set(edgeKey(edge.source, edge.target), edge.weight);
 	}
 	const freshWikiKeys = new Set<string>();
 	const touched = new Set<string>();
@@ -90,7 +101,7 @@ export function applyWikiPatch(current: GraphData, freshWiki: GraphData): WikiPa
 		}
 	}
 	for (const edge of current.edges) {
-		if (edge.type !== "wiki") continue;
+		if (edge.type === "semantic") continue;
 		if (!freshWikiKeys.has(edgeKey(edge.source, edge.target))) {
 			touched.add(edge.source);
 			touched.add(edge.target);
@@ -98,7 +109,7 @@ export function applyWikiPatch(current: GraphData, freshWiki: GraphData): WikiPa
 	}
 
 	const wikiChanged = currentWikiWeights.size !== freshWikiKeys.size || touched.size > 0;
-	if (addedPaths.length === 0 && removedPaths.length === 0 && !wikiChanged) {
+	if (addedPaths.length === 0 && removedPaths.length === 0 && !tagNodesChanged && !wikiChanged) {
 		return { data: current, addedPaths, removedPaths, touchedPaths: [], changed: false };
 	}
 
@@ -131,8 +142,11 @@ export function applyWikiPatch(current: GraphData, freshWiki: GraphData): WikiPa
 	const edges = [...freshWiki.edges, ...semanticEdges];
 
 	// Added/removed nodes get dedicated handling by the caller (vote / cleanup);
-	// only surviving nodes count as "touched".
-	const touchedPaths = [...touched].filter((path) => freshPaths.has(path) && currentByPath.has(path));
+	// only surviving notes count as "touched" — a tag endpoint has no vote.
+	const touchedPaths = [...touched].filter((path) => {
+		const previous = currentByPath.get(path);
+		return previous !== undefined && !isTagNode(previous) && freshPaths.has(path);
+	});
 
 	return {
 		data: { nodes: withRecomputedDegrees(nodes, edges), edges },
@@ -233,10 +247,45 @@ export function voteNodeCommunity(
 	return best;
 }
 
+/**
+ * Vote a set of unassigned nodes into communities until nothing more lands.
+ *
+ * A single pass in a fixed order misses a realistic case: a live patch that
+ * adds a note together with a brand-new tag (also applied to existing notes).
+ * Voted first, the note sees only a tag with no community; voted first, the
+ * tag might see only that note. Repeating the pass lets whichever side can
+ * settle from already-assigned neighbours go first, and the other follow.
+ * Bounded: every round either assigns at least one more node or stops.
+ *
+ * Mutates `communities`; returns the ids that landed, in the order they did.
+ */
+export function voteUntilSettled(
+	ids: Iterable<string>,
+	edges: GraphEdge[],
+	communities: Record<string, number>,
+	weightOf: (edge: GraphEdge) => number,
+): string[] {
+	const pending = new Set(ids);
+	const landed: string[] = [];
+	let progressed = true;
+	while (progressed && pending.size > 0) {
+		progressed = false;
+		for (const id of [...pending]) {
+			const vote = voteNodeCommunity(id, edges, communities, weightOf);
+			if (vote === undefined) continue;
+			communities[id] = vote;
+			pending.delete(id);
+			landed.push(id);
+			progressed = true;
+		}
+	}
+	return landed;
+}
+
 /** The slice of the vector store the incremental semantic query needs. */
 export interface SemanticQueryStore {
 	getAllByPath(path: string): Promise<DocumentVector[]>;
-	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<ScoredDocument[]>;
+	search(queryVector: Float32Array, topK: number, threshold?: number): Promise<SearchHit[]>;
 }
 
 export interface NoteSemanticQueryOptions {
@@ -277,7 +326,7 @@ export async function queryNoteSemanticEdges(
 	for (const chunk of chunks) {
 		const hits = await store.search(chunk.vector, topK, threshold);
 		for (const hit of hits) {
-			const neighbor = hit.doc.path;
+			const neighbor = hit.path;
 			if (neighbor === path || !includePaths.has(neighbor)) continue;
 			if (options.excludeEdgeKeys?.has(edgeKey(path, neighbor))) continue;
 			if (!Number.isFinite(hit.score) || hit.score < threshold) continue;

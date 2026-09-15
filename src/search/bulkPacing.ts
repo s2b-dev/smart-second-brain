@@ -8,7 +8,7 @@
  * observed; change the value only with a new measurement.
  */
 
-import { Platform, type TFile } from "obsidian";
+import { type App, Platform, type TFile } from "obsidian";
 import { isBinaryTextFile } from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 
@@ -61,7 +61,7 @@ export const MOBILE_BULK_MAX_DELAY_MS = 300_000;
 
 /** Yield the event loop for `ms` (a real pause on mobile, a bare yield on desktop). */
 export function bulkPause(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 /**
@@ -84,50 +84,71 @@ export function bulkStartDelayMs(crashedAttempts: number): number {
  * pressure, where the OS killed the process seconds into the run. Instead the
  * delay adapts to observed deaths: every bulk attempt writes this marker and a
  * completed run clears it, so a marker still present at boot means the last
- * attempt died mid-run — and the next one waits twice as long. localStorage,
- * not plugin data: it survives the kill (the plugin's data debounce may not)
- * and stays out of sync.
+ * attempt died mid-run — and the next one waits twice as long. Obsidian's
+ * vault-scoped local storage (`App.loadLocalStorage` / `saveLocalStorage`), not
+ * plugin data: it survives the kill (the plugin's data debounce may not) and
+ * stays out of sync.
  *
- * One marker per indexer per vault (`s2b-<indexer>-bulk-attempts:<vaultId>`):
- * the two indexers die independently and back off independently.
+ * One marker per indexer per vault (`s2b-<indexer>-bulk-attempts`; Obsidian
+ * scopes the key to the vault): the two indexers die independently and back
+ * off independently.
  */
 export class BulkAttemptMarker {
 	private readonly key: string;
+	private readonly storage: VaultLocalStorage;
 
-	constructor(indexer: string, vaultId: string) {
-		this.key = `s2b-${indexer}-bulk-attempts:${vaultId}`;
-	}
-
-	private get storage(): Storage | null {
-		try {
-			return typeof window !== "undefined" ? (window.localStorage ?? null) : null;
-		} catch {
-			// Accessing localStorage throws in some sandboxed contexts; treat as absent.
-			return null;
-		}
+	constructor(indexer: string, storage: VaultLocalStorage) {
+		this.key = `s2b-${indexer}-bulk-attempts`;
+		this.storage = storage;
 	}
 
 	/** Number of consecutive attempts that died mid-run (0 when the last run completed). */
 	read(): number {
-		const raw = Number(this.storage?.getItem(this.key));
+		const raw = Number(this.storage.loadLocalStorage(this.key));
 		return Number.isFinite(raw) && raw > 0 ? raw : 0;
 	}
 
 	/** Record that a run is starting. Call before the first read of the run. */
 	markAttempt(): void {
-		this.storage?.setItem(this.key, String(this.read() + 1));
+		this.storage.saveLocalStorage(this.key, String(this.read() + 1));
 	}
 
 	/** Record that the run survived (completed or was cancelled by the user). */
 	clear(): void {
-		this.storage?.removeItem(this.key);
+		this.storage.saveLocalStorage(this.key, null);
 	}
 }
 
+/** The slice of {@link App} the marker persists through (vault-scoped local storage). */
+export type VaultLocalStorage = Pick<App, "loadLocalStorage" | "saveLocalStorage">;
+
 /**
- * Run `work` after the platform-appropriate bulk start delay, logging when the
- * delay was lengthened by earlier crashed attempts. `label` names the indexer
- * in that log line.
+ * Scheduled bulk runs, across both indexers, run one after another on this
+ * chain, in the order they were scheduled. The lexical and embedding builds
+ * used to start on the same tick and each read every note — and extracted
+ * every PDF, the expensive read — on its own; on a phone that also meant two
+ * bulk allocators competing inside the boot spike. Sequenced, each file is
+ * read once per run, and the search index (fast, no provider round trips) is
+ * complete before the embedding run starts. A run that throws is logged and
+ * does not block the ones behind it.
+ */
+let bulkRunChain: Promise<void> = Promise.resolve();
+
+/** Test hook: drop whatever is queued so one test's run cannot delay the next. */
+export function resetBulkRunQueue(): void {
+	bulkRunChain = Promise.resolve();
+}
+
+/**
+ * Run `work` after the platform-appropriate bulk start delay — and after any
+ * bulk run scheduled before it has finished — logging when the delay was
+ * lengthened by earlier crashed attempts. `label` names the indexer in that
+ * log line.
+ *
+ * The run is queued at once and waits out its own delay *inside* the chain,
+ * so scheduling order is run order even when the indexers' crash backoffs
+ * differ (each has its own marker): a lexical run with a longer backoff still
+ * goes before the embedding run scheduled after it.
  */
 export function scheduleBulkRun(label: string, marker: BulkAttemptMarker, work: () => Promise<void>): void {
 	const attempts = marker.read();
@@ -137,7 +158,17 @@ export function scheduleBulkRun(label: string, marker: BulkAttemptMarker, work: 
 			`[${label}] Last bulk index attempt did not complete (${attempts} in a row) — delaying the next by ${Math.round(delay / 1000)}s`,
 		);
 	}
-	window.setTimeout(() => void work(), delay);
+	const readyAt = Date.now() + delay;
+	bulkRunChain = bulkRunChain
+		.then(async () => {
+			// Always through a timer, even for no delay: a run never starts inside
+			// the tick that scheduled it (layout-ready, or a run's own completion).
+			await bulkPause(Math.max(0, readyAt - Date.now()));
+			await work();
+		})
+		.catch((error: unknown) => {
+			Logger.error(`[${label}] Bulk run failed:`, error);
+		});
 }
 
 /**

@@ -17,7 +17,7 @@ const ICONIC_COLOR_VARIABLES = new Map<string, string>([
 
 type CommunityPlugins = Record<string, unknown>;
 
-const colorResolutionElement = document.createElement("div");
+const colorResolutionElement = createDiv();
 
 interface IconizeApi {
 	setIconForNode(iconName: string, node: HTMLElement, color?: string): void;
@@ -120,7 +120,12 @@ export function resolveIconColor(color?: string): string | undefined {
 		return undefined;
 	}
 
-	const bodyStyle = globalThis.getComputedStyle(document.body);
+	// Resolve the style through the same document the element belongs to. Pairing
+	// `activeWindow` with the global `document` breaks whenever they are different
+	// documents (a popout window, and jsdom under test) — getComputedStyle then
+	// reports nothing and every themed colour silently falls back.
+	const body = document.body;
+	const bodyStyle = (body.ownerDocument.defaultView ?? window).getComputedStyle(body);
 	const thematicVariable = ICONIC_COLOR_VARIABLES.get(color);
 	const themedColor = thematicVariable ? bodyStyle.getPropertyValue(thematicVariable).trim() : "";
 	const cssColor = themedColor || color;
@@ -277,10 +282,10 @@ function getIconicPathIcon(app: App, path: string, kind: PathIconKind): PathIcon
 		color: item.color ?? undefined,
 		isDefault: usingDefault,
 		render(node) {
-			const refreshIcon = plugin.fileIconManager?.refreshIcon;
-			if (typeof refreshIcon === "function") {
+			const manager = plugin.fileIconManager;
+			if (typeof manager?.refreshIcon === "function") {
 				clearNode(node);
-				refreshIcon.call(plugin.fileIconManager, item, node);
+				manager.refreshIcon(item, node);
 				return;
 			}
 

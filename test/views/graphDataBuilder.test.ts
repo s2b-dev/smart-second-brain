@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildSemanticEdges, buildWikiGraph } from "../../src/views/smart-graph/graphDataBuilder";
+import { buildSemanticEdges, buildWikiGraph, resolveSegments } from "../../src/views/smart-graph/graphDataBuilder";
+import type { GraphData, GraphEdge, GraphNode } from "../../src/types/graph";
 import { edgeKey } from "../../src/utils/graphUtils";
 import type { App, CachedMetadata, TFile } from "obsidian";
 import type { DocumentVector } from "../../src/vectorstore/types";
@@ -67,7 +68,6 @@ function createMockDocumentVector(path: string, vector: number[]): DocumentVecto
 		id: path,
 		path,
 		mtime: Date.now(),
-		checksum: "abc123",
 		vector: new Float32Array(vector),
 	};
 }
@@ -254,5 +254,165 @@ describe("buildWikiGraph", () => {
 		const result = buildWikiGraph(app);
 
 		expect(result.graphData.nodes[0].label).toBe("My Note");
+	});
+});
+
+describe("buildWikiGraph — tags as nodes", () => {
+	const tagged = () =>
+		createMockApp({ "a.md": { "c.md": 1 } }, ["a.md", "b.md", "c.md"], {
+			"a.md": ["#foo", "#bar"],
+			"b.md": ["#foo"],
+		});
+
+	it("leaves tags out unless asked for", () => {
+		const { graphData, filteredPaths } = buildWikiGraph(tagged());
+		expect(graphData.nodes.every((node) => node.kind !== "tag")).toBe(true);
+		expect(graphData.edges.every((edge) => edge.type !== "tag")).toBe(true);
+		expect(filteredPaths.sort()).toEqual(["a.md", "b.md", "c.md"]);
+	});
+
+	it("draws each tag as a node linked to every note carrying it", () => {
+		const { graphData, filteredPaths } = buildWikiGraph(tagged(), undefined, undefined, { includeTags: true });
+
+		const tagNodes = graphData.nodes.filter((node) => node.kind === "tag");
+		expect(tagNodes.map((node) => node.id).sort()).toEqual(["tag:#bar", "tag:#foo"]);
+		expect(tagNodes.map((node) => node.label).sort()).toEqual(["#bar", "#foo"]);
+		// A tag node's path is its synthetic id, never a vault file.
+		expect(tagNodes.every((node) => node.path === node.id)).toBe(true);
+
+		const tagEdges = graphData.edges.filter((edge) => edge.type === "tag");
+		expect(tagEdges.map((edge) => `${edge.source}>${edge.target}`).sort()).toEqual([
+			"a.md>tag:#bar",
+			"a.md>tag:#foo",
+			"b.md>tag:#foo",
+		]);
+		expect(tagEdges.every((edge) => edge.weight === 1)).toBe(true);
+
+		// A tag's degree is how many notes carry it. A note's degree ignores its
+		// tags: degree breaks ties for a topic's representative, so a display
+		// toggle must not be able to move it.
+		const byId = new Map(graphData.nodes.map((node) => [node.id, node]));
+		expect(byId.get("tag:#foo")?.degree).toBe(2);
+		expect(byId.get("tag:#bar")?.degree).toBe(1);
+		expect(byId.get("a.md")?.degree).toBe(1);
+		expect(byId.get("b.md")?.degree).toBe(0);
+
+		// The note list handed back never includes tag ids.
+		expect(filteredPaths.sort()).toEqual(["a.md", "b.md", "c.md"]);
+	});
+
+	it("treats tag casing and repeats the way Obsidian does: one tag, one link per note", () => {
+		const app = createMockApp({}, ["a.md", "b.md"], {
+			"a.md": ["#Foo", "#foo", "#Foo"],
+			"b.md": ["#FOO"],
+		});
+		const { graphData } = buildWikiGraph(app, undefined, undefined, { includeTags: true });
+
+		const tagNodes = graphData.nodes.filter((node) => node.kind === "tag");
+		expect(tagNodes).toHaveLength(1);
+		expect(tagNodes[0].id).toBe("tag:#foo");
+		// First-seen casing is the label.
+		expect(tagNodes[0].label).toBe("#Foo");
+		expect(graphData.edges.filter((edge) => edge.type === "tag")).toHaveLength(2);
+	});
+
+	it("only shows tags of notes that are in the graph", () => {
+		const app = createMockApp({}, ["Work/a.md", "Home/b.md"], {
+			"Work/a.md": ["#work"],
+			"Home/b.md": ["#home"],
+		});
+		const { graphData } = buildWikiGraph(app, { folders: ["Work"] }, undefined, { includeTags: true });
+
+		expect(graphData.nodes.map((node) => node.id).sort()).toEqual(["Work/a.md", "tag:#work"]);
+		expect(graphData.edges).toEqual([{ source: "Work/a.md", target: "tag:#work", weight: 1, type: "tag" }]);
+	});
+});
+
+describe("resolveSegments — tags in communities", () => {
+	const note = (id: string, degree = 1): GraphNode => ({
+		id,
+		path: id,
+		label: id,
+		x: 0,
+		y: 0,
+		degree,
+		highlighted: false,
+	});
+	const tag = (name: string, degree: number): GraphNode => ({
+		id: `tag:${name}`,
+		path: `tag:${name}`,
+		label: name,
+		x: 0,
+		y: 0,
+		degree,
+		highlighted: false,
+		kind: "tag",
+	});
+	const wiki = (source: string, target: string): GraphEdge => ({ source, target, weight: 1, type: "wiki" });
+	const tagged = (source: string, name: string): GraphEdge => ({
+		source,
+		target: `tag:${name}`,
+		weight: 1,
+		type: "tag",
+	});
+
+	/**
+	 * Topic 0 is three notes all carrying #cooking; topic 1 is two linked notes,
+	 * one of which also carries #cooking. Leiden placed the tag in topic 0.
+	 */
+	const graph: GraphData = {
+		nodes: [note("a1"), note("a2"), note("a3"), note("b1"), note("b2"), tag("#cooking", 4)],
+		edges: [
+			wiki("a1", "a2"),
+			tagged("a1", "#cooking"),
+			tagged("a2", "#cooking"),
+			tagged("a3", "#cooking"),
+			wiki("b1", "b2"),
+			tagged("b1", "#cooking"),
+		],
+	};
+	const communities = { a1: 0, a2: 0, a3: 0, "tag:#cooking": 0, b1: 1, b2: 1 };
+
+	it("keeps tags out of a topic's members and size", () => {
+		const segments = resolveSegments(graph, "leiden", { leidenCommunities: communities });
+		const topic0 = segments.find((segment) => segment.communityId === 0);
+		expect(topic0).toBeDefined();
+		expect([...(topic0?.paths ?? [])].sort()).toEqual(["a1", "a2", "a3"]);
+		expect(segments.every((segment) => ![...segment.paths].some((path) => path.startsWith("tag:")))).toBe(true);
+	});
+
+	it("lists a tag as living in the topic that holds at least half its notes", () => {
+		const segments = resolveSegments(graph, "leiden", { leidenCommunities: communities });
+		expect([...(segments.find((segment) => segment.communityId === 0)?.tagIds ?? [])]).toEqual(["tag:#cooking"]);
+		expect(segments.find((segment) => segment.communityId === 1)?.tagIds.size).toBe(0);
+		// ...but never as a member.
+		expect([...(segments.find((segment) => segment.communityId === 0)?.paths ?? [])]).not.toContain("tag:#cooking");
+	});
+
+	it("lets a tag name the topic it mostly lives in", () => {
+		const segments = resolveSegments(graph, "leiden", { leidenCommunities: communities });
+		// Three of the four notes carrying #cooking are in topic 0, and the tag
+		// out-degrees every note there — it is the topic's best name.
+		expect(segments.find((segment) => segment.communityId === 0)?.label).toBe("#cooking");
+	});
+
+	it("does not let a tag spread across topics name the one it landed in", () => {
+		// Same shape, but #cooking is carried by many notes elsewhere: fewer than
+		// half of its notes are inside topic 0, so a note names the topic.
+		const broad: GraphData = {
+			nodes: [...graph.nodes.filter((n) => n.kind !== "tag"), tag("#cooking", 10)],
+			edges: graph.edges,
+		};
+		const segments = resolveSegments(broad, "leiden", { leidenCommunities: communities });
+		expect(segments.find((segment) => segment.communityId === 0)?.label).not.toBe("#cooking");
+		expect(segments.find((segment) => segment.communityId === 0)?.tagIds.size).toBe(0);
+	});
+
+	it("does not count a tag toward the minimum topic size", () => {
+		const tiny: GraphData = {
+			nodes: [note("solo"), tag("#x", 1)],
+			edges: [tagged("solo", "#x")],
+		};
+		expect(resolveSegments(tiny, "leiden", { leidenCommunities: { solo: 0, "tag:#x": 0 } })).toEqual([]);
 	});
 });

@@ -44,12 +44,14 @@ import {
 	granularityToResolution,
 	type TopicHierarchy,
 } from "../../utils/topicHierarchy";
-import { edgeKey, graphTopologySignature } from "../../utils/graphUtils";
+import { computeNodeDegrees, edgeKey, graphTopologySignature, isTagNode, noteSubgraph } from "../../utils/graphUtils";
+import { openTagSearch } from "../../utils/tagSearch";
 import {
 	applyWikiPatch,
 	queryNoteSemanticEdges,
 	replaceSemanticEdgesForPaths,
 	voteNodeCommunity,
+	voteUntilSettled,
 } from "../../utils/liveGraphPatch";
 import {
 	clearCachedPartitions,
@@ -81,6 +83,15 @@ import GraphControls from "./GraphControls.svelte";
 
 const plugin = getPlugin();
 const data = getData();
+
+/**
+ * Whether the semantic-edge scan has anything to run against: a graph index
+ * is selected *and* its config still exists. `loadSemanticEdges` silently
+ * returns nothing otherwise, so without this the "Inferred links" switch would
+ * be live but do nothing — the controls use it to disable that switch and say
+ * why.
+ */
+const hasGraphIndex = $derived(data.getGraphEmbedModel() != null);
 
 // Start restoring persisted topic caches immediately so the IndexedDB read
 // overlaps mounting; buildGraph awaits the same promise before reading them.
@@ -154,6 +165,15 @@ let lassoMode = $state(false);
 let selectedPaths: string[] = $state([]);
 let immersePaths: Set<string> | null = $state(null);
 let isImmersed: boolean = $derived(immersePaths !== null);
+
+/**
+ * Live width of the graph toolbar, reported by GraphControls. The mobile
+ * immerse banner shares the top strip with that toolbar and has to stop short
+ * of it: the toolbar is right-aligned and its width varies with the button
+ * count (immersing adds an exit button) and with wrapping on narrow phones, so
+ * a hardcoded reservation goes stale the moment either changes.
+ */
+let toolbarWidth = $state(0);
 /**
  * What the user immersed *into*, when that was topics rather than a raw lasso.
  *
@@ -228,6 +248,15 @@ const INTERIM_TOPIC_MIN_COVERAGE = 0.8;
 const SEMANTIC_LEIDEN_WEIGHT = 0.7;
 
 /**
+ * Weight of a tag edge for community detection, for a tag carried by a single
+ * note — the same as one wiki link. Divided by √(notes carrying the tag): a
+ * tag's total pull then grows only as √n, so a topical tag on a dozen notes
+ * binds them firmly while a status tag on hundreds (`#todo`, `#draft`) can't
+ * form a gravity well that drags unrelated notes into one topic.
+ */
+const TAG_LEIDEN_WEIGHT = 1;
+
+/**
  * Colour for the folded "Unsorted" node — deliberately neutral so it reads as
  * leftovers rather than as another topic competing for attention.
  */
@@ -286,8 +315,9 @@ let collapsedTopics: Set<number> = $state(new Set());
 let allTopicIds: number[] = $derived.by(() => {
 	const ids = new Set(graphData.nodes.map((node) => node.cluster).filter((c): c is number => c != null));
 	// Notes with no topic are foldable too — in the merged view they'd otherwise
-	// sit among the topic nodes looking like topics of their own.
-	if (graphData.nodes.some((node) => node.cluster == null)) ids.add(UNSORTED_CLUSTER);
+	// sit among the topic nodes looking like topics of their own. (Tags never
+	// have a topic and never fold, so they don't make an "Unsorted" group.)
+	if (graphData.nodes.some((node) => !isTagNode(node) && node.cluster == null)) ids.add(UNSORTED_CLUSTER);
 	return [...ids].sort((a, b) => a - b);
 });
 
@@ -347,6 +377,18 @@ let displayGraphData: GraphData = $derived.by(() => {
 	});
 });
 
+/**
+ * How many notes the graph holds. `graphData.nodes` also carries tag nodes when
+ * tags are shown, and those aren't notes for any purpose here — counts shown to
+ * the user, the semantic-scan ceiling, the drift threshold.
+ */
+let noteNodeCount = $derived(graphData.nodes.reduce((count, node) => (isTagNode(node) ? count : count + 1), 0));
+
+/** Options for the wiki graph build, from the scope settings. */
+function wikiGraphOptions() {
+	return { includeTags: settings.showTags ?? false };
+}
+
 // Build cancellation — abort stale builds when a new one starts
 let currentBuild: AbortController | null = null;
 
@@ -376,6 +418,7 @@ function createAutoRebuildSignature(filter: GraphFilter): string {
 		extensions: [...(filter.extensions ?? [])].sort(),
 		showWikiLinks: settings.showWikiLinks,
 		markdownOnly: settings.markdownOnly,
+		showTags: settings.showTags ?? false,
 	});
 }
 
@@ -435,7 +478,9 @@ function loadFilterOptions() {
  */
 async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number): Promise<GraphEdge[]> {
 	if (!data.graphEmbedIndex) return [];
-	if (wikiData.nodes.length < 2 || wikiData.nodes.length > SEMANTIC_EDGE_MAX_NOTES) return [];
+	// Only notes have embeddings; tag nodes are neither scanned nor counted.
+	const noteNodes = wikiData.nodes.filter((node) => !isTagNode(node));
+	if (noteNodes.length < 2 || noteNodes.length > SEMANTIC_EDGE_MAX_NOTES) return [];
 
 	const serviceReady = await waitForVectorStore();
 	if (!serviceReady || localBuildVersion !== buildVersion) return [];
@@ -455,7 +500,9 @@ async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number)
 	const metadata = await inst.store.getMetadata().catch(() => null);
 	if (localBuildVersion !== buildVersion) return [];
 	const cacheKey = [
-		graphTopologySignature(wikiData),
+		// Over the notes only: the scan never sees tags, so showing them must
+		// not throw its result away.
+		graphTopologySignature(noteSubgraph(wikiData)),
 		data.graphEmbedIndex,
 		metadata?.lastUpdated ?? "no-metadata",
 		settings.semanticNeighborCount,
@@ -469,7 +516,7 @@ async function loadSemanticEdges(wikiData: GraphData, localBuildVersion: number)
 	// Only connect notes that are actually on screen, and never duplicate a pair
 	// the user already linked by hand. The store scans its own vectors and
 	// returns pairs; no embedding is copied to this thread.
-	const includePaths = new Set(wikiData.nodes.map((node) => node.path));
+	const includePaths = new Set(noteNodes.map((node) => node.path));
 	const wikiEdgeKeys = new Set(wikiData.edges.map((edge) => edgeKey(edge.source, edge.target)));
 
 	const edges = await buildSemanticEdges(inst.store, includePaths, {
@@ -507,7 +554,12 @@ async function buildGraph() {
 		if (localBuildVersion !== buildVersion) return;
 
 		const filter = getFilter();
-		const { graphData: wikiData } = buildWikiGraph(plugin.app, filter, immersePaths ?? undefined);
+		const { graphData: wikiData } = buildWikiGraph(
+			plugin.app,
+			filter,
+			immersePaths ?? undefined,
+			wikiGraphOptions(),
+		);
 		// A newer build (or unmount) superseded us before we could apply.
 		if (localBuildVersion !== buildVersion) return;
 		graphData = wikiData;
@@ -554,11 +606,7 @@ async function buildGraph() {
 			const fused = { ...wikiData, edges: [...wikiData.edges, ...semanticEdges] };
 			// Degree drives node size and the Detail filter's hub ranking. Recompute it
 			// over the fused edge set so semantically-central notes read as hubs too.
-			const degreeMap = new Map<string, number>();
-			for (const edge of fused.edges) {
-				degreeMap.set(edge.source, (degreeMap.get(edge.source) ?? 0) + 1);
-				degreeMap.set(edge.target, (degreeMap.get(edge.target) ?? 0) + 1);
-			}
+			const degreeMap = computeNodeDegrees(fused.edges);
 			graphData = {
 				...fused,
 				nodes: fused.nodes.map((node) => ({ ...node, degree: degreeMap.get(node.path) ?? 0 })),
@@ -654,16 +702,60 @@ let buildGraphSignature = $derived(
 		extensions: selectedExtensions,
 		showWikiLinks: settings.showWikiLinks,
 		markdownOnly: settings.markdownOnly,
+		// Tag nodes are part of the built graph (they carry edges and inform
+		// topics), so showing them is a rebuild. Semantic edges come back from
+		// cache (keyed on the note subgraph); Leiden re-runs once per graph.
+		showTags: settings.showTags ?? false,
 		// Semantic edges are computed during the build, so changing how they're
 		// derived needs a rebuild (unlike `showSemanticLinks`, which only hides them).
 		semanticNeighborCount: settings.semanticNeighborCount,
 		semanticThreshold: settings.semanticThreshold,
+		// Which *usable* index (if any) the scan reads. `loadSemanticEdges` only
+		// sees it inside the untracked build, so without this key picking or
+		// clearing an index in settings left the old edges on screen — and still
+		// shaping the topics — until something else forced a rebuild. Keyed on
+		// availability rather than the raw id: a stale selection whose config
+		// was removed and then re-added keeps the same id, and that transition
+		// must rebuild too. The edge cache is keyed on the id, so switching back
+		// is served from cache, not rescanned.
+		graphIndex: hasGraphIndex ? data.graphEmbedIndex : null,
 	}),
 );
 $effect(() => {
 	buildGraphSignature;
-	const timer = setTimeout(() => untrack(() => void buildGraph()), 300);
-	return () => clearTimeout(timer);
+	const timer = window.setTimeout(() => untrack(() => void buildGraph()), 300);
+	return () => window.clearTimeout(timer);
+});
+
+// The graph index is opened by this view's first request, not at boot, and
+// its validation against the vault then runs while the first build is already
+// scanning the store — so that scan can read rows that are missing or stale,
+// and nothing else would ever redo it. Watch the index's progress and rebuild
+// once a run (validation, full build, a later catch-up) ends. The semantic
+// edge cache is keyed on the index's `lastUpdated`, so a run that wrote
+// nothing costs no rescan.
+$effect(() => {
+	const indexId = data.graphEmbedIndex;
+	if (!indexId) return;
+	let cancelled = false;
+	let unsubscribe: (() => void) | null = null;
+	void waitForVectorStore().then((ready) => {
+		if (!ready || cancelled) return;
+		let wasIndexing = false;
+		unsubscribe = getVectorStoreService().onProgress((progress) => {
+			if (progress.isIndexing) {
+				wasIndexing = true;
+				return;
+			}
+			if (!wasIndexing) return;
+			wasIndexing = false;
+			untrack(() => void buildGraph());
+		}, indexId);
+	});
+	return () => {
+		cancelled = true;
+		unsubscribe?.();
+	};
 });
 
 // Re-apply segment coloring when highlight toggles change (no Leiden re-run needed).
@@ -738,7 +830,7 @@ const SEMANTIC_RETRY_MAX_ATTEMPTS = 24;
 let liveTopicDrift = 0;
 /** True once the first full build has landed — live patches diff against it. */
 let hasBuiltOnce = false;
-let liveUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+let liveUpdateTimer: number | null = null;
 /** Renames since the last flush, applied to the canvas position cache first. */
 let pendingRenames: Array<{ from: string; to: string }> = [];
 /**
@@ -747,7 +839,7 @@ let pendingRenames: Array<{ from: string; to: string }> = [];
  * running; `attempts` bounds the wait.
  */
 const pendingSemantic = new Map<string, { mtime: number; attempts: number }>();
-let semanticRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let semanticRetryTimer: number | null = null;
 let isProcessingSemantic = false;
 
 function isLiveRelevantFile(file: TAbstractFile): file is TFile {
@@ -762,8 +854,8 @@ function queueSemanticRefresh(file: TFile) {
 
 function scheduleLiveUpdate() {
 	if (isDestroyed) return;
-	if (liveUpdateTimer != null) clearTimeout(liveUpdateTimer);
-	liveUpdateTimer = setTimeout(() => {
+	if (liveUpdateTimer != null) window.clearTimeout(liveUpdateTimer);
+	liveUpdateTimer = window.setTimeout(() => {
 		liveUpdateTimer = null;
 		flushLiveUpdate();
 	}, LIVE_UPDATE_DEBOUNCE_MS);
@@ -802,8 +894,8 @@ const liveMetadataEventRef = plugin.app.metadataCache.on("resolved", () => sched
 onDestroy(() => {
 	for (const ref of liveVaultEventRefs) plugin.app.vault.offref(ref);
 	plugin.app.metadataCache.offref(liveMetadataEventRef);
-	if (liveUpdateTimer != null) clearTimeout(liveUpdateTimer);
-	if (semanticRetryTimer != null) clearTimeout(semanticRetryTimer);
+	if (liveUpdateTimer != null) window.clearTimeout(liveUpdateTimer);
+	if (semanticRetryTimer != null) window.clearTimeout(semanticRetryTimer);
 });
 
 /** Apply pending vault changes to the open graph. */
@@ -824,7 +916,12 @@ function flushLiveUpdate() {
 	// New folders/tags/extensions should appear in the filter dropdowns too.
 	loadFilterOptions();
 
-	const { graphData: freshWiki } = buildWikiGraph(plugin.app, getFilter(), immersePaths ?? undefined);
+	const { graphData: freshWiki } = buildWikiGraph(
+		plugin.app,
+		getFilter(),
+		immersePaths ?? undefined,
+		wikiGraphOptions(),
+	);
 	const patch = applyWikiPatch(graphData, freshWiki);
 	if (patch.changed) {
 		const communities = { ...leidenCommunities };
@@ -836,13 +933,21 @@ function flushLiveUpdate() {
 			}
 		}
 		const topicEdges = getTopicEdgesFor(patch.data);
-		for (const path of patch.addedPaths) {
-			const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
-			if (vote !== undefined) {
-				communities[path] = vote;
-				drift++;
-			}
-		}
+		const leidenWeight = leidenWeightFor(patch.data);
+		// Added notes, plus tags first seen since the last Leiden run (tags take
+		// part in detection, so an unassigned tag would pull nothing until the
+		// next full run). Voted to a fixed point rather than in one pass: a new
+		// note may hinge on a new tag and that tag on the note's other
+		// neighbours, or the other way round.
+		const unassignedTagIds = patch.data.nodes
+			.filter((node) => isTagNode(node) && communities[node.id] === undefined)
+			.map((node) => node.id);
+		drift += voteUntilSettled(
+			[...patch.addedPaths, ...unassignedTagIds],
+			topicEdges,
+			communities,
+			leidenWeight,
+		).length;
 		// A surviving note whose links changed may now belong elsewhere; re-vote
 		// it, but only count actual moves as drift.
 		for (const path of patch.touchedPaths) {
@@ -852,7 +957,35 @@ function flushLiveUpdate() {
 				drift++;
 			}
 		}
+		// `focusedClusters`/`focusedSegmentIds` hold indices into `segments` — but
+		// `applyLivePatch` below rebuilds `segments` from scratch (sorted by size,
+		// undersized ones dropped), so an index that pointed at "Marine Ecology"
+		// can point at a different topic, or nothing, once it returns. Capture what
+		// community each focused index actually meant *before* that happens, so it
+		// can be re-resolved to wherever that same community landed afterward —
+		// otherwise the focus silently follows the wrong topic (or none) post-patch,
+		// which breaks topic highlighting/panel rows generally, not just the label.
+		const focusedCommunityIdsBeforePatch = new Set(
+			[...focusedClusters].flatMap((cluster) => {
+				const id = segments[cluster]?.communityId;
+				return id === undefined ? [] : [id];
+			}),
+		);
+
 		applyLivePatch(patch.data, communities, drift);
+
+		// Re-resolve focus to the rebuilt `segments` array by community identity.
+		if (focusedClusters.size > 0) {
+			const nextFocusedClusters = new Set(
+				segments.flatMap((segment, index) =>
+					segment.communityId !== undefined && focusedCommunityIdsBeforePatch.has(segment.communityId)
+						? [index]
+						: [],
+				),
+			);
+			focusedClusters = nextFocusedClusters;
+			focusedSegmentIds = new Set([...nextFocusedClusters].flatMap((c) => (segments[c] ? [segments[c].id] : [])));
+		}
 
 		// A removed note can't stay selected — mirror the pruned selection out so
 		// chat trays don't keep offering a note that no longer exists.
@@ -861,7 +994,7 @@ function flushLiveUpdate() {
 			const surviving = selectedPaths.filter((path) => !removed.has(path));
 			if (surviving.length !== selectedPaths.length) {
 				canvasComponent?.selectNodesByPaths(surviving);
-				handleSelectionChange(surviving);
+				handleSelectionChange(surviving, true, topicLabelForCommunities(communities, surviving));
 			}
 		}
 
@@ -920,7 +1053,7 @@ function applyLivePatch(patched: GraphData, communities: Record<string, number>,
  * of changed notes don't invalidate them.
  */
 function maybeReclusterAfterDrift() {
-	const threshold = Math.max(8, Math.ceil(graphData.nodes.length * 0.02));
+	const threshold = Math.max(8, Math.ceil(noteNodeCount * 0.02));
 	if (liveTopicDrift < threshold) return;
 	Logger.info(`[SmartGraph] Live topic drift ${liveTopicDrift} ≥ ${threshold} — re-running Leiden`);
 	liveTopicDrift = 0;
@@ -954,7 +1087,7 @@ async function processPendingSemanticQueries() {
 	}
 	// Same ceiling as the full build: past it the graph is wiki-only, so there
 	// are no semantic edges to keep current.
-	if (graphData.nodes.length > SEMANTIC_EDGE_MAX_NOTES) {
+	if (noteNodeCount > SEMANTIC_EDGE_MAX_NOTES) {
 		pendingSemantic.clear();
 		return;
 	}
@@ -969,7 +1102,7 @@ async function processPendingSemanticQueries() {
 			.catch(() => null);
 		if (!store || isDestroyed) return;
 
-		const nodePaths = new Set(graphData.nodes.map((node) => node.path));
+		const nodePaths = new Set(graphData.nodes.filter((node) => !isTagNode(node)).map((node) => node.path));
 		const replacements = new Map<string, GraphEdge[]>();
 		/**
 		 * Retire an entry only if it is still the one this pass processed.
@@ -1032,6 +1165,7 @@ async function processPendingSemanticQueries() {
 				const communities = { ...leidenCommunities };
 				let drift = 0;
 				const topicEdges = getTopicEdgesFor(patched);
+				const leidenWeight = leidenWeightFor(patched);
 				for (const path of paths) {
 					const vote = voteNodeCommunity(path, topicEdges, communities, leidenWeight);
 					if (vote !== undefined && vote !== communities[path]) {
@@ -1051,7 +1185,7 @@ async function processPendingSemanticQueries() {
 
 function scheduleSemanticRetry() {
 	if (isDestroyed || pendingSemantic.size === 0 || semanticRetryTimer != null) return;
-	semanticRetryTimer = setTimeout(() => {
+	semanticRetryTimer = window.setTimeout(() => {
 		semanticRetryTimer = null;
 		void processPendingSemanticQueries();
 	}, SEMANTIC_RETRY_INTERVAL_MS);
@@ -1141,6 +1275,10 @@ function handleNodeClick(path: string) {
 	plugin.app.workspace.openLinkText(path, "", false);
 }
 
+function handleTagClick(tag: string) {
+	void openTagSearch(plugin.app, tag);
+}
+
 function handleRevealFile(path: string) {
 	const file = plugin.app.vault.getAbstractFileByPath(path);
 	if (file) {
@@ -1201,13 +1339,38 @@ function handleFocusCluster(cluster: number, pan = false, multi = true) {
  * Every path that changes the selection routes through here — canvas lasso,
  * topic label, panel row — so the graph and each open chat's context tray can
  * never disagree about what is selected.
+ *
+ * `isMaintenance` marks the one caller (the live-patch handler below) that
+ * republishes a *shrunk* version of the existing selection because notes were
+ * deleted out from under it — not a new user gesture. A chat tray needs this
+ * distinction verbatim, not inferred from path-set shape: a user picking a
+ * smaller selection (Shift-click, deselecting a topic, drilling into one
+ * cluster) also produces a subset of the prior selection, so shape alone
+ * can't tell the two apart. Per-chat dismissals should survive maintenance
+ * pruning but reset on every real selection change, however it was made.
+ *
+ * `topicLabelOverride` lets the same maintenance caller supply a label it
+ * already computed synchronously against the just-updated `communities`,
+ * instead of falling through to `selectedTopicLabels`. That derivation reads
+ * `canvasComponent`'s `simNodes`, which the canvas only rebuilds from
+ * `graphData` on its own next reactive flush — still stale in the same
+ * synchronous block that just reassigned `graphData` via `applyLivePatch`.
+ * Every other caller sets `focusedClusters`/`selectedPaths` and calls in
+ * synchronously too, but through *this* component's own reactive graph
+ * (`segments`, `effectiveClusterLabels`), which is current already.
  */
-function handleSelectionChange(paths: string[]) {
+function handleSelectionChange(paths: string[], isMaintenance = false, topicLabelOverride?: string[] | null) {
 	selectedPaths = paths;
 	const messenger = getSessionRegistry();
 	if (messenger) {
 		// Ambient: mirror the live graph selection into every open chat's tray.
 		messenger.graphSelection = [...paths];
+		messenger.graphSelectionIsMaintenance = isMaintenance;
+		// Callers set focusedClusters/selectedPaths before calling in, so this
+		// derivation is already current for the selection just adopted above —
+		// except the maintenance caller, which passes its own override (see above).
+		const labels = topicLabelOverride !== undefined ? topicLabelOverride : selectedTopicLabels;
+		messenger.graphSelectionTopicLabel = labels?.join(", ") ?? null;
 	}
 }
 
@@ -1294,6 +1457,8 @@ function handleOpenAllSelected() {
 async function handleSendToChat() {
 	const paths = selectedPaths;
 	if (paths.length === 0) return;
+	// Read before the awaits below give the user a chance to change the selection.
+	const topicLabel = selectedTopicLabels?.join(", ") ?? null;
 
 	// Reveal an existing chat (uncollapsing its sidebar) or create one.
 	const { workspace } = plugin.app;
@@ -1308,6 +1473,8 @@ async function handleSendToChat() {
 	if (messenger) {
 		// Ambient selection (shown in every chat) …
 		messenger.graphSelection = [...paths];
+		messenger.graphSelectionIsMaintenance = false;
+		messenger.graphSelectionTopicLabel = topicLabel;
 		// … plus a one-shot signal so the just-opened/focused chat grabs focus.
 		messenger.pendingGraphNotes = [...paths];
 	} else {
@@ -1324,6 +1491,57 @@ function handleClearSelection() {
 	focusedSegmentIds = new Set();
 	canvasComponent?.clearSelection();
 	handleSelectionChange([]);
+}
+
+/** Same naming ladder (and same fallbacks) the canvas uses for a topic node, so
+ * every surface calls a topic exactly what its pill did. */
+function clusterLabel(cluster: number): string {
+	return cluster === UNSORTED_CLUSTER
+		? "Unsorted"
+		: (effectiveClusterLabels[cluster] ?? segments[cluster]?.label ?? `Topic ${cluster}`);
+}
+
+/**
+ * Name the topics `paths` exactly matches under `communities` (path → raw
+ * Leiden community id), or null if it isn't an exact match — used only by the
+ * live-patch handler, whose `communities` is current but whose canvas isn't
+ * yet (see `handleSelectionChange`'s `topicLabelOverride` doc).
+ *
+ * `focusedClusters` holds *segment indices* (`segments[i]`, assigned `i` by
+ * `resolveAndApplySegments`/`resolveSegmentsByLeiden` after sorting and
+ * dropping undersized communities) — not raw community ids. The two numeric
+ * spaces aren't interchangeable: sorting and drops mean a segment's index can
+ * differ from its `communityId`. Map through `segments[i].communityId` (set
+ * by `resolveAndApplySegments`, already current — it runs synchronously
+ * inside `applyLivePatch`, before this is called) rather than comparing
+ * `communities` values against `focusedClusters` directly.
+ *
+ * Mirrors `getNodePathsForClusters`'s exclusion of unsorted notes (`cluster
+ * == null` never matches, even if `UNSORTED_CLUSTER` is itself focused) —
+ * but unlike the canvas method, doesn't resolve collapsed topic nodes back
+ * to their members, so a selection touching a currently-collapsed topic
+ * conservatively falls back to null (count-based label) rather than risk a
+ * wrong match.
+ */
+function topicLabelForCommunities(communities: Record<string, number>, paths: string[]): string[] | null {
+	if (focusedClusters.size === 0 || paths.length === 0) return null;
+	const focusedCommunityIds = new Set(
+		[...focusedClusters].flatMap((cluster) => {
+			const id = segments[cluster]?.communityId;
+			return id === undefined ? [] : [id];
+		}),
+	);
+	// Every focused segment must have resolved to a real community id — if
+	// segments haven't caught up either (shouldn't happen, but this is exactly
+	// the kind of ordering assumption that bit the canvas-based check), bail
+	// out to the safe count-based fallback rather than risk a wrong match.
+	if (focusedCommunityIds.size !== focusedClusters.size) return null;
+	const topicPaths = Object.entries(communities)
+		.filter(([, communityId]) => focusedCommunityIds.has(communityId))
+		.map(([path]) => path);
+	const selected = new Set(paths);
+	if (topicPaths.length !== selected.size || !topicPaths.every((path) => selected.has(path))) return null;
+	return [...focusedClusters].map(clusterLabel);
 }
 
 /**
@@ -1343,14 +1561,7 @@ let selectedTopicLabels: string[] | null = $derived.by(() => {
 	const topicPaths = new Set(canvasComponent?.getNodePathsForClusters(focusedClusters) ?? []);
 	const selected = new Set(selectedPaths);
 	if (topicPaths.size !== selected.size || ![...topicPaths].every((path) => selected.has(path))) return null;
-	// Same naming ladder (and same fallbacks) the canvas uses for a topic node,
-	// so the bar calls a topic exactly what its pill did — including the
-	// `UNSORTED_CLUSTER` sentinel, which is negative and so indexes no segment.
-	return [...focusedClusters].map((cluster) =>
-		cluster === UNSORTED_CLUSTER
-			? "Unsorted"
-			: (effectiveClusterLabels[cluster] ?? segments[cluster]?.label ?? `Topic ${cluster}`),
-	);
+	return [...focusedClusters].map(clusterLabel);
 });
 
 async function handleImmerse() {
@@ -1386,11 +1597,20 @@ async function handleExitImmerse() {
  * similarities (~0.55–1.0), so the raw values aren't comparable — passing them
  * through unchanged would let a single authored link dominate a strong semantic
  * match. Authored links are deliberately kept the stronger signal, with repeat
- * links damped so one heavily-linked pair can't swamp a topic.
+ * links damped so one heavily-linked pair can't swamp a topic. Tag edges are
+ * damped by the tag's breadth (see {@link TAG_LEIDEN_WEIGHT}), which is the
+ * tag node's degree — hence the graph is needed, not just the edge.
  */
-function leidenWeight(edge: GraphEdge): number {
-	if (edge.type === "wiki") return 1 + Math.log2(Math.max(1, edge.weight));
-	return edge.weight * SEMANTIC_LEIDEN_WEIGHT;
+function leidenWeightFor(gd: GraphData): (edge: GraphEdge) => number {
+	const tagBreadth = new Map<string, number>();
+	for (const node of gd.nodes) {
+		if (isTagNode(node)) tagBreadth.set(node.id, Math.max(1, node.degree ?? 1));
+	}
+	return (edge) => {
+		if (edge.type === "wiki") return 1 + Math.log2(Math.max(1, edge.weight));
+		if (edge.type === "tag") return TAG_LEIDEN_WEIGHT / Math.sqrt(tagBreadth.get(edge.target) ?? 1);
+		return edge.weight * SEMANTIC_LEIDEN_WEIGHT;
+	};
 }
 
 /**
@@ -1398,7 +1618,8 @@ function leidenWeight(edge: GraphEdge): number {
  *
  * Normally authored *and* inferred — that fusion is what lets notes with no wiki
  * links land in a topic. In link-only mode inferred edges are excluded so the
- * topics reflect nothing but the user's own linking.
+ * topics reflect nothing but the user's own structure — which includes tags
+ * whenever they're shown: for a vault organised by tags, they *are* the links.
  */
 function getTopicEdges(): GraphEdge[] {
 	return getTopicEdgesFor(graphData);
@@ -1406,9 +1627,7 @@ function getTopicEdges(): GraphEdge[] {
 
 /** Same filter over an arbitrary graph — used by live patches before they land. */
 function getTopicEdgesFor(gd: GraphData): GraphEdge[] {
-	return gd.edges.filter((e) =>
-		settings.linkOnlyTopics ? e.type === "wiki" : e.type === "wiki" || e.type === "semantic",
-	);
+	return settings.linkOnlyTopics ? gd.edges.filter((e) => e.type !== "semantic") : gd.edges;
 }
 
 /**
@@ -1467,7 +1686,7 @@ async function runLeidenSegmentation() {
 
 	const sources = topicEdges.map((e) => e.source);
 	const targets = topicEdges.map((e) => e.target);
-	const weights = topicEdges.map(leidenWeight);
+	const weights = topicEdges.map(leidenWeightFor(graphData));
 	const start = performance.now();
 	isLeidenRunning = true;
 	let result: Awaited<ReturnType<typeof leidenAsync>>;
@@ -1540,7 +1759,7 @@ async function deriveGranularityLevels(topicEdges: GraphEdge[]) {
 	const seed = settings.leidenSeed;
 	const sources = topicEdges.map((e) => e.source);
 	const targets = topicEdges.map((e) => e.target);
-	const weights = topicEdges.map(leidenWeight);
+	const weights = topicEdges.map(leidenWeightFor(graphData));
 
 	const probes: Array<{ resolution: number; topicCount: number; isFragmented: boolean }> = [];
 	const start = performance.now();
@@ -1658,7 +1877,7 @@ async function computeTopicHierarchy(topicEdges: GraphEdge[]) {
 			const result = await leidenAsync(
 				topicEdges.map((e) => e.source),
 				topicEdges.map((e) => e.target),
-				topicEdges.map(leidenWeight),
+				topicEdges.map(leidenWeightFor(graphData)),
 				settings.leidenSeed,
 				coarseResolution,
 			);
@@ -1785,18 +2004,26 @@ function resolveAndApplySegments(gd: GraphData) {
 	// Build path → segment lookup once so the single node-map pass below can do everything:
 	// strip stale color/cluster, apply bridge/isolated highlights, apply segment color.
 	const pathInfo = new Map<string, { color: string; cluster: number }>();
+	// A tag that lives in a topic is drawn as one of its own: it gets the
+	// cluster (so the region wraps it and cohesion pulls it to the centre) but
+	// no colour — the renderer keeps tags in the tag colour regardless.
+	const tagCluster = new Map<string, number>();
 	for (let i = 0; i < resolved.length; i++) {
 		for (const path of resolved[i].paths) {
 			if (!pathInfo.has(path)) {
 				pathInfo.set(path, { color: resolved[i].color, cluster: i });
 			}
 		}
+		for (const tagId of resolved[i].tagIds) {
+			if (!tagCluster.has(tagId)) tagCluster.set(tagId, i);
+		}
 	}
 	const isLeiden = Object.keys(leidenCommunities).length > 0;
-	// Paths touched by at least one authored wiki link — drives the isolated highlight.
+	// Paths touched by at least one authored edge (wiki link or tag) — drives
+	// the isolated highlight.
 	const linkedPaths = new Set<string>();
 	for (const edge of gd.edges) {
-		if (edge.type !== "wiki") continue;
+		if (edge.type === "semantic") continue;
 		linkedPaths.add(edge.source);
 		linkedPaths.add(edge.target);
 	}
@@ -1805,9 +2032,10 @@ function resolveAndApplySegments(gd: GraphData) {
 		// neighbors belong to a DIFFERENT community than its own. High-degree hubs link to
 		// many clusters but are firmly assigned to one — their own community dominates their neighbor
 		// vote, so they don't qualify. Only nodes that are structurally "between" communities do.
-		// Both edge types count here, matching the Leiden input: a note that ties two topics together
-		// by topic rather than by an authored link is exactly as much a bridge.
-		const isTopicEdge = (edge: GraphEdge) => edge.type === "wiki" || edge.type === "semantic";
+		// Every edge type counts here, matching the fused Leiden input: a note that ties two topics
+		// together by similarity or by a shared tag rather than by an authored link is exactly as
+		// much a bridge.
+		const isTopicEdge = (_edge: GraphEdge) => true;
 		let bridgeNodes: Set<string> | null = null;
 		if (isLeiden) {
 			// Build neighbor community vote counts per node
@@ -1857,14 +2085,15 @@ function resolveAndApplySegments(gd: GraphData) {
 				// "Isolated" means the user never linked this note — a note pulled into a
 				// topic purely by semantic similarity is still unlinked, and that's exactly
 				// the gap worth surfacing. So this counts authored links only, not `degree`
-				// (which now includes inferred edges).
-				const isIsolated = !linkedPaths.has(n.path);
+				// (which now includes inferred edges). A tag is not a note, so it is
+				// never "unlinked".
+				const isIsolated = !isTagNode(n) && !linkedPaths.has(n.path);
 				const highlighted =
 					(settings.highlightBridges && isBridge) || (settings.highlightIsolated && isIsolated);
 				return {
 					...n,
 					color: info?.color ?? undefined,
-					cluster: info?.cluster ?? undefined,
+					cluster: info?.cluster ?? tagCluster.get(n.id),
 					highlighted,
 				};
 			}),
@@ -2233,7 +2462,11 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
      so this widens the shortcuts to the graph leaf without claiming keys
      globally. `GraphCanvas.handleKeyDown` already ignores text inputs. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="smart-graph-view" onkeydown={(e) => canvasComponent?.handleKeyDown(e)}>
+<div
+  class="smart-graph-view"
+  style="--s2b-graph-toolbar-width: {toolbarWidth}px"
+  onkeydown={(e) => canvasComponent?.handleKeyDown(e)}
+>
   {#if isLoading && graphData.nodes.length === 0}
     <div class="graph-loading">
       <LoadingAnimation />
@@ -2250,12 +2483,14 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
       linkStrength={settings.linkStrength}
       showWikiLinks={settings.showWikiLinks}
       showSemanticLinks={settings.showSemanticLinks ?? true}
+      highlightSemanticLinks={settings.highlightSemanticLinks ?? false}
       showTopicHulls={settings.showTopicHulls ?? true}
       {focusedClusters}
       clusterLabels={effectiveClusterLabels}
       showClusterLabels={settings.showClusterLabels ?? true}
       clusterCohesionStrength={settings.clusterCohesionStrength ?? 0.15}
       onNodeClick={handleNodeClick}
+      onTagClick={handleTagClick}
       onSetTopicCollapsed={(cluster, collapsed) => void setTopicsCollapsed([cluster], collapsed)}
       onRevealFile={handleRevealFile}
       onFocusCluster={handleFocusCluster}
@@ -2304,8 +2539,8 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
       Immersed into
       <strong title={immerseTopicLabels.join(", ")}>{immerseTopicLabels.join(", ")}</strong>
     {:else}
-      <strong>{graphData.nodes.length}</strong>
-      {graphData.nodes.length === 1 ? "note" : "notes"} · immersed
+      <strong>{noteNodeCount}</strong>
+      {noteNodeCount === 1 ? "note" : "notes"} · immersed
     {/if}
   {/snippet}
 
@@ -2330,8 +2565,8 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
         {:else}
           <!-- A raw lasso has no name to give, so fall back to the size of what
                you're in — the same thing the desktop bar says in this case. -->
-          Immersed · <strong>{graphData.nodes.length}</strong>
-          {graphData.nodes.length === 1 ? "note" : "notes"}
+          Immersed · <strong>{noteNodeCount}</strong>
+          {noteNodeCount === 1 ? "note" : "notes"}
         {/if}
       </span>
     </div>
@@ -2495,6 +2730,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
     {lassoMode}
     onLassoModeChange={handleLassoModeChange}
     {graphData}
+    {hasGraphIndex}
     nodeCount={displayGraphData.nodes.length}
     segments={labeledSegments}
     {isTopicsCollapsed}
@@ -2504,6 +2740,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
     bind:isCollapsed={isControlsCollapsed}
     {isImmersed}
     onExitImmerse={handleExitImmerse}
+    onToolbarWidth={(width) => (toolbarWidth = width)}
   />
 </div>
 
@@ -2599,11 +2836,18 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
     /* Below the toolbar rail (13) and the sheet (14): this is a passive label,
        so nothing it could cover should lose its tap. Above the canvas. */
     z-index: 11;
-    /* The toolbar row is right-aligned at the same top offset and wraps to a
-       second row on narrow phones. Leave it the corner: 3 buttons at 44px plus
-       the 8px gutters is ~148px, and the banner truncates rather than pushing
-       into them. */
-    max-width: calc(100% - 160px);
+    /* The toolbar row is right-aligned at the same top offset. Leave it the
+       corner: reserve its MEASURED width (published as a custom property by the
+       view root) plus an 8px gutter, and truncate rather than push into it.
+
+       This was a hardcoded `calc(100% - 160px)` justified as "3 buttons at
+       44px". Both numbers were wrong: the buttons are 30px, and immersing —
+       precisely when this banner exists — adds a sixth (exit) button, so the
+       row is ~210px and painted straight over the banner, which sits below it
+       at z-index 11. Measuring removes the class of bug rather than re-guessing
+       the constant: the count also changes with the DEV-only wrench button, and
+       the row wraps on narrow phones. */
+    max-width: calc(100% - var(--s2b-graph-toolbar-width, 0px) - 16px);
     animation: s2b-immerse-banner-in 120ms ease-out;
   }
 

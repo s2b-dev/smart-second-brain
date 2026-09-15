@@ -31,12 +31,15 @@ export const Logger = {
 		if (logLevel <= LogLvl.DEBUG) console.debug("[S2B]", ...args);
 	},
 
+	// INFO-level output also goes through `console.debug`: Obsidian's plugin
+	// guidelines reserve the console's default (non-verbose) level for warnings
+	// and errors, so routine progress lines must not surface there.
 	log(...args: unknown[]) {
-		if (logLevel <= LogLvl.INFO) console.log("[S2B]", ...args);
+		if (logLevel <= LogLvl.INFO) console.debug("[S2B]", ...args);
 	},
 
 	info(...args: unknown[]) {
-		if (logLevel <= LogLvl.INFO) console.info("[S2B]", ...args);
+		if (logLevel <= LogLvl.INFO) console.debug("[S2B]", ...args);
 	},
 
 	warn(...args: unknown[]) {

@@ -1,33 +1,20 @@
 <script lang="ts">
-import { Keymap, MarkdownRenderer, Notice, type View, loadMathJax } from "obsidian";
+import { Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
+import { onDestroy } from "svelte";
 import { getPlugin } from "../../stores/state.svelte";
-import { Logger } from "../../utils/logging";
+import { findSealableEnd } from "../../utils/streamingMarkdown";
+import { openTagSearch } from "../../utils/tagSearch";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 
 interface Props {
 	content: string;
 	class?: string;
 	enableMath?: boolean;
+	/** Content is still being streamed: render incrementally (see below). */
+	streaming?: boolean;
 }
 
-// Internal Obsidian types not in public API
-interface ObsidianApp {
-	commands?: {
-		executeCommandById: (id: string) => Promise<void>;
-	};
-}
-
-interface SearchView extends View {
-	_children?: unknown[];
-	setQuery?: (query: string) => void;
-	searchComponent?: {
-		setValue: (value: string) => void;
-	};
-	searchInputEl?: HTMLInputElement;
-	startSearch?: () => void;
-}
-
-const { content, class: className = "", enableMath = true }: Props = $props();
+const { content, class: className = "", enableMath = true, streaming = false }: Props = $props();
 
 const plugin = getPlugin();
 
@@ -60,90 +47,6 @@ function getTagText(tagEl: HTMLElement): string | null {
 	return text ?? null;
 }
 
-/**
- * Open the search pane with a tag query (matches Obsidian's tag click behavior)
- */
-async function openTagSearch(tag: string): Promise<boolean> {
-	const { workspace } = plugin.app;
-	// Access the internal commands API (not in public types but available)
-	const app = plugin.app as unknown as ObsidianApp;
-	const commands = app.commands;
-
-	try {
-		const searchQuery = `tag:#${tag}`;
-
-		// Try to find existing search view first
-		let searchLeaf = workspace.getLeavesOfType("search").first();
-		let searchView = searchLeaf?.view as SearchView | undefined;
-
-		// Check if view exists but isn't fully initialized
-		// A deferred/lazy view will have no children and no setQuery method
-		const isViewDeferred =
-			searchLeaf &&
-			searchView &&
-			((searchView._children as unknown[])?.length === 0 || typeof searchView.setQuery !== "function");
-
-		if (!searchLeaf || isViewDeferred) {
-			// Use Obsidian's native command to properly initialize search
-			if (commands?.executeCommandById) {
-				await commands.executeCommandById("global-search:open");
-				await new Promise((resolve) => setTimeout(resolve, 50));
-				searchLeaf = workspace.getLeavesOfType("search").first();
-				searchView = searchLeaf?.view as SearchView | undefined;
-			}
-
-			// Fallback: try to create the view manually
-			if (!searchLeaf) {
-				const leftLeaf = workspace.getLeftLeaf(false);
-				if (leftLeaf) {
-					await leftLeaf.setViewState({
-						type: "search",
-						active: true,
-					});
-					searchLeaf = leftLeaf;
-					searchView = searchLeaf?.view as SearchView | undefined;
-				}
-			}
-		}
-
-		// Ensure we have a valid search leaf
-		if (!searchLeaf || !searchView) {
-			Logger.warn("[MarkdownRenderer] No search leaf available");
-			return false;
-		}
-
-		// Try different methods to set the search query based on Obsidian version
-		if (typeof searchView.setQuery === "function") {
-			// Newer Obsidian versions
-			searchView.setQuery(searchQuery);
-		} else if (typeof searchView.searchComponent?.setValue === "function") {
-			// Alternative method
-			searchView.searchComponent.setValue(searchQuery);
-		} else if (searchView.searchInputEl) {
-			// Fallback: set the input value directly
-			searchView.searchInputEl.value = searchQuery;
-			// Trigger search if possible
-			if (typeof searchView.startSearch === "function") {
-				searchView.startSearch();
-			}
-		} else {
-			Logger.warn("[MarkdownRenderer] Could not find method to set search query");
-			new Notice("Search pane opened but could not set tag query");
-			return false;
-		}
-
-		// Reveal and focus the search pane
-		workspace.revealLeaf(searchLeaf);
-		workspace.setActiveLeaf(searchLeaf, { focus: true });
-
-		return true;
-	} catch (error) {
-		Logger.error("[MarkdownRenderer] Error opening search pane with tag:", error);
-		new Notice(`Failed to open search pane for tag: ${tag}`);
-		return false;
-	}
-}
-
 // Handle internal link clicks
 function handleClick(evt: MouseEvent) {
 	const target = evt.target as HTMLElement;
@@ -156,7 +59,7 @@ function handleClick(evt: MouseEvent) {
 
 		const tag = getTagText(tagEl);
 		if (tag) {
-			openTagSearch(tag);
+			void openTagSearch(plugin.app, tag);
 		}
 		return;
 	}
@@ -218,8 +121,7 @@ function handleMouseOut(evt: MouseEvent) {
 // Post-process rendered content to normalize links
 function normalizeLinks(containerEl: HTMLElement) {
 	// Copy button styling
-	const copyBtn = containerEl.querySelector(".copy-code-button") as HTMLElement | null;
-	if (copyBtn) {
+	for (const copyBtn of containerEl.querySelectorAll(".copy-code-button")) {
 		copyBtn.className = "clickable-icon";
 		copyBtn.setAttribute("aria-label", "Copy code");
 	}
@@ -240,36 +142,130 @@ function normalizeLinks(containerEl: HTMLElement) {
 	}
 }
 
-// Render markdown when content changes
+// ---- Rendering ----------------------------------------------------------------
+//
+// Renders are coalesced to one per animation frame: during streaming `content`
+// changes once per token (often 100-300/s), and rendering each change would force
+// a style/layout pass per token. Renders are also serialised — a token arriving
+// while a render is in flight marks it dirty and the newest content is rendered
+// right after — so the DOM never interleaves two renders.
+//
+// While `streaming` is set the message is rendered in two parts (see
+// `utils/streamingMarkdown.ts`): a sealed prefix whose nodes stay in the DOM
+// untouched, and a live tail — the block still being written — that is the only
+// part re-parsed each frame. Without this the whole accumulated reply was torn
+// down and re-parsed every frame, O(length) per frame, which pinned the main
+// thread for the duration of a long reply (#482). Outside streaming, and when the
+// reply settles, the content is rendered as one document, so link-reference and
+// footnote definitions resolve exactly as before.
+
+let latest = { content: "", sourcePath: "", enableMath: true, streaming: false };
+let frame: number | null = null;
+let rendering = false;
+let dirty = false;
+let destroyed = false;
+/** Prefix of `latest.content` whose DOM is final (streaming only). */
+let sealedText = "";
+/** Nodes belonging to the live tail; replaced on every render while streaming. */
+let tailNodes: ChildNode[] = [];
+
 $effect(() => {
+	// Read every reactive dep here so the effect re-runs when any of them change;
+	// the render itself runs later, off the tracked scope.
+	latest = { content: content ?? "", sourcePath, enableMath, streaming };
+	if (container) schedule();
+});
+
+onDestroy(() => {
+	destroyed = true;
+	if (frame !== null) cancelAnimationFrame(frame);
+});
+
+function schedule() {
+	if (frame !== null) return;
+	frame = requestAnimationFrame(() => {
+		frame = null;
+		void flush();
+	});
+}
+
+async function flush() {
+	if (rendering) {
+		dirty = true;
+		return;
+	}
+	rendering = true;
+	try {
+		do {
+			dirty = false;
+			await renderLatest();
+		} while (dirty && !destroyed);
+	} finally {
+		rendering = false;
+	}
+}
+
+async function renderLatest() {
+	const { content: text, sourcePath: path, enableMath: math, streaming: live } = latest;
 	if (!container) return;
+	if (math) await loadMathJax();
+	// `container` may have been unbound (component unmounted) while awaiting.
+	if (destroyed || !container) return;
 
-	const currentContent = content;
-	const currentSourcePath = sourcePath;
-
-	// Async render function
-	async function render() {
-		if (!container) return;
-
-		if (enableMath) {
-			await loadMathJax();
-		}
-
-		// `container` may have been unbound (component unmounted) while awaiting
-		// above. Re-check before touching it — otherwise clearing `container`
-		// throws "Cannot read properties of null" during rapid mount/unmount
-		// (e.g. subagent tool cards folding in/out during streaming).
-		if (!container) return;
-
-		container.empty();
-		await MarkdownRenderer.render(plugin.app, currentContent ?? "", container, currentSourcePath, plugin);
-
-		if (!container) return;
-		normalizeLinks(container);
+	if (!live) {
+		resetDom();
+		await appendSegment(text, path);
+		return;
 	}
 
-	render();
-});
+	// Streaming: content normally extends what is already sealed. Anything else
+	// (a reset at a tool-call boundary, an edit) starts over.
+	if (!text.startsWith(sealedText)) resetDom();
+	const remainder = text.slice(sealedText.length);
+	const sealEnd = findSealableEnd(remainder);
+	removeTail();
+	if (sealEnd > 0) {
+		const segment = remainder.slice(0, sealEnd);
+		await appendSegment(segment, path);
+		if (destroyed || !container) return;
+		sealedText += segment;
+	}
+	tailNodes = await appendSegment(text.slice(sealedText.length), path);
+}
+
+function resetDom() {
+	container?.empty();
+	sealedText = "";
+	tailNodes = [];
+}
+
+function removeTail() {
+	for (const node of tailNodes) node.remove();
+	tailNodes = [];
+}
+
+/**
+ * Render `markdown` at the end of the container and return the nodes it produced.
+ * The render happens inside a boxless staging element that is attached for its
+ * duration — post-processors may measure layout — and is unwrapped afterwards so
+ * the container stays flat: no wrapper element, so `:first-child`/`:last-child`
+ * styling on the container keeps working across segment seams.
+ */
+async function appendSegment(markdown: string, path: string): Promise<ChildNode[]> {
+	if (!markdown || !container) return [];
+	const staging = container.createDiv({ attr: { style: "display: contents" } });
+	await MarkdownRenderer.render(plugin.app, markdown, staging, path, plugin);
+	if (destroyed || !container) {
+		staging.remove();
+		return [];
+	}
+	normalizeLinks(staging);
+	// The renderer may tag the target element (e.g. `markdown-rendered`); carry that over.
+	for (const cls of staging.classList) container.classList.add(cls);
+	const nodes = [...staging.childNodes];
+	staging.replaceWith(...nodes);
+	return nodes;
+}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

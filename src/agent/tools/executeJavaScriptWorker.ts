@@ -19,7 +19,7 @@ export type ExecuteJavaScriptWorkerResponse =
 			error: string;
 	  };
 
-globalThis.onmessage = async (event: MessageEvent<ExecuteJavaScriptWorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<ExecuteJavaScriptWorkerRequest>) => {
 	const message = event.data;
 
 	try {
@@ -33,13 +33,13 @@ globalThis.onmessage = async (event: MessageEvent<ExecuteJavaScriptWorkerRequest
 			type: "result",
 			result,
 		};
-		globalThis.postMessage(response);
+		self.postMessage(response);
 	} catch (error) {
 		const response: ExecuteJavaScriptWorkerResponse = {
 			id: message.id,
 			type: "error",
 			error: error instanceof Error ? error.message : String(error),
 		};
-		globalThis.postMessage(response);
+		self.postMessage(response);
 	}
 };

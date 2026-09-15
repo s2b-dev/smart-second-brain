@@ -1,7 +1,6 @@
 <script lang="ts">
 import { onDestroy, onMount } from "svelte";
 import { diffWords } from "diff";
-import { DEFAULT_AGENT_PROMPT } from "../../agent/prompts";
 import { EmbeddableMarkdownEditor } from "../../lib/editor";
 import type SecondBrainPlugin from "../../main";
 import Button from "../ui/Button.svelte";
@@ -32,7 +31,11 @@ $effect(() => {
 	if (showDiff) viewMode = "diff";
 });
 
-const defaultPrompt = $derived(accessors.defaultPrompt ?? DEFAULT_AGENT_PROMPT);
+// No `?? DEFAULT_AGENT_PROMPT` fallback: editable callers are now required to name their
+// own baseline, and silently substituting the agent base prompt is exactly the bug this
+// had (a skill diffed against — and resettable to — an unrelated document). Read-only
+// previews never reach the diff or reset paths, so "" is inert for them.
+const defaultPrompt = $derived(accessors.defaultPrompt ?? "");
 const isDirty = $derived(promptValue !== initialPromptValue);
 const isAtDefault = $derived(promptValue === defaultPrompt);
 const canShowDiff = $derived(!readOnly && !isAtDefault);

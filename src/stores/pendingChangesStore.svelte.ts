@@ -126,7 +126,7 @@ export class PendingChangesStore {
 	#entries: PendingChangeEntry[] = $state([]);
 	#revision = $state(0);
 	readonly #plugin: SecondBrainPlugin;
-	#saveTimer: ReturnType<typeof setTimeout> | null = null;
+	#saveTimer: number | null = null;
 	readonly #processingGroups = new Set<string>();
 	readonly #fileLocks = new Map<string, Promise<void>>();
 	readonly #batchProcessing = new Set<string>();
@@ -144,7 +144,7 @@ export class PendingChangesStore {
 				const parsed = JSON.parse(raw);
 				const result = pendingChangesArraySchema.safeParse(parsed);
 				if (result.success) {
-					this.#entries = result.data as PendingChangeEntry[];
+					this.#entries = result.data;
 				} else {
 					Logger.error(
 						"[PendingChanges] Invalid data in pending-changes.json, discarding malformed entries",
@@ -234,8 +234,8 @@ export class PendingChangesStore {
 	}
 
 	private scheduleSave(): void {
-		if (this.#saveTimer) clearTimeout(this.#saveTimer);
-		this.#saveTimer = setTimeout(
+		if (this.#saveTimer) window.clearTimeout(this.#saveTimer);
+		this.#saveTimer = window.setTimeout(
 			() => void this.saveToDisk().catch((e) => Logger.error("[PendingChanges] Failed to save:", e)),
 			SAVE_DEBOUNCE_MS,
 		);
@@ -251,7 +251,7 @@ export class PendingChangesStore {
 	 */
 	private flushSave(): void {
 		if (this.#saveTimer) {
-			clearTimeout(this.#saveTimer);
+			window.clearTimeout(this.#saveTimer);
 			this.#saveTimer = null;
 		}
 		void this.saveToDisk().catch((e) => Logger.error("[PendingChanges] Failed to save:", e));
@@ -429,7 +429,10 @@ export class PendingChangesStore {
 						`File "${change.path}" was modified after the delete was proposed. Review the note and re-stage the delete.`,
 					);
 				}
-				await app.vault.trash(file, true);
+				// trashFile honours the user's "Deleted files" setting (system trash, vault
+				// .trash, or permanent). `vault.trash(file, true)` hardcoded system trash and
+				// ignored that choice.
+				await app.fileManager.trashFile(file);
 			} else if (change.type === "move") {
 				const file = app.vault.getAbstractFileByPath(normalizedPath);
 				if (!(file instanceof TFile)) {
@@ -1061,7 +1064,7 @@ export class PendingChangesStore {
 
 	cleanup(): void {
 		if (this.#saveTimer) {
-			clearTimeout(this.#saveTimer);
+			window.clearTimeout(this.#saveTimer);
 			this.#saveTimer = null;
 			// Flush any pending writes so data isn't lost on unload
 			void this.saveToDisk().catch((e) => Logger.error("[PendingChanges] Failed to save on cleanup:", e));

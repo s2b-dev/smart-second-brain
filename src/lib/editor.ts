@@ -1,6 +1,15 @@
 import { EditorSelection, EditorState, type Extension, Prec, StateEffect } from "@codemirror/state";
 import { EditorView, type ViewUpdate, keymap, placeholder, tooltips } from "@codemirror/view";
-import { type App, type Constructor, Scope, type TFile } from "obsidian";
+import { type App, type Constructor, type Editor, Scope, type TFile } from "obsidian";
+
+/**
+ * The CodeMirror 6 view behind an Obsidian `Editor`. `cm` is an internal field
+ * absent from the public typings; it is undefined for editors not backed by CM6.
+ */
+export function getEditorView(editor: Editor | undefined | null): EditorView | undefined {
+	if (!editor || !("cm" in editor)) return undefined;
+	return editor.cm as EditorView | undefined;
+}
 
 // Internal Obsidian type - not exported in official API
 interface ScrollableMarkdownEditor {
@@ -50,9 +59,10 @@ function resolveEditorPrototype(app: App): Constructor<ScrollableMarkdownEditor>
 			throw new Error("Obsidian embedRegistry API not available");
 		}
 
+		// The md embed factory takes a TFile; passing no file yields a detached editor.
 		const widgetEditorView = embedRegistry(
-			{ app, containerEl: document.createElement("div") },
-			null as unknown as TFile,
+			{ app, containerEl: createDiv() },
+			null as TFile | null,
 			"",
 		) as WidgetEditorView;
 
@@ -314,16 +324,19 @@ export class EmbeddableMarkdownEditor {
 	 * Enter vim insert mode if vim keybindings are enabled in Obsidian.
 	 */
 	private enterVimInsertMode(): void {
-		setTimeout(() => {
+		window.setTimeout(() => {
 			try {
 				// Check if vim mode is enabled in Obsidian settings
 				// @ts-expect-error - Using internal API
 				const vimModeEnabled = this.app.vault.getConfig("vimMode");
 				if (!vimModeEnabled) return;
 
-				// Access the Vim API from Obsidian's CodeMirrorAdapter
-				// @ts-expect-error - Using internal API
-				const Vim = (globalThis as Record<string, unknown>).CodeMirrorAdapter?.Vim;
+				// Access the Vim API from Obsidian's CodeMirrorAdapter (internal global)
+				const Vim = (
+					window as {
+						CodeMirrorAdapter?: { Vim?: { handleKey(cm: unknown, key: string, origin: string): void } };
+					}
+				).CodeMirrorAdapter?.Vim;
 				if (!Vim) return;
 
 				// Get the CM5 adapter

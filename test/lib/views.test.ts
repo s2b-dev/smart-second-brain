@@ -11,7 +11,7 @@ import {
 	rewriteViewFilterForRename,
 } from "../../src/lib/views";
 import type { ViewFilter, ViewFilterGroup } from "../../src/types/viewFilter";
-import type { App, CachedMetadata, TFile } from "obsidian";
+import { type App, type CachedMetadata, TFile } from "obsidian";
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -25,15 +25,21 @@ function createMockApp(
 	fileTags: Record<string, string[]> = {},
 	fileFrontmatter: Record<string, Record<string, unknown>> = {},
 ): App {
-	const mockFiles = files.map((path) => ({
-		path,
-		basename: path
-			.replace(/\.[^.]+$/, "")
-			.split("/")
-			.pop(),
-		extension: path.split(".").pop() ?? "md",
-		name: path.split("/").pop(),
-	}));
+	// Real TFile instances, not object literals: the tag rules narrow with
+	// `instanceof TFile` (rather than a duck-typed "extension" in file), so a plain
+	// object would silently fail every tag match.
+	const mockFiles = files.map((path) => {
+		const file = new TFile();
+		file.path = path;
+		file.basename =
+			path
+				.replace(/\.[^.]+$/, "")
+				.split("/")
+				.pop() ?? "";
+		file.extension = path.split(".").pop() ?? "md";
+		file.name = path.split("/").pop() ?? "";
+		return file;
+	});
 
 	const getFileCache = vi.fn((file: TFile): CachedMetadata | null => {
 		const tags = fileTags[file.path];

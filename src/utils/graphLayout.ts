@@ -291,7 +291,7 @@ export function applyLayoutForces<N extends LayoutNode, L extends LayoutLink<N>>
 	const linkForce = forceLink<N, L>(links)
 		.id((d) => d.id)
 		.distance(makeWeightedLinkDistance(effectiveLinkDistance, config.nodeSize, links));
-	const defaultLinkStrengthFn = linkForce.strength() as (link: L, i: number, links: L[]) => number;
+	const defaultLinkStrengthFn = linkForce.strength();
 	linkForce.strength((l, i, all) => config.linkStrength * defaultLinkStrengthFn(l, i, all) * weightPull(l));
 
 	// Clustered nodes take the density-profiled centering; satellites take

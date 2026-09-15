@@ -62,7 +62,7 @@ export function compileFilter(filter: SearchFilter): CompiledFilter {
  */
 export function matchesPathFilter(path: string, filter?: SearchFilter | CompiledFilter): boolean {
 	if (!filter) return true;
-	const compiled: CompiledFilter | null = "exactPathSet" in filter ? (filter as CompiledFilter) : null;
+	const compiled: CompiledFilter | null = "exactPathSet" in filter ? filter : null;
 	const sf: SearchFilter = compiled ? compiled.filter : (filter as SearchFilter);
 
 	if (!sf.pathPrefixes?.length) return true;
@@ -79,7 +79,7 @@ export function matchesSearchFilter(path: string, docTags: string[], filter?: Se
 	}
 
 	// Unwrap CompiledFilter if provided
-	const compiled: CompiledFilter | null = "exactPathSet" in filter ? (filter as CompiledFilter) : null;
+	const compiled: CompiledFilter | null = "exactPathSet" in filter ? filter : null;
 	const sf: SearchFilter = compiled ? compiled.filter : (filter as SearchFilter);
 
 	if (sf.pathPrefixes?.length) {

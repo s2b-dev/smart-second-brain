@@ -1,4 +1,4 @@
-import { normalizePath } from "obsidian";
+import { Notice, normalizePath } from "obsidian";
 import {
 	createEmptyPrivacyFilter,
 	matchesPrivacyMembershipDraftPath,
@@ -37,7 +37,8 @@ import { getDefaultEmbeddingBatchSize, normalizeEmbeddingBatchSize } from "../ve
 import { type UUIDv7, genUUIDv7 } from "../utils/uuid7Validator";
 
 import { type SmartGraphSettings, DEFAULT_SMART_GRAPH_SETTINGS } from "../types/graph";
-import { applyVerboseLogging } from "../utils/logging";
+import { Logger, applyVerboseLogging } from "../utils/logging";
+import { extractErrorMessage } from "../utils/errorMessage";
 
 // Provider system types
 import {
@@ -225,7 +226,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	// UI state
 	isVerbose: false,
 	showToolIODetails: false,
-	chatOpenLocation: "tab" as ChatOpenLocation,
+	chatOpenLocation: "tab",
 	lastActiveChatId: null,
 	onboardingComplete: false,
 	onboardingSplashSeen: false,
@@ -269,6 +270,8 @@ export const DEFAULT_SETTINGS: PluginData = {
 export class PluginDataStore {
 	#data: PluginData;
 	private readonly _plugin: SecondBrainPlugin;
+	/** Rate-limits the "could not save" Notice; see `notifySaveFailed`. */
+	#saveFailureNotified = false;
 
 	/**
 	 * Guidance surfaces whose built-in default changed while the user had a customization
@@ -318,7 +321,7 @@ export class PluginDataStore {
 				const rewritten = rewriteViewFilterForRename(this.#data.privacyFilter, oldPath, file.path);
 				if (rewritten !== this.#data.privacyFilter) {
 					this.#data.privacyFilter = rewritten;
-					this.saveSettings();
+					void this.saveSettings();
 				}
 			}),
 		);
@@ -328,9 +331,50 @@ export class PluginDataStore {
 	 * Persist current settings.
 	 * Snapshots the $state to avoid saving reactive proxies.
 	 */
-	private async saveSettings() {
+	/**
+	 * Persist the current data snapshot.
+	 *
+	 * Deliberately never rejects. ~70 setters call this as the last statement of a
+	 * synchronous mutation (`this.#data.x = y; this.saveSettings();`) and have no
+	 * meaningful way to recover, so a rejection here used to surface as an unhandled
+	 * rejection: `saveData` failing (disk full, permissions, a sync conflict) left the
+	 * user's change applied in memory, absent from disk, and unreported until the next
+	 * reload silently reverted it.
+	 *
+	 * Failures are caught, logged, and surfaced once so the user learns their settings
+	 * did not persist.
+	 *
+	 * This is for the fire-and-forget setters only. Anything that *awaits* a save is by
+	 * definition persistence-dependent (provider create/rename/delete, `deleteData`) and
+	 * must not be told a write succeeded when it did not — those call
+	 * `saveSettingsOrThrow` and let the failure reach their own caller.
+	 */
+	private async saveSettings(): Promise<void> {
+		try {
+			await this.saveSettingsOrThrow();
+		} catch (error) {
+			Logger.error("Failed to persist plugin settings:", error);
+			this.notifySaveFailed(error);
+		}
+	}
+
+	/** Persist and propagate failure, for callers that must observe a failed write. */
+	private async saveSettingsOrThrow(): Promise<void> {
 		const snap = $state.snapshot(this.#data);
 		await this._plugin.saveData(snap);
+	}
+
+	/**
+	 * One notice per burst. A failing disk usually fails for every setter the user
+	 * touches, and stacking a Notice per keystroke would bury the workspace.
+	 */
+	private notifySaveFailed(error: unknown): void {
+		if (this.#saveFailureNotified) return;
+		this.#saveFailureNotified = true;
+		new Notice(`Smart Second Brain could not save your settings: ${extractErrorMessage(error)}`, 10000);
+		window.setTimeout(() => {
+			this.#saveFailureNotified = false;
+		}, 30000);
 	}
 
 	getLastActiveChatId(): UUIDv7 | null {
@@ -339,12 +383,12 @@ export class PluginDataStore {
 
 	setLastActiveChatId(id: UUIDv7 | null) {
 		this.#data.lastActiveChatId = id;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	async deleteData(): Promise<void> {
 		this.#data = structuredClone(DEFAULT_SETTINGS);
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
 	}
 
 	/**
@@ -389,12 +433,48 @@ export class PluginDataStore {
 
 	setPrivacyMode(mode: PrivacyMode) {
 		this.#data.privacyMode = mode;
-		this.saveSettings();
+		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
 	}
 
 	setPrivacyFilter(filter: PluginData["privacyFilter"]) {
 		this.#data.privacyFilter = filter;
-		this.saveSettings();
+		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
+	}
+
+	/**
+	 * Listeners for changes to what `isFilePrivate` / `isProviderTrusted` answer.
+	 * The embedding indexer subscribes: which notes an index may hold follows
+	 * from these, so a change means every index needs re-validating against
+	 * the vault (notes to drop, notes now allowed in). A plain callback set
+	 * rather than a rune, because the subscriber is a service, not a component.
+	 */
+	readonly #privacyListeners = new Set<() => void>();
+
+	/** Subscribe to privacy-rule changes; returns the unsubscribe. */
+	onPrivacyRulesChange(listener: () => void): () => void {
+		this.#privacyListeners.add(listener);
+		return () => this.#privacyListeners.delete(listener);
+	}
+
+	private notifyPrivacyRulesChanged(): void {
+		for (const listener of this.#privacyListeners) listener();
+	}
+
+	/**
+	 * Listeners for a provider rename, awaited by `renameProvider` before it
+	 * resolves. Embedding indexes are keyed `provider:model`, and so are their
+	 * IndexedDB databases: the embedding indexer moves each renamed index's
+	 * vectors to the new name, and must have done so before the UI — which
+	 * awaits the rename — opens the index under its new id.
+	 */
+	readonly #providerRenameListeners = new Set<(oldId: string, newId: string) => Promise<void> | void>();
+
+	/** Subscribe to provider renames; returns the unsubscribe. */
+	onProviderRenamed(listener: (oldId: string, newId: string) => Promise<void> | void): () => void {
+		this.#providerRenameListeners.add(listener);
+		return () => this.#providerRenameListeners.delete(listener);
 	}
 
 	isFilePrivate(filePath: string): boolean {
@@ -424,8 +504,10 @@ export class PluginDataStore {
 	setProviderTrusted(providerId: string, trusted: boolean) {
 		const config = this.#data.providerConfig[providerId];
 		if (!config) return;
+		if (config.trustedForPrivateData === trusted) return;
 		config.trustedForPrivateData = trusted;
-		this.saveSettings();
+		void this.saveSettings();
+		this.notifyPrivacyRulesChanged();
 	}
 
 	private getAllVaultPaths(): Set<string> {
@@ -453,7 +535,7 @@ export class PluginDataStore {
 		} catch {
 			// ignore
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get attachmentFolder() {
@@ -461,7 +543,7 @@ export class PluginDataStore {
 	}
 	set attachmentFolder(val: string) {
 		this.#data.attachmentFolder = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get agentFolder() {
@@ -479,7 +561,7 @@ export class PluginDataStore {
 		} catch {
 			// ignore
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get agentFolderMigrated() {
@@ -487,7 +569,7 @@ export class PluginDataStore {
 	}
 	set agentFolderMigrated(val: boolean) {
 		this.#data.agentFolderMigrated = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get coreSkillsSeeded() {
@@ -495,7 +577,7 @@ export class PluginDataStore {
 	}
 	set coreSkillsSeeded(val: boolean) {
 		this.#data.coreSkillsSeeded = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get manageSkillsFolderMigrated() {
@@ -503,7 +585,7 @@ export class PluginDataStore {
 	}
 	set manageSkillsFolderMigrated(val: boolean) {
 		this.#data.manageSkillsFolderMigrated = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get manageNotesFolderMigrated() {
@@ -511,7 +593,7 @@ export class PluginDataStore {
 	}
 	set manageNotesFolderMigrated(val: boolean) {
 		this.#data.manageNotesFolderMigrated = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -547,7 +629,7 @@ export class PluginDataStore {
 	}
 	set enableLangSmith(val: boolean) {
 		this.#data.enableLangSmith = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get langSmithApiKey() {
@@ -565,7 +647,7 @@ export class PluginDataStore {
 			}
 			this.#data.langSmithApiKeyId = "";
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get langSmithApiKeyId() {
@@ -573,7 +655,7 @@ export class PluginDataStore {
 	}
 	set langSmithApiKeyId(val: string) {
 		this.#data.langSmithApiKeyId = val.trim();
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get langSmithProject() {
@@ -581,7 +663,7 @@ export class PluginDataStore {
 	}
 	set langSmithProject(val: string) {
 		this.#data.langSmithProject = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get langSmithEndpoint() {
@@ -589,7 +671,7 @@ export class PluginDataStore {
 	}
 	set langSmithEndpoint(val: string) {
 		this.#data.langSmithEndpoint = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// ============================================================================
@@ -601,7 +683,7 @@ export class PluginDataStore {
 	}
 	set webSearchProvider(val: string) {
 		this.#data.webSearchProvider = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/** Resolve the API key for the currently selected provider (empty string if none). */
@@ -624,7 +706,7 @@ export class PluginDataStore {
 			if (existing) setSecret(this._plugin.app, existing, "");
 			delete this.#data.webSearchApiKeyIds[provider];
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/** Secret id bound to the current provider's key field in the UI (empty if unset). */
@@ -641,7 +723,7 @@ export class PluginDataStore {
 		} else {
 			delete this.#data.webSearchApiKeyIds[provider];
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// ============================================================================
@@ -689,7 +771,7 @@ export class PluginDataStore {
 	set selectedAgentId(agentId: string) {
 		if (this.#data.agents[agentId]) {
 			this.#data.selectedAgentId = agentId;
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -720,7 +802,7 @@ export class PluginDataStore {
 			throw new Error(`Agent with ID "${agentId}" not found`);
 		}
 		this.#data.defaultAgentId = agentId;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -734,7 +816,7 @@ export class PluginDataStore {
 			...this.#data.agents,
 			[agent.id]: agent,
 		};
-		this.saveSettings();
+		void this.saveSettings();
 		return agent;
 	}
 
@@ -784,7 +866,7 @@ export class PluginDataStore {
 				...normalizedUpdates,
 			},
 		};
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -823,7 +905,7 @@ export class PluginDataStore {
 			this.#data.selectedAgentId = this.#data.defaultAgentId;
 		}
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -856,7 +938,7 @@ export class PluginDataStore {
 			...this.#data.agents,
 			[newAgent.id]: newAgent,
 		};
-		this.saveSettings();
+		void this.saveSettings();
 		return newAgent;
 	}
 
@@ -877,7 +959,7 @@ export class PluginDataStore {
 		const agent = this.#data.agents[agentId];
 		if (agent?.toolsConfig[toolId]) {
 			agent.toolsConfig[toolId].enabled = !agent.toolsConfig[toolId].enabled;
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -891,7 +973,7 @@ export class PluginDataStore {
 				...agent.toolsConfig[toolId],
 				...config,
 			};
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -915,7 +997,7 @@ export class PluginDataStore {
 		if (!agent) return;
 		agent.pluginExecTools ??= {};
 		agent.pluginExecTools[toolId] = enabled;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// --- Agent-specific Subagent References ---
@@ -945,7 +1027,7 @@ export class PluginDataStore {
 		} else {
 			return;
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -990,7 +1072,7 @@ export class PluginDataStore {
 				...agent.mcpServers,
 				[serverId]: config,
 			};
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -1002,7 +1084,7 @@ export class PluginDataStore {
 		if (agent) {
 			const { [serverId]: _, ...rest } = agent.mcpServers;
 			agent.mcpServers = rest;
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -1017,7 +1099,7 @@ export class PluginDataStore {
 				...agent.mcpServers,
 				[serverId]: { ...server, enabled: !server.enabled },
 			};
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -1034,20 +1116,11 @@ export class PluginDataStore {
 		for (const [id, config] of Object.entries(agent.mcpServers)) {
 			if (!config.enabled) continue;
 
-			if (config.transport === "stdio") {
-				result[id] = {
-					transport: "stdio",
-					command: config.command,
-					args: config.args,
-					...(config.env && Object.keys(config.env).length > 0 && { env: config.env }),
-				};
-			} else {
-				result[id] = {
-					transport: "http",
-					url: config.url,
-					...(config.headers && Object.keys(config.headers).length > 0 && { headers: config.headers }),
-				};
-			}
+			result[id] = {
+				transport: "http",
+				url: config.url,
+				...(config.headers && Object.keys(config.headers).length > 0 && { headers: config.headers }),
+			};
 		}
 
 		return result;
@@ -1071,7 +1144,7 @@ export class PluginDataStore {
 		if (!agent) return;
 
 		agent.skills[skillId] = { enabled };
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1082,7 +1155,7 @@ export class PluginDataStore {
 		if (!agent?.skills[skillId]) return false;
 
 		delete agent.skills[skillId];
-		this.saveSettings();
+		void this.saveSettings();
 		return true;
 	}
 
@@ -1092,7 +1165,7 @@ export class PluginDataStore {
 	set isVerbose(val: boolean) {
 		this.#data.isVerbose = val;
 		applyVerboseLogging(val);
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get showToolIODetails() {
@@ -1100,7 +1173,7 @@ export class PluginDataStore {
 	}
 	set showToolIODetails(val: boolean) {
 		this.#data.showToolIODetails = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get thinkingProcessExpanded() {
@@ -1108,7 +1181,7 @@ export class PluginDataStore {
 	}
 	set thinkingProcessExpanded(val: boolean) {
 		this.#data.thinkingProcessExpanded = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get showActiveAgentsInStatusBar() {
@@ -1116,7 +1189,7 @@ export class PluginDataStore {
 	}
 	set showActiveAgentsInStatusBar(val: boolean) {
 		this.#data.showActiveAgentsInStatusBar = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get overrideMobileNavbarSearch() {
@@ -1124,7 +1197,7 @@ export class PluginDataStore {
 	}
 	set overrideMobileNavbarSearch(val: boolean) {
 		this.#data.overrideMobileNavbarSearch = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get suppressIntegrationPrivacyWarning() {
@@ -1132,7 +1205,7 @@ export class PluginDataStore {
 	}
 	set suppressIntegrationPrivacyWarning(val: boolean) {
 		this.#data.suppressIntegrationPrivacyWarning = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get onboardingComplete() {
@@ -1140,7 +1213,7 @@ export class PluginDataStore {
 	}
 	set onboardingComplete(val: boolean) {
 		this.#data.onboardingComplete = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get onboardingSplashSeen() {
@@ -1148,7 +1221,7 @@ export class PluginDataStore {
 	}
 	set onboardingSplashSeen(val: boolean) {
 		this.#data.onboardingSplashSeen = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get dismissedRecommendations() {
@@ -1161,13 +1234,13 @@ export class PluginDataStore {
 		if (!this.#data.dismissedRecommendations.includes(id)) {
 			// Reassign (not push) so $state reactivity fires.
 			this.#data.dismissedRecommendations = [...this.#data.dismissedRecommendations, id];
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 	/** Brings every dismissed recommendation back. Exposed in Developer settings. */
 	restoreDismissedRecommendations() {
 		this.#data.dismissedRecommendations = [];
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get searchShowPath() {
@@ -1175,7 +1248,7 @@ export class PluginDataStore {
 	}
 	set searchShowPath(val: boolean) {
 		this.#data.searchShowPath = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get searchShowTags() {
@@ -1183,7 +1256,7 @@ export class PluginDataStore {
 	}
 	set searchShowTags(val: boolean) {
 		this.#data.searchShowTags = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get searchShowMatchBadges() {
@@ -1191,7 +1264,7 @@ export class PluginDataStore {
 	}
 	set searchShowMatchBadges(val: boolean) {
 		this.#data.searchShowMatchBadges = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get searchShowMatchContext() {
@@ -1199,7 +1272,7 @@ export class PluginDataStore {
 	}
 	set searchShowMatchContext(val: boolean) {
 		this.#data.searchShowMatchContext = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get searchShowKeyboardHints() {
@@ -1207,7 +1280,7 @@ export class PluginDataStore {
 	}
 	set searchShowKeyboardHints(val: boolean) {
 		this.#data.searchShowKeyboardHints = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get recentNotes(): RecentNoteEntry[] {
@@ -1216,7 +1289,7 @@ export class PluginDataStore {
 
 	async clearRecentNotes(): Promise<void> {
 		this.#data.recentNotes = [];
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
 	}
 
 	recordRecentlyOpenedNote(path: string): void {
@@ -1229,7 +1302,7 @@ export class PluginDataStore {
 			(entry) => entry.path !== normalizedPath && now - entry.lastOpenedAt < RECENT_NOTE_WINDOW_MS,
 		);
 		this.#data.recentNotes = [{ path: normalizedPath, lastOpenedAt: now }, ...existing].slice(0, MAX_RECENT_NOTES);
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// --- Embedding Indexes (Multi-Index) ---
@@ -1305,7 +1378,7 @@ export class PluginDataStore {
 			this.#data.graphEmbedIndex = indexId;
 		}
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1318,7 +1391,7 @@ export class PluginDataStore {
 			this.#data.graphEmbedIndex = null;
 		}
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1326,14 +1399,41 @@ export class PluginDataStore {
 	 */
 	updateEmbeddingIndexStats(
 		indexId: string,
-		stats: { lastBuiltAt?: number; documentCount?: number; dimensions?: number },
+		stats: {
+			lastBuiltAt?: number | null;
+			documentCount?: number;
+			dimensions?: number;
+			failedNotes?: Record<string, number>;
+		},
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
 		if (!config) return;
-		if (stats.lastBuiltAt !== undefined) config.lastBuiltAt = stats.lastBuiltAt;
-		if (stats.documentCount !== undefined) config.documentCount = stats.documentCount;
-		if (stats.dimensions !== undefined) config.dimensions = stats.dimensions;
-		this.saveSettings();
+		// Skip the save when nothing moved: the count is now re-synced at every
+		// index open and bulk checkpoint, and most of those confirm the cached
+		// value rather than change it.
+		let changed = false;
+		if (stats.lastBuiltAt !== undefined && config.lastBuiltAt !== stats.lastBuiltAt) {
+			config.lastBuiltAt = stats.lastBuiltAt;
+			changed = true;
+		}
+		if (stats.documentCount !== undefined && config.documentCount !== stats.documentCount) {
+			config.documentCount = stats.documentCount;
+			changed = true;
+		}
+		if (stats.dimensions !== undefined && config.dimensions !== stats.dimensions) {
+			config.dimensions = stats.dimensions;
+			changed = true;
+		}
+		if (stats.failedNotes !== undefined) {
+			// Written only when the set actually moved (the indexer diffs first);
+			// an empty record is dropped rather than stored.
+			const next = Object.keys(stats.failedNotes).length > 0 ? stats.failedNotes : undefined;
+			if (next !== undefined || config.failedNotes !== undefined) {
+				config.failedNotes = next;
+				changed = true;
+			}
+		}
+		if (changed) void this.saveSettings();
 	}
 
 	/**
@@ -1349,7 +1449,7 @@ export class PluginDataStore {
 
 		this.#data.embeddingIndexes = this.#data.embeddingIndexes.filter((i) => i.id !== indexId);
 
-		this.saveSettings();
+		void this.saveSettings();
 		return true;
 	}
 
@@ -1367,7 +1467,7 @@ export class PluginDataStore {
 	}
 	set smartGraphSettings(val: SmartGraphSettings) {
 		this.#data.smartGraphSettings = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// --- Diff View Mode ---
@@ -1377,7 +1477,7 @@ export class PluginDataStore {
 	}
 	set diffViewMode(val: DiffViewMode) {
 		this.#data.diffViewMode = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	get vaultSlug(): string {
@@ -1392,7 +1492,7 @@ export class PluginDataStore {
 	}
 	set chatOpenLocation(val: ChatOpenLocation) {
 		this.#data.chatOpenLocation = val;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// --- Favorite Models ---
@@ -1415,7 +1515,7 @@ export class PluginDataStore {
 		} else {
 			this.#data.favoriteModels.push({ provider, model });
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// Get/set isConfigured for a provider
@@ -1431,7 +1531,7 @@ export class PluginDataStore {
 		const wasConfigured = config.isConfigured;
 		config.isConfigured = !wasConfigured;
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1514,7 +1614,7 @@ export class PluginDataStore {
 			// Store as value
 			config.auth.values[key] = value as string;
 		}
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1563,7 +1663,7 @@ export class PluginDataStore {
 		if (!config) return;
 		if (modelName in config.embedModels) throw new AddEmbedModelError(provider, modelName);
 		config.embedModels = { ...config.embedModels, [modelName]: conf };
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	updateEmbedModel(provider: string, modelName: string, conf: EmbedModelConfig) {
@@ -1571,7 +1671,7 @@ export class PluginDataStore {
 		if (!config) return;
 		if (!(modelName in config.embedModels)) throw new SetEmbedModelError(provider, modelName);
 		config.embedModels = { ...config.embedModels, [modelName]: conf };
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	deleteEmbedModel(provider: string, modelName: string) {
@@ -1580,7 +1680,7 @@ export class PluginDataStore {
 		if (!(modelName in config.embedModels)) throw new SetEmbedModelError(provider, modelName);
 		const { [modelName]: _, ...rest } = config.embedModels;
 		config.embedModels = rest;
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// --- Chat Model Management (Record-based) ---
@@ -1595,7 +1695,7 @@ export class PluginDataStore {
 		if (!config) return;
 		if (modelName in config.chatModels) throw new AddChatModelError(provider, modelName);
 		config.chatModels = { ...config.chatModels, [modelName]: conf };
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	updateChatModel(provider: string, modelName: string, conf: ChatModelConfig) {
@@ -1603,7 +1703,7 @@ export class PluginDataStore {
 		if (!config) return;
 		if (!(modelName in config.chatModels)) throw new SetChatModelError(provider, modelName);
 		config.chatModels = { ...config.chatModels, [modelName]: conf };
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	deleteChatModel(provider: string, modelName: string) {
@@ -1625,7 +1725,7 @@ export class PluginDataStore {
 			}
 		}
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	// Get/set chatModels
@@ -1638,7 +1738,7 @@ export class PluginDataStore {
 		const config = this.#data.providerConfig[provider];
 		if (config) {
 			config.chatModels = value;
-			this.saveSettings();
+			void this.saveSettings();
 		}
 	}
 
@@ -1745,7 +1845,7 @@ export class PluginDataStore {
 			unsyncProvider(providerId);
 		}
 
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1769,7 +1869,7 @@ export class PluginDataStore {
 		// Refresh the registry's cached auth — it snapshots the resolved AuthObject at
 		// registration, so an edited key/baseUrl would otherwise keep using the old value.
 		this.syncProviderIfConfigured(providerId);
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1787,7 +1887,7 @@ export class PluginDataStore {
 			delete config.auth.secretIds[fieldName];
 		}
 		this.syncProviderIfConfigured(providerId);
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	getProviderAuthMode(providerId: string): OpenAIAuthMode {
@@ -1808,7 +1908,7 @@ export class PluginDataStore {
 		if (!config) return;
 		config.auth.authMode = authMode;
 		this.syncProviderIfConfigured(providerId);
-		this.saveSettings();
+		void this.saveSettings();
 	}
 
 	/**
@@ -1878,7 +1978,7 @@ export class PluginDataStore {
 			isConfigured: configured,
 		};
 
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
 	}
 
 	async updateProviderMeta(providerId: string, updates: Partial<ProviderInstanceMeta>): Promise<void> {
@@ -1908,7 +2008,7 @@ export class PluginDataStore {
 			};
 		}
 
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
 	}
 
 	/**
@@ -1971,7 +2071,10 @@ export class PluginDataStore {
 		// registry rather than syncing a single ID.
 		syncAllProviders(this);
 
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
+		// The config is saved either way; a listener that fails logs and leaves
+		// the index to rebuild, which is what happened before on every rename.
+		await Promise.all([...this.#providerRenameListeners].map((listener) => listener(oldId, newId)));
 	}
 
 	/**
@@ -2055,7 +2158,7 @@ export class PluginDataStore {
 		// SecretStorage — until the next Obsidian reload.
 		unsyncProvider(providerId);
 
-		await this.saveSettings();
+		await this.saveSettingsOrThrow();
 
 		return orphanedIndexIds;
 	}

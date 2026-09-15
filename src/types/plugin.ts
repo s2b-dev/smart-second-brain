@@ -73,6 +73,12 @@ export interface EmbeddingIndexConfig {
 	batchSize?: number;
 	/** Vector width the model produced, recorded from the first stored vector */
 	dimensions?: number;
+	/**
+	 * Notes the provider rejected (a content filter, a chunk it refuses), keyed
+	 * by path with the mtime they failed at. Validation leaves them alone until
+	 * that mtime changes; absent when nothing failed.
+	 */
+	failedNotes?: Record<string, number>;
 }
 
 // ============================================================================
@@ -80,11 +86,11 @@ export interface EmbeddingIndexConfig {
 // ============================================================================
 
 /**
- * Transport type for MCP servers
- * - stdio: Local processes (recommended)
- * - http: Streamable HTTP (recommended for remote servers)
+ * Transport type for MCP servers. Only Streamable HTTP is supported: a stdio
+ * transport would spawn local processes (`child_process`), which is shell access
+ * the plugin deliberately does not have.
  */
-export type MCPTransportType = "stdio" | "http";
+export type MCPTransportType = "http";
 
 /**
  * Base configuration shared by all MCP server types
@@ -99,20 +105,7 @@ interface MCPServerBaseConfig {
 }
 
 /**
- * Configuration for stdio-based MCP servers (local processes)
- */
-export interface MCPStdioServerConfig extends MCPServerBaseConfig {
-	transport: "stdio";
-	/** Command to execute */
-	command: string;
-	/** Arguments to pass to the command */
-	args: string[];
-	/** Environment variables */
-	env?: Record<string, string>;
-}
-
-/**
- * Configuration for HTTP-based MCP servers (Streamable HTTP - recommended for remote)
+ * Configuration for HTTP-based MCP servers (Streamable HTTP)
  */
 export interface MCPHTTPServerConfig extends MCPServerBaseConfig {
 	transport: "http";
@@ -123,9 +116,9 @@ export interface MCPHTTPServerConfig extends MCPServerBaseConfig {
 }
 
 /**
- * Union type for all MCP server configurations
+ * MCP server configuration (HTTP is the only transport).
  */
-export type MCPServerConfig = MCPStdioServerConfig | MCPHTTPServerConfig;
+export type MCPServerConfig = MCPHTTPServerConfig;
 
 /**
  * Record of MCP server configurations keyed by server ID

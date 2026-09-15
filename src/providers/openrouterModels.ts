@@ -7,6 +7,8 @@
  * @see https://openrouter.ai/docs/api/api-reference/models/get-models
  */
 
+import { Logger } from "../utils/logging";
+
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
@@ -132,7 +134,7 @@ export async function fetchOpenRouterModels(): Promise<Map<string, OpenRouterMod
 	}
 
 	try {
-		const response = await globalThis.fetch(OPENROUTER_MODELS_URL, {
+		const response = await window.fetch(OPENROUTER_MODELS_URL, {
 			method: "GET",
 			headers: {
 				Accept: "application/json",
@@ -140,7 +142,7 @@ export async function fetchOpenRouterModels(): Promise<Map<string, OpenRouterMod
 		});
 
 		if (!response.ok) {
-			console.warn(`Failed to fetch OpenRouter models: ${response.status}`);
+			Logger.warn(`Failed to fetch OpenRouter models: ${response.status}`);
 			return cachedResponse?.models ?? null;
 		}
 
@@ -164,7 +166,7 @@ export async function fetchOpenRouterModels(): Promise<Map<string, OpenRouterMod
 
 		return models;
 	} catch (error) {
-		console.warn("Error fetching OpenRouter models:", error);
+		Logger.warn("Error fetching OpenRouter models:", error);
 		return cachedResponse?.models ?? null;
 	}
 }

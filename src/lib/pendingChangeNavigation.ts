@@ -1,7 +1,7 @@
-import type { EditorView } from "@codemirror/view";
 import { diffLines } from "diff";
 import { MarkdownView, Notice, TFile } from "obsidian";
 import { computeOriginalAffectedLines, countOriginalLines, insertionAnchorLine } from "../editor/diffLineMath";
+import { getEditorView } from "./editor";
 import type SecondBrainPlugin from "../main";
 import { getPendingChangesStore } from "../stores/pendingChangesStore.svelte";
 import type { PendingChange, PendingChangeEntry } from "../types/shared";
@@ -204,8 +204,7 @@ const SCROLL_ANCHOR_FRACTION = 1 / 5;
 function scrollToLine(view: MarkdownView, line: number): void {
 	const apply = () => {
 		// Edit mode: anchor the line's document-space top to the top third.
-		// biome-ignore lint/suspicious/noExplicitAny: Obsidian internal CM6 API
-		const cm = (view.editor as any)?.cm as EditorView | undefined;
+		const cm = getEditorView(view.editor);
 		if (cm?.state && cm.scrollDOM && view.getMode() === "source") {
 			try {
 				const lineCount = cm.state.doc.lines;
@@ -231,7 +230,7 @@ function scrollToLine(view: MarkdownView, line: number): void {
 		}
 	};
 	apply();
-	requestAnimationFrame(apply);
+	window.requestAnimationFrame(apply);
 	window.setTimeout(apply, 50);
 	// One later retry: reading-mode layout can settle a frame or two late, so a
 	// final pass ensures the scroll lands where intended.

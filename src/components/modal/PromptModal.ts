@@ -29,7 +29,6 @@ class PromptModal extends Modal {
 			value: this.initialValue,
 		});
 		input.classList.add("s2b-prompt-input");
-		input.style.width = "100%";
 		input.focus();
 		input.select();
 

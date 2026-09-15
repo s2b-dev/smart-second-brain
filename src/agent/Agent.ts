@@ -1,6 +1,6 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { type BaseMessage, HumanMessage, isAIMessage } from "@langchain/core/messages";
-import type { MessageContentComplex, ToolCallChunk } from "@langchain/core/messages";
+import { AIMessage, type BaseMessage, HumanMessage } from "@langchain/core/messages";
+import type { ContentBlock, ToolCallChunk } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import type { BaseCheckpointSaver, CheckpointTuple } from "@langchain/langgraph";
@@ -421,12 +421,12 @@ export class Agent {
 		supportsVision: boolean,
 		currentProvider: string,
 		attachments?: ChatAttachment[],
-	): Promise<string | MessageContentComplex[]> {
+	): Promise<string | ContentBlock[]> {
 		if (!attachments || attachments.length === 0) {
 			return query;
 		}
 
-		const contentParts: MessageContentComplex[] = [{ type: "text", text: query }];
+		const contentParts: ContentBlock[] = [{ type: "text", text: query }];
 		const hasImages = attachments.some((a) => a.mimeType.startsWith("image/"));
 		const skipImagesForNonVisionModel = hasImages && !supportsVision;
 		let addedImageSkipNotice = false;
@@ -443,7 +443,7 @@ export class Agent {
 							type: "text",
 							text: "[Image attachments were skipped because the selected model does not support vision. Switch to a vision-capable model to analyze images.]",
 							s2b_attachment: true,
-						} as unknown as MessageContentComplex);
+						});
 						addedImageSkipNotice = true;
 					}
 					continue;
@@ -476,7 +476,7 @@ export class Agent {
 						type: "text",
 						text: `[PDF "${attachment.name}" not found at ${attachment.vaultPath}]`,
 						s2b_attachment: true,
-					} as unknown as MessageContentComplex);
+					});
 					continue;
 				}
 				const buffer = await app.vault.readBinary(file);
@@ -493,7 +493,7 @@ export class Agent {
 						data: toBase64(buffer),
 						mime_type: "application/pdf",
 						metadata: { filename: attachment.name },
-					} as unknown as MessageContentComplex);
+					});
 				} else {
 					// Providers without native PDF support: extract text locally
 					const data = new Uint8Array(buffer);
@@ -505,20 +505,20 @@ export class Agent {
 								type: "text",
 								text: `--- PDF: ${attachment.name} (${totalPages} pages) ---\n${truncated}\n--- End PDF ---`,
 								s2b_attachment: true,
-							} as unknown as MessageContentComplex);
+							});
 						} else {
 							contentParts.push({
 								type: "text",
 								text: `[PDF "${attachment.name}" contains ${totalPages} page(s) but no extractable text. It may contain only images/scans.]`,
 								s2b_attachment: true,
-							} as unknown as MessageContentComplex);
+							});
 						}
 					} catch (error) {
 						contentParts.push({
 							type: "text",
 							text: `[Error extracting text from PDF "${attachment.name}": ${error instanceof Error ? error.message : String(error)}]`,
 							s2b_attachment: true,
-						} as unknown as MessageContentComplex);
+						});
 					}
 				}
 			} else {
@@ -529,7 +529,7 @@ export class Agent {
 						type: "text",
 						text: `[File "${attachment.name}" not found at ${attachment.vaultPath}]`,
 						s2b_attachment: true,
-					} as unknown as MessageContentComplex);
+					});
 					continue;
 				}
 				try {
@@ -539,13 +539,13 @@ export class Agent {
 						type: "text",
 						text: `--- File: ${attachment.name} ---\n${truncated}\n--- End File ---`,
 						s2b_attachment: true,
-					} as unknown as MessageContentComplex);
+					});
 				} catch (error) {
 					contentParts.push({
 						type: "text",
 						text: `[Error reading "${attachment.name}": ${error instanceof Error ? error.message : String(error)}]`,
 						s2b_attachment: true,
-					} as unknown as MessageContentComplex);
+					});
 				}
 			}
 		}
@@ -748,7 +748,7 @@ export class Agent {
 						// getRunnableConfig() (re-injecting __pregel_read). runWithConfig
 						// re-runs the subgraph in a fresh ALS context whose ambient config is
 						// our clean config, so the parent's channels are no longer visible.
-						return AsyncLocalStorageProviderSingleton.runWithConfig(cleanConfig as never, () =>
+						return AsyncLocalStorageProviderSingleton.runWithConfig(cleanConfig, () =>
 							compiledGraph.invoke(state, cleanConfig),
 						) as Promise<never>;
 					};
@@ -765,11 +765,11 @@ export class Agent {
 	/**
 	 * Creates a HumanMessage with optional attachment metadata in additional_kwargs.
 	 * Attachment metadata is stored so it can be reconstructed from checkpoints.
-	 * Uses the object form so that multimodal content arrays (MessageContentComplex[])
+	 * Uses the object form so that multimodal content arrays (ContentBlock[])
 	 * are correctly assigned to BaseMessage.content instead of being silently dropped.
 	 */
 	private createHumanMessage(
-		content: string | MessageContentComplex[],
+		content: string | ContentBlock[],
 		attachments?: ChatAttachment[],
 		visibleNotes?: VisibleNoteRef[],
 		selection?: SelectionRef,
@@ -786,7 +786,7 @@ export class Agent {
 		if (reviewStatus) additional_kwargs.reviewStatus = reviewStatus;
 		const hasKwargs = Object.keys(additional_kwargs).length > 0;
 		// Cast content — the HumanMessage constructor handles both string and
-		// MessageContentComplex[] at runtime, but the TS types are overly strict.
+		// ContentBlock[] at runtime, but the TS types are overly strict.
 		return new HumanMessage({
 			content: content as string,
 			additional_kwargs: hasKwargs ? additional_kwargs : undefined,
@@ -878,8 +878,7 @@ export class Agent {
 		Logger.debug("agent.run.complete", {
 			runId,
 			durationMs: result.durationMs,
-			responsePreview:
-				typeof result.response === "string" ? (result.response as string).slice(0, 200) : undefined,
+			responsePreview: typeof result.response === "string" ? result.response.slice(0, 200) : undefined,
 		});
 
 		return result;
@@ -1049,7 +1048,7 @@ export class Agent {
 
 				if (mode === "messages") {
 					const [message, msgMeta] = payload as [BaseMessage, Record<string, unknown>];
-					if (message.getType() === "ai") {
+					if (message.type === "ai") {
 						// Tokens authored by a subagent carry `lc_agent_name` in their stream
 						// metadata (set by deepagents' `task` tool). The subagent's answer is
 						// delivered to the parent via the `task` ToolMessage (rendered under the
@@ -1201,8 +1200,7 @@ export class Agent {
 		Logger.debug(`${label}.complete`, {
 			runId,
 			durationMs: result.durationMs,
-			responsePreview:
-				typeof result.response === "string" ? (result.response as string).slice(0, 200) : undefined,
+			responsePreview: typeof result.response === "string" ? result.response.slice(0, 200) : undefined,
 		});
 
 		yield {
@@ -1513,16 +1511,18 @@ export class Agent {
 	}
 
 	private wrapCheckpointer(checkpointer: BaseCheckpointSaver): BaseCheckpointSaver {
-		const agent = this;
+		// The async generator below is a `function*` (arrow generators do not exist),
+		// so it cannot see the class `this`; hand it a bound normalizer instead.
+		const normalizeTuple = (tuple: CheckpointTuple | undefined) => this.normalizeCheckpointTuple(tuple);
 		return new Proxy(checkpointer, {
-			get(target, prop, receiver) {
+			get: (target, prop, receiver) => {
 				if (prop === "getTuple") {
 					return async (...args: unknown[]) => {
 						const getTuple = Reflect.get(target, prop, receiver) as (
 							...innerArgs: unknown[]
 						) => Promise<CheckpointTuple | undefined>;
 						const tuple = await getTuple.apply(target, args);
-						return agent.normalizeCheckpointTuple(tuple);
+						return normalizeTuple(tuple);
 					};
 				}
 
@@ -1532,7 +1532,7 @@ export class Agent {
 							...innerArgs: unknown[]
 						) => AsyncIterable<CheckpointTuple>;
 						for await (const tuple of list.apply(target, args)) {
-							yield agent.normalizeCheckpointTuple(tuple) as CheckpointTuple;
+							yield normalizeTuple(tuple) as CheckpointTuple;
 						}
 					};
 				}
@@ -1540,7 +1540,7 @@ export class Agent {
 				const value = Reflect.get(target, prop, receiver);
 				return typeof value === "function" ? value.bind(target) : value;
 			},
-		}) as BaseCheckpointSaver;
+		});
 	}
 
 	private normalizeCheckpointTuple(tuple: CheckpointTuple | undefined): CheckpointTuple | undefined {
@@ -1548,7 +1548,7 @@ export class Agent {
 			return tuple;
 		}
 
-		const channelValues = tuple.checkpoint.channel_values as Record<string, unknown>;
+		const channelValues = tuple.checkpoint.channel_values;
 		const rawMessages = channelValues.messages;
 		if (!Array.isArray(rawMessages)) {
 			return tuple;
@@ -1564,7 +1564,7 @@ export class Agent {
 					messages: normalizedMessages,
 				},
 			},
-		} as CheckpointTuple;
+		};
 	}
 
 	private extractMessagesFromResult(result: unknown): BaseMessage[] {
@@ -1817,10 +1817,9 @@ export class Agent {
 			metadata.lastMessagePreview = preview.slice(0, 200);
 		}
 		// Map LangChain type to role for metadata
-		if (lastMessage?.getType) {
-			const lcType = lastMessage.getType();
-			const role = lcType === "human" ? "user" : lcType === "ai" ? "assistant" : lcType;
-			metadata.lastMessageRole = role;
+		const lcType = lastMessage?.type;
+		if (lcType) {
+			metadata.lastMessageRole = lcType === "human" ? "user" : lcType === "ai" ? "assistant" : lcType;
 		}
 		await this.threadStore.write(
 			createSnapshot({
@@ -1921,8 +1920,8 @@ ${userMessage}`;
 	}
 
 	private generateId(): string {
-		if (typeof globalThis.crypto !== "undefined" && "randomUUID" in globalThis.crypto) {
-			return globalThis.crypto.randomUUID();
+		if (typeof window.crypto !== "undefined" && "randomUUID" in window.crypto) {
+			return window.crypto.randomUUID();
 		}
 		return `run_${Math.random().toString(36).slice(2, 10)}`;
 	}
@@ -1944,7 +1943,7 @@ ${userMessage}`;
 
 		// Find the last AI message (assistant)
 		for (let i = messages.length - 1; i >= 0; i--) {
-			if (isAIMessage(messages[i])) {
+			if (AIMessage.isInstance(messages[i])) {
 				return messages[i];
 			}
 		}

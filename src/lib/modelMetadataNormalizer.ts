@@ -1,5 +1,5 @@
 import { lookupModelInfoSync, type ModelsDevApiResponse } from "../providers/modelsDevApi";
-import { formatParameterSize, type OllamaModelInfo } from "../providers/ollamaModels";
+import { formatParameterSize, OLLAMA_EMBED_NUM_CTX, type OllamaModelInfo } from "../providers/ollamaModels";
 import {
 	extractCapabilities as extractOpenRouterCapabilities,
 	type OpenRouterModelInfo,
@@ -165,13 +165,21 @@ export function hydrateEmbeddingModel(
 
 	const providerDefaultMaxInputTokens = DEFAULT_EMBED_MAX_INPUT_TOKENS_BY_PROVIDER[provider];
 
-	const maxInputTokens =
+	const advertisedMaxInputTokens =
 		maxInputFromOpenRouter ||
 		ollama?.contextLength ||
 		modelsDev?.limit?.input ||
 		modelsDev?.limit?.context ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;
+
+	// Ollama's `/api/show` reports the architecture's context length (40960 for
+	// qwen3-embedding), not what the server will accept: that is bounded by the
+	// `num_ctx` each request carries. The embedding client pins num_ctx to
+	// OLLAMA_EMBED_NUM_CTX, so the budget the chunker sizes against must be the
+	// same number or every long note is rejected (#485).
+	const maxInputTokens =
+		provider === "ollama" ? Math.min(advertisedMaxInputTokens, OLLAMA_EMBED_NUM_CTX) : advertisedMaxInputTokens;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
 

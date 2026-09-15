@@ -20,6 +20,13 @@ const BASENAME_RE = /(?:.*\/)?([^/]+?)(?:\.\w+)?$/;
 interface Props {
 	/** Graph note paths set externally (e.g. from Messenger.pendingGraphNotes). */
 	graphPaths?: string[];
+	/** Name of the topic(s) `graphPaths` exactly matches, or null/undefined if
+	 * the selection isn't a whole topic (e.g. Messenger.graphSelectionTopicLabel). */
+	topicLabel?: string | null;
+	/** True when `graphPaths` was republished by background vault maintenance
+	 * (a live patch pruning deleted notes) rather than a new user selection
+	 * gesture (e.g. Messenger.graphSelectionIsMaintenance). */
+	graphSelectionIsMaintenance?: boolean;
 	/** Content attachments (files whose bytes/content are inlined into the message). */
 	attachments?: ChatAttachment[];
 	/** Remove a content attachment. */
@@ -32,6 +39,8 @@ interface Props {
 
 let {
 	graphPaths = [],
+	topicLabel = null,
+	graphSelectionIsMaintenance = false,
 	attachments = [],
 	onRemoveAttachment,
 	onPromoteToAttachment,
@@ -82,11 +91,36 @@ let graphDismissed = $state(new Set<string>());
 // Graph selections can be large (lasso-select of many nodes). Collapse them into
 // a single summary chip by default; expand on demand to review/remove individuals.
 let graphExpanded = $state(false);
+// `graphPaths` changes for two different reasons, which need opposite treatment:
+//  1. A genuinely new selection gesture (topic click, panel row, lasso, Shift-click,
+//     drilling into one cluster of a larger selection) — may be a subset of, equal
+//     to, or disjoint from the old one, but the user's old dismissals shouldn't
+//     carry over regardless of shape: without a reset, stale exclusions would filter
+//     fresh paths out of a selection the user never touched, and (since the topic
+//     label requires an exact match) permanently hide the name for a selection
+//     gesture that has nothing to do with the earlier dismissal.
+//  2. A background live-patch pruning vault-deleted notes out of the *current*
+//     selection (SmartGraphView's live-patch handler): this republishes a fresh,
+//     shrunk array too, but it's the same selection minus some notes — a note the
+//     user explicitly dismissed must stay dismissed, not reappear because of
+//     unrelated vault maintenance.
+// These can't be told apart from the paths alone — a user picking a smaller
+// selection also produces a subset, so shape is not a valid signal (see the prior
+// `isPrune`-by-membership attempt). SmartGraphView knows which case it is by
+// construction (only its live-patch handler sets `graphSelectionIsMaintenance`), so
+// it's threaded through as an explicit flag instead of inferred here.
+$effect(() => {
+	void graphPaths; // establish the dependency; the reset itself is unconditional
+	if (!graphSelectionIsMaintenance) graphDismissed = new Set();
+});
 const activeGraphPaths = $derived(graphPaths.filter((p) => !graphDismissed.has(p)));
 // Once every graph note is dismissed there's nothing to expand.
 $effect(() => {
 	if (activeGraphPaths.length === 0 && graphExpanded) graphExpanded = false;
 });
+// The topic name only describes the full, untouched selection — once the user
+// dismisses any member of it, the remaining notes no longer are that topic.
+const effectiveTopicLabel = $derived(activeGraphPaths.length === graphPaths.length ? topicLabel : null);
 
 // --- One-way outputs. Derived, not synced through effects, per the repo's
 // Svelte guidance. Exposed as getter functions (Svelte disallows exporting
@@ -288,12 +322,16 @@ onDestroy(() => {
           class="chip-body s2b-pill s2b-pill--interactive"
           title={graphExpanded
             ? "Graph selection — click to collapse"
-            : `${activeGraphPaths.length} note${activeGraphPaths.length === 1 ? "" : "s"} from graph — click to expand`}
+            : effectiveTopicLabel
+              ? `${effectiveTopicLabel} — click to expand`
+              : `${activeGraphPaths.length} note${activeGraphPaths.length === 1 ? "" : "s"} from graph — click to expand`}
           aria-expanded={graphExpanded}
           onclick={() => (graphExpanded = !graphExpanded)}
         >
           <div class="chip-icon" use:icon={"git-fork"} style="--icon-size: 12px"></div>
-          <span>{activeGraphPaths.length} Graph Note{activeGraphPaths.length === 1 ? "" : "s"}</span>
+          <span>
+            {effectiveTopicLabel ?? `${activeGraphPaths.length} Graph Note${activeGraphPaths.length === 1 ? "" : "s"}`}
+          </span>
           <div class="chip-icon chip-chevron" use:icon={graphExpanded ? "chevron-up" : "chevron-down"} style="--icon-size: 12px"></div>
         </button>
         <button

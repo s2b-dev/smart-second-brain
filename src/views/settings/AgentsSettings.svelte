@@ -17,6 +17,7 @@ import { getData } from "../../stores/dataStore.svelte";
 import { DEFAULT_AGENT_ID } from "../../stores/agentDefaults";
 import { getPlugin } from "../../stores/state.svelte";
 import { DEFAULT_AGENT_ICON, type ChatOpenLocation } from "../../types/plugin";
+import { isMobileUI } from "../../utils/platform";
 
 const pluginData = getData();
 const plugin = getPlugin();
@@ -251,15 +252,19 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
       />
     </SettingItem>
 
-    <SettingItem
-      name="Show active agents in status bar"
-      desc="Display a clickable indicator in the status bar for each chat with a running agent."
-    >
-      <Toggle
-        checked={pluginData.showActiveAgentsInStatusBar}
-        onchange={(checked) => (pluginData.showActiveAgentsInStatusBar = checked)}
-      />
-    </SettingItem>
+    <!-- Obsidian mobile has no status bar (addStatusBarItem is a no-op there), so the
+         toggle would control nothing. Hide it rather than offering a dead switch. -->
+    {#if !isMobileUI()}
+      <SettingItem
+        name="Show active agents in status bar"
+        desc="Display a clickable indicator in the status bar for each chat with a running agent."
+      >
+        <Toggle
+          checked={pluginData.showActiveAgentsInStatusBar}
+          onchange={(checked) => (pluginData.showActiveAgentsInStatusBar = checked)}
+        />
+      </SettingItem>
+    {/if}
   </SettingGroup>
 </div>
 

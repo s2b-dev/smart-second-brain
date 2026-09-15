@@ -34,6 +34,8 @@ interface Props {
 	showWikiLinks?: boolean;
 	/** When false, inferred semantic similarity edges are not drawn (they still inform topics). */
 	showSemanticLinks?: boolean;
+	/** When true, drawn inferred edges take the accent colour instead of the shared line colour. */
+	highlightSemanticLinks?: boolean;
 	/** When false, the tinted topic regions are not drawn. */
 	showTopicHulls?: boolean;
 	focusedClusters?: Set<number>;
@@ -46,6 +48,8 @@ interface Props {
 	 */
 	clusterCohesionStrength?: number;
 	onNodeClick?: (path: string) => void;
+	/** A tag node was clicked; receives the tag as labelled (with its `#`). */
+	onTagClick?: (tag: string) => void;
 	/** Fold or unfold one topic. Used by the context menu's direct actions. */
 	onSetTopicCollapsed?: (cluster: number, collapsed: boolean) => void;
 	onRevealFile?: (path: string) => void;
@@ -86,12 +90,14 @@ let {
 	linkStrength = 1,
 	showWikiLinks = true,
 	showSemanticLinks = true,
+	highlightSemanticLinks = false,
 	showTopicHulls = true,
 	focusedClusters = new Set<number>(),
 	clusterLabels = {},
 	showClusterLabels = true,
 	clusterCohesionStrength = 0.15,
 	onNodeClick,
+	onTagClick,
 	onSetTopicCollapsed,
 	onRevealFile,
 	onFocusCluster,
@@ -128,7 +134,11 @@ let pixi: PixiRenderer | null = null;
 // camera fit already magnifies the handful of topic nodes, so re-inflating
 // their world radius on top rendered them as giant discs.
 let representedNoteCount = $derived(
-	graphData.nodes.reduce((count, node) => count + (node.kind === "topic" ? (node.memberPaths?.length ?? 1) : 1), 0),
+	graphData.nodes.reduce(
+		(count, node) =>
+			count + (node.kind === "topic" ? (node.memberPaths?.length ?? 1) : node.kind === "tag" ? 0 : 1),
+		0,
+	),
 );
 let nodeSize = $derived(autoNodeSize(representedNoteCount));
 
@@ -173,17 +183,54 @@ let draggedNode: GraphNode | null = $state(null);
 let hasDragged = false;
 // Track pointer-down position to detect viewport pans (which also fire click)
 let pointerDownScreenPos: { x: number; y: number } | null = null;
+/** Pointer type of the press in progress, so the click that follows can apply
+ *  touch tolerances. `click` itself carries no `pointerType`. */
+let pointerDownType = "mouse";
+
+/**
+ * How far the pointer may travel between press and release and still count as a
+ * click rather than a pan.
+ *
+ * A mouse pivots on a fixed cursor, so 4px is generous. A fingertip does not: a
+ * deliberate tap routinely slides 10px or more, which silently turned every tap
+ * on a node into a "pan" and made nodes unselectable by touch. Reuses the same
+ * slack the long-press path already allows for the identical reason.
+ */
+function clickMoveTolerance(pointerType: string): number {
+	return pointerType === "touch" || pointerType === "pen" ? LONG_PRESS_MOVE_TOLERANCE : 4;
+}
+
+/** Extra screen-space hit slack for finger taps — see findNodeAt. */
+const TOUCH_HIT_SLACK = 8;
+
+/**
+ * Touch has no hover: a finger is either down or gone, so the node highlight
+ * (label + connected-neighbour emphasis) had no state to live in and merely
+ * flashed for the length of the press — the browser fires a synthetic
+ * `mouseleave` as the touch sequence ends, which cleared it.
+ *
+ * So on touch the highlight LATCHES: tapping a node holds it lit until the next
+ * tap moves it elsewhere or clears it on empty canvas. That mirrors what hover
+ * gives a mouse — "this is the node I am looking at, these are its links" — as
+ * a persistent state rather than a transient one, and needs no gesture the user
+ * has to discover. Mouse hover is untouched.
+ */
+let touchLatchedNode: GraphNode | null = $state(null);
+
+function hitSlack(pointerType: string): number {
+	return pointerType === "touch" || pointerType === "pen" ? TOUCH_HIT_SLACK : 0;
+}
 
 // Long-press → context menu (touch has no right-click). Armed on pointerdown
 // over a node, cancelled by movement/lift; fires the same menu as oncontextmenu.
-let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+let longPressTimer: number | null = null;
 let longPressFired = false;
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_MOVE_TOLERANCE = 10;
 
 function cancelLongPress() {
 	if (longPressTimer !== null) {
-		clearTimeout(longPressTimer);
+		window.clearTimeout(longPressTimer);
 		longPressTimer = null;
 	}
 }
@@ -227,7 +274,7 @@ let forceTickCount = 0;
 // Hide canvas during the initial chaos phase on fresh loads (no cached positions).
 // Starts hidden; revealed immediately when positions are known, or after 300ms on fresh loads.
 let canvasVisible = $state(false);
-let canvasRevealTimer: ReturnType<typeof setTimeout> | null = null;
+let canvasRevealTimer: number | null = null;
 
 // Simulation reference — $state so the hot-update $effect re-runs when simulation is (re)created
 let simulation: ReturnType<typeof forceSimulation<SimNode>> | null = $state(null);
@@ -412,9 +459,9 @@ let hoverAlphas: Map<string, number> = new Map();
 let outgoingHulls: Array<{ cluster: number; color: string; path: Array<{ x: number; y: number }> }> = [];
 let hullFadeProgress = 1;
 /** Releases the sustained alpha after a collapse/expand transition. */
-let retargetTimer: ReturnType<typeof setTimeout> | null = null;
+let retargetTimer: number | null = null;
 /** Fires the corrective fit once post-settle drift has stopped. */
-let settleFitTimer: ReturnType<typeof setTimeout> | null = null;
+let settleFitTimer: number | null = null;
 /** Signature of the current grouping; a change starts a new cross-fade. */
 let lastHullSignature = "";
 /** Most recently built hull shapes, captured so a change can fade from them. */
@@ -511,7 +558,7 @@ function requestRender(mode: RenderMode) {
 		pendingRenderMode = mode;
 	}
 	if (renderRafId != null) return;
-	renderRafId = requestAnimationFrame(() => {
+	renderRafId = window.requestAnimationFrame(() => {
 		renderRafId = null;
 		const nextMode = pendingRenderMode ?? "world";
 		pendingRenderMode = null;
@@ -694,7 +741,8 @@ function refreshClusterMetadata(data: GraphData) {
 	);
 	clusterNodeCounts = new Map<number, number>();
 	for (const node of data.nodes) {
-		if (node.cluster == null) continue;
+		// A resident tag shares the cluster for drawing but is not a note of it.
+		if (node.cluster == null || node.kind === "tag") continue;
 		clusterNodeCounts.set(node.cluster, (clusterNodeCounts.get(node.cluster) ?? 0) + 1);
 	}
 }
@@ -857,10 +905,16 @@ function findNodeLinear(x: number, y: number, hitRadius: number, displayFactor: 
  * Picks the top-most match (highest index in `simNodes`), matching the
  * original reverse-scan semantics in both paths.
  */
-function findNodeAt(screenX: number, screenY: number): GraphNode | null {
+/**
+ * `extraSlack` widens the hit target in SCREEN pixels before the zoom division,
+ * so it stays a constant on-screen distance at any camera scale. Touch passes
+ * slack because a fingertip's contact patch is ~8-10mm against a mouse hotspot
+ * of one pixel; without it, hitting a node on a phone is a game of luck.
+ */
+function findNodeAt(screenX: number, screenY: number, extraSlack = 0): GraphNode | null {
 	const { x, y } = screenToGraph(screenX, screenY);
 	const scale = pixi?.scale ?? 1;
-	const hitRadius = (Math.max(1, nodeSize) + 4) / scale;
+	const hitRadius = (Math.max(1, nodeSize) + 4 + extraSlack) / scale;
 	// Nodes are drawn counter-scaled against the zoom, so the hit target must
 	// grow and shrink with them. Applied at query time only — the grid itself
 	// stores camera-independent positions and stays valid across zooms.
@@ -1103,6 +1157,7 @@ function render(mode: RenderMode) {
 				{
 					showWikiLinks,
 					showSemanticLinks,
+					highlightSemanticLinks,
 					directedWikiEdges,
 					hoveredNodeId: hoveredNode?.id ?? null,
 					adjacency,
@@ -1642,6 +1697,7 @@ function handleMouseDown(e: PointerEvent) {
 	const x = e.clientX - rect.left;
 	const y = e.clientY - rect.top;
 	pointerDownScreenPos = { x, y };
+	pointerDownType = e.pointerType;
 
 	// Topic pills are screen-space overlays drawn on top of everything, so they
 	// claim the pointer before the lasso does. Without this, Shift+pointerdown on
@@ -1675,7 +1731,7 @@ function handleMouseDown(e: PointerEvent) {
 		return;
 	}
 
-	const node = findNodeAt(x, y);
+	const node = findNodeAt(x, y, hitSlack(e.pointerType));
 
 	if (node) {
 		const sn = simNodeMap.get(node.id);
@@ -1689,7 +1745,7 @@ function handleMouseDown(e: PointerEvent) {
 			}
 			longPressFired = false;
 			cancelLongPress();
-			longPressTimer = setTimeout(() => {
+			longPressTimer = window.setTimeout(() => {
 				longPressTimer = null;
 				longPressFired = true;
 				openNodeMenu(node, e.clientX, e.clientY);
@@ -1740,9 +1796,33 @@ function handleMouseMove(e: PointerEvent) {
 	}
 
 	if (dragSimNode) {
-		// Drag node
-		hasDragged = true;
-		hoveredNode = null;
+		// Drag node.
+		//
+		// `hasDragged` makes handleClick discard the click that follows, so it must
+		// mean "the user actually moved this node", not "a pointermove arrived". A
+		// fingertip jitters by a few pixels during any deliberate tap, which set the
+		// flag on every touch and swallowed the selection click even once the click
+		// distance check allowed it. Gate on the same per-device tolerance so a tap
+		// still selects while a real drag still suppresses.
+		if (pointerDownScreenPos) {
+			const movedX = x - pointerDownScreenPos.x;
+			const movedY = y - pointerDownScreenPos.y;
+			const tolerance = clickMoveTolerance(pointerDownType);
+			if (movedX * movedX + movedY * movedY > tolerance * tolerance) hasDragged = true;
+		} else {
+			hasDragged = true;
+		}
+		// Dragging with a mouse drops the hover highlight — the label would trail
+		// the cursor and the cursor is already the pointer. Touch is the opposite
+		// case: the finger covers the node, so the label and its lit connections
+		// are the only feedback about what is being moved. Keep them on the dragged
+		// node, which the renderer already positions from the node's live
+		// coordinates, so they follow it for free.
+		if (pointerDownType === "touch" || pointerDownType === "pen") {
+			hoveredNode = draggedNode;
+		} else {
+			hoveredNode = null;
+		}
 		const graphPos = screenToGraph(x, y);
 		dragSimNode.fx = graphPos.x;
 		dragSimNode.fy = graphPos.y;
@@ -1801,6 +1881,11 @@ function handleMouseUp(_e: PointerEvent) {
 		simulation?.alphaTarget(0);
 		dragSimNode.fx = null;
 		dragSimNode.fy = null;
+		// A touch drag kept the highlight on the node being moved; latch it so the
+		// synthetic mouseleave that ends the touch doesn't wipe it on release.
+		if ((pointerDownType === "touch" || pointerDownType === "pen") && hasDragged) {
+			touchLatchedNode = draggedNode;
+		}
 		draggedNode = null;
 		dragSimNode = null;
 		pixi?.resumeViewport();
@@ -1827,14 +1912,17 @@ function handleClick(e: MouseEvent) {
 	const x = e.clientX - rect.left;
 	const y = e.clientY - rect.top;
 
-	// If the pointer moved more than 4px since mousedown the user was panning — ignore
+	// If the pointer travelled past the tolerance since pointerdown the user was
+	// panning — ignore. The tolerance is per input device: see clickMoveTolerance.
 	if (pointerDownScreenPos) {
 		const dx = x - pointerDownScreenPos.x;
 		const dy = y - pointerDownScreenPos.y;
 		pointerDownScreenPos = null;
-		if (dx * dx + dy * dy > 16) return;
+		const tolerance = clickMoveTolerance(pointerDownType);
+		if (dx * dx + dy * dy > tolerance * tolerance) return;
 	}
 
+	const clickSlack = hitSlack(pointerDownType);
 	const pill = clusterPillAt(x, y);
 	if (pill) {
 		// A topic's label selects that topic — the same act as clicking its row in
@@ -1845,7 +1933,19 @@ function handleClick(e: MouseEvent) {
 		requestRender("world");
 		return;
 	}
-	const node = findNodeAt(x, y);
+	const node = findNodeAt(x, y, clickSlack);
+
+	// Touch has no hover, so a tap is what moves the highlight: latch it onto the
+	// tapped node (or drop it when the tap lands on empty canvas) and keep
+	// `hoveredNode` — which every render path already reads — pointing at it.
+	if (pointerDownType === "touch" || pointerDownType === "pen") {
+		touchLatchedNode = node;
+		if (hoveredNode !== node) {
+			hoveredNode = node;
+			previewTriggeredForNode = null;
+			requestRender("world");
+		}
+	}
 
 	if (node) {
 		// A collapsed topic has no file behind it, so clicking selects the topic —
@@ -1856,6 +1956,10 @@ function handleClick(e: MouseEvent) {
 			if (node.cluster != null) {
 				onFocusCluster?.(node.cluster, false, e.shiftKey || e.metaKey || e.ctrlKey);
 			}
+		} else if (node.kind === "tag") {
+			// No file behind a tag either — searching for it is what a tag click
+			// does everywhere else in Obsidian.
+			onTagClick?.(node.label);
 		} else if (onNodeClick) {
 			onNodeClick(node.path);
 		}
@@ -1890,8 +1994,8 @@ function triggerNodePreview(event: MouseEvent | KeyboardEvent, node: GraphNode) 
 	const containerRect = containerEl.getBoundingClientRect();
 	const offsetX = canvasRect.left - containerRect.left;
 	const offsetY = canvasRect.top - containerRect.top;
-	// Nothing to preview for a synthetic topic node.
-	if (node.kind === "topic") return;
+	// Nothing to preview for a synthetic topic or tag node.
+	if (node.kind === "topic" || node.kind === "tag") return;
 
 	hoverAnchorEl.href = node.path;
 	hoverAnchorEl.dataset.href = node.path;
@@ -1904,6 +2008,13 @@ function triggerNodePreview(event: MouseEvent | KeyboardEvent, node: GraphNode) 
 
 function handleMouseLeave() {
 	cancelLongPress();
+	// A touch sequence ends with a synthetic mouseleave, which is what used to
+	// wipe the tap highlight a frame after it appeared. A latched node survives
+	// it — only a real tap elsewhere clears the latch.
+	if (touchLatchedNode) {
+		applyCursor(false);
+		return;
+	}
 	hoveredNode = null;
 	previewTriggeredForNode = null;
 	// Leaving while over a node or pill would otherwise strand `var(--cursor)`
@@ -1952,6 +2063,18 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 					onOpenPaths?.(node.memberPaths ?? []);
 				}),
 		);
+	} else if (node.kind === "tag") {
+		// A tag belongs to no topic, so none of the cluster actions below apply.
+		menu.addItem((item) =>
+			item
+				.setTitle("Search notes with this tag")
+				.setIcon("search")
+				.onClick(() => {
+					onTagClick?.(node.label);
+				}),
+		);
+		menu.showAtPosition({ x: clientX, y: clientY });
+		return;
 	} else {
 		menu.addItem((item) =>
 			item
@@ -2006,7 +2129,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 			.setIcon("box-select")
 			.onClick(() => {
 				if (node.cluster != null) {
-					const clusterPaths = simNodes.filter((n) => n.cluster === node.cluster).map((n) => n.path);
+					const clusterPaths = simNodes.filter((n) => n.cluster === node.cluster).flatMap(resolveNodePaths);
 					selectNodesByPaths(clusterPaths);
 					onSelectionChange?.(clusterPaths);
 				}
@@ -2177,6 +2300,11 @@ function buildInternalData(data: GraphData): {
 		return { x: sumX / count + Math.cos(angle) * radius, y: sumY / count + Math.sin(angle) * radius };
 	};
 
+	// The latch pins a node from the previous graph. Rebuilding (immerse, collapse,
+	// refresh) can drop that node, which would strand its highlight, so release it
+	// with the graph it belonged to.
+	touchLatchedNode = null;
+
 	simNodes = data.nodes.map((n) => {
 		const sn: SimNode = { ...n };
 		// Priority matters: a position inherited from what this node *replaces on
@@ -2250,8 +2378,10 @@ function buildInternalData(data: GraphData): {
 		];
 	});
 
-	// Pre-split by edge type to avoid filtering every render frame
-	renderableSimLinks = simLinks.filter((l) => l.type === "wiki" || l.type === "semantic");
+	// Pre-split by edge type to avoid filtering every render frame. Every
+	// drawable type is listed: the renderer decides per frame which of them
+	// the display toggles currently show.
+	renderableSimLinks = simLinks.filter((l) => l.type === "wiki" || l.type === "semantic" || l.type === "tag");
 	refreshClusterMetadata(data);
 
 	// Build adjacency map for O(1) hover-dimming lookups
@@ -2358,8 +2488,8 @@ function setupForceSimulation(
 					// and framed, and an unconditional refit reads as the camera
 					// lurching out for no reason a second after it arrived.
 					const settledBounds = computeNodeBounds(simNodes);
-					if (settleFitTimer != null) clearTimeout(settleFitTimer);
-					settleFitTimer = setTimeout(() => {
+					if (settleFitTimer != null) window.clearTimeout(settleFitTimer);
+					settleFitTimer = window.setTimeout(() => {
 						settleFitTimer = null;
 						if (driftedSince(settledBounds)) {
 							animateCameraToNodes(undefined, GRAPH_FIT_PADDING, 500);
@@ -2385,8 +2515,8 @@ function setupForceSimulation(
 	// already partially settled rather than the initial random-pile explosion.
 	if (isFreshLayout) {
 		canvasVisible = false;
-		if (canvasRevealTimer != null) clearTimeout(canvasRevealTimer);
-		canvasRevealTimer = setTimeout(() => {
+		if (canvasRevealTimer != null) window.clearTimeout(canvasRevealTimer);
+		canvasRevealTimer = window.setTimeout(() => {
 			canvasVisible = true;
 			canvasRevealTimer = null;
 		}, 300);
@@ -2544,6 +2674,7 @@ $effect(() => {
 	void nodeSize;
 	void showWikiLinks;
 	void showSemanticLinks;
+	void highlightSemanticLinks;
 	void showTopicHulls;
 	void alwaysRefitOnDataChange;
 	void directedWikiEdges;
@@ -2793,9 +2924,9 @@ onMount(() => {
 			cancelAnimationFrame(renderRafId);
 			renderRafId = null;
 		}
-		if (retargetTimer != null) clearTimeout(retargetTimer);
-		if (settleFitTimer != null) clearTimeout(settleFitTimer);
-		if (canvasRevealTimer != null) clearTimeout(canvasRevealTimer);
+		if (retargetTimer != null) window.clearTimeout(retargetTimer);
+		if (settleFitTimer != null) window.clearTimeout(settleFitTimer);
+		if (canvasRevealTimer != null) window.clearTimeout(canvasRevealTimer);
 		if (simulation) {
 			simulation.stop();
 			simulation = null;
@@ -2888,8 +3019,8 @@ export function followLayout() {
 	// layout comes to rest.
 	simulation.alphaTarget(RETARGET_ALPHA).velocityDecay(RECLUSTER_VELOCITY_DECAY).restart();
 	isReclustering = true;
-	if (retargetTimer != null) clearTimeout(retargetTimer);
-	retargetTimer = setTimeout(() => {
+	if (retargetTimer != null) window.clearTimeout(retargetTimer);
+	retargetTimer = window.setTimeout(() => {
 		retargetTimer = null;
 		// Back to 0 so the layout can actually come to rest.
 		simulation?.alphaTarget(0);

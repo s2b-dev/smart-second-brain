@@ -65,6 +65,7 @@ function createMockPlugin() {
 			vault,
 			fileManager: {
 				renameFile: vi.fn().mockResolvedValue(undefined),
+				trashFile: vi.fn().mockResolvedValue(undefined),
 			},
 		},
 		registerEvent: vi.fn(),
@@ -294,7 +295,8 @@ describe("PendingChangesStore", () => {
 			await store.acceptChange(id);
 
 			expect(store.getEntry(id)?.status).toBe("accepted");
-			expect(plugin.app.vault.trash).toHaveBeenCalledWith(file, true);
+			// trashFile, not vault.trash: honours the user's "Deleted files" preference.
+			expect(plugin.app.fileManager.trashFile).toHaveBeenCalledWith(file);
 		});
 
 		it("should refuse a delete when the file was modified after staging", async () => {
@@ -311,7 +313,7 @@ describe("PendingChangesStore", () => {
 
 			await expect(store.acceptChange(id)).rejects.toThrow("was modified after the delete was proposed");
 			expect(store.getEntry(id)?.status).toBe("pending");
-			expect(plugin.app.vault.trash).not.toHaveBeenCalled();
+			expect(plugin.app.fileManager.trashFile).not.toHaveBeenCalled();
 		});
 
 		it("should accept and apply a move change", async () => {

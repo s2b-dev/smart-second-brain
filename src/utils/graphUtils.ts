@@ -17,6 +17,63 @@ export function splitEdgeKey(key: string): [string, string] {
 }
 
 /**
+ * Stable node id for a tag drawn as a node — must not collide with any vault
+ * path (a colon can't start a path segment on any supported platform) or with
+ * a collapsed topic's `topic:<n>`.
+ *
+ * Tags are case-insensitive in Obsidian (`#Foo` and `#foo` are one tag), so
+ * the id is keyed on the lower-cased form; the first-seen casing is kept as
+ * the node's label.
+ */
+export function tagNodeId(tag: string): string {
+	return `tag:${tag.toLowerCase()}`;
+}
+
+/** Whether a node is a tag drawn as a node rather than a note (or a collapsed topic). */
+export function isTagNode(node: { kind?: string }): boolean {
+	return node.kind === "tag";
+}
+
+/**
+ * Per-node degree over an edge set — the one rule every degree recompute
+ * (full build, fused build, live patch) shares.
+ *
+ * A tag edge counts for its tag only: the tag's size says how many notes
+ * carry it (which is also the breadth the Leiden weight damps by), but a
+ * note's degree stays what its links make it. Note degree is the tie-breaker
+ * for a topic's representative (label, colour anchor, the titles sent for
+ * naming), so letting tags inflate it would let the Tags toggle re-label
+ * topics whose membership it didn't change.
+ */
+export function computeNodeDegrees(
+	edges: Iterable<{ source: string; target: string; type: string }>,
+): Map<string, number> {
+	const degrees = new Map<string, number>();
+	for (const edge of edges) {
+		if (edge.type !== "tag") degrees.set(edge.source, (degrees.get(edge.source) ?? 0) + 1);
+		degrees.set(edge.target, (degrees.get(edge.target) ?? 0) + 1);
+	}
+	return degrees;
+}
+
+/**
+ * The graph without its tag layer: note nodes and the edges between notes.
+ *
+ * For derivations that are over note *content* rather than authored structure —
+ * the semantic scan and its cache key — where a tag can neither contribute nor
+ * invalidate anything.
+ */
+export function noteSubgraph<N extends object, E extends { type: string }>(graph: {
+	nodes: N[];
+	edges: E[];
+}): { nodes: N[]; edges: E[] } {
+	return {
+		nodes: graph.nodes.filter((node) => !isTagNode(node as { kind?: string })),
+		edges: graph.edges.filter((edge) => edge.type !== "tag"),
+	};
+}
+
+/**
  * Radius (in world px, on top of the base size) of the vault's *largest*
  * collapsed topic — the top of the bubble scale. Keeps the biggest topic sane
  * at fit-to-view: ~5× a hub note, not a disc that swallows the layout.
@@ -295,6 +352,11 @@ function djb2(text: string): number {
  * builds that enumerate the same nodes and edges in different orders produce
  * the same signature. Counts are included so the accumulators can't be walked
  * back into a collision by adding and removing offsetting elements.
+ *
+ * The tag layer is part of the signature: tag edges feed community detection,
+ * so a graph with tags shown is a different topic-bearing graph from the same
+ * notes without them. Derivations that ignore tags (the semantic scan) key on
+ * `noteSubgraph` instead.
  */
 export function graphTopologySignature(graph: {
 	nodes: Array<{ id: string }>;

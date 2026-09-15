@@ -175,12 +175,12 @@ function animateScrollTo(top: number) {
 		const eased = 1 - (1 - t) ** 3;
 		el.scrollTop = start + delta * eased;
 		if (t < 1) {
-			scrollRafId = requestAnimationFrame(step);
+			scrollRafId = window.requestAnimationFrame(step);
 		} else {
 			scrollRafId = null;
 		}
 	};
-	scrollRafId = requestAnimationFrame(step);
+	scrollRafId = window.requestAnimationFrame(step);
 }
 
 // Scroll a specific user message to the top of the container.
@@ -247,13 +247,13 @@ let nextAvailable = $state(false);
 // The nav arrows appear while scrolling (and on hover, via CSS). After scrolling
 // stops they linger briefly, then fade out.
 let isScrolling = $state(false);
-let scrollIdleTimer: ReturnType<typeof setTimeout> | undefined;
+let scrollIdleTimer: number | undefined;
 
 function handleScroll() {
 	recomputeActiveUserIndex();
 	isScrolling = true;
-	if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
-	scrollIdleTimer = setTimeout(() => {
+	if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
+	scrollIdleTimer = window.setTimeout(() => {
 		isScrolling = false;
 	}, 900);
 }
@@ -624,7 +624,7 @@ $effect(() => {
 
 $effect(() => {
 	return () => {
-		if (scrollIdleTimer) clearTimeout(scrollIdleTimer);
+		if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
 		if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
 	};
 });
@@ -1301,20 +1301,24 @@ $effect(() => {
   .message-nav :global(button) {
     color: var(--text-muted);
     /* Override Obsidian's .clickable-icon defaults (padding, min-width, hover
-       box-shadow/background) so the arrows are a tight, chrome-free icon box. */
-    background: transparent !important;
-    box-shadow: none !important;
-    width: var(--icon-s) !important;
-    height: var(--icon-s) !important;
-    min-width: 0 !important;
-    padding: 2px !important;
+       box-shadow/background) so the arrows are a tight, chrome-free icon box.
+       The scoped `.message-nav` ancestor plus the element (0,2,1) already
+       out-specifies core's `.clickable-icon` / `.is-mobile .clickable-icon`
+       (0,2,0), and leaves the mobile touch-target rule in styles.css
+       (`body.is-mobile .message-nav button`) able to win on specificity. */
+    background: transparent;
+    box-shadow: none;
+    width: var(--icon-s);
+    height: var(--icon-s);
+    min-width: 0;
+    padding: 2px;
     box-sizing: content-box;
     border-radius: 4px;
   }
 
   .message-nav :global(button:hover) {
     color: var(--text-normal);
-    background: transparent !important;
-    box-shadow: none !important;
+    background: transparent;
+    box-shadow: none;
   }
 </style>

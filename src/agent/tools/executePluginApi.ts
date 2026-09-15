@@ -46,7 +46,7 @@ export function createPluginApiExecTool(app: App, pluginId: string, displayName:
 
 		try {
 			const timeout = new Promise<never>((_, reject) => {
-				setTimeout(
+				window.setTimeout(
 					() => reject(new Error(`Execution timed out after ${EXECUTION_TIMEOUT_MS}ms.`)),
 					EXECUTION_TIMEOUT_MS,
 				);

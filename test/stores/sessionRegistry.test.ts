@@ -156,6 +156,72 @@ describe("SessionRegistry — rekey on thread rename", () => {
 	});
 });
 
+/* --------------------------------------------------------------------------
+ * Regression: session callbacks must survive the auto-title rename.
+ *
+ * The first message in a chat renames the thread (auto-title). `runStream`
+ * performs that rename and THEN fires `onNeedReload` for `reloadAfter`. A
+ * callback that captured the load-time path resolves to a map key that no
+ * longer exists, so the reload threw "No session to reload" — swallowed by
+ * runStream's catch, which flipped the just-succeeded turn to an error state.
+ * ------------------------------------------------------------------------*/
+describe("SessionRegistry — reload callbacks survive a mid-run rename", () => {
+	/** Minimal AgentManager stub covering only what loadSession/reload touch. */
+	function makeLoadableRegistry(): { registry: SessionRegistry; historyCalls: string[] } {
+		const historyCalls: string[] = [];
+		const stub = {
+			isThreadEmpty: async () => false,
+			getThreadHistory: async (id: string) => {
+				historyCalls.push(id);
+				return { messages: [], metadata: {} };
+			},
+			getCheckpointHistory: async () => [{ id: "cp1", parentId: undefined, messages: [] }],
+			setLastViewedCheckpoint: async () => {},
+			onNextInitialized: () => {},
+		} as unknown as AgentManager;
+		const registry = new SessionRegistry(stub);
+		// Agent selection is orthogonal to this regression and would require a
+		// fully constructed PluginDataStore; stub it to a fixed agent id.
+		(
+			registry as unknown as { restoreSelectionFromLoadedMessages: () => Promise<string> }
+		).restoreSelectionFromLoadedMessages = async () => "agent-1";
+		return { registry, historyCalls };
+	}
+
+	async function loadThread(registry: SessionRegistry, path: string): Promise<ChatSession> {
+		await registry.loadSession({ path } as unknown as Parameters<SessionRegistry["loadSession"]>[0]);
+		const session = registry.sessionFor(path);
+		if (!session) throw new Error("expected a session after load");
+		return session;
+	}
+
+	it("onNeedReload still resolves after the session is rekeyed", async () => {
+		const { registry, historyCalls } = makeLoadableRegistry();
+		const session = await loadThread(registry, "Untitled.chat");
+
+		// Reproduce what runStream does on the first message: update the session's
+		// own id, then rekey the registry via the onThreadIdChange callback.
+		const opts = session as unknown as {
+			onNeedReload?: () => Promise<void>;
+			onThreadIdChange?: (o: string, n: string) => void;
+		};
+		session.id = "Renamed Title.chat";
+		opts.onThreadIdChange?.("Untitled.chat", "Renamed Title.chat");
+
+		historyCalls.length = 0;
+		// Previously threw "No session to reload".
+		await expect(opts.onNeedReload?.()).resolves.toBeUndefined();
+		// And it reloaded the RENAMED thread, not the stale path.
+		expect(historyCalls).toContain("Renamed Title.chat");
+		expect(historyCalls).not.toContain("Untitled.chat");
+	});
+
+	it("reloadSession(path) still throws for a genuinely absent session", async () => {
+		const { registry } = makeLoadableRegistry();
+		await expect(registry.reloadSession("nope.chat")).rejects.toThrow("No session to reload");
+	});
+});
+
 describe("ChatSession — isRunning reflects an in-flight stream", () => {
 	it("is false on a freshly built session", () => {
 		const s = makeSession("a.chat");

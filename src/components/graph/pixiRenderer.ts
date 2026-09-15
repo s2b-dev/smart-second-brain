@@ -7,18 +7,11 @@
  * and reactive state.
  */
 
-import {
-	Application,
-	CanvasSource,
-	Container,
-	Graphics,
-	Sprite,
-	Text,
-	TextStyle,
-	Texture,
-	Ticker,
-	type PointData,
-} from "pixi.js";
+// Pixi's eval-free code paths (uniform/UBO/shader sync without `new Function`).
+// Must run before the first renderer is created; the eval-based originals are
+// aliased out of the bundle in vite.config.ts.
+import "pixi.js/unsafe-eval";
+import { Application, CanvasSource, Container, Graphics, Sprite, Text, TextStyle, Texture, Ticker } from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import { edgeAlphaZoomLift, nodeDrawRadius, zoomNodeScale } from "../../utils/graphUtils";
 
@@ -72,7 +65,7 @@ function resolveColor(raw: string, fallback: string): string {
 
 	try {
 		if (!_colorCtx) {
-			const c = document.createElement("canvas");
+			const c = createEl("canvas");
 			c.width = 1;
 			c.height = 1;
 			// getContext can genuinely return null (no 2D support, or a context already
@@ -111,6 +104,8 @@ export interface ThemeColors {
 	textAccent: string;
 	graphLine: string;
 	graphNode: string;
+	/** Fill for tag nodes — Obsidian's own graph colour for them. */
+	graphNodeTag: string;
 	textOnAccent: string;
 	bgPrimary: string;
 	font: string;
@@ -179,6 +174,7 @@ export function readThemeColors(el: HTMLElement): ThemeColors {
 		textAccent: get("--text-accent", "#7b6cd9"),
 		graphLine: get("--graph-line", "#969696"),
 		graphNode: get("--graph-node", "#999999"),
+		graphNodeTag: get("--graph-node-tag", "#08b94e"),
 		textOnAccent: get("--text-on-accent", "#ffffff"),
 		bgPrimary: get("--background-primary", "#1e1e1e"),
 		font: style.getPropertyValue("--font-interface").trim() || "-apple-system, BlinkMacSystemFont, sans-serif",
@@ -380,11 +376,8 @@ export class PixiRenderer {
 		this._appInitialized = true;
 
 		// Style the canvas
-		const canvas = this.app.canvas as HTMLCanvasElement;
-		canvas.style.display = "block";
-		canvas.style.width = "100%";
-		canvas.style.height = "100%";
-		canvas.style.touchAction = "none";
+		const canvas = this.app.canvas;
+		canvas.addClass("s2b-graph-canvas");
 		containerEl.prepend(canvas);
 
 		// Context-loss hooks. Pixi's GlContextSystem registered its listeners during
@@ -471,7 +464,7 @@ export class PixiRenderer {
 		// of aliased blobs — render textures only mipmap on explicit request.
 		// Extreme zoom-ins upscale past the texture, where the vector stroke
 		// ring on the hovered node carries the sharp edge anyway.
-		const disc = document.createElement("canvas");
+		const disc = createEl("canvas");
 		disc.width = NODE_TEXTURE_SIZE;
 		disc.height = NODE_TEXTURE_SIZE;
 		const discCtx = disc.getContext("2d");
@@ -612,7 +605,7 @@ export class PixiRenderer {
 		if (this._appInitialized) {
 			// The context-loss listeners were only registered once init() got past
 			// the same gate, so they exist exactly when the app does.
-			const canvas = this.app.canvas as HTMLCanvasElement;
+			const canvas = this.app.canvas;
 			if (this._contextLostHandler) canvas.removeEventListener("webglcontextlost", this._contextLostHandler);
 			if (this._contextRestoredHandler) {
 				canvas.removeEventListener("webglcontextrestored", this._contextRestoredHandler);
@@ -639,7 +632,7 @@ export class PixiRenderer {
 	// ── Canvas access ──────────────────────────────────────
 
 	get canvas(): HTMLCanvasElement {
-		return this.app.canvas as HTMLCanvasElement;
+		return this.app.canvas;
 	}
 
 	// ── Resize ─────────────────────────────────────────────
@@ -701,7 +694,7 @@ export class PixiRenderer {
 	/** Animate the viewport to frame a bounding box. */
 	animateToFrame(centerX: number, centerY: number, scale: number, duration: number): void {
 		this.viewport.animate({
-			position: { x: centerX, y: centerY } as PointData,
+			position: { x: centerX, y: centerY },
 			scale: scale,
 			time: duration,
 			ease: "easeOutCubic",
@@ -814,7 +807,14 @@ export class PixiRenderer {
 			// nodes visible when the camera is far out (GraphCanvas applies the
 			// same factor to hit-testing and label anchoring).
 			const radius = nodeDrawRadius(node, nodeSize) * spawnScale * zoomNodeScale(scale);
-			const rawFill = node.highlighted ? c.accent : (node.color ?? c.graphNode);
+			// A tag never joins a topic, so it has no segment colour to carry; it
+			// takes the theme's tag colour instead, which is how the eye tells a
+			// tag hub from a hub note.
+			const rawFill = node.highlighted
+				? c.accent
+				: node.kind === "tag"
+					? c.graphNodeTag
+					: (node.color ?? c.graphNode);
 			// Resolve hsl()/calc() colors to hex so Pixi.js can parse them
 			const resolvedFillColor = rawFill.startsWith("#") ? rawFill : resolveColor(rawFill, c.graphNode);
 
@@ -977,6 +977,13 @@ export class PixiRenderer {
 		opts: {
 			showWikiLinks: boolean;
 			showSemanticLinks?: boolean;
+			/**
+			 * Draw inferred edges in the accent colour rather than `graphLine`, so
+			 * the inferred layer can be told from the authored one at overview zoom
+			 * (where the dash pattern is too fine to read). Width and alpha are
+			 * unchanged — this is a hue swap, not extra emphasis.
+			 */
+			highlightSemanticLinks?: boolean;
 			directedWikiEdges?: boolean;
 			hoveredNodeId: string | null;
 			adjacency: Map<string, Set<string>>;
@@ -1001,7 +1008,9 @@ export class PixiRenderer {
 
 		const showWiki = opts.showWikiLinks;
 		const showSemantic = opts.showSemanticLinks !== false;
-		if (!showWiki && !showSemantic) return;
+		// Tag edges are drawn whenever tag nodes are (they only exist then): a
+		// tag with no lines to its notes would be a floating label.
+		if (!showWiki && !showSemantic && !edges.some((edge) => edge.type === "tag")) return;
 
 		const c = this._theme;
 		const scale = this.viewport.scaled || 1;
@@ -1013,6 +1022,10 @@ export class PixiRenderer {
 		// made them hard to see at all; the inferred structure is worth reading,
 		// not just hinting at.
 		const semanticWidth = normalWidth;
+		// Opt-in (Display → "Highlight inferred links"). Only the colour changes:
+		// the inferred layer is often the larger half of the edges, so widening or
+		// brightening it as well would bury the authored links it is drawn against.
+		const semanticColor = opts.highlightSemanticLinks ? c.accent : c.graphLine;
 		const dash = 5 / scale;
 		const dashGap = 4 / scale;
 
@@ -1045,7 +1058,9 @@ export class PixiRenderer {
 
 		for (const edge of edges) {
 			const isSemantic = edge.type === "semantic";
-			if (isSemantic ? !showSemantic : !showWiki) continue;
+			const isTag = edge.type === "tag";
+			const hidden = isSemantic ? !showSemantic : !isTag && !showWiki;
+			if (hidden) continue;
 
 			const sx = edge.source.x;
 			const sy = edge.source.y;
@@ -1105,7 +1120,7 @@ export class PixiRenderer {
 			const alpha = clampUnitInterval(Math.round(rawAlpha * 20) / 20, 0);
 			if (alpha <= 0) continue;
 
-			const color = isHighlighted ? c.accent : c.graphLine;
+			const color = isHighlighted ? c.accent : isSemantic ? semanticColor : c.graphLine;
 			const baseWidth = isHighlighted ? highlightWidth : isSemantic ? semanticWidth : normalWidth;
 			// A collapsed topic edge's weight counts how many note-level links cross
 			// between the two topics, so thickness is the at-a-glance read of which
@@ -1140,7 +1155,8 @@ export class PixiRenderer {
 			}
 			bucket.push({ sx, sy, tx, ty });
 
-			if (opts.directedWikiEdges) {
+			// Arrowheads mark an authored link's direction; carrying a tag has none.
+			if (opts.directedWikiEdges && !isTag) {
 				const dx = tx - sx;
 				const dy = ty - sy;
 				const len = Math.hypot(dx, dy);
@@ -1476,6 +1492,9 @@ export class PixiRenderer {
 			lines.push(
 				`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}  ·  ${links.toLocaleString()} ${links === 1 ? "link" : "links"}`,
 			);
+		} else if (node.kind === "tag") {
+			const notes = node.degree ?? 0;
+			lines.push(`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}`);
 		} else if (node.cluster != null) {
 			const clusterLabel = clusterLabels[node.cluster] ?? `Cluster ${node.cluster}`;
 			lines.push(`${clusterLabel}  ·  ${node.degree ?? 0} connections`);

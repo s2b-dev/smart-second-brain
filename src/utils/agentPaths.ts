@@ -65,9 +65,8 @@ const RESERVED_AGENT_FOLDER_NAMES = [MEMORIES_SUBDIR, SKILLS_SUBDIR, LEGACY_SYST
  */
 export function sanitizeAgentFileName(name: string): string {
 	const cleaned = (name ?? "")
-		// Replace filename-illegal chars (path separators + reserved chars) and control chars with a space.
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping control chars is the intent
-		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+		// Replace filename-illegal chars (path separators + reserved chars) and control chars (\p{Cc}) with a space.
+		.replace(/[\\/:*?"<>|\p{Cc}]/gu, " ")
 		.replace(/\s+/g, " ")
 		.trim()
 		// Obsidian/OSes dislike leading/trailing dots; strip them, then re-trim any exposed space.

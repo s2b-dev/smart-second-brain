@@ -12,7 +12,6 @@
  * Authentication: apiKey (required)
  */
 
-import { ChatOpenAI } from "@langchain/openai";
 import { requestUrl } from "obsidian";
 import type {
 	AuthObject,
@@ -146,7 +145,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			(config.configuration as Record<string, unknown>).defaultHeaders = auth.headers;
 		}
 
-		return createTransportedChatOpenAI("openrouter", config as ConstructorParameters<typeof ChatOpenAI>[0]);
+		return createTransportedChatOpenAI("openrouter", config);
 	},
 
 	createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
@@ -161,7 +160,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 		if (auth.headers && Object.keys(auth.headers).length > 0) {
 			(config.configuration as Record<string, unknown>).defaultHeaders = auth.headers;
 		}
-		return createBufferedTransportedChatOpenAI("openrouter", config as ConstructorParameters<typeof ChatOpenAI>[0]);
+		return createBufferedTransportedChatOpenAI("openrouter", config);
 	},
 
 	createEmbeddingInstance: (auth: AuthObject, modelId: string) => {
@@ -251,7 +250,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			Object.assign(headers, auth.headers);
 		}
 
-		const response = await globalThis.fetch(`${OPENROUTER_BASE_URL}/models`, {
+		const response = await window.fetch(`${OPENROUTER_BASE_URL}/models`, {
 			method: "GET",
 			headers,
 		});
@@ -296,9 +295,9 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			const payload = response.json as OpenRouterModelResponse;
 			const resources = Array.isArray(payload.data) ? payload.data : [];
 			return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
-		} catch (error) {
+		} catch {
 			// If the dedicated endpoint fails, fall back to filtering all models
-			const response = await globalThis.fetch(`${OPENROUTER_BASE_URL}/models`, {
+			const response = await window.fetch(`${OPENROUTER_BASE_URL}/models`, {
 				method: "GET",
 				headers,
 			});

@@ -18,9 +18,12 @@ interface ObsidianDraggable {
 }
 
 function draggableFromApp(app?: App | null): ObsidianDraggable | null {
-	// biome-ignore lint/suspicious/noExplicitAny: dragManager is an Obsidian internal API
-	const draggable = (app as any)?.dragManager?.draggable;
-	return draggable && typeof draggable === "object" ? (draggable as ObsidianDraggable) : null;
+	// `dragManager` is an Obsidian internal API, absent from the typings.
+	if (!app || !("dragManager" in app)) return null;
+	const dragManager: unknown = app.dragManager;
+	if (!dragManager || typeof dragManager !== "object" || !("draggable" in dragManager)) return null;
+	const draggable: unknown = dragManager.draggable;
+	return draggable && typeof draggable === "object" ? draggable : null;
 }
 
 function collectDraggableFilePaths(draggable: ObsidianDraggable): string[] {

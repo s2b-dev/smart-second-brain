@@ -33,6 +33,7 @@
 
 import type { GraphEdge } from "../../types/graph";
 import { GRANULARITY_LADDER_RULES_KEY } from "../../utils/topicHierarchy";
+import { toError } from "../../utils/toError";
 import { getData } from "../../stores/dataStore.svelte";
 import { Logger } from "../../utils/logging";
 
@@ -592,12 +593,12 @@ function openDatabase(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(dbName, DB_VERSION);
 		let settled = false;
-		let blockedTimer: ReturnType<typeof setTimeout> | null = null;
+		let blockedTimer: number | null = null;
 
 		const finish = (fn: () => void) => {
 			if (settled) return;
 			settled = true;
-			if (blockedTimer !== null) clearTimeout(blockedTimer);
+			if (blockedTimer !== null) window.clearTimeout(blockedTimer);
 			fn();
 		};
 
@@ -617,8 +618,8 @@ function openDatabase(): Promise<IDBDatabase> {
 				`[SmartGraph] Topic-cache DB open blocked on "${dbName}" — another connection is still open. ` +
 					`Waiting ${OPEN_BLOCKED_TIMEOUT_MS}ms for it to close.`,
 			);
-			if (blockedTimer !== null) clearTimeout(blockedTimer);
-			blockedTimer = setTimeout(() => {
+			if (blockedTimer !== null) window.clearTimeout(blockedTimer);
+			blockedTimer = window.setTimeout(() => {
 				finish(() =>
 					reject(
 						new Error(
@@ -642,7 +643,8 @@ function openDatabase(): Promise<IDBDatabase> {
 			};
 			finish(() => resolve(db));
 		};
-		request.onerror = () => finish(() => reject(request.error));
+		request.onerror = () =>
+			finish(() => reject(toError(request.error, "Failed to open the graph cache database.")));
 	});
 }
 
@@ -653,7 +655,7 @@ async function readPersisted(): Promise<unknown> {
 			const tx = db.transaction(STORE_NAME, "readonly");
 			const request = tx.objectStore(STORE_NAME).get(RECORD_KEY);
 			request.onsuccess = () => resolve(request.result);
-			request.onerror = () => reject(request.error);
+			request.onerror = () => reject(toError(request.error, "Failed to read the graph cache."));
 		});
 	} finally {
 		db.close();
@@ -667,7 +669,7 @@ async function writePersisted(payload: PersistedTopicCaches): Promise<void> {
 			const tx = db.transaction(STORE_NAME, "readwrite");
 			tx.objectStore(STORE_NAME).put(payload, RECORD_KEY);
 			tx.oncomplete = () => resolve();
-			tx.onerror = () => reject(tx.error);
+			tx.onerror = () => reject(toError(tx.error, "Failed to write the graph cache."));
 		});
 	} finally {
 		db.close();
@@ -702,7 +704,7 @@ export function loadPersistedTopicCaches(): Promise<void> {
 	return hydration;
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveTimer: number | null = null;
 
 /**
  * Persist the current caches, debounced — derivations land in bursts (probe
@@ -713,8 +715,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
  */
 export function scheduleTopicCacheSave(): void {
 	if (typeof indexedDB === "undefined") return;
-	if (saveTimer != null) clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => {
+	if (saveTimer != null) window.clearTimeout(saveTimer);
+	saveTimer = window.setTimeout(() => {
 		saveTimer = null;
 		if (topicCaches.leiden.size === 0 && archivedGraphs.size === 0) return;
 		writePersisted(encodeTopicCaches(snapshotTopicCaches())).catch((error) => {

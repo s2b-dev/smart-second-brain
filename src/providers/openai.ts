@@ -9,7 +9,6 @@
  * Authentication: apiKey (required), baseUrl (optional), headers (optional)
  */
 
-import { ChatOpenAI } from "@langchain/openai";
 import { fetchModelsDevData, isEmbeddingModel } from "./modelsDevApi";
 import { getPlugin } from "../stores/state.svelte";
 import OpenAILogo from "../components/ui/logos/OpenAILogo.svelte";
@@ -195,7 +194,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 			};
 		}
 
-		return createTransportedChatOpenAI("openai", config as ConstructorParameters<typeof ChatOpenAI>[0]);
+		return createTransportedChatOpenAI("openai", config);
 	},
 
 	createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
@@ -233,7 +232,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 				defaultHeaders: auth.headers,
 			};
 		}
-		return createBufferedTransportedChatOpenAI("openai", config as ConstructorParameters<typeof ChatOpenAI>[0]);
+		return createBufferedTransportedChatOpenAI("openai", config);
 	},
 
 	createEmbeddingInstance: (auth: AuthObject, modelId: string) => {
@@ -296,7 +295,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 
 		let response: Response;
 		try {
-			response = await globalThis.fetch(`${baseUrl}/models`, {
+			response = await window.fetch(`${baseUrl}/models`, {
 				method: "GET",
 				headers,
 			});
@@ -374,7 +373,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 			Object.assign(headers, auth.headers);
 		}
 
-		const response = await globalThis.fetch(`${baseUrl}/models`, {
+		const response = await window.fetch(`${baseUrl}/models`, {
 			method: "GET",
 			headers,
 		});

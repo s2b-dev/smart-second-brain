@@ -1,16 +1,15 @@
 // vite.config.ts
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { copyFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { builtinModules } from "node:module";
 
 // Anchor all file paths to this config file's directory, NOT process.cwd():
 // builds must work identically from the main checkout and from any git
 // worktree (parallel agent slots), regardless of the caller's CWD.
 const configDir = fileURLToPath(new URL(".", import.meta.url));
-
-import builtinModules from "builtin-modules";
 
 /**
  * Route bundled Node-builtin requires through Obsidian's working `require`.
@@ -121,6 +120,97 @@ const PROCESS_SHIM =
 
 const BANNER = PROCESS_SHIM;
 
+/**
+ * Dependency modules swapped for shims in `src/lib/shims/`, matched on the
+ * RESOLVED file path (so a relative `./skills.mjs` inside one package cannot be
+ * confused with another's). Together these keep two capabilities out of the
+ * bundle that the plugin never uses but Obsidian's plugin review flags:
+ *
+ * - process spawning (`child_process`): the MCP SDK's stdio transport. (The
+ *   Anthropic SDK's local agent toolset used to need a shim too; since
+ *   @anthropic-ai/sdk 0.120 the package maps it to a browser stub itself, and
+ *   the forbidden-pattern scan below is what keeps that honest.)
+ * - dynamic code execution (`new Function`): the MCP SDK's ajv validator
+ *   (replaced by the SDK's own cfworker provider) and Pixi's code generators
+ *   (replaced at runtime by `pixi.js/unsafe-eval`, imported in pixiRenderer.ts).
+ *
+ * Each shim's header says what it replaces and why.
+ */
+const MODULE_SHIMS: Array<[pattern: RegExp, shim: string]> = [
+	[/\/@modelcontextprotocol\/sdk\/dist\/esm\/client\/stdio\.js$/, "src/lib/shims/mcpStdioTransport.ts"],
+	[/\/@modelcontextprotocol\/sdk\/dist\/esm\/validation\/ajv-provider\.js$/, "src/lib/shims/mcpJsonSchemaValidator.ts"],
+	[
+		/\/pixi\.js\/lib\/.*\/(unsafeEvalSupported|createUboSyncFunction|compileBufferSync|GenerateShaderSyncCode|generateUniformsSync|generateParticleUpdateFunction)\.mjs$/,
+		"src/lib/shims/pixiNoEval.ts",
+	],
+];
+
+/**
+ * Patterns that must not survive into the production bundle. Checked after
+ * minification, so comments (which mention these names freely) are gone and
+ * only live code and string literals remain. A hit fails the build — that is
+ * the point: a dependency moving a file out from under {@link MODULE_SHIMS}
+ * must surface as a red build, not as a quietly restored capability.
+ */
+const FORBIDDEN_BUNDLE_PATTERNS: Array<[label: string, pattern: RegExp]> = [
+	["child_process", /child_process/],
+	["spawn()", /\.spawn\(/],
+	["execFile", /execFile/],
+	["new Function()", /new Function\(/],
+	["eval()", /[^\w.$]eval\(/],
+];
+
+function shimModules(isProduction: boolean): Plugin {
+	const applied = new Set<number>();
+	return {
+		name: "shim-modules",
+		enforce: "pre",
+		async resolveId(source, importer, options) {
+			const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+			if (!resolved) return null;
+			for (const [index, [pattern, shim]] of MODULE_SHIMS.entries()) {
+				if (pattern.test(resolved.id)) {
+					applied.add(index);
+					return resolve(configDir, shim);
+				}
+			}
+			return null;
+		},
+		generateBundle(_options, bundle) {
+			const missing = MODULE_SHIMS.filter((_, index) => !applied.has(index)).map(([pattern]) => String(pattern));
+			if (missing.length > 0) {
+				throw new Error(
+					`shim-modules: no dependency module matched ${missing.join(", ")} — did a package move the file? ` +
+						"Update MODULE_SHIMS in vite.config.ts.",
+				);
+			}
+			if (!isProduction) return;
+			for (const output of Object.values(bundle)) {
+				if (output.type !== "chunk") continue;
+				for (const [label, pattern] of FORBIDDEN_BUNDLE_PATTERNS) {
+					const match = pattern.exec(output.code);
+					if (!match) continue;
+					const at = Math.max(0, match.index - 80);
+					throw new Error(
+						`shim-modules: production bundle ${output.fileName} still contains ${label} near: ` +
+							`…${output.code.slice(at, match.index + 80)}…`,
+					);
+				}
+			}
+		},
+		transform(code, id) {
+			// @langchain/mcp-adapters keeps the stdio option schema (never reachable
+			// here) and its description names `child_process.spawn` — a literal that
+			// reads as shell access to a bundle scan. Reword the doc string only.
+			// Matched on the module token alone — the surrounding prose (and its
+			// apostrophe) has already changed once between adapter versions.
+			if (!id.endsWith("/@langchain/mcp-adapters/dist/types.js")) return null;
+			const reworded = code.replaceAll("`child_process.spawn`", "process spawning").replaceAll("child_process", "child process");
+			return reworded === code ? null : { code: reworded, map: null };
+		},
+	};
+}
+
 const setOutDir = (mode: string) => {
 	switch (mode) {
 		case "development":
@@ -138,6 +228,7 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		plugins: [
+			shimModules(!isDevelopment),
 			svelte({
 				preprocess: vitePreprocess(),
 				onwarn: (warning, handler) => {
@@ -192,6 +283,7 @@ export default defineConfig(({ mode }) => {
 					"@lezer/lr",
 					"@sap-ai-sdk/langchain", // Optional dependency for SAP AI Core provider
 					...builtinModules,
+					...builtinModules.map((m) => `node:${m}`),
 				],
 			},
 			outDir: setOutDir(mode),

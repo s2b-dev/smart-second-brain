@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import type { Checkpoint, CheckpointMetadata } from "@langchain/langgraph-checkpoint";
 import {
 	THREAD_DATA_VERSION,
@@ -186,6 +187,35 @@ describe("threadDataCodec", () => {
 		expect(sniffThreadDataVersion('{"threadId":"Chats/t.chat"')).toBe(0);
 		expect(sniffThreadDataVersion("not json")).toBe(0);
 		expect(sniffThreadDataVersion("")).toBe(0);
+	});
+
+	it("persists only `configurable` from each checkpoint's parentConfig", () => {
+		const data = makeQuadraticThread();
+		const runtimeConfig = {
+			configurable: { thread_id: "Chats/t.chat", checkpoint_id: "cp-1" },
+			callbacks: [{ name: "StreamMessagesHandler", seen: { "msg-1": { content: "…" } } }],
+			tags: ["graph:step:1"],
+			metadata: { agent_id: "default-agent" },
+			recursionLimit: 25,
+			signal: {},
+		};
+		data.checkpoints["cp-2"].parentConfig = runtimeConfig as unknown as RunnableConfig;
+
+		const deflated = deflateThreadData(data);
+		const entry = (deflated.checkpoints as Record<string, { parentConfig?: Record<string, unknown> }>)["cp-2"];
+		expect(entry.parentConfig).toEqual({ configurable: runtimeConfig.configurable });
+		expect(JSON.stringify(deflated)).not.toContain("StreamMessagesHandler");
+
+		// Stripping happens on the serialized copy, never on the in-memory thread.
+		expect(data.checkpoints["cp-2"].parentConfig).toBe(runtimeConfig);
+	});
+
+	it("passes an already configurable-only parentConfig through unchanged", () => {
+		const data = makeQuadraticThread();
+		const before = data.checkpoints["cp-2"].parentConfig;
+		const restored = inflateThreadData(JSON.parse(JSON.stringify(deflateThreadData(data))) as ThreadData);
+		expect(restored.checkpoints["cp-2"].parentConfig).toEqual(before);
+		expect(restored.checkpoints["cp-1"].parentConfig).toBeUndefined();
 	});
 
 	it("leaves an unresolvable ref in place instead of throwing", () => {

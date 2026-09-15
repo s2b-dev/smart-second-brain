@@ -365,15 +365,14 @@ describe("PluginDataStore – Agent MCP Servers", () => {
 	it("should set and get MCP server for agent", () => {
 		store.setAgentMCPServer(DEFAULT_AGENT_ID, "my-server", {
 			displayName: "my-server",
-			transport: "stdio",
-			command: "npx",
-			args: ["-y", "@modelcontextprotocol/server-everything"],
+			transport: "http",
+			url: "http://localhost:3000/mcp",
 			enabled: true,
 		});
 
 		const servers = store.getAgentMCPServers(DEFAULT_AGENT_ID);
 		expect(servers["my-server"]).toBeDefined();
-		expect(servers["my-server"].transport).toBe("stdio");
+		expect(servers["my-server"].transport).toBe("http");
 		expect(servers["my-server"].enabled).toBe(true);
 	});
 
@@ -392,9 +391,8 @@ describe("PluginDataStore – Agent MCP Servers", () => {
 	it("should toggle MCP server enabled state", () => {
 		store.setAgentMCPServer(DEFAULT_AGENT_ID, "toggle-me", {
 			displayName: "toggle-me",
-			transport: "stdio",
-			command: "cmd",
-			args: [],
+			transport: "http",
+			url: "http://localhost:3000/mcp",
 			enabled: true,
 		});
 
@@ -405,16 +403,14 @@ describe("PluginDataStore – Agent MCP Servers", () => {
 	it("should convert MCP config for client (only enabled servers)", () => {
 		store.setAgentMCPServer(DEFAULT_AGENT_ID, "enabled-server", {
 			displayName: "enabled-server",
-			transport: "stdio",
-			command: "npx",
-			args: ["-y", "server"],
+			transport: "http",
+			url: "http://localhost:3001/mcp",
 			enabled: true,
 		});
 		store.setAgentMCPServer(DEFAULT_AGENT_ID, "disabled-server", {
 			displayName: "disabled-server",
-			transport: "stdio",
-			command: "npx",
-			args: [],
+			transport: "http",
+			url: "http://localhost:3002/mcp",
 			enabled: false,
 		});
 
@@ -1063,5 +1059,56 @@ describe("PluginDataStore – Embedding Indexes", () => {
 		expect(store.embeddingIndexes).toHaveLength(0);
 		expect(store.searchEmbedIndex).toBeNull();
 		expect(store.graphEmbedIndex).toBeNull();
+	});
+});
+
+/* --------------------------------------------------------------------------
+ * Graph index availability
+ * ------------------------------------------------------------------------*/
+
+describe("PluginDataStore graph index availability", () => {
+	let store: PluginDataStore;
+
+	beforeEach(() => {
+		({ store } = makeStore());
+	});
+
+	/**
+	 * The smart graph derives `hasGraphIndex` from `getGraphEmbedModel()` and
+	 * disables the "Inferred links" controls on it. Svelte tracks that read
+	 * because the method goes through the store's `$state`-backed data on every
+	 * call; these pin that it answers each transition the settings UI can
+	 * trigger from live state, never from anything cached at construction.
+	 * (Effects are inert under this Vitest config — Svelte modules compile in
+	 * server mode here — so the tracking itself can't be exercised in a unit test.)
+	 */
+	it("reports a graph index only while one is selected", () => {
+		expect(store.getGraphEmbedModel()).toBeNull();
+
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).toEqual({ provider: "ollama", model: "nomic-embed-text" });
+
+		store.clearEmbedIndex("graph");
+		expect(store.getGraphEmbedModel()).toBeNull();
+
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).not.toBeNull();
+	});
+
+	it("reports no graph index once its config is removed, even via the search purpose", () => {
+		store.setEmbedIndex("graph", "ollama", "nomic-embed-text");
+		store.setEmbedIndex("search", "ollama", "nomic-embed-text");
+		expect(store.getGraphEmbedModel()).not.toBeNull();
+
+		store.removeEmbeddingIndex("ollama:nomic-embed-text");
+		expect(store.graphEmbedIndex).toBeNull();
+		expect(store.getGraphEmbedModel()).toBeNull();
+	});
+
+	it("reports no graph index when the selected id has no config", () => {
+		// A stale selection can survive a sync; the lookup, not the id, decides.
+		({ store } = makeStore({ graphEmbedIndex: "ollama:gone", embeddingIndexes: [] }));
+		expect(store.graphEmbedIndex).toBe("ollama:gone");
+		expect(store.getGraphEmbedModel()).toBeNull();
 	});
 });

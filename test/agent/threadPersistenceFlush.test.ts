@@ -13,7 +13,7 @@ const { createAgentMock, summarizationMiddlewareMock } = vi.hoisted(() => ({
 		streamEvents: vi.fn(),
 		stream: vi.fn(async () => {
 			async function* gen() {
-				yield ["values", { messages: [{ getType: () => "ai", text: "done", content: "done" }] }];
+				yield ["values", { messages: [{ type: "ai", getType: () => "ai", text: "done", content: "done" }] }];
 			}
 			return gen();
 		}),
@@ -139,7 +139,7 @@ describe("run-completion thread persistence", () => {
 		const agent = new Agent({ registry: makeRegistry() as never, threadStore: store });
 		const resolved = await makeResolved(agent);
 		(resolved.runnable as unknown as { invoke: ReturnType<typeof vi.fn> }).invoke = vi.fn(async () => ({
-			messages: [{ getType: () => "ai", text: "done", content: "done" }],
+			messages: [{ type: "ai", getType: () => "ai", text: "done", content: "done" }],
 		}));
 
 		await agent.run({ query: "hi", resolved, threadId: THREAD_ID });

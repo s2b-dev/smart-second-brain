@@ -11,15 +11,24 @@
  * defense-in-depth fallback that fails with a clear message.
  */
 
-import type { createServer as CreateServer } from "node:http";
+/**
+ * Type-only views of `node:http`. Expressed as `import()` type queries rather than
+ * an `import type` declaration so nothing — not even a type-only statement — names
+ * a Node builtin at the module top; the runtime module is reached only through
+ * {@link requireNodeHttp}.
+ */
+export type NodeHttpServer = import("node:http").Server;
+export type NodeHttpIncomingMessage = import("node:http").IncomingMessage;
+export type NodeHttpServerResponse = import("node:http").ServerResponse;
+type CreateServer = typeof import("node:http").createServer;
 
 /** Lazily resolve `node:http`'s `createServer` via Electron's exposed require. */
-export function requireNodeHttp(): typeof CreateServer {
-	const req = (globalThis as { require?: (id: string) => unknown }).require;
+export function requireNodeHttp(): CreateServer {
+	const req = (window as { require?: (id: string) => unknown }).require;
 	if (typeof req !== "function") {
 		throw new Error("OAuth sign-in requires a desktop environment (node:http is unavailable).");
 	}
-	const http = req("http") as { createServer: typeof CreateServer };
+	const http = req("http") as { createServer: CreateServer };
 	return http.createServer;
 }
 

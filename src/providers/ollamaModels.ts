@@ -7,7 +7,22 @@
  * @see https://github.com/ollama/ollama/blob/main/docs/api.md#show-model-information
  */
 
+import { Logger } from "../utils/logging";
+
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour (shorter than cloud APIs since local)
+
+/**
+ * `num_ctx` sent with every Ollama embedding request, and the ceiling on the
+ * input budget the chunker sizes Ollama models against.
+ *
+ * The server accepts min(num_ctx, model context) tokens per input, and its
+ * num_ctx default is chosen from free VRAM (4k and up) — not readable through
+ * the API, and unrelated to the architecture context `/api/show` reports.
+ * Pinning one value on both sides is what makes a chunk that fits the budget
+ * fit the server (#485). 8k covers every current embedding model's useful
+ * range while keeping the KV allocation modest on small GPUs.
+ */
+export const OLLAMA_EMBED_NUM_CTX = 8192;
 
 /**
  * Model details from Ollama API
@@ -89,7 +104,7 @@ let cachedResponse: CachedData | null = null;
  */
 async function fetchModelInfo(baseUrl: string, modelName: string): Promise<OllamaModelInfo | null> {
 	try {
-		const response = await globalThis.fetch(`${baseUrl}/api/show`, {
+		const response = await window.fetch(`${baseUrl}/api/show`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -98,7 +113,7 @@ async function fetchModelInfo(baseUrl: string, modelName: string): Promise<Ollam
 		});
 
 		if (!response.ok) {
-			console.warn(`Failed to fetch Ollama model info for ${modelName}: ${response.status}`);
+			Logger.warn(`Failed to fetch Ollama model info for ${modelName}: ${response.status}`);
 			return null;
 		}
 
@@ -121,7 +136,7 @@ async function fetchModelInfo(baseUrl: string, modelName: string): Promise<Ollam
 			}
 			// Also check direct keys
 			if (data.model_info["llama.context_length"] !== undefined) {
-				contextLength = data.model_info["llama.context_length"] as number;
+				contextLength = data.model_info["llama.context_length"];
 			}
 		}
 
@@ -143,7 +158,7 @@ async function fetchModelInfo(baseUrl: string, modelName: string): Promise<Ollam
 			supportsTools,
 		};
 	} catch (error) {
-		console.warn(`Error fetching Ollama model info for ${modelName}:`, error);
+		Logger.warn(`Error fetching Ollama model info for ${modelName}:`, error);
 		return null;
 	}
 }

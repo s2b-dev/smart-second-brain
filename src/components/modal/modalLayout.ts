@@ -99,24 +99,12 @@ export function applyModalLayout(modal: Modal, options: ModalLayoutOptions): () 
 			? [...modal.modalEl.querySelectorAll<HTMLElement>(".modal-header-button, .modal-close-button")]
 			: [];
 	for (const button of headerButtons) {
-		button.style.setProperty("top", "calc(var(--safe-area-inset-top, 0px) + var(--size-4-3))", "important");
+		button.addClass("s2b-modal-sheet-header-button");
 	}
 
-	if (contentFill) {
-		modal.modalEl.style.display = "flex";
-		modal.modalEl.style.flexDirection = "column";
-		modal.contentEl.style.display = "flex";
-		modal.contentEl.style.flexDirection = "column";
-		modal.contentEl.style.flex = "1";
-		modal.contentEl.style.minHeight = "0";
-	} else {
-		modal.modalEl.style.removeProperty("display");
-		modal.modalEl.style.removeProperty("flex-direction");
-		modal.contentEl.style.removeProperty("display");
-		modal.contentEl.style.removeProperty("flex-direction");
-		modal.contentEl.style.removeProperty("flex");
-		modal.contentEl.style.removeProperty("min-height");
-	}
+	// Column-flex the modal and its content so the body fills the sheet.
+	modal.modalEl.toggleClass("s2b-modal-fill", contentFill);
+	modal.contentEl.toggleClass("s2b-modal-fill-content", contentFill);
 
 	if (contentOverflow === undefined) {
 		modal.contentEl.style.removeProperty("overflow");
@@ -136,15 +124,11 @@ export function applyModalLayout(modal: Modal, options: ModalLayoutOptions): () 
 		}
 
 		for (const button of headerButtons) {
-			button.style.removeProperty("top");
+			button.removeClass("s2b-modal-sheet-header-button");
 		}
 
-		modal.modalEl.style.removeProperty("display");
-		modal.modalEl.style.removeProperty("flex-direction");
-		modal.contentEl.style.removeProperty("display");
-		modal.contentEl.style.removeProperty("flex-direction");
-		modal.contentEl.style.removeProperty("flex");
-		modal.contentEl.style.removeProperty("min-height");
+		modal.modalEl.removeClass("s2b-modal-fill");
+		modal.contentEl.removeClass("s2b-modal-fill-content");
 		modal.contentEl.style.removeProperty("overflow");
 		modal.contentEl.style.removeProperty("padding");
 	};

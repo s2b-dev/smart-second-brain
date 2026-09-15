@@ -130,7 +130,7 @@ function createVaultFileSearchResult(app: App, file: TFile): SearchResult {
 	return {
 		path: file.path,
 		name: file.basename,
-		frontmatter: cache?.frontmatter as Record<string, unknown> | undefined,
+		frontmatter: cache?.frontmatter,
 	};
 }
 
@@ -185,7 +185,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 	   otherwise bound only to Tab / Alt+Enter (unreachable without a keyboard). */
 	private pendingPostOpenFrameId: number | null = null;
 	private pendingFocusFrameId: number | null = null;
-	private pendingFocusTimeoutIds: ReturnType<typeof globalThis.setTimeout>[] = [];
+	private pendingFocusTimeoutIds: number[] = [];
 	private hasPrimedOpenResults = false;
 
 	constructor(app: App, options: SearchModalOptions = {}) {
@@ -509,7 +509,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		}
 
 		const preview = trimmedQuery.length > 36 ? `${trimmedQuery.slice(0, 33)}...` : trimmedQuery;
-		return `Create \"${preview}\"`;
+		return `Create "${preview}"`;
 	}
 
 	private updateInstructions(): void {
@@ -563,7 +563,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 	private getSuggestionEls(): HTMLElement[] {
 		return Array.from(this.resultContainerEl?.children ?? []).filter(
 			(child): child is HTMLElement =>
-				child instanceof HTMLElement && child.classList.contains("suggestion-item"),
+				child.instanceOf(HTMLElement) && child.classList.contains("suggestion-item"),
 		);
 	}
 
@@ -748,7 +748,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		this.close();
 		for (const [index, result] of results.entries()) {
 			getData().recordRecentlyOpenedNote(result.path);
-			this.app.workspace.openLinkText(result.path, "", destination === "tab" || index > 0 ? "tab" : false);
+			void this.app.workspace.openLinkText(result.path, "", destination === "tab" || index > 0 ? "tab" : false);
 		}
 	}
 
@@ -786,7 +786,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		}
 
 		this.close();
-		this.app.workspace.openLinkText(result.path, "", destination);
+		void this.app.workspace.openLinkText(result.path, "", destination);
 	}
 
 	/**
@@ -975,7 +975,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			this.close();
 			const leaf = this.app.workspace.getLeaf(false);
 			await leaf.openFile(file);
-			this.app.workspace.revealLeaf(leaf);
+			await this.app.workspace.revealLeaf(leaf);
 		} catch (error) {
 			Logger.error("[SearchModal] Failed to create note from query:", error);
 			new Notice("Failed to create note");
@@ -1010,7 +1010,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		this.searchResults = this.getModalRecentNotes();
 		this.hasPrimedOpenResults = true;
 
-		super.onOpen();
+		void super.onOpen();
 
 		applyPromptSafeArea(this.modalEl);
 		this.schedulePostOpenHydration();
@@ -1046,12 +1046,12 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			this.autocompleteHydrationTimeout = null;
 		}
 		if (this.pendingPostOpenFrameId !== null) {
-			globalThis.cancelAnimationFrame(this.pendingPostOpenFrameId);
+			window.cancelAnimationFrame(this.pendingPostOpenFrameId);
 			this.pendingPostOpenFrameId = null;
 		}
 		this.hasPrimedOpenResults = false;
 		if (this.pendingFocusFrameId !== null) {
-			globalThis.cancelAnimationFrame(this.pendingFocusFrameId);
+			window.cancelAnimationFrame(this.pendingFocusFrameId);
 			this.pendingFocusFrameId = null;
 		}
 		this.clearPendingFocusTimeouts();
@@ -1059,10 +1059,10 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private schedulePostOpenHydration(): void {
 		if (this.pendingPostOpenFrameId !== null) {
-			globalThis.cancelAnimationFrame(this.pendingPostOpenFrameId);
+			window.cancelAnimationFrame(this.pendingPostOpenFrameId);
 		}
 
-		this.pendingPostOpenFrameId = globalThis.requestAnimationFrame(() => {
+		this.pendingPostOpenFrameId = window.requestAnimationFrame(() => {
 			this.pendingPostOpenFrameId = null;
 			if (this.isClosed) {
 				return;
@@ -1162,12 +1162,12 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		// Reserve a dedicated content column so wrapped chips never slide beneath the search icon.
 		inputContainer.addClass("s2b-inline-chips-container");
 
-		this.inlineInputContentEl = document.createElement("div");
+		this.inlineInputContentEl = createDiv();
 		this.inlineInputContentEl.className = "s2b-inline-input-content";
 		inputContainer.insertBefore(this.inlineInputContentEl, inputEl);
 
 		// Create the chip wrapper inside the content flow, before the input.
-		this.inlineChipsEl = document.createElement("div");
+		this.inlineChipsEl = createDiv();
 		this.inlineChipsEl.className = "s2b-inline-chips";
 		this.inlineInputContentEl.appendChild(this.inlineChipsEl);
 		this.inlineInputContentEl.appendChild(inputEl);
@@ -1183,15 +1183,15 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private scheduleInputFocus(): void {
 		if (this.pendingFocusFrameId !== null) {
-			globalThis.cancelAnimationFrame(this.pendingFocusFrameId);
+			window.cancelAnimationFrame(this.pendingFocusFrameId);
 		}
 		this.clearPendingFocusTimeouts();
 
-		this.pendingFocusFrameId = globalThis.requestAnimationFrame(() => {
+		this.pendingFocusFrameId = window.requestAnimationFrame(() => {
 			this.pendingFocusFrameId = null;
 			this.focusInput();
 			for (const delay of [0, 50, 150, 400, 800]) {
-				const timeoutId = globalThis.setTimeout(() => {
+				const timeoutId = window.setTimeout(() => {
 					this.pendingFocusTimeoutIds = this.pendingFocusTimeoutIds.filter((id) => id !== timeoutId);
 					this.focusInput();
 				}, delay);
@@ -1202,7 +1202,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private clearPendingFocusTimeouts(): void {
 		for (const timeoutId of this.pendingFocusTimeoutIds) {
-			globalThis.clearTimeout(timeoutId);
+			window.clearTimeout(timeoutId);
 		}
 		this.pendingFocusTimeoutIds = [];
 	}
@@ -1256,7 +1256,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			if (!noteIcon) {
 				this.noteIconElementCache.set(path, null);
 			} else {
-				const iconEl = document.createElement("span");
+				const iconEl = createSpan();
 				iconEl.className = "s2b-search-result-note-icon";
 				iconEl.setAttribute("aria-hidden", "true");
 				noteIcon.render(iconEl);
@@ -1273,7 +1273,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			if (!tagIcon) {
 				this.tagIconElementCache.set(tag, null);
 			} else {
-				const iconEl = document.createElement("span");
+				const iconEl = createSpan();
 				iconEl.className = "s2b-search-result-tag-icon iconic-icon";
 				iconEl.setAttribute("aria-hidden", "true");
 				tagIcon.render(iconEl);
@@ -1286,7 +1286,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private getCachedTagPillElement(tag: string): HTMLElement {
 		if (!this.tagPillElementCache.has(tag)) {
-			const tagEl = document.createElement("span");
+			const tagEl = createSpan();
 			tagEl.className = "s2b-search-result-tag";
 
 			const tagIcon = this.getCachedTagIcon(tag);
@@ -1319,7 +1319,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private getCachedBadgeIconElement(badge: SearchResultBadge): HTMLElement {
 		if (!this.badgeIconElementCache.has(badge)) {
-			const badgeIconEl = document.createElement("span");
+			const badgeIconEl = createSpan();
 			badgeIconEl.className = "s2b-search-result-badge-icon";
 			badgeIconEl.setAttribute("aria-hidden", "true");
 			setIcon(badgeIconEl, getBadgeIconId(badge));
@@ -1349,13 +1349,12 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			);
 		}
 
+		// Only the theme-dependent leading inset is set here; the static resets
+		// live on `.s2b-inline-input` (styles.css). Inline `!important` because
+		// Cupertino pins `padding-inline-start` on `.prompt-input` at that priority.
 		const leadingInset = hasChips || !usesCupertinoTheme ? "0" : "36px";
 		inputEl.style.setProperty("padding-left", leadingInset, "important");
 		inputEl.style.setProperty("padding-inline-start", leadingInset, "important");
-		inputEl.style.setProperty("padding-right", "0", "important");
-		inputEl.style.setProperty("padding-inline-end", "0", "important");
-		inputEl.style.setProperty("margin-left", "0", "important");
-		inputEl.style.setProperty("text-indent", "0", "important");
 	}
 
 	private getModalRecentNotes(): SearchResult[] {
@@ -1472,7 +1471,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		this.updateInlineInputSpacing();
 
 		for (const [index, filter] of this.activeFilters.entries()) {
-			const chip = chipsEl.createEl("button", { cls: "s2b-inline-chip" }) as HTMLButtonElement;
+			const chip = chipsEl.createEl("button", { cls: "s2b-inline-chip" });
 			chip.type = "button";
 
 			// Try to get an icon from Iconic / Iconize
@@ -1521,7 +1520,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			const modeChip = chipsEl.createEl("button", {
 				cls: "s2b-inline-chip s2b-inline-chip-mode",
 				text: this.requireAllTags ? "ALL" : "ANY",
-			}) as HTMLButtonElement;
+			});
 			modeChip.type = "button";
 			modeChip.setAttribute("aria-label", "Toggle tag match mode");
 			modeChip.addEventListener("click", (evt) => {
@@ -1540,10 +1539,10 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		const borderWidth = 2;
 
 		// Hide the modal's own border so the gradient replaces it
-		this.modalEl.style.setProperty("border-color", "transparent", "important");
+		this.modalEl.addClass("s2b-search-modal-glowing");
 
 		// Create a fixed-position overlay exactly on top of the modal
-		const border = document.createElement("div");
+		const border = createDiv();
 		const modalRect = this.modalEl.getBoundingClientRect();
 		Object.assign(border.style, {
 			position: "fixed",
@@ -1558,9 +1557,9 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		document.body.appendChild(border);
 		this.borderEl = border;
 
-		const canvas = document.createElement("canvas");
+		const canvas = createEl("canvas");
 		const dpr = window.devicePixelRatio || 1;
-		canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+		canvas.addClass("s2b-search-modal-glow-canvas");
 		border.appendChild(canvas);
 
 		const animate = () => {
@@ -1606,9 +1605,9 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			ctx.fillStyle = grad;
 			ctx.fill("evenodd");
 
-			this.glowAnimationId = requestAnimationFrame(animate);
+			this.glowAnimationId = window.requestAnimationFrame(animate);
 		};
-		this.glowAnimationId = requestAnimationFrame(animate);
+		this.glowAnimationId = window.requestAnimationFrame(animate);
 	}
 
 	private stopGlowAnimation(): void {
@@ -1620,7 +1619,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			this.borderEl.remove();
 			this.borderEl = null;
 		}
-		this.modalEl.style.removeProperty("border-color");
+		this.modalEl.removeClass("s2b-search-modal-glowing");
 	}
 
 	/** Force the next getSuggestions call to re-trigger a search. */
@@ -1766,10 +1765,10 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			badges: result.matchBadges?.join(", ") ?? "",
 		}));
 
-		console.groupCollapsed(`[S2B][SearchDebug] ${algorithm} query=\"${query}\" results=${results.length}`);
-		console.debug("filter", filter ?? null);
-		console.table(summary);
-		console.groupEnd();
+		console.debug(`[S2B][SearchDebug] ${algorithm} query="${query}" results=${results.length}`, {
+			filter: filter ?? null,
+			results: summary,
+		});
 	}
 
 	/**
@@ -1942,9 +1941,15 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		const highlightTerms = getHighlightTerms(this.currentQuery);
 		const searchSettings = getData();
 		const showPath = searchSettings.searchShowPath;
-		const showTags = searchSettings.searchShowTags;
+		// A phone row has no width to spare: a tag strip is `max-content` wide and
+		// squeezes the note name — the one thing the row exists to show — down to
+		// nothing. Suppress tags there regardless of the setting, which is desktop-
+		// scoped (the settings toggle says so, and is disabled on phones).
+		const showTags = searchSettings.searchShowTags && !Platform.isPhone;
 		const showMatchBadges = searchSettings.searchShowMatchBadges;
 		const showMatchContext = searchSettings.searchShowMatchContext;
+		// Feeds `shouldShowMatchExplanation` too: with tags hidden the snippet is no
+		// longer redundant with them, so an empty list is the right input there.
 		const displayTags = showTags ? getFrontmatterDisplayTags(result.frontmatter) : [];
 
 		// Title row

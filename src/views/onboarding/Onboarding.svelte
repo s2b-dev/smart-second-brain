@@ -79,9 +79,9 @@ $effect(() => {
 			stylesReady = true;
 			return;
 		}
-		raf = requestAnimationFrame(probe);
+		raf = window.requestAnimationFrame(probe);
 	};
-	raf = requestAnimationFrame(probe);
+	raf = window.requestAnimationFrame(probe);
 	return () => cancelAnimationFrame(raf);
 });
 // Lets an impatient user jump straight to the settled page instead of waiting out

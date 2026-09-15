@@ -20,8 +20,7 @@ export abstract class SvelteModal extends Modal {
 	 * override that is reverted on close (see {@link applyModalLayout}).
 	 */
 	protected mountComponent<Props extends Record<string, unknown>>(
-		// biome-ignore lint/suspicious/noExplicitAny: Svelte's own `mount` accepts any exports/bindings shape
-		component: Component<Props, any, any>,
+		component: Component<Props, Record<string, unknown>, string>,
 		props: Props,
 		layout?: ModalLayoutOptions,
 	): void {
@@ -33,7 +32,7 @@ export abstract class SvelteModal extends Modal {
 		this.restoreLayout?.();
 		this.restoreLayout = null;
 		if (this.mounted) {
-			unmount(this.mounted);
+			void unmount(this.mounted);
 			this.mounted = null;
 		}
 		this.contentEl.empty();

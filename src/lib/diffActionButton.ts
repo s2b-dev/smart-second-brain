@@ -39,16 +39,16 @@ export function createResolveButton(
 	label: string,
 	ariaLabel: string,
 ): HTMLButtonElement {
-	const btn = document.createElement("button");
+	const btn = createEl("button");
 	btn.className = className;
 	btn.setAttribute("aria-label", ariaLabel);
 
-	const iconEl = document.createElement("span");
+	const iconEl = createSpan();
 	iconEl.className = "s2b-diff-btn-icon";
 	setIcon(iconEl, iconName);
 	btn.appendChild(iconEl);
 
-	const labelEl = document.createElement("span");
+	const labelEl = createSpan();
 	labelEl.className = "s2b-diff-btn-label";
 	labelEl.textContent = label;
 	btn.appendChild(labelEl);

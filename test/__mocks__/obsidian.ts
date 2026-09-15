@@ -140,6 +140,7 @@ export class SuggestModal<T> {
 export class Notice {
 	message: string;
 	timeout?: number;
+	messageEl = document.createElement("div");
 
 	constructor(message: string, timeout?: number) {
 		this.message = message;
@@ -277,3 +278,7 @@ export interface CachedMetadata {
 }
 
 export type DataAdapter = Vault["adapter"];
+
+export function getLanguage(): string {
+	return "en";
+}

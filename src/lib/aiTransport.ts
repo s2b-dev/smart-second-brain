@@ -107,14 +107,8 @@ export function getCurrentAiTransportModeForTest(): AiTransportMode {
 }
 
 async function getElectronNetFetch(): Promise<typeof fetch | null> {
-	const globalWithRequire = globalThis as typeof globalThis & {
-		require?: (id: string) => unknown;
-		window?: { require?: (id: string) => unknown };
-	};
-
-	const requireCandidates = [globalWithRequire.require, globalWithRequire.window?.require];
-	for (const requireFn of requireCandidates) {
-		if (typeof requireFn !== "function") continue;
+	const requireFn = (window as { require?: (id: string) => unknown }).require;
+	if (typeof requireFn === "function") {
 		try {
 			const electron = requireFn("electron") as {
 				net?: { fetch?: typeof fetch };
@@ -327,7 +321,7 @@ async function requestUrlFetch(url: string, init: RequestInit): Promise<Response
 	});
 
 	const responseHeaders: Record<string, string> = {
-		...(response.headers as Record<string, string>),
+		...response.headers,
 		"x-smart2brain-transport": "requestUrl",
 		"x-smart2brain-execution": "buffered",
 	};
@@ -463,41 +457,173 @@ function isTransportFailure(error: unknown): boolean {
 	return looksLikeTransportFailureMessage(message);
 }
 
+/**
+ * Keep the renderer's `AbortSignal` out of Electron's main-process fetch.
+ *
+ * `electron.remote.net.fetch` runs in the main process, so every argument
+ * crosses the `@electron/remote` bridge and an `AbortSignal` arrives there as a
+ * remote proxy object. From Electron 40 (Node 24 / undici 7 — Obsidian
+ * installer 1.13.x ships Electron 43) undici brand-checks `RequestInit.signal`
+ * and rejects the proxy with `RequestInit: Expected signal (...) to be an
+ * instance of AbortSignal` (#472). Every streaming send then failed before it
+ * left the machine, surfacing as the OpenAI SDK's "Connection error." once its
+ * retries ran out. So the signal never travels: the request goes out without
+ * one, and cancellation is honoured on this side instead — see
+ * `fetchWithLocalAbort`.
+ */
+function abortErrorFor(signal: AbortSignal): unknown {
+	return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
+
+/**
+ * Re-wrap a response so an abort tears the stream (and thus the main-process
+ * request) down even after a consumer has started reading.
+ *
+ * The signal no longer reaches Electron's fetch, so we own cancellation. We
+ * cannot call `response.body.cancel()` on abort because the OpenAI SDK acquires
+ * a reader as soon as the response arrives, which *locks* the body — `cancel()`
+ * on a locked stream throws and the underlying request keeps running (the P1 in
+ * review). Instead we pipe the source body through a stream we hold the only
+ * reader of: the SDK reads our readable, and on abort we cancel the source
+ * reader (never locked by anyone else, so this always tears down the
+ * main-process request) and error our readable so the SDK's in-flight read
+ * rejects with the abort reason. A body-less response is returned unchanged.
+ */
+function withAbortableBody(response: Response, signal: AbortSignal): Response {
+	const source = response.body;
+	if (!source) {
+		// No stream to tear down, but still surface the abort to a waiting caller.
+		signal.addEventListener("abort", () => {}, { once: true });
+		return response;
+	}
+
+	const reader = source.getReader();
+	let onAbort: () => void = () => {};
+	const readable = new ReadableStream<Uint8Array>({
+		start(controller) {
+			onAbort = () => {
+				void reader.cancel(signal.reason).catch(() => {});
+				try {
+					controller.error(abortErrorFor(signal));
+				} catch {
+					// Already closed/errored; nothing to do.
+				}
+			};
+			if (signal.aborted) {
+				onAbort();
+				return;
+			}
+			signal.addEventListener("abort", onAbort, { once: true });
+		},
+		async pull(controller) {
+			try {
+				const { done, value } = await reader.read();
+				if (done) {
+					signal.removeEventListener("abort", onAbort);
+					controller.close();
+					return;
+				}
+				controller.enqueue(value);
+			} catch (error) {
+				signal.removeEventListener("abort", onAbort);
+				controller.error(error);
+			}
+		},
+		cancel(reason) {
+			signal.removeEventListener("abort", onAbort);
+			return reader.cancel(reason);
+		},
+	});
+
+	return new Response(readable, {
+		status: response.status,
+		statusText: response.statusText,
+		headers: response.headers,
+	});
+}
+
+async function fetchWithLocalAbort(
+	fetchFn: typeof fetch,
+	url: string,
+	init: RequestInit,
+	signal: AbortSignal | null | undefined,
+	afterResponse: (response: Response) => Response,
+): Promise<Response> {
+	if (!signal) return afterResponse(await fetchFn(url, init));
+	if (signal.aborted) throw abortErrorFor(signal);
+
+	const pending = fetchFn(url, init);
+	let rejectOnAbort: () => void = () => {};
+	const aborted = new Promise<never>((_, reject) => {
+		rejectOnAbort = () => reject(abortErrorFor(signal));
+		signal.addEventListener("abort", rejectOnAbort, { once: true });
+	});
+
+	try {
+		const response = await Promise.race([pending, aborted]);
+		signal.removeEventListener("abort", rejectOnAbort);
+		// Normalize headers on the raw Electron response first, then wrap so an
+		// abort can tear down the (now standard) stream.
+		return withAbortableBody(afterResponse(response), signal);
+	} catch (error) {
+		signal.removeEventListener("abort", rejectOnAbort);
+		if (signal.aborted) {
+			// The request may still complete in the main process; close it when it does.
+			pending.then(
+				(response) => {
+					void response.body?.cancel(signal.reason).catch(() => {});
+				},
+				() => {},
+			);
+		}
+		throw error;
+	}
+}
+
 async function performPrimaryFetch(normalized: NormalizedRequest): Promise<Response> {
 	const electronFetch = await getElectronNetFetch();
-	const primaryFetch = electronFetch ?? globalThis.fetch.bind(globalThis);
 	const parsedBody = parseRequestBody(normalized.init.body);
 	const normalizedBody =
 		parsedBody && normalized.url.includes("/chat/completions")
 			? normalizeChatCompletionMessages(parsedBody)
 			: undefined;
 	const requestBody = normalizedBody ? stringifyRequestBody(normalizedBody) : normalized.init.body;
-	const requestInit =
-		electronFetch && normalized.init.headers
-			? {
-					...normalized.init,
-					body: requestBody,
-					headers: toHeaderRecord(normalized.init.headers),
-				}
-			: {
-					...normalized.init,
-					body: requestBody,
-				};
-	const response = await primaryFetch(normalized.url, requestInit);
-	if (!response.ok && normalized.url.includes("/chat/completions")) {
-		let responseText: string | undefined;
-		try {
-			responseText = await response.clone().text();
-		} catch {
-			responseText = undefined;
-		}
-		Logger.debug("aiTransport.response_error", {
-			url: normalized.url,
-			status: response.status,
-			body: responseText,
-		});
+
+	// Non-2xx `/chat/completions` bodies are small; logging them clones the raw
+	// response before any abort wrapping so it never contends with the reader.
+	const logIfError = (response: Response): void => {
+		if (response.ok || !normalized.url.includes("/chat/completions")) return;
+		void response
+			.clone()
+			.text()
+			.then(
+				(body) =>
+					Logger.debug("aiTransport.response_error", { url: normalized.url, status: response.status, body }),
+				() => {},
+			);
+	};
+
+	if (!electronFetch) {
+		const response = await window.fetch(normalized.url, { ...normalized.init, body: requestBody });
+		logIfError(response);
+		return response;
 	}
-	return electronFetch ? normalizeFetchLikeResponse(response as Response) : response;
+
+	const { signal, ...initWithoutSignal } = normalized.init;
+	return fetchWithLocalAbort(
+		electronFetch,
+		normalized.url,
+		{
+			...initWithoutSignal,
+			body: requestBody,
+			headers: normalized.init.headers ? toHeaderRecord(normalized.init.headers) : undefined,
+		},
+		signal,
+		(response) => {
+			logIfError(response);
+			return normalizeFetchLikeResponse(response);
+		},
+	);
 }
 
 export async function performAiFetch(
@@ -556,7 +682,7 @@ export async function performAiFetch(
 }
 
 export function createAiProviderFetch(providerId: string): typeof fetch {
-	return ((input: RequestInfo | URL, init?: RequestInit) => performAiFetch(providerId, input, init)) as typeof fetch;
+	return (input: RequestInfo | URL, init?: RequestInit) => performAiFetch(providerId, input, init);
 }
 
 /**
@@ -570,10 +696,10 @@ export function createAiProviderFetch(providerId: string): typeof fetch {
  * actually takes the non-streaming path.
  */
 export function createBufferedAiProviderFetch(providerId: string): typeof fetch {
-	return ((input: RequestInfo | URL, init?: RequestInit) => {
+	return (input: RequestInfo | URL, init?: RequestInit) => {
 		const normalized = normalizeRequest(input, init);
 		const bufferedInit = isStreamingRequest(normalized.init) ? disableStreaming(normalized.init) : normalized.init;
 		Logger.debug("aiTransport.subagent_buffered_request", { providerId, url: normalized.url });
 		return requestUrlFetch(normalized.url, bufferedInit);
-	}) as typeof fetch;
+	};
 }

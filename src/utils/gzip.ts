@@ -15,7 +15,7 @@ type NodeZlib = typeof import("node:zlib");
 /** Resolve `node:zlib` on desktop via Electron's exposed `require`, else null. */
 function tryRequireZlib(): NodeZlib | null {
 	try {
-		const req = (globalThis as { require?: (id: string) => unknown }).require;
+		const req = (window as { require?: (id: string) => unknown }).require;
 		if (typeof req === "function") return req("zlib") as NodeZlib;
 	} catch {
 		// require unavailable (mobile) or module missing — fall through.
@@ -23,8 +23,8 @@ function tryRequireZlib(): NodeZlib | null {
 	return null;
 }
 
-const hasCompressionStream = typeof globalThis.CompressionStream === "function";
-const hasDecompressionStream = typeof globalThis.DecompressionStream === "function";
+const hasCompressionStream = typeof window.CompressionStream === "function";
+const hasDecompressionStream = typeof window.DecompressionStream === "function";
 
 /**
  * Copy bytes into a fresh `ArrayBuffer`-backed Uint8Array. `WritableStream`

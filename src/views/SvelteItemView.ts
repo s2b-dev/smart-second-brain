@@ -24,8 +24,7 @@ export abstract class SvelteItemView extends ItemView {
 	 * `containerClass` is the view's root CSS class; `testId` lands in `data-testid`.
 	 */
 	protected mountComponent<Props extends Record<string, unknown>>(
-		// biome-ignore lint/suspicious/noExplicitAny: Svelte's own `mount` accepts any exports/bindings shape
-		component: Component<Props, any, any>,
+		component: Component<Props, Record<string, unknown>, string>,
 		props: Props,
 		chrome: { containerClass: string; testId: string },
 	): void {
@@ -37,7 +36,7 @@ export abstract class SvelteItemView extends ItemView {
 
 	async onClose(): Promise<void> {
 		if (this.mounted) {
-			unmount(this.mounted);
+			void unmount(this.mounted);
 			this.mounted = null;
 		}
 	}

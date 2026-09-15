@@ -1,4 +1,3 @@
-import type { Server, IncomingMessage, ServerResponse } from "node:http";
 import { Platform, requestUrl } from "obsidian";
 import { getPlugin } from "../stores/state.svelte";
 import { clearCodexSession, getCodexSession, saveCodexSession } from "../stores/providerRuntime.svelte";
@@ -6,7 +5,14 @@ import type { CodexSession } from "../types/provider";
 import { Logger } from "../utils/logging";
 import { performAiFetch } from "../lib/aiTransport";
 import { escapeHtml } from "../utils/html";
-import { arrayBufferToBase64Url, base64UrlToString, requireNodeHttp } from "./oauthNode";
+import {
+	arrayBufferToBase64Url,
+	base64UrlToString,
+	type NodeHttpIncomingMessage as IncomingMessage,
+	type NodeHttpServer as Server,
+	type NodeHttpServerResponse as ServerResponse,
+	requireNodeHttp,
+} from "./oauthNode";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const ISSUER = "https://auth.openai.com";
@@ -45,7 +51,7 @@ interface PendingOpenAICodexAuth {
 	redirectUri: string;
 	resolve: (session: CodexSession) => void;
 	reject: (error: Error) => void;
-	timeoutId: ReturnType<typeof setTimeout>;
+	timeoutId: number;
 }
 
 let pendingOpenAICodexAuth: PendingOpenAICodexAuth | null = null;
@@ -67,7 +73,7 @@ const HTML_SUCCESS = `<!doctype html>
       <h1 style="margin-bottom:1rem;">Authorization Successful</h1>
       <p>You can close this window and return to Obsidian.</p>
     </div>
-    <script>setTimeout(() => window.close(), 1500)</script>
+    <script>window.setTimeout(() => window.close(), 1500)</script>
   </body>
 </html>`;
 
@@ -82,19 +88,19 @@ const htmlError = (error: string) => `<!doctype html>
   </body>
 </html>`;
 
-const oauthSuccessPage = (res: import("node:http").ServerResponse): void => {
+const oauthSuccessPage = (res: ServerResponse): void => {
 	res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
 	res.end(HTML_SUCCESS);
 };
 
-const oauthErrorPage = (res: import("node:http").ServerResponse, error: string): void => {
+const oauthErrorPage = (res: ServerResponse, error: string): void => {
 	res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
 	res.end(htmlError(error));
 };
 
 function cleanupPendingOpenAICodexAuth() {
 	if (!pendingOpenAICodexAuth) return;
-	clearTimeout(pendingOpenAICodexAuth.timeoutId);
+	window.clearTimeout(pendingOpenAICodexAuth.timeoutId);
 	pendingOpenAICodexAuth.server.close();
 	pendingOpenAICodexAuth = null;
 }
@@ -405,7 +411,7 @@ async function startOpenAICodexAuthServer(expectedState: string, pkce: PkceCodes
 				redirectUri,
 				resolve: () => undefined,
 				reject: () => undefined,
-				timeoutId: setTimeout(() => undefined, OAUTH_TIMEOUT_MS),
+				timeoutId: window.setTimeout(() => undefined, OAUTH_TIMEOUT_MS),
 			};
 			resolve();
 		});
@@ -444,8 +450,8 @@ export async function signInWithOpenAICodex(): Promise<CodexSession> {
 
 		pendingOpenAICodexAuth.resolve = resolve;
 		pendingOpenAICodexAuth.reject = reject;
-		clearTimeout(pendingOpenAICodexAuth.timeoutId);
-		pendingOpenAICodexAuth.timeoutId = setTimeout(() => {
+		window.clearTimeout(pendingOpenAICodexAuth.timeoutId);
+		pendingOpenAICodexAuth.timeoutId = window.setTimeout(() => {
 			if (!pendingOpenAICodexAuth) return;
 			pendingOpenAICodexAuth.reject(new Error("Timed out waiting for ChatGPT sign-in"));
 			cleanupPendingOpenAICodexAuth();
@@ -584,7 +590,7 @@ function injectCodexDefaults(init: RequestInit | undefined): RequestInit | undef
 }
 
 export function createOpenAICodexFetch(): typeof fetch {
-	return (async (input: RequestInfo | URL, init?: RequestInit) => {
+	return async (input: RequestInfo | URL, init?: RequestInit) => {
 		const session = await getValidOpenAICodexSession();
 		if (!session) {
 			throw new Error("ChatGPT sign-in required");
@@ -599,5 +605,5 @@ export function createOpenAICodexFetch(): typeof fetch {
 			...injectCodexDefaults(init),
 			headers,
 		});
-	}) as typeof fetch;
+	};
 }

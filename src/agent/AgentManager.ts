@@ -1,6 +1,6 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { Notice, normalizePath, Platform, TFile, type WorkspaceLeaf } from "obsidian";
+import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
@@ -102,7 +102,7 @@ const LANGCHAIN_TROUBLESHOOT_REGEX = /\n*Troubleshooting URL: https:\/\/docs\.la
 /** Create a DocumentFragment with clickable links for any URLs in the text. */
 function createNoticeFragment(text: string): DocumentFragment {
 	const cleaned = text.replace(LANGCHAIN_TROUBLESHOOT_REGEX, "").trim();
-	const frag = document.createDocumentFragment();
+	const frag = createFragment();
 	let lastIndex = 0;
 	for (const match of cleaned.matchAll(URL_REGEX)) {
 		const url = match[0];
@@ -478,6 +478,8 @@ export class AgentManager {
 			this.plugin,
 			{
 				getPrompt: () => promptFiles?.getAgentPrompt(agentId) ?? DEFAULT_AGENT_PROMPT,
+				// The factory default this agent's AGENT.md body was written from.
+				defaultPrompt: DEFAULT_AGENT_PROMPT,
 				// The modal closes synchronously after this, so a rejected write would read as
 				// a successful save (and leave an unhandled rejection). The edit only exists
 				// in the closed editor at that point — say so rather than letting the user
@@ -531,6 +533,11 @@ export class AgentManager {
 			this.plugin,
 			{
 				getPrompt: () => current,
+				// The shipped body this skill was seeded from. Without it the modal falls back
+				// to DEFAULT_AGENT_PROMPT and diffs the skill against the *agent* system prompt
+				// — two unrelated documents, so the whole pane highlights and "Use default"
+				// would overwrite the skill with the base prompt.
+				defaultPrompt: bundled.content,
 				// The modal closes synchronously after calling this, so a rejected write would
 				// otherwise read as a successful save (and leave an unhandled rejection). The
 				// edit only exists in the closed editor at that point, so say so explicitly
@@ -1185,30 +1192,15 @@ export class AgentManager {
 		mcpServers: Record<string, unknown> | undefined,
 	): Promise<boolean> {
 		if (!mcpServers || Object.keys(mcpServers).length === 0) return true;
-		let servers = mcpServers;
-
-		// stdio transport spawns a local process (Node child_process/stdio), which
-		// Obsidian's mobile WebView lacks. HTTP MCP has no such dependency, so on
-		// mobile drop only the stdio servers and load the rest. If that leaves no
-		// servers, skip entirely (avoids evaluating the SDK for nothing).
-		if (!Platform.isDesktopApp) {
-			const httpServers = Object.fromEntries(
-				Object.entries(mcpServers).filter(([, cfg]) => (cfg as { transport?: string })?.transport !== "stdio"),
-			);
-			const droppedStdio = Object.keys(mcpServers).length - Object.keys(httpServers).length;
-			if (droppedStdio > 0) {
-				Logger.log(`Skipping ${droppedStdio} stdio MCP server(s): stdio transport is desktop-only.`);
-			}
-			if (Object.keys(httpServers).length === 0) return true;
-			servers = httpServers;
-		}
 
 		try {
 			// Dynamically import so the MCP SDK (and its top-level Node builtin
-			// imports) is only evaluated when MCP is actually used on desktop —
-			// never at plugin load, which would crash the whole plugin.
+			// imports) is only evaluated when MCP is actually used — never at plugin
+			// load, which would crash the whole plugin. Only HTTP servers exist
+			// (the stdio transport is aliased out of the bundle, see vite.config.ts),
+			// so this works the same on desktop and mobile.
 			const { MultiServerMCPClient } = await import("@langchain/mcp-adapters");
-			const mcpConfig = { mcpServers: servers } as ConstructorParameters<typeof MultiServerMCPClient>[0];
+			const mcpConfig = { mcpServers } as ConstructorParameters<typeof MultiServerMCPClient>[0];
 			Logger.log("Initializing MCP client...", mcpConfig);
 
 			// Patch global fetch once for the manager's lifetime — MCP tools read
@@ -1679,7 +1671,7 @@ export class AgentManager {
 				configurable: { agent_id: resolvedAgentId },
 				signal,
 				attachments,
-			} as Parameters<Agent["editFromCheckpoint"]>[0]),
+			}),
 			signal,
 			chatModel,
 			"Error editing message",
@@ -1920,7 +1912,7 @@ export class AgentManager {
 		}
 		if (!leaf) return;
 		await leaf.openFile(file);
-		workspace.revealLeaf(leaf);
+		await workspace.revealLeaf(leaf);
 	}
 
 	/** Open (and reveal) the chat leaf for a given thread path. Used to navigate

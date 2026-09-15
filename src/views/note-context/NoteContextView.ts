@@ -31,9 +31,9 @@ export class NoteContextView extends SvelteItemView {
 
 	private getContextFile(): TFile | null {
 		const { workspace } = this.app;
-		const activeLeaf = workspace.activeLeaf;
-		if (activeLeaf?.view instanceof MarkdownView && activeLeaf.view.file) {
-			return activeLeaf.view.file;
+		const activeView = workspace.getActiveViewOfType(MarkdownView);
+		if (activeView?.file) {
+			return activeView.file;
 		}
 
 		for (const leaf of workspace.getLeavesOfType("markdown")) {

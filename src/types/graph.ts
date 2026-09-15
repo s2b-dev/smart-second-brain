@@ -28,6 +28,14 @@ export interface SpaceSegment {
 	/** Resolved file paths that belong to this segment */
 	paths: Set<string>;
 	/**
+	 * Ids of the tag nodes that *live* in this topic — at least half of the
+	 * notes carrying the tag are members. Display membership only: such a tag
+	 * takes the topic's `cluster` so the region wraps it and the cohesion force
+	 * pulls it to the topic's centre, but it is never in `paths`, so it counts
+	 * for nothing, folds into nothing, and reaches chat as nothing.
+	 */
+	tagIds: Set<string>;
+	/**
 	 * For `leiden` segments: the underlying community id.
 	 *
 	 * Segments are ordered by size, so a segment's position is NOT its community
@@ -42,23 +50,32 @@ export interface SpaceSegment {
  * - "wiki": An explicit wiki link authored by the user in Obsidian
  * - "semantic": An inferred similarity link between notes whose embeddings are
  *   close. Weight is the cosine similarity rather than a link count.
+ * - "tag": A note carrying a tag, joining the note to that tag's node. Only
+ *   present while tags are shown as nodes (`showTags`); weight is always 1.
+ *   Authored structure like a wiki link, so it informs topic detection (damped
+ *   by how many notes share the tag) — but never the semantic scan, which is
+ *   over note content.
  */
-export type EdgeType = "wiki" | "semantic";
+export type EdgeType = "wiki" | "semantic" | "tag";
 
 /**
  * A node in the graph representing a vault note.
  */
 export interface GraphNode {
-	/** Unique identifier (file path, or `topic:<cluster>` for a collapsed topic) */
+	/**
+	 * Unique identifier: the file path, `topic:<cluster>` for a collapsed topic,
+	 * or `tag:<tag>` for a tag node (see `tagNodeId`).
+	 */
 	id: string;
 	/**
 	 * Vault-relative file path.
 	 *
-	 * For a `kind: "topic"` node this is a synthetic id, NOT a real file — every
-	 * path that opens, reveals, or previews a file must check {@link kind} first.
+	 * For a `kind: "topic"` or `kind: "tag"` node this is a synthetic id, NOT a
+	 * real file — every path that opens, reveals, or previews a file must check
+	 * {@link kind} first.
 	 */
 	path: string;
-	/** Display label (file basename without extension) */
+	/** Display label (file basename without extension; the `#tag` for a tag node) */
 	label: string;
 	/** X position (set by the d3-force simulation) */
 	x: number;
@@ -81,9 +98,15 @@ export interface GraphNode {
 	 *
 	 * `"note"` (the default when absent) is a real vault file. `"topic"` is a
 	 * synthetic node standing in for a whole collapsed topic — it has no file
-	 * behind it, so file-opening interactions must branch on this.
+	 * behind it, so file-opening interactions must branch on this. `"tag"` is a
+	 * vault tag drawn as a node (Scope → "Tags"), linked to every note carrying
+	 * it; also fileless. Tags take part in community detection but are never
+	 * *members* of the resulting topics (no segment path), so they keep the tag
+	 * colour, count for nothing and never fold into a bubble. A tag that lives
+	 * in a topic (see `SpaceSegment.tagIds`) does take its `cluster` for
+	 * drawing, so the region wraps it and it settles at the topic's centre.
 	 */
-	kind?: "note" | "topic";
+	kind?: "note" | "topic" | "tag";
 	/** For `kind: "topic"` — the vault paths this node stands for. */
 	memberPaths?: string[];
 	/**
@@ -137,6 +160,18 @@ export interface SmartGraphSettings {
 	/** Whether to draw inferred semantic similarity edges (they always inform topics) */
 	showSemanticLinks: boolean;
 	/**
+	 * Whether inferred edges are drawn in the accent colour instead of sharing
+	 * the authored links' `--graph-line`.
+	 *
+	 * The dash pattern alone answers "is this edge inferred?" for one edge under
+	 * the cursor, but not "where did the inference add structure?" across the
+	 * whole graph — at overview zoom the dashes are a few pixels apart and read
+	 * as solid. Off by default: colouring the inferred layer permanently would
+	 * make it the loudest thing on screen, and it is usually the larger half of
+	 * the edges.
+	 */
+	highlightSemanticLinks: boolean;
+	/**
 	 * When true, topics are detected from authored wiki links alone, ignoring
 	 * semantic edges. Shows how much structure the user's own linking provides —
 	 * notes left without a topic are ones they never linked.
@@ -154,6 +189,14 @@ export interface SmartGraphSettings {
 	autoLabelClusters: boolean;
 	/** When true, only include markdown files in the graph; otherwise all indexable files */
 	markdownOnly: boolean;
+	/**
+	 * Whether tags are drawn as nodes, each linked to the notes that carry it —
+	 * the same option as Obsidian's own graph. Tags are authored structure, so
+	 * with this on they also inform topic detection (in link-only mode too): a
+	 * vault organised by tags rather than links gets topics from them. The
+	 * semantic scan is over note content and never sees tags.
+	 */
+	showTags: boolean;
 	/** Leiden PRNG seed — controls community assignment reproducibility */
 	leidenSeed: number;
 	/** Leiden resolution γ (default 1.0). Lower → fewer larger communities; higher → more smaller ones */
@@ -197,6 +240,7 @@ export const DEFAULT_SMART_GRAPH_SETTINGS: SmartGraphSettings = {
 	clusterCohesionStrength: 0.45,
 	showWikiLinks: true,
 	showSemanticLinks: true,
+	highlightSemanticLinks: false,
 	linkOnlyTopics: false,
 	semanticNeighborCount: 5,
 	semanticThreshold: 0.55,
@@ -204,6 +248,7 @@ export const DEFAULT_SMART_GRAPH_SETTINGS: SmartGraphSettings = {
 	graphChatModel: null,
 	autoLabelClusters: false,
 	markdownOnly: false,
+	showTags: false,
 	leidenSeed: 42,
 	// Granularity level 3 on the ladder in topicHierarchy.ts. Kept exactly on a rung so
 	// the slider doesn't silently shift γ the first time it's touched.

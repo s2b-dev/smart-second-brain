@@ -5,6 +5,7 @@ import { Platform } from "obsidian";
 import AuthConfigFields from "../../components/settings/AuthConfigFields.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
+import CircularLoader from "../../components/ui/CircularLoader.svelte";
 import DocsLink from "../../components/ui/DocsLink.svelte";
 import Text from "../../components/ui/Text.svelte";
 import Toggle from "../../components/ui/Toggle.svelte";
@@ -30,6 +31,7 @@ import {
 	getProviderDefinition,
 } from "../../providers/index";
 import { getData, slugifyProviderName } from "../../stores/dataStore.svelte";
+import { icon } from "../../utils/utils";
 import type { ProviderSetupModal } from "./ProviderSetup";
 
 interface Props {
@@ -152,11 +154,6 @@ async function handleOAuthSignIn() {
 			// Store the OAuth-obtained key as a managed secret so validation re-runs and Save enables.
 			data.setProviderAuthField(providerId, "apiKey", result.apiKey, true);
 		}
-		// A completed OAuth sign-in is a clear terminal action — once the connection
-		// validates and the provider commits, auto-close the modal so the user gets
-		// unambiguous feedback (the provider appears in the list) rather than having to
-		// spot the small green header icon. The commit effect honors this flag.
-		closeAfterCommit = true;
 		invalidateAuthState(providerId);
 	} catch (error) {
 		// A user-initiated cancel isn't a failure — clear the flow silently so the CTA
@@ -198,7 +195,7 @@ function scrollManualCodeIntoView(e: FocusEvent) {
 	if (!Platform.isMobileApp) return;
 	const target = e.currentTarget;
 	if (!(target instanceof HTMLElement)) return;
-	setTimeout(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" }), 350);
+	window.setTimeout(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" }), 350);
 }
 
 function handleOAuthDisconnect() {
@@ -212,12 +209,20 @@ let headerStatusHost: HTMLSpanElement | null = null;
 let headerStatusComponent: ReturnType<typeof mount> | null = null;
 // Reactive prop bag for the imperatively-mounted header status component. Mutating these
 // fields propagates to the mounted subtree (Svelte 5 mount props are reactive via $state).
-const headerStatusProps = $state<{ provider: string; showStatus: boolean }>({
+const headerStatusProps = $state<{ provider: string }>({
 	provider: untrack(() => providerId),
-	showStatus: false,
 });
 let displayName = $state("");
 let displayNameError = $state<string | null>(null);
+// Number of display-name saves currently in flight. `displayNameError` still holds its
+// previous value until an await settles, so without this Done could enable mid-save on a
+// name whose validity isn't known yet — and the commit's slug is derived from that same
+// name. A counter rather than a boolean: blurring twice before the first save settles
+// would otherwise let the first completion clear the flag while the second is still
+// running, reopening the commit gate and letting `renameProvider` move the ID out from
+// under it.
+let pendingDisplayNameSaves = $state(0);
+const isSavingDisplayName = $derived(pendingDisplayNameSaves > 0);
 const isTrusted = $derived(data.isProviderTrusted(providerId));
 
 // Logos per template for the picker grid. Templates without a dedicated logo
@@ -251,13 +256,10 @@ async function handleSelectTemplate(id: ProviderTemplateId) {
 }
 
 // Guards the one-time live commit so it never re-runs once the provider is configured
-// or while a commit is already in flight (the effect can re-fire mid-await).
-let isCommitting = false;
-
-// Set by a completed OAuth sign-in: once the provider commits, auto-close the modal after
-// a short beat so the "Connected" check is briefly visible. Manual API-key entry doesn't
-// set this — the modal stays open so the user can still adjust trusted/advanced fields.
-let closeAfterCommit = false;
+// or while a commit is already in flight (the effect can re-fire mid-await). Reactive so
+// the Done button can stay disabled across the commit's awaits — closing mid-rename would
+// race the ID change, and `markSubmitted` only lands after it.
+let isCommitting = $state(false);
 
 // Promotes a draft to a fully configured provider the moment its connection validates.
 // This replaces the old "Add Provider" button: display name / auth / trusted all
@@ -280,12 +282,23 @@ async function commitProvider() {
 			let finalId = base;
 			let n = 2;
 			while (otherIds.has(finalId)) finalId = `${base}-${n++}`;
-			try {
-				await data.renameProvider(providerId, finalId);
+			// `renameProvider` re-keys everything synchronously and only awaits its persist,
+			// so take the promise without awaiting and point `providerId` at the new ID in
+			// the same turn. Awaiting first would leave `providerId` naming a key that no
+			// longer exists for the length of a settings write — the window every "Provider
+			// not found" failure in this modal came from.
+			const renamed = data.renameProvider(providerId, finalId);
+			// Its validation guards reject rather than throw (it's async), so confirm the
+			// re-key actually happened before adopting the new ID.
+			const oldId = providerId;
+			if (data.getProviderMeta(finalId) && !data.getProviderMeta(oldId)) {
 				modal.selectedProvider = finalId;
 				providerId = finalId;
+			}
+			try {
+				await renamed;
 			} catch {
-				// keep draft ID if rename somehow fails
+				// keep whichever ID is live if the persist fails
 			}
 		}
 		data.setProviderConfigured(providerId, true);
@@ -300,14 +313,6 @@ async function commitProvider() {
 	} finally {
 		isCommitting = false;
 	}
-
-	// OAuth sign-in path: the provider is now committed and shows "Connected". Close the
-	// modal after a short beat so the green check is briefly visible — the provider then
-	// appears in the list, which is the clearest confirmation.
-	if (closeAfterCommit) {
-		closeAfterCommit = false;
-		setTimeout(() => modal.close(), 800);
-	}
 }
 
 async function handleDisplayNameBlur(nextName: string) {
@@ -317,6 +322,7 @@ async function handleDisplayNameBlur(nextName: string) {
 		displayNameError = null;
 		return;
 	}
+	pendingDisplayNameSaves += 1;
 	try {
 		await data.updateProviderMeta(providerId, { displayName: trimmedName });
 		displayName = trimmedName;
@@ -324,6 +330,8 @@ async function handleDisplayNameBlur(nextName: string) {
 		modal.refreshTitle(trimmedName);
 	} catch (e) {
 		displayNameError = e instanceof Error ? e.message : "Invalid name";
+	} finally {
+		pendingDisplayNameSaves -= 1;
 	}
 }
 
@@ -339,8 +347,8 @@ function renderHeaderLogo() {
 	if (step !== "configure") return;
 	const title = modal.titleEl;
 	const header = title.parentElement;
-	// Don't let the title stretch — it would push the status/trust icons onto a new
-	// line, where they collide with the absolutely-positioned .modal-close-button.
+	// Don't let the title stretch — it would push the trust icon onto a new line, where
+	// it collides with the absolutely-positioned .modal-close-button.
 	// Zero the inline margins too: Obsidian's .modal-title uses auto side-margins that
 	// resolve to a large value in a flex row, opening a gap on either side of the title.
 	title.setCssStyles({ margin: "0", flex: "0 0 auto" });
@@ -373,8 +381,16 @@ function renderHeaderLogo() {
 			props: { width: 32, height: 32 },
 		});
 
-		// Status + trust icons after the title (icon → name → status → trust).
+		// Trust icon after the title (logo → name → trust).
+		// Recreating the host must also recreate the component: leaving the old one mounted
+		// kept it rendering into the now-detached span while the `!headerStatusComponent`
+		// guard below suppressed a remount, so the icon silently vanished from the header.
+		// Tear both down together.
 		if (!headerStatusHost || headerStatusHost.parentElement !== header) {
+			if (headerStatusComponent) {
+				unmount(headerStatusComponent);
+				headerStatusComponent = null;
+			}
 			headerStatusHost?.remove();
 			headerStatusHost = header.createSpan({ cls: "provider-setup-header-status" });
 			title.after(headerStatusHost);
@@ -410,11 +426,10 @@ $effect(() => {
 	};
 });
 
-// Keep the imperatively-mounted header status component's props in sync with the modal's
-// reactive state (provider id after rename, and the empty-state gate).
+// Keep the imperatively-mounted header component's props in sync with the modal's reactive
+// state (the provider id changes once, when a committed draft is renamed to its slug).
 $effect(() => {
 	headerStatusProps.provider = providerId;
-	headerStatusProps.showStatus = hasCredentials;
 });
 
 // Live commit: once the connection validates on the configure step, promote the draft to
@@ -422,10 +437,41 @@ $effect(() => {
 // it no-ops once configured, so later validation failures never un-configure it.
 $effect(() => {
 	if (step !== "configure") return;
-	if (query.data?.success && !isConfigured && !displayNameError) {
+	// Wait out an in-flight name save too: the commit slugifies the display name into the
+	// provider's final ID, so committing mid-save could derive it from a name that is about
+	// to be rejected. The save settling re-runs this effect.
+	if (query.data?.success && !isConfigured && !displayNameError && !isSavingDisplayName) {
 		untrack(() => void commitProvider());
 	}
 });
+
+// In-body connection status. The header carries the same verdict as a small icon, but that
+// is easy to miss — especially in onboarding, where the user has never seen this modal and
+// has no "Add" button to press, so nothing tells them the provider took. The status row
+// below is the primary signal; the header icon stays as a secondary cue.
+type ConnectionStatus = "idle" | "checking" | "connected" | "failed";
+const connectionStatus = $derived.by<ConnectionStatus>(() => {
+	if (!hasCredentials) return "idle";
+	if (query.isPending || query.isFetching) return "checking";
+	if (query.data?.success) return "connected";
+	if (query.data !== undefined) return "failed";
+	return "idle";
+});
+const connectionError = $derived(
+	query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed",
+);
+
+// Done must track the *commit*, not just the connection. A valid connection alone isn't
+// enough to leave safely: the commit effect skips while `displayNameError` is set, so
+// closing then would hit onClose with an uncommitted draft and delete it along with the
+// credentials the user just entered; and closing mid-commit races `renameProvider`, whose
+// ID change lands before `markSubmitted`. A name save still in flight counts as unsettled
+// too — `displayNameError` lags the await, and the commit slugifies that same name.
+// Editing an already-configured provider has nothing to commit, so it's ready as soon as
+// it validates.
+const canFinish = $derived(
+	connectionStatus === "connected" && isConfigured && !isCommitting && !displayNameError && !isSavingDisplayName,
+);
 </script>
 
 {#if step === "pick"}
@@ -462,9 +508,16 @@ $effect(() => {
       name="Provider name"
       desc="Name this provider instance so you can distinguish it later."
     >
+      <!-- Disabled while the commit runs: it derives the provider's permanent ID from this
+           name, so editing it mid-flight has nothing sensible to mean. Note this is not
+           what makes the rename safe — disabling a focused input fires a blur, and Svelte
+           only flushes `isCommitting` to the DOM after the effect has already entered the
+           commit, so that blur lands *inside* the window rather than before it. The fix is
+           in commitProvider, which no longer leaves `providerId` stale across an await. -->
       <Text
         inputType="text"
         value={displayName}
+        disabled={isCommitting}
         placeholder={providerDefinition?.displayName ?? "New Provider"}
         onblur={(value: string) => void handleDisplayNameBlur(value)}
       />
@@ -520,8 +573,41 @@ $effect(() => {
     {:else}
       <AuthConfigFields provider={providerId} afterRequired={trustedToggle} />
     {/if}
+
+    {@render connectionStatusRow()}
   </div>
 {/if}
+
+{#snippet connectionStatusRow()}
+  <!-- The modal has no submit button (auth autosaves and the provider commits itself the
+       moment validation passes), so without this row a successful setup looks identical to
+       an untouched form. Spell the verdict out, and give the user an explicit way to leave. -->
+  <div class="provider-connection-row">
+    <div class="provider-connection-status" role="status" aria-live="polite">
+      {#if connectionStatus === "checking"}
+        <CircularLoader size={16} color="var(--text-muted)" />
+        <span class="provider-connection-text">Checking connection…</span>
+      {:else if connectionStatus === "connected"}
+        <span class="provider-connection-icon is-success" use:icon={"check-circle"}></span>
+        <span class="provider-connection-text is-success">Connected</span>
+        {#if displayNameError}
+          <!-- Connected, but the commit is blocked: say why, so a disabled Done isn't a
+               dead end the user has to guess at. -->
+          <span class="provider-connection-text is-muted">— fix the provider name to finish</span>
+        {/if}
+      {:else if connectionStatus === "failed"}
+        <span class="provider-connection-icon is-error" use:icon={"x-circle"}></span>
+        <span class="provider-connection-text is-error">{connectionError}</span>
+      {:else}
+        <span class="provider-connection-text is-muted">
+          Enter your credentials above — the connection is checked automatically.
+        </span>
+      {/if}
+    </div>
+
+    <Button buttonText="Done" cta={canFinish} disabled={!canFinish} onClick={() => modal.close()} />
+  </div>
+{/snippet}
 
 {#snippet trustedToggle()}
   <SettingItem
@@ -586,6 +672,59 @@ $effect(() => {
     color: var(--text-success, #4caf50);
     font-size: var(--font-ui-small);
     font-weight: 500;
+  }
+
+  .provider-connection-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--size-4-3);
+    margin-top: var(--size-4-2);
+    padding: var(--size-4-3);
+    border-top: 1px solid var(--background-modifier-border);
+  }
+
+  .provider-connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    min-width: 0;
+  }
+
+  .provider-connection-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  /* The action injects a bare <svg>, which defaults to 100%/auto and overflows the box. */
+  .provider-connection-icon :global(svg) {
+    width: 16px;
+    height: 16px;
+  }
+
+  .provider-connection-text {
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
+  }
+
+  .provider-connection-text.is-muted {
+    color: var(--text-muted);
+  }
+
+  .is-success {
+    color: var(--text-success, #4caf50);
+  }
+
+  .provider-connection-text.is-success {
+    font-weight: 500;
+  }
+
+  .is-error {
+    color: var(--text-error);
   }
 
   .auth-alt-toggle {
