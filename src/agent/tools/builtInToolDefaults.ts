@@ -193,6 +193,17 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 				"Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
 		},
 	},
+	ask_question: {
+		displayName: "Ask Question",
+		summary:
+			"Ask the user one or more multiple-choice questions to clarify requirements, solicit preferences, or choose between options. Execution pauses until the user responds in chat.",
+		config: {
+			enabled: true,
+			name: "ask_question",
+			description:
+				"Ask the user one or more multiple-choice questions to clarify requirements, solicit preferences, or choose between options. Execution pauses until the user responds in chat.",
+		},
+	},
 };
 
 /**

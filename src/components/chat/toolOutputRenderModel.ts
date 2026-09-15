@@ -67,6 +67,18 @@ interface ExecuteJavaScriptPayload {
 	inputJson?: string;
 }
 
+export interface QuestionAnswerItem {
+	questionId?: string;
+	question: string;
+	selected: string[];
+	customText?: string;
+}
+
+export interface AskQuestionPayload {
+	status?: string;
+	answers: QuestionAnswerItem[];
+}
+
 interface StructuredSection {
 	key: string;
 	label: string;
@@ -137,6 +149,11 @@ export type ToolOutputRenderModel =
 	| {
 			kind: "execute_javascript";
 			payload: ExecuteJavaScriptPayload;
+			rawText: string;
+	  }
+	| {
+			kind: "ask_question";
+			payload: AskQuestionPayload;
 			rawText: string;
 	  };
 
@@ -247,6 +264,17 @@ function buildSpecializedStringModel(
 		};
 	}
 
+	if (toolName === "ask_question") {
+		const payload = parseAskQuestionPayload(trimmed);
+		if (payload) {
+			return {
+				kind: "ask_question",
+				payload,
+				rawText: trimmed,
+			};
+		}
+	}
+
 	return undefined;
 }
 
@@ -289,6 +317,10 @@ function buildStructuredToolSpecificModel(
 			payload: buildExecuteJavaScriptPayload(value, input),
 			rawText,
 		};
+	}
+
+	if (toolName === "ask_question" && isAskQuestionPayload(value)) {
+		return { kind: "ask_question", payload: value, rawText };
 	}
 
 	return undefined;
@@ -649,4 +681,16 @@ function isListDirectoryPayload(value: unknown): value is ListDirectoryPayload {
 		return false;
 	if (!("tree" in value) || !isDirectoryTreeNode(value.tree)) return false;
 	return true;
+}
+
+function parseAskQuestionPayload(raw: string): AskQuestionPayload | undefined {
+	const parsed = parseJsonString(raw);
+	if (isAskQuestionPayload(parsed)) return parsed;
+	return undefined;
+}
+
+function isAskQuestionPayload(value: unknown): value is AskQuestionPayload {
+	if (!isPlainObject(value)) return false;
+	if (!("answers" in value) || !Array.isArray(value.answers)) return false;
+	return value.answers.every((item) => isPlainObject(item) && typeof item.question === "string");
 }

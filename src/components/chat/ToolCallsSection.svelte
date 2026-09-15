@@ -14,6 +14,7 @@ import {
 import { buildToolSummary, buildMergedToolSummary, type MergedCall, type ToolSummary } from "./toolSummaryModel";
 import MarkdownRenderer from "../ui/MarkdownRenderer.svelte";
 import Icon from "../ui/Icon.svelte";
+import AskQuestionCard from "./AskQuestionCard.svelte";
 
 interface Props {
 	assistantTimeline?: AssistantTimelineEvent[];
@@ -465,6 +466,7 @@ const PROSE_MARKDOWN_CLASS =
       : undefined}
   {@const toolSummary = buildToolSummary(tool.name, tool.input, outputModel, tool.status)}
   {@const isTask = tool.name === "task"}
+  {@const isAskQuestionRunning = tool.name === "ask_question" && tool.status === "running"}
   <!-- A `task` (subagent) row reads as one coherent sentence like any other tool
        call: the subagent name followed by what it was asked to do
        ("Web Search: Explore the user's OKRs"). No "subagent" pill and no separate
@@ -475,7 +477,11 @@ const PROSE_MARKDOWN_CLASS =
     return description ? `${name}: ${description}` : name;
   })()}
   {@const headerLabel = isTask ? taskSentence : foldOutcome(toolSummary)}
-  {#if isExpandable(tool)}
+  {#if isAskQuestionRunning}
+    <div class="tool-card tool-card-interactive w-full">
+      <AskQuestionCard toolCallId={tool.id} input={tool.input} />
+    </div>
+  {:else if isExpandable(tool)}
     <details class="tool-card">
       <summary class="tool-card-header">
         {@render toolCardHeader(headerLabel, tool.status, tool.subAgentName, isTask)}
@@ -681,7 +687,30 @@ const PROSE_MARKDOWN_CLASS =
 {/snippet}
 
 {#snippet outputBody(model: ToolOutputRenderModel, toolCallId: string = "")}
-  {#if model.kind === "markdown"}
+  {#if model.kind === "ask_question"}
+    <div class="tool-output-ask-question py-1 space-y-2.5">
+      {#each model.payload.answers as ans}
+        <div class="border-b border-[--background-modifier-border] pb-2 last:border-b-0 last:pb-0">
+          <div class="text-xs font-semibold text-[--text-normal] mb-1.5">{ans.question}</div>
+          <div class="flex flex-wrap gap-1.5 items-center">
+            {#each ans.selected as sel}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[--background-modifier-active-hover] border border-[--interactive-accent] text-[--text-normal] font-medium text-xs">
+                <svg class="w-3 h-3 text-[--interactive-accent]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                {sel}
+              </span>
+            {/each}
+            {#if ans.customText}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[--background-modifier-hover] border border-[--background-modifier-border] text-[--text-normal] italic text-xs">
+                "{ans.customText}"
+              </span>
+            {/if}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {:else if model.kind === "markdown"}
     <MarkdownRenderer
       content={model.markdown}
       class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.82rem] leading-[1.6] break-words [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_code]:bg-[--background-primary] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.88em] [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-1.5 [&_pre_code]:bg-transparent [&_pre_code]:p-0"
@@ -1050,7 +1079,11 @@ const PROSE_MARKDOWN_CLASS =
     pointer-events: none;
   }
   .tool-timeline > .thinking-summary-header,
-  .tool-timeline > .steps-expand-grid {
+  .tool-timeline > .steps-expand-grid,
+  .tool-timeline-current,
+  .tool-timeline-current *,
+  .tool-card-interactive,
+  .tool-card-interactive * {
     pointer-events: auto;
   }
 
