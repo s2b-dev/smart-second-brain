@@ -80,4 +80,34 @@ describe("findSealableEnd", () => {
 		const text = "\n\nfirst\n";
 		expect(findSealableEnd(text)).toBe(text.indexOf("first"));
 	});
+
+	it("ignores $$ that does not open a block: inline code and mid-line dollars", () => {
+		const inline = "use `$$` for display math\n\nnext\n";
+		expect(findSealableEnd(inline)).toBe(inline.indexOf("next"));
+		const midline = "it costs $$5 total\n\nnext\n";
+		expect(findSealableEnd(midline)).toBe(midline.indexOf("next"));
+	});
+
+	it("closes a math block on a content line ending with $$", () => {
+		const text = "$$\na = b $$\n\nafter\n";
+		expect(findSealableEnd(text)).toBe(text.indexOf("after"));
+	});
+
+	it("only closes a fence with the same marker at least as long", () => {
+		const nested = "````md\n```\ninner\n\nstill code\n````\n\nafter\n";
+		expect(findSealableEnd(nested)).toBe(nested.indexOf("after"));
+		expect(findSealableEnd("````\n```\n\nstill code\n")).toBe(0);
+		expect(findSealableEnd("```\n~~~\n\nstill code\n")).toBe(0);
+	});
+
+	it("does not treat a fence line with an info string as closing", () => {
+		expect(findSealableEnd("```\n``` js\n\nstill code\n")).toBe(0);
+	});
+
+	it("seals right before a fence or math block that opens after a blank line", () => {
+		const fence = "para\n\n```ts\nx\n";
+		expect(findSealableEnd(fence)).toBe(fence.indexOf("```"));
+		const math = "para\n\n$$\nx\n";
+		expect(findSealableEnd(math)).toBe(math.indexOf("$$"));
+	});
 });

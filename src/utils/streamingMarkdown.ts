@@ -26,8 +26,16 @@ const LIST_ITEM = /^\s{0,3}(?:[-*+]|\d{1,9}[.)])\s/;
 const LEADING_WHITESPACE = /^\s+\S/;
 const INDENTED_CODE = /^(?: {4}|\t)/;
 const BLOCKQUOTE = /^\s{0,3}>/;
-const FENCE = /^\s{0,3}(?:```|~~~)/;
-const MATH_DELIMITER = /\$\$/g;
+const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
+const CLOSING_FENCE = /^\s{0,3}(`{3,}|~{3,})\s*$/;
+/** A `$$` block opens at a line start; anything else (`` `$$` ``, `costs $$5`) is inline. */
+const MATH_OPEN = /^\s{0,3}\$\$/;
+const MATH_CLOSE = /\$\$\s*$/;
+
+interface Fence {
+	char: string;
+	length: number;
+}
 
 function startsNewBlock(line: string, previous: string | null): boolean {
 	if (INDENTED_CODE.test(line)) return false;
@@ -38,8 +46,14 @@ function startsNewBlock(line: string, previous: string | null): boolean {
 	return true;
 }
 
+/** CommonMark: a closing fence uses the opening marker's character, at least as long, with no info string. */
+function closesFence(line: string, fence: Fence): boolean {
+	const match = CLOSING_FENCE.exec(line);
+	return match !== null && match[1][0] === fence.char && match[1].length >= fence.length;
+}
+
 export function findSealableEnd(remainder: string): number {
-	let inFence = false;
+	let fence: Fence | null = null;
 	let inMath = false;
 	let lineStart = 0;
 	let previousNonBlank: string | null = null;
@@ -54,18 +68,24 @@ export function findSealableEnd(remainder: string): number {
 		const blank = line.trim() === "";
 
 		if (blank) {
-			if (!inFence && !inMath) blankSincePrevious = true;
+			if (fence === null && !inMath) blankSincePrevious = true;
 		} else {
-			if (blankSincePrevious && !inFence && !inMath && startsNewBlock(line, previousNonBlank)) {
-				sealable = lineStart;
+			if (fence !== null) {
+				if (closesFence(line, fence)) fence = null;
+			} else if (inMath) {
+				if (MATH_CLOSE.test(line)) inMath = false;
+			} else {
+				if (blankSincePrevious && startsNewBlock(line, previousNonBlank)) sealable = lineStart;
+				const opening = FENCE.exec(line);
+				if (opening) {
+					fence = { char: opening[1][0], length: opening[1].length };
+				} else if (MATH_OPEN.test(line)) {
+					// `$$x$$` on one line is already closed; a bare `$$` (or `$$x`) opens a block.
+					const body = line.trim().slice(2);
+					inMath = !(body.length > 0 && MATH_CLOSE.test(body));
+				}
 			}
 			blankSincePrevious = false;
-			if (FENCE.test(line)) {
-				inFence = !inFence;
-			} else if (!inFence) {
-				const delimiters = line.match(MATH_DELIMITER)?.length ?? 0;
-				if (delimiters % 2 === 1) inMath = !inMath;
-			}
 			previousNonBlank = line;
 		}
 		lineStart = newline + 1;
