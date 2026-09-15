@@ -77,7 +77,8 @@ export function findSealableEnd(remainder: string): number {
 			} else {
 				if (blankSincePrevious && startsNewBlock(line, previousNonBlank)) sealable = lineStart;
 				const opening = FENCE.exec(line);
-				if (opening) {
+				// CommonMark: a backtick fence's info string may not contain a backtick.
+				if (opening && !(opening[1][0] === "`" && line.slice(opening[0].length).includes("`"))) {
 					fence = { char: opening[1][0], length: opening[1].length };
 				} else if (MATH_OPEN.test(line)) {
 					// `$$x$$` on one line is already closed; a bare `$$` (or `$$x`) opens a block.

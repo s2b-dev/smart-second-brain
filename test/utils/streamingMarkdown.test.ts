@@ -110,4 +110,11 @@ describe("findSealableEnd", () => {
 		const math = "para\n\n$$\nx\n";
 		expect(findSealableEnd(math)).toBe(math.indexOf("$$"));
 	});
+
+	it("does not treat a backtick run with a backtick in its info string as a fence", () => {
+		const text = "```foo`bar\n\nnext\n";
+		expect(findSealableEnd(text)).toBe(text.indexOf("next"));
+		// Tilde fences may carry anything in the info string.
+		expect(findSealableEnd("~~~foo`bar\n\nstill code\n")).toBe(0);
+	});
 });
