@@ -1,6 +1,8 @@
 <script lang="ts">
 import { Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
+import { onDestroy } from "svelte";
 import { getPlugin } from "../../stores/state.svelte";
+import { findSealableEnd } from "../../utils/streamingMarkdown";
 import { openTagSearch } from "../../utils/tagSearch";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 
@@ -8,9 +10,11 @@ interface Props {
 	content: string;
 	class?: string;
 	enableMath?: boolean;
+	/** Content is still being streamed: render incrementally (see below). */
+	streaming?: boolean;
 }
 
-const { content, class: className = "", enableMath = true }: Props = $props();
+const { content, class: className = "", enableMath = true, streaming = false }: Props = $props();
 
 const plugin = getPlugin();
 
@@ -117,8 +121,7 @@ function handleMouseOut(evt: MouseEvent) {
 // Post-process rendered content to normalize links
 function normalizeLinks(containerEl: HTMLElement) {
 	// Copy button styling
-	const copyBtn = containerEl.querySelector(".copy-code-button") as HTMLElement | null;
-	if (copyBtn) {
+	for (const copyBtn of containerEl.querySelectorAll(".copy-code-button")) {
 		copyBtn.className = "clickable-icon";
 		copyBtn.setAttribute("aria-label", "Copy code");
 	}
@@ -139,62 +142,130 @@ function normalizeLinks(containerEl: HTMLElement) {
 	}
 }
 
-// Render markdown when content changes.
-// Coalesced to one paint per animation frame. During streaming, `content` updates
-// once per token (often 100-300/s); a naive re-render tears down and re-parses the
-// entire accumulated message each time, forcing a full style/layout recalc per token
-// that stalls the whole app for the length of the reply. Scheduling the render on
-// requestAnimationFrame collapses a burst of token updates into a single re-parse per
-// frame (~60Hz). The effect re-runs on every `content` change and the cleanup cancels
-// the previous pending frame, so only the newest content is ever rendered — the final
-// token is never dropped, and static (non-streaming) content just paints one frame later.
+// ---- Rendering ----------------------------------------------------------------
+//
+// Renders are coalesced to one per animation frame: during streaming `content`
+// changes once per token (often 100-300/s), and rendering each change would force
+// a style/layout pass per token. Renders are also serialised — a token arriving
+// while a render is in flight marks it dirty and the newest content is rendered
+// right after — so the DOM never interleaves two renders.
+//
+// While `streaming` is set the message is rendered in two parts (see
+// `utils/streamingMarkdown.ts`): a sealed prefix whose nodes stay in the DOM
+// untouched, and a live tail — the block still being written — that is the only
+// part re-parsed each frame. Without this the whole accumulated reply was torn
+// down and re-parsed every frame, O(length) per frame, which pinned the main
+// thread for the duration of a long reply (#482). Outside streaming, and when the
+// reply settles, the content is rendered as one document, so link-reference and
+// footnote definitions resolve exactly as before.
+
+let latest = { content: "", sourcePath: "", enableMath: true, streaming: false };
+let frame: number | null = null;
+let rendering = false;
+let dirty = false;
+let destroyed = false;
+/** Prefix of `latest.content` whose DOM is final (streaming only). */
+let sealedText = "";
+/** Nodes belonging to the live tail; replaced on every render while streaming. */
+let tailNodes: ChildNode[] = [];
+
 $effect(() => {
-	if (!container) return;
+	// Read every reactive dep here so the effect re-runs when any of them change;
+	// the render itself runs later, off the tracked scope.
+	latest = { content: content ?? "", sourcePath, enableMath, streaming };
+	if (container) schedule();
+});
 
-	// Read every reactive dep synchronously here so the effect re-runs when any of
-	// them change — including `enableMath`, which is only used later inside the
-	// rAF-deferred render() and would otherwise not be tracked.
-	const currentContent = content;
-	const currentSourcePath = sourcePath;
-	const currentEnableMath = enableMath;
+onDestroy(() => {
+	destroyed = true;
+	if (frame !== null) cancelAnimationFrame(frame);
+});
 
-	let frame: number | null = null;
-	let disposed = false;
-
-	// Async render function
-	async function render() {
-		if (disposed || !container) return;
-
-		if (currentEnableMath) {
-			await loadMathJax();
-		}
-
-		// `container` may have been unbound (component unmounted), or this render
-		// superseded by a newer frame, while awaiting above. Re-check before touching
-		// it — otherwise clearing `container` throws "Cannot read properties of null"
-		// during rapid mount/unmount (e.g. subagent tool cards folding in/out).
-		if (disposed || !container) return;
-
-		container.empty();
-		await MarkdownRenderer.render(plugin.app, currentContent ?? "", container, currentSourcePath, plugin);
-
-		if (disposed || !container) return;
-		normalizeLinks(container);
-	}
-
+function schedule() {
+	if (frame !== null) return;
 	frame = requestAnimationFrame(() => {
 		frame = null;
-		render();
+		void flush();
 	});
+}
 
-	// Runs before the effect re-runs (content changed) and on unmount: drop the
-	// pending frame and abort any in-flight render so we never render stale content
-	// or touch an unbound container.
-	return () => {
-		disposed = true;
-		if (frame !== null) cancelAnimationFrame(frame);
-	};
-});
+async function flush() {
+	if (rendering) {
+		dirty = true;
+		return;
+	}
+	rendering = true;
+	try {
+		do {
+			dirty = false;
+			await renderLatest();
+		} while (dirty && !destroyed);
+	} finally {
+		rendering = false;
+	}
+}
+
+async function renderLatest() {
+	const { content: text, sourcePath: path, enableMath: math, streaming: live } = latest;
+	if (!container) return;
+	if (math) await loadMathJax();
+	// `container` may have been unbound (component unmounted) while awaiting.
+	if (destroyed || !container) return;
+
+	if (!live) {
+		resetDom();
+		await appendSegment(text, path);
+		return;
+	}
+
+	// Streaming: content normally extends what is already sealed. Anything else
+	// (a reset at a tool-call boundary, an edit) starts over.
+	if (!text.startsWith(sealedText)) resetDom();
+	const remainder = text.slice(sealedText.length);
+	const sealEnd = findSealableEnd(remainder);
+	removeTail();
+	if (sealEnd > 0) {
+		const segment = remainder.slice(0, sealEnd);
+		await appendSegment(segment, path);
+		if (destroyed || !container) return;
+		sealedText += segment;
+	}
+	tailNodes = await appendSegment(text.slice(sealedText.length), path);
+}
+
+function resetDom() {
+	container?.empty();
+	sealedText = "";
+	tailNodes = [];
+}
+
+function removeTail() {
+	for (const node of tailNodes) node.remove();
+	tailNodes = [];
+}
+
+/**
+ * Render `markdown` at the end of the container and return the nodes it produced.
+ * The render happens inside a boxless staging element that is attached for its
+ * duration — post-processors may measure layout — and is unwrapped afterwards so
+ * the container stays flat: no wrapper element, so `:first-child`/`:last-child`
+ * styling on the container keeps working across segment seams.
+ */
+async function appendSegment(markdown: string, path: string): Promise<ChildNode[]> {
+	if (!markdown || !container) return [];
+	const staging = container.createDiv({ attr: { style: "display: contents" } });
+	await MarkdownRenderer.render(plugin.app, markdown, staging, path, plugin);
+	if (destroyed || !container) {
+		staging.remove();
+		return [];
+	}
+	normalizeLinks(staging);
+	// The renderer may tag the target element (e.g. `markdown-rendered`); carry that over.
+	for (const cls of staging.classList) container.classList.add(cls);
+	const nodes = [...staging.childNodes];
+	staging.replaceWith(...nodes);
+	return nodes;
+}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->

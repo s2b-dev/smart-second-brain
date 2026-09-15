@@ -952,7 +952,7 @@ const PROSE_MARKDOWN_CLASS =
 
 {#snippet answerContentBlock()}
   {#if liveContent}
-    <MarkdownRenderer content={liveContent} class={PROSE_MARKDOWN_CLASS} />
+    <MarkdownRenderer content={liveContent} streaming={isStreaming} class={PROSE_MARKDOWN_CLASS} />
   {/if}
 {/snippet}
 
