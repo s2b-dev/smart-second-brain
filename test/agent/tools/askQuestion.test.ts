@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { createAskQuestionTool } from "../../../src/agent/tools/askQuestion";
 import {
 	getPendingQuestionStore,
@@ -37,7 +38,7 @@ describe("askQuestion tool", () => {
 			{
 				toolCallId,
 				configurable: { thread_id: "thread-abc" },
-			} as any,
+			} as unknown as RunnableConfig,
 		);
 
 		// Wait a tick for async validation and execution to reach the tool function
