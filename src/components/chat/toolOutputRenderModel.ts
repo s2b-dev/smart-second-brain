@@ -692,5 +692,11 @@ function parseAskQuestionPayload(raw: string): AskQuestionPayload | undefined {
 function isAskQuestionPayload(value: unknown): value is AskQuestionPayload {
 	if (!isPlainObject(value)) return false;
 	if (!("answers" in value) || !Array.isArray(value.answers)) return false;
-	return value.answers.every((item) => isPlainObject(item) && typeof item.question === "string");
+	return value.answers.every(
+		(item) =>
+			isPlainObject(item) &&
+			typeof item.question === "string" &&
+			Array.isArray(item.selected) &&
+			item.selected.every((selected) => typeof selected === "string"),
+	);
 }
