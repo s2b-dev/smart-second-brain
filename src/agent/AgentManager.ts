@@ -838,8 +838,7 @@ export class AgentManager {
 		const attached = this.attachedToolIds(agentCfg);
 		const isToolEnabled = (toolId: BuiltInToolId): boolean => {
 			return (
-				(attached.has(toolId) || toolId === "ask_question") &&
-				(agentCfg.toolsConfig[toolId]?.enabled ?? true)
+				(attached.has(toolId) || toolId === "ask_question") && (agentCfg.toolsConfig[toolId]?.enabled ?? true)
 			);
 		};
 

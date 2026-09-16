@@ -102,9 +102,7 @@ describe("PendingQuestionStore", () => {
 
 	it("clears pending questions for a thread", async () => {
 		const store = new PendingQuestionStore();
-		const askPromise = store.ask("thread-5", "tool-5", [
-			{ id: "q1", question: "Q", options: ["1", "2"] },
-		]);
+		const askPromise = store.ask("thread-5", "tool-5", [{ id: "q1", question: "Q", options: ["1", "2"] }]);
 
 		store.clearForThread("thread-5");
 		await expect(askPromise).rejects.toThrow("Thread session cleared or reset");
