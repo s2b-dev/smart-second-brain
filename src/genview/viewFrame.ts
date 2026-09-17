@@ -8,16 +8,43 @@
  * CSP is what makes it safe to post vault data into the frame: a sandboxed frame could
  * otherwise still `fetch()` it out.
  *
- * Both directions of the bridge are `postMessage` with a fixed, tagged shape
- * (`s2bView: true`). Host → frame: `data` (query results) and `theme` (CSS variables).
- * Frame → host: `ready`, `resize`, `open-note`, `requery`. The host verifies
- * `event.source` against the frame's window; the frame verifies `event.source` against
- * `parent`. Nothing else crosses.
+ * ## Two frames, not one
+ *
+ * CSP governs what a document *loads*, not where it *navigates*: a sandboxed frame may
+ * still set `location.href` to an external URL with the data it received in the query
+ * string, and no policy inside that document stops it. What does stop it is the
+ * `frame-src` of the document that *contains* the frame — navigations of a nested
+ * browsing context are checked against the parent's policy, before any request is made
+ * (verified in Obsidian's Electron: the `securitypolicyviolation` event fires on the
+ * parent with `violatedDirective: frame-src` and the target URL as `blockedURI`). Obsidian's
+ * own document has no CSP and must not get one (it would break every other plugin's
+ * iframes), so the view is wrapped in a trusted **outer** frame — plugin code only, with
+ * `frame-src 'none'` — that hosts the model-written **inner** frame. `about:srcdoc` is
+ * exempt from `frame-src`, so the inner still loads; anything it navigates to is refused.
+ *
+ * The outer frame relays the bridge in both directions and, as a backstop, treats any
+ * `load` of the inner frame after it reported `ready` as a navigation: it drops the frame
+ * and tells the host, which stops posting data and shows why.
+ *
+ * ## Bridge
+ *
+ * Both directions are `postMessage` with a fixed, tagged shape (`s2bView: true`).
+ * Host → view: `data` (query results) and `theme` (CSS variables). View → host: `ready`,
+ * `resize`, `open-note`, `requery`; outer → host additionally `navigated`. Every hop
+ * checks `event.source` against the one window it accepts from. Nothing else crosses.
+ *
+ * Known residual: hostname-based side channels that CSP does not govern (DNS prefetch
+ * hints). `x-dns-prefetch-control: off` is set in the inner document; a view is still
+ * model-authored code and should be treated with the same trust as the agent's tools.
  */
 
-/** Allows only inline script/style and data/blob images; blocks every network request. */
+/** Inner (view) document: only inline script/style and data/blob media; no network, no navigation targets. */
 export const VIEW_CSP =
-	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:";
+	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
+
+/** Outer (relay) document: inline script/style only, and no frame may be navigated anywhere. */
+export const OUTER_FRAME_CSP =
+	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src 'none'; form-action 'none'; base-uri 'none'";
 
 /** Obsidian CSS variables copied into the frame so a view tracks the user's theme. */
 export const THEME_VARIABLES: readonly string[] = [
@@ -94,10 +121,12 @@ export function collectThemeCss(doc: Document = document): string {
 }
 
 /**
- * The script that runs first inside every frame. It installs the `s2b` global the view's
- * own code talks to, listens for host messages, and reports its content height so the
- * host can size the frame. Kept dependency-free and free of `${}` so it can be a plain
- * template literal.
+ * The script that runs first inside every view document. It installs the `s2b` global
+ * the view's own code talks to, listens for relayed host messages, and reports its
+ * content height so the host can size the frame. `ready` is sent from the window's
+ * `load` event on purpose: the outer frame treats any load after `ready` as a
+ * navigation, so `ready` must not precede the document's own load. Kept
+ * dependency-free and free of `${}` so it can be a plain template literal.
  */
 export const VIEW_RUNTIME_SCRIPT = `
 (() => {
@@ -159,18 +188,21 @@ export const VIEW_RUNTIME_SCRIPT = `
 	} else {
 		observe();
 	}
-	window.addEventListener("load", reportHeight);
-	send({ type: "ready" });
+	window.addEventListener("load", () => {
+		reportHeight();
+		send({ type: "ready" });
+	});
 })();
 `;
 
-/** The full `srcdoc` for a view: CSP, theme, base styles, runtime, then the view's own body. */
+/** The inner document: CSP, theme, base styles, runtime, then the view's own body. */
 export function buildViewSrcdoc(body: string, themeCss: string): string {
 	return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">
+<meta http-equiv="x-dns-prefetch-control" content="off">
 <style id="s2b-theme">${themeCss}</style>
 <style>
 html, body { margin: 0; padding: 0; height: auto; }
@@ -194,11 +226,72 @@ ${body}
 </html>`;
 }
 
+/**
+ * The outer document's script: creates the inner frame from the embedded `INNER`
+ * srcdoc, relays bridge messages between the host and the inner frame, and retires
+ * the inner frame on any load after `ready` (a navigation the CSP backstop did not
+ * catch). Free of `${}`; `INNER` is defined by {@link buildViewFrameSrcdoc}.
+ */
+export const OUTER_RELAY_SCRIPT = `
+(() => {
+	let ready = false;
+	let retired = false;
+	const toHost = (message) => {
+		window.parent.postMessage(message, "*");
+	};
+	const frame = document.createElement("iframe");
+	frame.setAttribute("sandbox", "allow-scripts");
+	frame.setAttribute("referrerpolicy", "no-referrer");
+	frame.addEventListener("load", () => {
+		if (!ready || retired) return;
+		retired = true;
+		frame.remove();
+		toHost({ s2bView: true, type: "navigated" });
+	});
+	window.addEventListener("message", (event) => {
+		const message = event.data;
+		if (retired || !message || message.s2bView !== true) return;
+		if (event.source === window.parent) {
+			if (frame.contentWindow) frame.contentWindow.postMessage(message, "*");
+		} else if (event.source === frame.contentWindow) {
+			if (message.type === "ready") ready = true;
+			toHost(message);
+		}
+	});
+	frame.srcdoc = INNER;
+	document.body.appendChild(frame);
+})();
+`;
+
+/** Embed a string in a script as a literal that cannot terminate the surrounding `<script>`. */
+function scriptStringLiteral(value: string): string {
+	return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+/** The full `srcdoc` for a view: the trusted outer relay frame wrapping the inner view document. */
+export function buildViewFrameSrcdoc(body: string, themeCss: string): string {
+	return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${OUTER_FRAME_CSP}">
+<style>
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
+iframe { display: block; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss))};${OUTER_RELAY_SCRIPT}</script>
+</body>
+</html>`;
+}
+
 export type FrameToHostMessage =
 	| { type: "ready" }
 	| { type: "resize"; height: number }
 	| { type: "open-note"; path: string }
-	| { type: "requery" };
+	| { type: "requery" }
+	| { type: "navigated" };
 
 /** Validate a `message` event payload from a frame. Anything off-shape is dropped. */
 export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
@@ -208,6 +301,7 @@ export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
 	switch (message.type) {
 		case "ready":
 		case "requery":
+		case "navigated":
 			return { type: message.type };
 		case "resize":
 			return typeof message.height === "number" && Number.isFinite(message.height)

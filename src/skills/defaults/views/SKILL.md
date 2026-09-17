@@ -78,9 +78,10 @@ for static content.
 - `s2b.refresh()` — ask for a re-run of the queries.
 
 ## Rules
-- The frame has no network: no CDN scripts, external fonts, images, or `fetch`. Every
-  library-free line of code must be inline. Draw charts with inline SVG or `<canvas>`;
-  there is no charting library. Keep scripts small and readable.
+- The frame has no network and cannot navigate: no CDN scripts, external fonts,
+  images, `fetch`, links to web pages, or `location` changes — a view that tries is
+  stopped. Everything must be inline. Draw charts with inline SVG or `<canvas>`; there
+  is no charting library. Keep scripts small and readable.
 - Style with Obsidian's CSS variables so the view matches the theme in light and dark:
   `--background-primary`, `--background-secondary`, `--background-modifier-border`,
   `--text-normal`, `--text-muted`, `--text-faint`, `--text-accent`, `--interactive-accent`,

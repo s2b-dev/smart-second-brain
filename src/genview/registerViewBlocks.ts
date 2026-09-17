@@ -68,11 +68,20 @@ function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (
 /** Write the view as `<folder>/<title>.md` holding the fence, suffixing the name on collision. */
 export async function saveViewAsNote(app: App, folder: string, spec: ViewSpec, source: string): Promise<TFile> {
 	const folderPath = normalizePath(folder || "Views");
-	if (!app.vault.getFolderByPath(folderPath)) await app.vault.createFolder(folderPath);
+	await ensureFolder(app, folderPath);
 	const base = viewFileBasename(spec.title);
 	let path = normalizePath(`${folderPath}/${base}.md`);
 	for (let n = 2; app.vault.getAbstractFileByPath(path); n++) {
 		path = normalizePath(`${folderPath}/${base} ${n}.md`);
 	}
 	return app.vault.create(path, wrapViewFence(source));
+}
+
+/** Create `folderPath` and any missing ancestors, one segment at a time. */
+async function ensureFolder(app: App, folderPath: string): Promise<void> {
+	let current = "";
+	for (const segment of folderPath.split("/").filter(Boolean)) {
+		current = current ? `${current}/${segment}` : segment;
+		if (!app.vault.getFolderByPath(current)) await app.vault.createFolder(current);
+	}
 }

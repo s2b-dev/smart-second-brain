@@ -1684,10 +1684,15 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
 }
-.s2b-view-placeholder {
+.s2b-view-placeholder,
+.s2b-view-blocked {
 	padding: var(--size-4-4);
 	border: 1px dashed var(--background-modifier-border);
 	border-radius: var(--radius-m);
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
+}
+.s2b-view-blocked {
+	border-color: var(--text-error);
+	color: var(--text-error);
 }

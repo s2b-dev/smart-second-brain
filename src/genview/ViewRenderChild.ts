@@ -1,5 +1,5 @@
 import { type App, type EventRef, MarkdownRenderChild } from "obsidian";
-import { buildViewSrcdoc, collectThemeCss, parseFrameMessage } from "./viewFrame";
+import { buildViewFrameSrcdoc, collectThemeCss, parseFrameMessage } from "./viewFrame";
 import { runViewQueries } from "./viewQueries";
 import type { ViewSpec } from "./viewSpec";
 
@@ -19,6 +19,9 @@ const REFRESH_EVENTS = ["changed", "dataview:metadata-change", "dataview:index-r
 /**
  * One rendered view: owns the sandboxed frame, feeds it query results, keeps those
  * results live while the vault changes, and tears everything down with the block.
+ *
+ * `this.frame` is the trusted outer relay frame (see `viewFrame.ts`); the view's own
+ * document is nested inside it and never talks to the host directly.
  *
  * Lifecycle is Obsidian's `MarkdownRenderChild`: `onload` when the block is attached
  * to a loaded parent component, `onunload` when that parent unloads (the reading
@@ -63,7 +66,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		}
 
 		// Set last: the frame starts loading (and may post `ready`) as soon as srcdoc is assigned.
-		frame.srcdoc = buildViewSrcdoc(this.spec.body, collectThemeCss());
+		frame.srcdoc = buildViewFrameSrcdoc(this.spec.body, collectThemeCss());
 	}
 
 	onunload(): void {
@@ -96,7 +99,25 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			case "open-note":
 				void this.app.workspace.openLinkText(message.path, this.sourcePath, false);
 				break;
+			case "navigated":
+				this.retireFrame();
+				break;
 		}
+	}
+
+	/**
+	 * The outer frame reports that the view document was replaced (a navigation the
+	 * CSP backstop did not refuse). Nothing may be posted to whatever loaded in its
+	 * place: drop the frame and say why in its stead.
+	 */
+	private retireFrame(): void {
+		this.queryGeneration++;
+		this.frame?.remove();
+		this.frame = null;
+		this.containerEl.createDiv({
+			cls: "s2b-view-blocked",
+			text: "This view was stopped because it tried to navigate away from its sandbox.",
+		});
 	}
 
 	private post(message: Record<string, unknown>): void {

