@@ -3,6 +3,7 @@ import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { WIDGET_FILE_EXTENSION } from "../views/widget/WidgetView";
+import { resolveWidgetIcon } from "./widgetIcon";
 import { WidgetRenderChild } from "./WidgetRenderChild";
 import { resolveWidgetLibs, WIDGET_LIBS } from "./widgetLibs";
 import {
@@ -80,6 +81,7 @@ function renderChatToolbar(
 	sourcePath: string,
 ): void {
 	const bar = el.createDiv({ cls: "s2b-widget-toolbar" });
+	setIcon(bar.createSpan({ cls: "s2b-widget-toolbar-icon" }), resolveWidgetIcon(spec.icon));
 	bar.createSpan({ cls: "s2b-widget-toolbar-title", text: spec.title ?? "Widget" });
 	// Saving twice from the same block would create a second file: share one in-flight
 	// save, and forget it only if it failed.

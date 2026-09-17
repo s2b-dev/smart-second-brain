@@ -31,6 +31,8 @@ export interface WidgetSpec {
 	title?: string;
 	/** One line on what the widget shows. With the title, the only text of a `.widget` file that is indexed. */
 	description?: string;
+	/** Lucide icon name for the tab and toolbar; see `widgetIcon.ts` for the default and validation. */
+	icon?: string;
 	/** Fixed frame height in px. When absent the frame follows its content height. */
 	height?: number;
 	/** Named Dataview queries, run by the host and kept live. */
@@ -100,6 +102,8 @@ function parseFrontmatter(lines: string[]): WidgetSpec {
 			spec.title = value;
 		} else if (key === "description" && value) {
 			spec.description = value;
+		} else if (key === "icon" && value) {
+			spec.icon = value;
 		} else if (key === "height") {
 			const height = Number.parseInt(value, 10);
 			if (Number.isFinite(height) && height > 0) spec.height = height;

@@ -199,7 +199,7 @@ const BUNDLED_CORE_SKILL_ICONS: Record<string, string> = {
 	"manage-notes": "file-pen",
 	web: "globe",
 	"manage-skills": "wand-2",
-	widgets: "component",
+	widgets: "component", // = DEFAULT_WIDGET_ICON in widget/widgetIcon.ts
 };
 
 /**

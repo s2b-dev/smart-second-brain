@@ -1,5 +1,6 @@
 import { FileView, Notice, setIcon, type TFile, type WorkspaceLeaf } from "obsidian";
 import type SecondBrainPlugin from "../../main";
+import { DEFAULT_WIDGET_ICON, resolveWidgetIcon } from "../../widget/widgetIcon";
 import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
 import { parseWidgetSpec } from "../../widget/widgetSpec";
 
@@ -22,6 +23,7 @@ export class WidgetView extends FileView {
 	private body: HTMLElement | null = null;
 	private child: WidgetRenderChild | null = null;
 	private source: HTMLElement | null = null;
+	private icon = DEFAULT_WIDGET_ICON;
 	/** mtime of the file when the source editor loaded it; a save refuses if the file moved on. */
 	private sourceMtime = 0;
 	private sourceStaleHint: HTMLElement | null = null;
@@ -39,7 +41,7 @@ export class WidgetView extends FileView {
 	}
 
 	getIcon(): string {
-		return "component";
+		return this.icon;
 	}
 
 	canAcceptExtension(extension: string): boolean {
@@ -99,9 +101,14 @@ export class WidgetView extends FileView {
 		if (this.file !== file || !this.body) return;
 		this.dropChild();
 		this.body.empty();
-		this.child = new WidgetRenderChild(this.body, this.plugin.app, parseWidgetSpec(text), file.path, {
-			fill: true,
-		});
+		const spec = parseWidgetSpec(text);
+		const icon = resolveWidgetIcon(spec.icon);
+		if (icon !== this.icon) {
+			this.icon = icon;
+			// The tab header read getIcon() before the file was parsed; internal leaf API.
+			(this.leaf as unknown as { updateHeader?: () => void }).updateHeader?.();
+		}
+		this.child = new WidgetRenderChild(this.body, this.plugin.app, spec, file.path, { fill: true });
 		this.addChild(this.child);
 	}
 

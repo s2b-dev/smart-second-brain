@@ -61,7 +61,9 @@ queries:
 
 Frontmatter keys (all optional): `title` (toolbar label and file name when saved),
 `description` (one line on what the widget shows — with the title, the only text of a saved
-widget that search sees, so always give one),
+widget that search sees, so always give one), `icon` (a Lucide icon name that fits the
+widget — `chart-column`, `chart-line`, `calendar`, `list-todo`, `gauge`, `table`, `clock`,
+`map` … — shown on its tab and in the chat; unknown names fall back to the default),
 `height` (frame height in px; omit to size to content — with it, the layout gets that
 height and the frame still shrinks if the drawn content is shorter), `queries` (name → Dataview DQL
 string; use `|` for a multi-line query), `libs` (bundled libraries to load, see

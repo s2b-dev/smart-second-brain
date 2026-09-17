@@ -1753,6 +1753,12 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	gap: var(--size-4-1);
 	margin-bottom: var(--size-4-1);
 }
+.s2b-widget-toolbar-icon {
+	display: flex;
+	align-items: center;
+	color: var(--text-muted);
+	--icon-size: var(--icon-s);
+}
 .s2b-widget-toolbar-title {
 	flex: 1;
 	min-width: 0;

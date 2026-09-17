@@ -86,6 +86,7 @@ describe("widgetIndexText", () => {
 	it("is empty for a widget without title or description", () => {
 		expect(widgetIndexText("<p>body only</p>")).toBe("");
 		expect(parseWidgetSpec("---\ndescription: Only this\n---\nx").description).toBe("Only this");
+		expect(parseWidgetSpec("---\nicon: chart-column\n---\nx").icon).toBe("chart-column");
 	});
 });
 

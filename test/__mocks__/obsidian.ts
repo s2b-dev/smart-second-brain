@@ -299,3 +299,5 @@ export type DataAdapter = Vault["adapter"];
 export function getLanguage(): string {
 	return "en";
 }
+
+export const getIcon = vi.fn((_id: string): SVGSVGElement | null => null);
