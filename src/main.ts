@@ -30,6 +30,7 @@ import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerViewBlocks } from "./genview/registerViewBlocks";
+import { VIEW_HOVER_SOURCE } from "./genview/ViewRenderChild";
 import { GenView, VIEW_FILE_EXTENSION, VIEW_TYPE_GEN_VIEW } from "./views/gen-view/GenView";
 import { registerViewEmbed, unregisterViewEmbed } from "./views/gen-view/viewEmbed";
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
@@ -486,6 +487,8 @@ export default class SecondBrainPlugin extends Plugin {
 		this.registerView(VIEW_TYPE_GEN_VIEW, (leaf) => new GenView(leaf, this));
 		this.registerExtensions([VIEW_FILE_EXTENSION], VIEW_TYPE_GEN_VIEW);
 		registerViewEmbed(this);
+		// Note links inside view frames (`data-note`) preview like links in a note.
+		this.registerHoverLinkSource(VIEW_HOVER_SOURCE, { display: "S2B Views", defaultMod: false });
 
 		if (this.manifest.dir === undefined) {
 			this.unload();

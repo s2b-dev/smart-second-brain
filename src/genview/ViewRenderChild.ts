@@ -1,7 +1,8 @@
-import { type App, type EventRef, MarkdownRenderChild } from "obsidian";
+import { type App, type EventRef, type HoverPopover, Keymap, MarkdownRenderChild } from "obsidian";
 import {
 	buildViewFrameSrcdoc,
 	collectThemeCss,
+	type HoverNoteMessage,
 	parseFrameMessage,
 	VIEW_FRAME_PADDING_PX,
 	VIEW_READY_EVENT,
@@ -23,6 +24,9 @@ const MAX_AUTO_HEIGHT = 4000;
  */
 const REFRESH_EVENTS = ["changed", "dataview:metadata-change", "dataview:index-ready"];
 
+/** Hover-link source id registered in main.ts so page preview knows these links. */
+export const VIEW_HOVER_SOURCE = "smart-second-brain-view";
+
 /**
  * One rendered view: owns the sandboxed frame, feeds it query results, keeps those
  * results live while the vault changes, and tears everything down with the block.
@@ -35,7 +39,10 @@ const REFRESH_EVENTS = ["changed", "dataview:metadata-change", "dataview:index-r
  * view re-renders, the chat message is replaced, the note closes).
  */
 export class ViewRenderChild extends MarkdownRenderChild {
+	/** Page preview attaches its popover here (`HoverParent`). */
+	hoverPopover: HoverPopover | null = null;
 	private frame: HTMLIFrameElement | null = null;
+	private hoverProxy: HTMLElement | null = null;
 	private refreshTimer: number | null = null;
 	private queryGeneration = 0;
 
@@ -91,6 +98,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		}
 		// Invalidate any in-flight query so its result is dropped rather than posted.
 		this.queryGeneration++;
+		this.removeHoverProxy();
 		this.frame = null;
 	}
 
@@ -123,6 +131,9 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			case "open-note":
 				void this.app.workspace.openLinkText(message.path, this.sourcePath, false);
 				break;
+			case "hover-note":
+				this.showHoverProxy(message);
+				break;
 			case "navigated":
 				this.retireFrame();
 				break;
@@ -142,6 +153,61 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			cls: "s2b-view-blocked",
 			text: "This view was stopped because it tried to navigate away from its sandbox.",
 		});
+	}
+
+	/**
+	 * Lay an invisible element over the hovered link's box — the frame's content is
+	 * unreachable from the host — and hand it to page preview as the link. The proxy
+	 * takes pointer events, so the popover's own hover tracking works natively; it
+	 * opens the note on click and removes itself when the pointer leaves it.
+	 */
+	private showHoverProxy({ path, rect, ctrlKey, metaKey }: HoverNoteMessage): void {
+		const frame = this.frame;
+		if (!frame) return;
+		this.removeHoverProxy();
+		const frameBox = frame.getBoundingClientRect();
+		const hostBox = this.containerEl.getBoundingClientRect();
+		const style = getComputedStyle(frame);
+		const insetX = (Number.parseFloat(style.borderLeftWidth) || 0) + VIEW_FRAME_PADDING_PX;
+		const insetY = (Number.parseFloat(style.borderTopWidth) || 0) + VIEW_FRAME_PADDING_PX;
+		const innerWidth = frameBox.width - 2 * insetX;
+		const innerHeight = frameBox.height - 2 * insetY;
+		// Clamp to the visible part of the view document.
+		const x = Math.max(0, Math.min(rect.x, innerWidth));
+		const y = Math.max(0, Math.min(rect.y, innerHeight));
+		const width = Math.max(1, Math.min(rect.width - (x - rect.x), innerWidth - x));
+		const height = Math.max(1, Math.min(rect.height - (y - rect.y), innerHeight - y));
+
+		const proxy = this.containerEl.createDiv({ cls: "s2b-view-hover-proxy" });
+		proxy.style.left = `${frameBox.left - hostBox.left + insetX + x}px`;
+		proxy.style.top = `${frameBox.top - hostBox.top + insetY + y}px`;
+		proxy.style.width = `${width}px`;
+		proxy.style.height = `${height}px`;
+		proxy.addEventListener("mouseleave", () => this.removeHoverProxy());
+		proxy.addEventListener("click", (event) => {
+			void this.app.workspace.openLinkText(path, this.sourcePath, Keymap.isModEvent(event));
+		});
+		this.hoverProxy = proxy;
+
+		const proxyBox = proxy.getBoundingClientRect();
+		this.app.workspace.trigger("hover-link", {
+			event: new MouseEvent("mouseover", {
+				ctrlKey,
+				metaKey,
+				clientX: proxyBox.left + proxyBox.width / 2,
+				clientY: proxyBox.top + proxyBox.height / 2,
+			}),
+			source: VIEW_HOVER_SOURCE,
+			hoverParent: this,
+			targetEl: proxy,
+			linktext: path,
+			sourcePath: this.sourcePath,
+		});
+	}
+
+	private removeHoverProxy(): void {
+		this.hoverProxy?.remove();
+		this.hoverProxy = null;
 	}
 
 	private post(message: Record<string, unknown>): void {

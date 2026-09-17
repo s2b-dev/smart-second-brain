@@ -131,6 +131,41 @@ describe("parseFrameMessage", () => {
 			type: "open-note",
 			path: "a/b.md",
 		});
+		expect(
+			parseFrameMessage({
+				s2bView: true,
+				type: "hover-note",
+				path: "a/b.md",
+				rect: { x: 1, y: 2.5, width: 30, height: 12 },
+				metaKey: true,
+			}),
+		).toEqual({
+			type: "hover-note",
+			path: "a/b.md",
+			rect: { x: 1, y: 2.5, width: 30, height: 12 },
+			ctrlKey: false,
+			metaKey: true,
+		});
+	});
+
+	it("drops hover messages with a missing path or a malformed box", () => {
+		expect(
+			parseFrameMessage({
+				s2bView: true,
+				type: "hover-note",
+				path: "",
+				rect: { x: 0, y: 0, width: 1, height: 1 },
+			}),
+		).toBeNull();
+		expect(parseFrameMessage({ s2bView: true, type: "hover-note", path: "a.md" })).toBeNull();
+		expect(
+			parseFrameMessage({
+				s2bView: true,
+				type: "hover-note",
+				path: "a.md",
+				rect: { x: "0", y: 0, width: 1, height: 1 },
+			}),
+		).toBeNull();
 	});
 
 	it("drops untagged, unknown or malformed messages", () => {

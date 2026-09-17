@@ -43,7 +43,7 @@ queries:
       const row = tbody.insertRow();
       const a = document.createElement("a");
       a.textContent = link.display;
-      a.onclick = () => s2b.openNote(link.path);
+      a.dataset.note = link.path; // click opens the note, hover previews it
       row.insertCell().append(a);
       row.insertCell().textContent = new Date(modified).toLocaleDateString();
     }
@@ -81,8 +81,10 @@ static content.
   available and again on every vault change, so make the render idempotent
   (clear, then draw).
 - `s2b.data` — the latest results.
-- `s2b.openNote(path)` — open a note in Obsidian. Plain `<a href>` cannot leave the
-  frame; use this on click.
+- `data-note="Path/To/Note.md"` on any element makes it a note link: click opens the
+  note, hovering shows Obsidian's page preview. Prefer this over click handlers. Plain
+  `<a href>` cannot leave the frame.
+- `s2b.openNote(path)` — open a note programmatically (e.g. from a chart's click handler).
 - `s2b.refresh()` — ask for a re-run of the queries.
 
 ## Plots and 3D

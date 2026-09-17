@@ -30,8 +30,16 @@
  *
  * Both directions are `postMessage` with a fixed, tagged shape (`s2bView: true`).
  * Host → view: `data` (query results) and `theme` (CSS variables). View → host: `ready`,
- * `resize`, `open-note`, `requery`; outer → host additionally `navigated`. Every hop
- * checks `event.source` against the one window it accepts from. Nothing else crosses.
+ * `resize`, `open-note`, `hover-note`, `requery`; outer → host additionally `navigated`.
+ * Every hop checks `event.source` against the one window it accepts from. Nothing else
+ * crosses.
+ *
+ * ## Note links
+ *
+ * Any element with `data-note="<path>"` is a note link: the runtime opens it on click and
+ * reports its rectangle on hover, and the host lays an invisible proxy element over that
+ * rectangle and hands it to Obsidian's page preview — so a link inside a view previews
+ * exactly like one in a note. `s2b.openNote(path)` stays for programmatic opening.
  *
  * Known residual: hostname-based side channels that CSP does not govern (DNS prefetch
  * hints). `x-dns-prefetch-control: off` is set in the inner document; a view is still
@@ -164,6 +172,30 @@ export const VIEW_RUNTIME_SCRIPT = `
 			send({ type: "requery" });
 		},
 	};
+	const noteLinkOf = (target) => (target && target.closest ? target.closest("[data-note]") : null);
+	document.addEventListener("click", (event) => {
+		const link = noteLinkOf(event.target);
+		if (!link) return;
+		event.preventDefault();
+		send({ type: "open-note", path: String(link.getAttribute("data-note")) });
+	});
+	let hoveredLink = null;
+	document.addEventListener("mouseover", (event) => {
+		const link = noteLinkOf(event.target);
+		if (!link || link === hoveredLink) return;
+		hoveredLink = link;
+		const rect = link.getBoundingClientRect();
+		send({
+			type: "hover-note",
+			path: String(link.getAttribute("data-note")),
+			rect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
+			ctrlKey: event.ctrlKey,
+			metaKey: event.metaKey,
+		});
+	});
+	document.addEventListener("mouseout", (event) => {
+		if (hoveredLink && noteLinkOf(event.relatedTarget) !== hoveredLink) hoveredLink = null;
+	});
 	window.addEventListener("message", (event) => {
 		if (event.source !== window.parent) return;
 		const message = event.data;
@@ -388,12 +420,24 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 </html>`;
 }
 
+export interface HoverNoteMessage {
+	type: "hover-note";
+	path: string;
+	/** The link's box in the view document's viewport coordinates. */
+	rect: { x: number; y: number; width: number; height: number };
+	ctrlKey: boolean;
+	metaKey: boolean;
+}
+
 export type FrameToHostMessage =
 	| { type: "ready" }
 	| { type: "resize"; height: number; extent: number }
 	| { type: "open-note"; path: string }
+	| HoverNoteMessage
 	| { type: "requery" }
 	| { type: "navigated" };
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
 /** Validate a `message` event payload from a frame. Anything off-shape is dropped. */
 export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
@@ -415,6 +459,21 @@ export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
 			return typeof message.path === "string" && message.path.length > 0
 				? { type: "open-note", path: message.path }
 				: null;
+		case "hover-note": {
+			const rect = message.rect as Record<string, unknown> | undefined;
+			if (typeof message.path !== "string" || !message.path || typeof rect !== "object" || rect === null)
+				return null;
+			const { x, y, width, height } = rect;
+			if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(width) || !isFiniteNumber(height))
+				return null;
+			return {
+				type: "hover-note",
+				path: message.path,
+				rect: { x, y, width, height },
+				ctrlKey: message.ctrlKey === true,
+				metaKey: message.metaKey === true,
+			};
+		}
 		default:
 			return null;
 	}

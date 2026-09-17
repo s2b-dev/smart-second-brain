@@ -1668,7 +1668,15 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	padding: 0;
 }
 .s2b-gen-view-body {
+	position: relative;
 	height: 100%;
+}
+/* Invisible stand-in for a hovered note link inside a frame (see ViewRenderChild). */
+.s2b-view-hover-proxy {
+	position: absolute;
+	z-index: 1;
+	cursor: pointer;
+	background: transparent;
 }
 .s2b-view-frame.s2b-view-fill {
 	--s2b-view-border-width: 0px;
