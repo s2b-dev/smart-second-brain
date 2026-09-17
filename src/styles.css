@@ -1688,6 +1688,7 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	height: 100%;
 }
 .s2b-view-frame.s2b-view-fill {
+	--s2b-view-border-width: 0px;
 	height: 100%;
 	border: 0;
 	border-radius: 0;
