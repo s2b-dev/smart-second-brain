@@ -1,4 +1,5 @@
 import { Platform, type TFile, type Vault } from "obsidian";
+import { stripViewFences } from "../genview/viewFences";
 import { getAgentPathSource } from "./agentPathSource";
 import { agentRootDir } from "./agentPaths";
 import { THREAD_DATA_DEDUP_VERSION, inflateThreadData, sniffThreadDataVersion } from "../agent/threadDataCodec";
@@ -250,7 +251,10 @@ export function getEmbeddableVaultFiles(vault: Vault): TFile[] {
  * before calling this helper.
  */
 export async function readIndexableContent(vault: Vault, file: TFile): Promise<string> {
-	const content = await readIndexableContentRaw(vault, file);
+	const raw = await readIndexableContentRaw(vault, file);
+	// A view fence's HTML/JS is noise to retrieval (and would surface as chunks); keep
+	// only a marker with its title. `.view` files themselves are not indexable at all.
+	const content = file.extension === "md" ? stripViewFences(raw) : raw;
 	const cap = maxIndexedTextChars(file);
 	return content.length > cap ? content.slice(0, cap) : content;
 }

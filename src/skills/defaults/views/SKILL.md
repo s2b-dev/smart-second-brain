@@ -14,10 +14,11 @@ fragment — markup, `<style>`, `<script>` — rendered in a sandboxed frame rig
 wrote it. An optional frontmatter block at the top declares a title, a fixed height, and
 named Dataview queries that the host runs for you and keeps live as the vault changes.
 
-The user keeps a view from the toolbar above it: copy it as a block to paste into any
-note, save it as its own note, or save and open it as its own pane. A view in a note
-can be opened as a pane at any time. Do not create that note yourself unless asked; if
-the user does ask, stage it with `manage_notes` and put the same fence in the note body.
+The user keeps a view from the toolbar above it: copy it as a block to paste into a
+note, or save it as a standalone `.view` file, which opens as its own pane and can be
+embedded in any note with `![[Name.view]]`. Do not create that file yourself unless
+asked; if the user does ask, stage it with `manage_notes` as `<folder>/<Name>.view` whose
+content is the fence **body** only — frontmatter, then HTML, no fence markers.
 
 ## Format
 ````markdown

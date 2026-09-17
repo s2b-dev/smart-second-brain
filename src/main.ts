@@ -30,8 +30,8 @@ import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerViewBlocks } from "./genview/registerViewBlocks";
-import { findViewFences } from "./genview/viewFences";
-import { GenView, openGenView, VIEW_TYPE_GEN_VIEW } from "./views/gen-view/GenView";
+import { GenView, VIEW_FILE_EXTENSION, VIEW_TYPE_GEN_VIEW } from "./views/gen-view/GenView";
+import { registerViewEmbed, unregisterViewEmbed } from "./views/gen-view/viewEmbed";
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
@@ -481,8 +481,11 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
-		// A note's `s2b-view` fence as its own leaf (see views/gen-view/GenView.ts).
+		// `.view` files: a standalone view as its own leaf, plus `![[x.view]]` embeds and
+		// hover previews (see views/gen-view/). Torn down in onunload with the chat's.
 		this.registerView(VIEW_TYPE_GEN_VIEW, (leaf) => new GenView(leaf, this));
+		this.registerExtensions([VIEW_FILE_EXTENSION], VIEW_TYPE_GEN_VIEW);
+		registerViewEmbed(this);
 
 		if (this.manifest.dir === undefined) {
 			this.unload();
@@ -533,27 +536,6 @@ export default class SecondBrainPlugin extends Plugin {
 		});
 
 		this.registerMobileNavbarSearchOverride();
-
-		this.addCommand({
-			id: "open-note-as-view",
-			name: "Open note as view",
-			icon: "layout-dashboard",
-			checkCallback: (checking) => {
-				const file = this.app.workspace.getActiveFile();
-				if (!file || file.extension !== "md") return false;
-				if (!checking) {
-					void (async () => {
-						const [first] = findViewFences(await this.app.vault.read(file));
-						if (!first) {
-							new Notice("This note has no view block.");
-							return;
-						}
-						await openGenView(this, { path: file.path, index: 0, title: first.spec.title });
-					})();
-				}
-				return true;
-			},
-		});
 
 		this.addCommand({
 			id: "open-smart-graph",
@@ -904,8 +886,9 @@ export default class SecondBrainPlugin extends Plugin {
 		// during unload.
 		(
 			this.app as typeof this.app & { viewRegistry?: { unregisterExtensions?: (extensions: string[]) => void } }
-		).viewRegistry?.unregisterExtensions?.(["chat"]);
+		).viewRegistry?.unregisterExtensions?.(["chat", VIEW_FILE_EXTENSION]);
 		unregisterChatEmbed(this);
+		unregisterViewEmbed(this);
 	}
 
 	async createNewChat() {

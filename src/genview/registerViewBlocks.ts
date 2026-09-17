@@ -2,8 +2,7 @@ import { type App, Notice, normalizePath, setIcon, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
-import { openGenView } from "../views/gen-view/GenView";
-import { viewFenceAtLine } from "./viewFences";
+import { VIEW_FILE_EXTENSION } from "../views/gen-view/GenView";
 import { ViewRenderChild } from "./ViewRenderChild";
 import { resolveViewLibs, VIEW_LIBS } from "./viewLibs";
 import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wrapViewFence } from "./viewSpec";
@@ -39,11 +38,9 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 			return;
 		}
 		// Inside a chat the block is a proposal the user may want to keep, so it gets a
-		// toolbar; in a note it already is the note and only offers to open as a pane.
+		// toolbar; in a note it already is the note's content.
 		if (el.closest(`.workspace-leaf-content[data-type="${VIEW_TYPE_CHAT}"]`)) {
 			renderChatToolbar(plugin, el, spec, source);
-		} else {
-			renderNoteAction(plugin, el, ctx.sourcePath, ctx.getSectionInfo(el));
 		}
 		ctx.addChild(new ViewRenderChild(el, plugin.app, spec, ctx.sourcePath));
 	});
@@ -64,70 +61,41 @@ function renderPlaceholder(el: HTMLElement): void {
 }
 
 /**
- * In a note, a hover-revealed corner button that opens this block as its own pane.
- * The block's index among the note's view fences comes from the section info Obsidian
- * hands the processor; without it (some embed contexts) there is no safe target.
+ * Two ways to keep a view from the chat: copy it as a fence to paste inline into a
+ * note, or save it as a standalone `.view` file — which opens as its own pane, is
+ * embeddable with `![[name.view]]`, and stays out of the search indexes.
  */
-function renderNoteAction(
-	plugin: SecondBrainPlugin,
-	el: HTMLElement,
-	sourcePath: string,
-	section: { text: string; lineStart: number } | null,
-): void {
-	if (!section || !sourcePath) return;
-	const fence = viewFenceAtLine(section.text, section.lineStart);
-	if (!fence) return;
-	iconButton(
-		el,
-		"maximize-2",
-		"Open as view",
-		() => openGenView(plugin, { path: sourcePath, index: fence.index, title: fence.spec.title }),
-		"s2b-view-open",
-	);
-}
-
 function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {
 	const bar = el.createDiv({ cls: "s2b-view-toolbar" });
 	bar.createSpan({ cls: "s2b-view-toolbar-title", text: spec.title ?? "View" });
-	// Saving twice from the same block would create a second note: share one in-flight
-	// save between both buttons, and forget it only if it failed.
+	// Saving twice from the same block would create a second file: share one in-flight
+	// save, and forget it only if it failed.
 	let saving: Promise<TFile> | null = null;
 	const save = (): Promise<TFile> => {
-		saving ??= saveViewAsNote(plugin.app, getData().viewsFolder, spec, source).catch((error: unknown) => {
+		saving ??= saveViewFile(plugin.app, getData().viewsFolder, spec, source).catch((error: unknown) => {
 			saving = null;
 			throw error;
 		});
 		return saving;
 	};
-	const report = (error: unknown) =>
-		new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
 
 	iconButton(bar, "copy", "Copy as block to paste into a note", async () => {
 		await navigator.clipboard.writeText(wrapViewFence(source));
 		new Notice("View block copied. Paste it into any note.");
 	});
-	iconButton(bar, "save", "Save as a note in the vault", async () => {
+	iconButton(bar, "save", "Save as a view file and open it", async () => {
 		try {
 			const file = await save();
-			new Notice(`Saved view to ${file.path}`);
 			await plugin.app.workspace.getLeaf("tab").openFile(file);
 		} catch (error) {
-			report(error);
-		}
-	});
-	iconButton(bar, "maximize-2", "Save and open as its own view", async () => {
-		try {
-			const file = await save();
-			await openGenView(plugin, { path: file.path, index: 0, title: spec.title });
-		} catch (error) {
-			report(error);
+			new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	});
 }
 
-function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => Promise<void>, cls = ""): void {
+function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => Promise<void>): void {
 	const button = parent.createDiv({
-		cls: `clickable-icon ${cls}`.trim(),
+		cls: "clickable-icon",
 		attr: { role: "button", tabindex: "0", "aria-label": label },
 	});
 	setIcon(button, icon);
@@ -140,16 +108,16 @@ function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (
 	});
 }
 
-/** Write the view as `<folder>/<title>.md` holding the fence, suffixing the name on collision. */
-export async function saveViewAsNote(app: App, folder: string, spec: ViewSpec, source: string): Promise<TFile> {
+/** Write the view as `<folder>/<title>.view`, suffixing the name on collision. */
+export async function saveViewFile(app: App, folder: string, spec: ViewSpec, source: string): Promise<TFile> {
 	const folderPath = normalizePath(folder || "Views");
 	await ensureFolder(app, folderPath);
 	const base = viewFileBasename(spec.title);
-	let path = normalizePath(`${folderPath}/${base}.md`);
+	let path = normalizePath(`${folderPath}/${base}.${VIEW_FILE_EXTENSION}`);
 	for (let n = 2; app.vault.getAbstractFileByPath(path); n++) {
-		path = normalizePath(`${folderPath}/${base} ${n}.md`);
+		path = normalizePath(`${folderPath}/${base} ${n}.${VIEW_FILE_EXTENSION}`);
 	}
-	return app.vault.create(path, wrapViewFence(source));
+	return app.vault.create(path, `${source.trim()}\n`);
 }
 
 /** Create `folderPath` and any missing ancestors, one segment at a time. */

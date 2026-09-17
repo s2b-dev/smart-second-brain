@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findViewFences, viewFenceAtLine } from "../../src/genview/viewFences";
+import { findViewFences, stripViewFences } from "../../src/genview/viewFences";
 
 const NOTE = [
 	"# Dashboard",
@@ -53,10 +53,21 @@ describe("findViewFences", () => {
 	});
 });
 
-describe("viewFenceAtLine", () => {
-	it("maps the opening marker's line to its fence", () => {
-		expect(viewFenceAtLine(NOTE, 2)?.index).toBe(0);
-		expect(viewFenceAtLine(NOTE, 17)?.index).toBe(1);
-		expect(viewFenceAtLine(NOTE, 3)).toBeNull();
+describe("stripViewFences", () => {
+	it("replaces each fence with a titled marker and leaves the rest untouched", () => {
+		const stripped = stripViewFences(NOTE);
+		expect(stripped).not.toContain("<p>one</p>");
+		expect(stripped).not.toContain("<p>two</p>");
+		expect(stripped).toContain("(view: First)");
+		expect(stripped).toContain("(view)");
+		// Content that only looked like a fence (nested, or inside a js block) stays.
+		expect(stripped).toContain("this is an example inside a longer fence");
+		expect(stripped).toContain("console.log('```s2b-view is just text here');");
+		expect(stripped.startsWith("# Dashboard\n\n(view: First)\n\nSome prose")).toBe(true);
+	});
+
+	it("returns the input unchanged when there is nothing to strip", () => {
+		const note = "# Just a note\n\n```js\nlet x = 1;\n```";
+		expect(stripViewFences(note)).toBe(note);
 	});
 });
