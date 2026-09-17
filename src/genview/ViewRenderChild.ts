@@ -1,5 +1,5 @@
 import { type App, type EventRef, MarkdownRenderChild } from "obsidian";
-import { buildViewFrameSrcdoc, collectThemeCss, parseFrameMessage } from "./viewFrame";
+import { buildViewFrameSrcdoc, collectThemeCss, parseFrameMessage, VIEW_FRAME_PADDING_PX } from "./viewFrame";
 import { resolveViewLibs } from "./viewLibs";
 import { runViewQueries } from "./viewQueries";
 import type { ViewSpec } from "./viewSpec";
@@ -51,7 +51,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 				title: this.spec.title ?? "View",
 			},
 		});
-		frame.style.height = `${this.spec.height ?? DEFAULT_AUTO_HEIGHT}px`;
+		frame.style.height = `${(this.spec.height ?? DEFAULT_AUTO_HEIGHT) + 2 * VIEW_FRAME_PADDING_PX}px`;
 		this.frame = frame;
 
 		this.registerDomEvent(window, "message", (event: MessageEvent) => this.onMessage(event));
@@ -94,7 +94,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			case "resize":
 				if (this.spec.height === undefined) {
 					const height = Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.height)));
-					this.frame.style.height = `${height}px`;
+					this.frame.style.height = `${height + 2 * VIEW_FRAME_PADDING_PX}px`;
 				}
 				break;
 			case "open-note":

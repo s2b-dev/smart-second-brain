@@ -42,6 +42,13 @@
 export const VIEW_CSP =
 	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
 
+/**
+ * Space between the card border and the view's content, in px. Lives in the trusted outer
+ * document — a view's own `body { padding: 0 }` (which models write reflexively) cannot
+ * remove it — so the host adds twice this to every content height it applies to the frame.
+ */
+export const VIEW_FRAME_PADDING_PX = 12;
+
 /** Outer (relay) document: inline script/style only, and no frame may be navigated anywhere. */
 export const OUTER_FRAME_CSP =
 	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src 'none'; form-action 'none'; base-uri 'none'";
@@ -222,7 +229,6 @@ export function buildViewSrcdoc(body: string, themeCss: string, libSources: read
 html, body { margin: 0; padding: 0; height: auto; }
 body {
 	box-sizing: border-box;
-	padding: var(--size-4-3, 12px);
 	background: var(--background-primary, transparent);
 	color: var(--text-normal, inherit);
 	font-family: var(--font-interface, system-ui, sans-serif);
@@ -292,6 +298,7 @@ export function buildViewFrameSrcdoc(body: string, themeCss: string, libSources:
 <meta http-equiv="Content-Security-Policy" content="${OUTER_FRAME_CSP}">
 <style>
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
+body { box-sizing: border-box; padding: ${VIEW_FRAME_PADDING_PX}px; }
 iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>

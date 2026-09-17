@@ -132,7 +132,8 @@ libs: plotly
   `--text-normal`, `--text-muted`, `--text-faint`, `--text-accent`, `--interactive-accent`,
   `--color-red/orange/yellow/green/cyan/blue/purple/pink`, `--font-interface`,
   `--font-monospace`, `--font-ui-small`, `--radius-s/m`. The body already uses the
-  interface font and has padding; override `body { padding: 0 }` if you need the edge.
+  interface font; the card around the view provides the padding, so use none of your own
+  at the edges.
 - The frame follows its content height. Set `height` only when the view scrolls
   internally or uses percentage layouts; canvases and SVGs should carry explicit sizes.
 - One screen, not a web app: a view is a dashboard, chart, table, or small widget.
