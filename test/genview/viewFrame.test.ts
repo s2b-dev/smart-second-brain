@@ -116,9 +116,16 @@ describe("parseFrameMessage", () => {
 		expect(parseFrameMessage({ s2bView: true, type: "ready" })).toEqual({ type: "ready" });
 		expect(parseFrameMessage({ s2bView: true, type: "requery" })).toEqual({ type: "requery" });
 		expect(parseFrameMessage({ s2bView: true, type: "navigated" })).toEqual({ type: "navigated" });
-		expect(parseFrameMessage({ s2bView: true, type: "resize", height: 240.5 })).toEqual({
+		expect(parseFrameMessage({ s2bView: true, type: "resize", height: 240.5, extent: 180 })).toEqual({
 			type: "resize",
 			height: 240.5,
+			extent: 180,
+		});
+		// A missing or malformed extent falls back to the height rather than dropping the message.
+		expect(parseFrameMessage({ s2bView: true, type: "resize", height: 240 })).toEqual({
+			type: "resize",
+			height: 240,
+			extent: 240,
 		});
 		expect(parseFrameMessage({ s2bView: true, type: "open-note", path: "a/b.md" })).toEqual({
 			type: "open-note",

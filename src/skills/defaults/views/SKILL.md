@@ -51,7 +51,8 @@ queries:
 ````
 
 Frontmatter keys (all optional): `title` (toolbar label and note name when saved),
-`height` (frame height in px; omit to size to content), `queries` (name → Dataview DQL
+`height` (frame height in px; omit to size to content — with it, the layout gets that
+height and the frame still shrinks if the drawn content is shorter), `queries` (name → Dataview DQL
 string; use `|` for a multi-line query), `libs` (bundled libraries to load, see
 [Plots and 3D](#plots-and-3d)). Body-only views with no frontmatter are fine for
 static content.

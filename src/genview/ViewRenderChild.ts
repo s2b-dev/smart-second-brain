@@ -104,12 +104,18 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			case "requery":
 				this.scheduleRefresh();
 				break;
-			case "resize":
-				if (this.spec.height === undefined) {
-					const height = Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.height)));
-					this.frame.style.height = `${height + 2 * VIEW_FRAME_PADDING_PX}px`;
-				}
+			case "resize": {
+				// Auto: follow the content. Declared: the layout gets that height, but the frame
+				// shrinks to the content's drawn extent when that is shorter — models over-estimate
+				// heights, and the surplus would show as empty space. Percentage-sized children
+				// fill the declared height, so their extent equals it and nothing changes.
+				const height =
+					this.spec.height === undefined
+						? Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.height)))
+						: Math.min(this.spec.height, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.extent)));
+				this.frame.style.height = `${height + 2 * VIEW_FRAME_PADDING_PX}px`;
 				break;
+			}
 			case "open-note":
 				void this.app.workspace.openLinkText(message.path, this.sourcePath, false);
 				break;

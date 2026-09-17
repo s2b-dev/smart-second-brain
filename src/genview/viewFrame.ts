@@ -196,16 +196,56 @@ export const VIEW_RUNTIME_SCRIPT = `
 			parseFloat(style.marginBottom || "0")
 		);
 	};
+	// The bottom edge of what is actually drawn: for a declared height the host shrinks
+	// the frame to this when it is shorter (an over-estimated height would otherwise show
+	// as empty space), while percentage-sized children fill the frame and keep it.
+	const contentExtent = () => {
+		const body = document.body;
+		if (!body) return 0;
+		let bottom = 0;
+		for (const child of body.children) {
+			const rect = child.getBoundingClientRect();
+			if (rect.height > 0 || rect.width > 0) bottom = Math.max(bottom, rect.bottom + window.scrollY);
+		}
+		const style = getComputedStyle(body);
+		return bottom + parseFloat(style.paddingBottom || "0") + parseFloat(style.marginBottom || "0");
+	};
+	let lastExtent = -1;
 	const reportHeight = () => {
 		const height = Math.ceil(contentHeight());
-		if (height === lastHeight) return;
+		const extent = Math.ceil(contentExtent());
+		if (height === lastHeight && extent === lastExtent) return;
 		lastHeight = height;
-		send({ type: "resize", height });
+		lastExtent = extent;
+		send({ type: "resize", height, extent });
+	};
+	// With a declared height the body keeps the frame's size, so a resize observer on
+	// html/body alone never fires again once content is built (typically after data
+	// arrives). Watch the body's children as well, follow DOM mutations to pick up
+	// new ones, and measure on the next frame after any mutation.
+	let measureFrame = 0;
+	const scheduleMeasure = () => {
+		if (measureFrame) return;
+		measureFrame = requestAnimationFrame(() => {
+			measureFrame = 0;
+			reportHeight();
+		});
 	};
 	const observe = () => {
-		const observer = new ResizeObserver(reportHeight);
-		observer.observe(document.documentElement);
-		if (document.body) observer.observe(document.body);
+		const sizes = new ResizeObserver(scheduleMeasure);
+		sizes.observe(document.documentElement);
+		const body = document.body;
+		if (body) {
+			sizes.observe(body);
+			const watchChildren = () => {
+				for (const child of body.children) sizes.observe(child);
+			};
+			watchChildren();
+			new MutationObserver(() => {
+				watchChildren();
+				scheduleMeasure();
+			}).observe(body, { childList: true, subtree: true, attributes: true, characterData: true });
+		}
 		reportHeight();
 	};
 	if (document.readyState === "loading") {
@@ -221,11 +261,11 @@ export const VIEW_RUNTIME_SCRIPT = `
 `;
 
 /**
- * Applied in auto-height mode: views routinely style html/body with `height: 100%` or
- * `min-height: 100vh`, which inside a frame equals the frame's current height and would
- * keep it from ever shrinking to short content (and would make percentage-sized
- * children fill the frame instead of their content). With a declared `height` the
- * frame is fixed and percentage layouts are the point, so this is left out.
+ * Applied in auto-height mode: the base style (and views themselves, with `height: 100%`
+ * or `min-height: 100vh`) size html/body to the frame, which inside a frame equals its
+ * current height and would keep it from ever shrinking to short content (and would make
+ * percentage-sized children fill the frame instead of their content). With a declared
+ * `height` percentage layouts are the point, so this is left out.
  */
 export const AUTO_HEIGHT_CSS =
 	"html, body { height: auto !important; min-height: 0 !important; max-height: none !important; }";
@@ -259,7 +299,8 @@ export function buildViewSrcdoc(
 <meta http-equiv="x-dns-prefetch-control" content="off">
 <style id="s2b-theme">${themeCss}</style>
 <style>
-html, body { margin: 0; padding: 0; height: auto; }
+/* Full height so a declared \`height\` lets percentage-sized children fill the frame; auto mode overrides this below. */
+html, body { margin: 0; padding: 0; height: 100%; }
 body {
 	box-sizing: border-box;
 	background: var(--background-primary, transparent);
@@ -349,7 +390,7 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 
 export type FrameToHostMessage =
 	| { type: "ready" }
-	| { type: "resize"; height: number }
+	| { type: "resize"; height: number; extent: number }
 	| { type: "open-note"; path: string }
 	| { type: "requery" }
 	| { type: "navigated" };
@@ -364,10 +405,12 @@ export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
 		case "requery":
 		case "navigated":
 			return { type: message.type };
-		case "resize":
-			return typeof message.height === "number" && Number.isFinite(message.height)
-				? { type: "resize", height: message.height }
-				: null;
+		case "resize": {
+			const { height, extent } = message;
+			if (typeof height !== "number" || !Number.isFinite(height)) return null;
+			const validExtent = typeof extent === "number" && Number.isFinite(extent) ? extent : height;
+			return { type: "resize", height, extent: validExtent };
+		}
 		case "open-note":
 			return typeof message.path === "string" && message.path.length > 0
 				? { type: "open-note", path: message.path }

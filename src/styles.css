@@ -1665,6 +1665,11 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 .s2b-view-frame {
 	display: block;
 	width: 100%;
+	/* The host sets this frame's height to content + padding; the border must sit
+	   outside that box. With border-box (Tailwind's preflight default) the inner
+	   viewport comes out 2px shorter than what was applied, a percentage-sized child
+	   reports 2px less, and the frame shrinks 2px per round until it hits the minimum. */
+	box-sizing: content-box;
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
 	background: var(--background-primary);
