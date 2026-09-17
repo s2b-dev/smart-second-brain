@@ -11,8 +11,8 @@ import { runViewQueries } from "./viewQueries";
 import type { ViewSpec } from "./viewSpec";
 
 const LIVE_UPDATE_DEBOUNCE_MS = 400;
-const DEFAULT_AUTO_HEIGHT = 160;
-const MIN_AUTO_HEIGHT = 48;
+const DEFAULT_AUTO_HEIGHT = 96;
+const MIN_AUTO_HEIGHT = 24;
 const MAX_AUTO_HEIGHT = 4000;
 
 /**

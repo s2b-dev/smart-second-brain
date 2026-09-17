@@ -134,8 +134,10 @@ libs: plotly
   `--font-monospace`, `--font-ui-small`, `--radius-s/m`. The body already uses the
   interface font; the card around the view provides the padding, so use none of your own
   at the edges.
-- The frame follows its content height. Set `height` only when the view scrolls
-  internally or uses percentage layouts; canvases and SVGs should carry explicit sizes.
+- The frame follows its content height — prefer that. Set `height` only when the view
+  scrolls internally or sizes children by percentage (Plotly), and then make it the
+  content's real size, not a round guess: a too-large `height` shows as empty space
+  under the content. Canvases and SVGs should carry explicit sizes.
 - One screen, not a web app: a view is a dashboard, chart, table, or small widget.
   `alert`, `prompt`, and popups are blocked.
 - Guard empty results (`rows.length === 0`) with a short message instead of a blank frame.

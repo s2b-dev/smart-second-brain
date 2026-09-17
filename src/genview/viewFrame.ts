@@ -183,10 +183,23 @@ export const VIEW_RUNTIME_SCRIPT = `
 		}
 	});
 	let lastHeight = -1;
+	// Content height is the bottom edge of the body's children, not the document's
+	// own height: views routinely style html/body with height: 100% or
+	// min-height: 100vh, which inside a frame equals the frame's current height and
+	// would keep the frame from ever shrinking to short content.
+	const contentHeight = () => {
+		const body = document.body;
+		if (!body) return document.documentElement.offsetHeight;
+		let bottom = 0;
+		for (const child of body.children) {
+			const rect = child.getBoundingClientRect();
+			if (rect.height > 0 || rect.width > 0) bottom = Math.max(bottom, rect.bottom + window.scrollY);
+		}
+		const style = getComputedStyle(body);
+		return bottom + parseFloat(style.paddingBottom || "0") + parseFloat(style.marginBottom || "0");
+	};
 	const reportHeight = () => {
-		const height = Math.ceil(
-			Math.max(document.documentElement.offsetHeight, document.body ? document.body.offsetHeight : 0),
-		);
+		const height = Math.ceil(contentHeight());
 		if (height === lastHeight) return;
 		lastHeight = height;
 		send({ type: "resize", height });
