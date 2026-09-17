@@ -39,7 +39,7 @@ export class WidgetView extends FileView {
 	}
 
 	getIcon(): string {
-		return "app-window";
+		return "component";
 	}
 
 	canAcceptExtension(extension: string): boolean {
