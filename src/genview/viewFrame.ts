@@ -182,8 +182,14 @@ export const VIEW_RUNTIME_SCRIPT = `
 		const explicit = element.getAttribute("data-note");
 		if (explicit) return explicit;
 		const href = element.tagName === "A" ? element.getAttribute("href") : null;
-		if (href && !NOT_A_NOTE.test(href.trim())) return decodeURIComponent(href.trim());
-		return null;
+		if (!href || NOT_A_NOTE.test(href.trim())) return null;
+		// An href may be a raw vault path ("50% off.md") or a percent-encoded one; decode
+		// only when that is valid, otherwise the raw text is the path.
+		try {
+			return decodeURIComponent(href.trim());
+		} catch (error) {
+			return href.trim();
+		}
 	};
 	const noteLinkOf = (target) => {
 		if (!target || !target.closest) return null;
