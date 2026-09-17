@@ -1,6 +1,6 @@
 // vite.config.ts
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import { patchVendoredLib, vendoredLibPatchesFor } from "./src/genview/vendoredLibPatches";
+import { patchVendoredLib, vendoredLibPatchesFor } from "./src/widget/vendoredLibPatches";
 import { defineConfig, type Plugin } from "vite";
 import { copyFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -213,12 +213,12 @@ function shimModules(isProduction: boolean): Plugin {
 }
 
 /**
- * Serve the browser bundles a view can request (`src/genview/viewLibs.ts`) as raw text
- * with their build-time patches applied (`src/genview/vendoredLibPatches.ts`), so the
+ * Serve the browser bundles a widget can request (`src/widget/widgetLibs.ts`) as raw text
+ * with their build-time patches applied (`src/widget/vendoredLibPatches.ts`), so the
  * string literal that lands in main.js is the patched one. A `load` hook, so the file
  * never passes through Vite's own `?raw` handling unpatched.
  */
-function vendoredViewLibs(): Plugin {
+function vendoredWidgetLibs(): Plugin {
 	return {
 		name: "vendored-view-libs",
 		enforce: "pre",
@@ -248,7 +248,7 @@ export default defineConfig(({ mode }) => {
 	return {
 		plugins: [
 			shimModules(!isDevelopment),
-			vendoredViewLibs(),
+			vendoredWidgetLibs(),
 			svelte({
 				preprocess: vitePreprocess(),
 				onwarn: (warning, handler) => {

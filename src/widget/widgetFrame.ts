@@ -1,7 +1,7 @@
 /**
- * The frame a view renders in, and the bridge between it and the host.
+ * The frame a widget renders in, and the bridge between it and the host.
  *
- * A view is model-written HTML and JavaScript. On desktop the Obsidian renderer has
+ * A widget is model-written HTML and JavaScript. On desktop the Obsidian renderer has
  * Node integration, so that code must never run in Obsidian's own document: it runs in
  * an `<iframe sandbox="allow-scripts" srcdoc>` — opaque origin, no parent DOM, no Node —
  * under a Content-Security-Policy that allows nothing but inline script and style. That
@@ -18,7 +18,7 @@
  * (verified in Obsidian's Electron: the `securitypolicyviolation` event fires on the
  * parent with `violatedDirective: frame-src` and the target URL as `blockedURI`). Obsidian's
  * own document has no CSP and must not get one (it would break every other plugin's
- * iframes), so the view is wrapped in a trusted **outer** frame — plugin code only, with
+ * iframes), so the widget is wrapped in a trusted **outer** frame — plugin code only, with
  * `frame-src 'none'` — that hosts the model-written **inner** frame. `about:srcdoc` is
  * exempt from `frame-src`, so the inner still loads; anything it navigates to is refused.
  *
@@ -28,8 +28,8 @@
  *
  * ## Bridge
  *
- * Both directions are `postMessage` with a fixed, tagged shape (`s2bView: true`).
- * Host → view: `data` (query results) and `theme` (CSS variables). View → host: `ready`,
+ * Both directions are `postMessage` with a fixed, tagged shape (`s2bWidget: true`).
+ * Host → widget: `data` (query results) and `theme` (CSS variables). Widget → host: `ready`,
  * `resize`, `open-note`, `hover-note`, `requery`; outer → host additionally `navigated`.
  * Every hop checks `event.source` against the one window it accepts from. Nothing else
  * crosses.
@@ -38,37 +38,37 @@
  *
  * Any element with `data-note="<path>"` is a note link: the runtime opens it on click and
  * reports its rectangle on hover, and the host lays an invisible proxy element over that
- * rectangle and hands it to Obsidian's page preview — so a link inside a view previews
+ * rectangle and hands it to Obsidian's page preview — so a link inside a widget previews
  * exactly like one in a note. `s2b.openNote(path)` stays for programmatic opening.
  *
  * Known residual: hostname-based side channels that CSP does not govern (DNS prefetch
- * hints). `x-dns-prefetch-control: off` is set in the inner document; a view is still
+ * hints). `x-dns-prefetch-control: off` is set in the inner document; a widget is still
  * model-authored code and should be treated with the same trust as the agent's tools.
  */
 
 /**
- * DOM event a rendered view dispatches (bubbling) on its block once its document
- * reported `ready`; the frame also gets `data-s2b-view-ready`. The chat renderer uses
- * both to hold a settling document off-screen until its views are showing.
+ * DOM event a rendered widget dispatches (bubbling) on its block once its document
+ * reported `ready`; the frame also gets `data-s2b-widget-ready`. The chat renderer uses
+ * both to hold a settling document off-screen until its widgets are showing.
  */
-export const VIEW_READY_EVENT = "s2b-view-ready";
+export const WIDGET_READY_EVENT = "s2b-widget-ready";
 
-/** Inner (view) document: only inline script/style and data/blob media; no network, no navigation targets. */
-export const VIEW_CSP =
+/** Inner (widget) document: only inline script/style and data/blob media; no network, no navigation targets. */
+export const WIDGET_CSP =
 	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
 
 /**
- * Space between the card border and the view's content, in px. Lives in the trusted outer
- * document — a view's own `body { padding: 0 }` (which models write reflexively) cannot
+ * Space between the card border and the widget's content, in px. Lives in the trusted outer
+ * document — a widget's own `body { padding: 0 }` (which models write reflexively) cannot
  * remove it — so the host adds twice this to every content height it applies to the frame.
  */
-export const VIEW_FRAME_PADDING_PX = 12;
+export const WIDGET_FRAME_PADDING_PX = 12;
 
 /** Outer (relay) document: inline script/style only, and no frame may be navigated anywhere. */
 export const OUTER_FRAME_CSP =
 	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src 'none'; form-action 'none'; base-uri 'none'";
 
-/** Obsidian CSS variables copied into the frame so a view tracks the user's theme. */
+/** Obsidian CSS variables copied into the frame so a widget tracks the user's theme. */
 export const THEME_VARIABLES: readonly string[] = [
 	"--background-primary",
 	"--background-primary-alt",
@@ -143,19 +143,19 @@ export function collectThemeCss(doc: Document = document): string {
 }
 
 /**
- * The script that runs first inside every view document. It installs the `s2b` global
- * the view's own code talks to, listens for relayed host messages, and reports its
+ * The script that runs first inside every widget document. It installs the `s2b` global
+ * the widget's own code talks to, listens for relayed host messages, and reports its
  * content height so the host can size the frame. `ready` is sent from the window's
  * `load` event on purpose: the outer frame treats any load after `ready` as a
  * navigation, so `ready` must not precede the document's own load. Kept
  * dependency-free and free of `${}` so it can be a plain template literal.
  */
-export const VIEW_RUNTIME_SCRIPT = `
+export const WIDGET_RUNTIME_SCRIPT = `
 (() => {
 	const listeners = [];
 	let data = null;
 	const send = (message) => {
-		window.parent.postMessage(Object.assign({ s2bView: true }, message), "*");
+		window.parent.postMessage(Object.assign({ s2bWidget: true }, message), "*");
 	};
 	window.s2b = {
 		get data() {
@@ -226,7 +226,7 @@ export const VIEW_RUNTIME_SCRIPT = `
 	window.addEventListener("message", (event) => {
 		if (event.source !== window.parent) return;
 		const message = event.data;
-		if (!message || message.s2bView !== true) return;
+		if (!message || message.s2bWidget !== true) return;
 		if (message.type === "data") {
 			data = message.data;
 			for (const callback of listeners) {
@@ -320,7 +320,7 @@ export const VIEW_RUNTIME_SCRIPT = `
 `;
 
 /**
- * Applied in auto-height mode: the base style (and views themselves, with `height: 100%`
+ * Applied in auto-height mode: the base style (and widgets themselves, with `height: 100%`
  * or `min-height: 100vh`) size html/body to the frame, which inside a frame equals its
  * current height and would keep it from ever shrinking to short content (and would make
  * percentage-sized children fill the frame instead of their content). With a declared
@@ -340,10 +340,10 @@ export function escapeInlineScript(source: string): string {
 
 /**
  * The inner document: CSP, theme, base styles, runtime, the requested libraries, then
- * the view's own body. Libraries are inlined whole (see `viewLibs.ts`); a sandboxed frame
+ * the widget's own body. Libraries are inlined whole (see `viewLibs.ts`); a sandboxed frame
  * has nowhere else to load them from.
  */
-export function buildViewSrcdoc(
+export function buildWidgetSrcdoc(
 	body: string,
 	themeCss: string,
 	libSources: readonly string[] = [],
@@ -354,7 +354,7 @@ export function buildViewSrcdoc(
 <html>
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">
+<meta http-equiv="Content-Security-Policy" content="${WIDGET_CSP}">
 <meta http-equiv="x-dns-prefetch-control" content="off">
 <style id="s2b-theme">${themeCss}</style>
 <style>
@@ -372,7 +372,7 @@ body {
 a { color: var(--text-accent, inherit); cursor: pointer; }
 ${autoHeight ? AUTO_HEIGHT_CSS : ""}
 </style>
-<script>${VIEW_RUNTIME_SCRIPT}</script>
+<script>${WIDGET_RUNTIME_SCRIPT}</script>
 ${libScripts}
 </head>
 <body>
@@ -385,7 +385,7 @@ ${body}
  * The outer document's script: creates the inner frame from the embedded `INNER`
  * srcdoc, relays bridge messages between the host and the inner frame, and retires
  * the inner frame on any load after `ready` (a navigation the CSP backstop did not
- * catch). Free of `${}`; `INNER` is defined by {@link buildViewFrameSrcdoc}.
+ * catch). Free of `${}`; `INNER` is defined by {@link buildWidgetFrameSrcdoc}.
  */
 export const OUTER_RELAY_SCRIPT = `
 (() => {
@@ -401,11 +401,11 @@ export const OUTER_RELAY_SCRIPT = `
 		if (!ready || retired) return;
 		retired = true;
 		frame.remove();
-		toHost({ s2bView: true, type: "navigated" });
+		toHost({ s2bWidget: true, type: "navigated" });
 	});
 	window.addEventListener("message", (event) => {
 		const message = event.data;
-		if (retired || !message || message.s2bView !== true) return;
+		if (retired || !message || message.s2bWidget !== true) return;
 		if (event.source === window.parent) {
 			if (frame.contentWindow) frame.contentWindow.postMessage(message, "*");
 		} else if (event.source === frame.contentWindow) {
@@ -423,8 +423,8 @@ function scriptStringLiteral(value: string): string {
 	return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-/** The full `srcdoc` for a view: the trusted outer relay frame wrapping the inner view document. */
-export function buildViewFrameSrcdoc(
+/** The full `srcdoc` for a widget: the trusted outer relay frame wrapping the inner widget document. */
+export function buildWidgetFrameSrcdoc(
 	body: string,
 	themeCss: string,
 	libSources: readonly string[] = [],
@@ -437,12 +437,12 @@ export function buildViewFrameSrcdoc(
 <meta http-equiv="Content-Security-Policy" content="${OUTER_FRAME_CSP}">
 <style>
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
-body { box-sizing: border-box; padding: ${VIEW_FRAME_PADDING_PX}px; }
+body { box-sizing: border-box; padding: ${WIDGET_FRAME_PADDING_PX}px; }
 iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>
 <body>
-<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss, libSources, autoHeight))};${OUTER_RELAY_SCRIPT}</script>
+<script>const INNER = ${scriptStringLiteral(buildWidgetSrcdoc(body, themeCss, libSources, autoHeight))};${OUTER_RELAY_SCRIPT}</script>
 </body>
 </html>`;
 }
@@ -450,7 +450,7 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 export interface HoverNoteMessage {
 	type: "hover-note";
 	path: string;
-	/** The link's box in the view document's viewport coordinates. */
+	/** The link's box in the widget document's viewport coordinates. */
 	rect: { x: number; y: number; width: number; height: number };
 	ctrlKey: boolean;
 	metaKey: boolean;
@@ -478,7 +478,7 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === "nu
 export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
 	if (typeof data !== "object" || data === null) return null;
 	const message = data as Record<string, unknown>;
-	if (message.s2bView !== true) return null;
+	if (message.s2bWidget !== true) return null;
 	switch (message.type) {
 		case "ready":
 		case "requery":

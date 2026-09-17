@@ -2,7 +2,7 @@
 import { Component, Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
 import { onDestroy } from "svelte";
 import { getPlugin } from "../../stores/state.svelte";
-import { VIEW_READY_EVENT } from "../../genview/viewFrame";
+import { WIDGET_READY_EVENT } from "../../widget/widgetFrame";
 import { findSealableEnd } from "../../utils/streamingMarkdown";
 import { openTagSearch } from "../../utils/tagSearch";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
@@ -159,14 +159,14 @@ function normalizeLinks(containerEl: HTMLElement) {
 // thread for the duration of a long reply (#482). The tail's staging element
 // carries `s2b-md-tail` while it renders, so a block processor can tell "still
 // being written" (show a placeholder) from "sealed" (render for real) — see
-// `genview/registerViewBlocks.ts`.
+// `widget/registerWidgetBlocks.ts`.
 //
 // Outside streaming — a settled reply's first render, and the moment a streamed
 // reply settles — the content is rendered as one document, so every construct
 // resolves exactly as a whole-document parse does (reference definitions, HTML
 // blocks and loose lists that a seam between segments would cut). That render is
 // double-buffered: it happens in a hidden wrapper while the previous DOM stays on
-// screen, and swaps in once the wrapper's view frames report ready (capped), so
+// screen, and swaps in once the wrapper's widget frames report ready (capped), so
 // settling never blanks a frame that was already showing. The wrapper is then
 // unwrapped so the container stays flat (call sites style with direct-child
 // selectors such as `[&>p]`) — unless it holds an iframe, which a DOM move would
@@ -175,7 +175,7 @@ function normalizeLinks(containerEl: HTMLElement) {
 const TAIL_CLASS = "s2b-md-tail";
 const DOC_CLASS = "s2b-md-doc";
 const DOC_PENDING_CLASS = "s2b-md-doc-pending";
-/** Upper bound on waiting for a settled document's view frames before swapping it in. */
+/** Upper bound on waiting for a settled document's widget frames before swapping it in. */
 const VIEW_READY_GRACE_MS = 2000;
 
 let latest = { content: "", sourcePath: "", enableMath: true, streaming: false };
@@ -191,7 +191,7 @@ let tailNodes: ChildNode[] = [];
 let settled = false;
 /**
  * Owners of the render children Obsidian's processors attach to rendered blocks
- * (Dataview tables, `s2b-view` frames, embeds). Handing the renderer the plugin
+ * (Dataview tables, `s2b-widget` frames, embeds). Handing the renderer the plugin
  * itself kept every such child alive until plugin unload; these are unloaded when
  * the DOM they belong to goes away — the tail's on every tail render, the
  * document's on reset, swap and destroy.
@@ -296,20 +296,20 @@ async function renderDocument(text: string, path: string) {
 	settled = true;
 }
 
-/** Resolve once every view frame under `root` has reported ready, or after the grace period. */
+/** Resolve once every widget frame under `root` has reported ready, or after the grace period. */
 function waitForViews(root: HTMLElement): Promise<void> {
-	let pending = root.querySelectorAll(".s2b-view-frame:not([data-s2b-view-ready])").length;
+	let pending = root.querySelectorAll(".s2b-widget-frame:not([data-s2b-widget-ready])").length;
 	if (pending === 0) return Promise.resolve();
 	return new Promise((resolve) => {
 		const finish = () => {
-			root.removeEventListener(VIEW_READY_EVENT, onReady);
+			root.removeEventListener(WIDGET_READY_EVENT, onReady);
 			window.clearTimeout(timer);
 			resolve();
 		};
 		const onReady = () => {
 			if (--pending <= 0) finish();
 		};
-		root.addEventListener(VIEW_READY_EVENT, onReady);
+		root.addEventListener(WIDGET_READY_EVENT, onReady);
 		const timer = window.setTimeout(finish, VIEW_READY_GRACE_MS);
 	});
 }

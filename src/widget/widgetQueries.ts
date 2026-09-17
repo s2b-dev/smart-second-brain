@@ -1,5 +1,5 @@
 /**
- * Runs a view's declared queries on the host and turns the results into plain JSON
+ * Runs a widget's declared queries on the host and turns the results into plain JSON
  * the frame can consume. The frame never sees the vault, Dataview, or `app`: it gets
  * exactly what these queries return, as structured-clone-safe data.
  *
@@ -11,21 +11,21 @@
 import type { App } from "obsidian";
 import { resolvePluginApi } from "../agent/integrations/pluginIntegrations";
 
-export type ViewQueryResult =
+export type WidgetQueryResult =
 	| { type: "table"; headers: string[]; rows: unknown[][] }
 	| { type: "list"; items: unknown[] }
 	| { type: "task"; items: unknown[] }
 	| { type: "calendar"; items: unknown[] }
 	| { error: string };
 
-export type ViewQueryResults = Record<string, ViewQueryResult>;
+export type WidgetQueryResults = Record<string, WidgetQueryResult>;
 
 interface DataviewQueryApi {
 	query(source: string, originFile?: string): Promise<{ successful: boolean; value?: unknown; error?: string }>;
 }
 
 export const DATAVIEW_PLUGIN_ID = "dataview";
-export const DATAVIEW_MISSING_ERROR = "The Dataview plugin is not enabled, so this view's queries cannot run.";
+export const DATAVIEW_MISSING_ERROR = "The Dataview plugin is not enabled, so this widget's queries cannot run.";
 
 const MAX_DEPTH = 6;
 const MAX_ARRAY_ITEMS = 1000;
@@ -33,13 +33,13 @@ const MAX_OBJECT_KEYS = 100;
 const MAX_STRING_LENGTH = 10_000;
 
 /** Run every query in `queries`; a failed query yields `{ error }` rather than failing the set. */
-export async function runViewQueries(
+export async function runWidgetQueries(
 	app: App,
 	queries: Record<string, string>,
 	sourcePath: string,
-): Promise<ViewQueryResults> {
+): Promise<WidgetQueryResults> {
 	const names = Object.keys(queries);
-	const results: ViewQueryResults = {};
+	const results: WidgetQueryResults = {};
 	if (names.length === 0) return results;
 
 	const api = resolvePluginApi(app, DATAVIEW_PLUGIN_ID) as DataviewQueryApi | null;
@@ -61,7 +61,7 @@ export async function runViewQueries(
 	return results;
 }
 
-function toViewResult(value: unknown): ViewQueryResult {
+function toViewResult(value: unknown): WidgetQueryResult {
 	if (typeof value !== "object" || value === null) return { error: "Query returned no result." };
 	const result = value as { type?: unknown; headers?: unknown; values?: unknown };
 	switch (result.type) {

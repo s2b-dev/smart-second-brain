@@ -40,7 +40,7 @@ export interface LoadSkillToolOptions {
 	/**
 	 * Live status of a community plugin a skill lists under `metadata.optionalPlugins`.
 	 * Appended to the loaded body so a skill whose *best* path depends on another
-	 * plugin (the views skill's Dataview queries) can tell the model up front whether
+	 * plugin (the widgets skill's Dataview queries) can tell the model up front whether
 	 * that path exists, instead of letting it find out from a failed result.
 	 */
 	pluginStatus?: (pluginId: string) => { status: CommunityPluginStatus; displayName: string };

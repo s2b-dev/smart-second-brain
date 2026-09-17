@@ -220,7 +220,7 @@ describe("manageNotes tool (update operations)", () => {
 			THREAD_CONFIG,
 		);
 
-		expect(result).toContain("Only notes (.md) and views (.view)");
+		expect(result).toContain("Only notes (.md) and views (.widget)");
 		expect(mockAddChanges).not.toHaveBeenCalled();
 	});
 

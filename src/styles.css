@@ -1658,40 +1658,40 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	pointer-events: none;
 }
 
-/* ---- Agent-generated views (`s2b-view` fences, src/genview) ---------------- */
-.s2b-view {
+/* ---- Agent-generated widgets (`s2b-widget` fences, src/widget) ---------------- */
+.s2b-widget {
 	position: relative;
 	margin: var(--size-4-2) 0;
 }
-/* ---- A view as its own leaf (views/gen-view) ---- */
-.view-content.s2b-gen-view {
+/* ---- A widget as its own leaf (views/widget) ---- */
+.view-content.s2b-widget-view {
 	padding: 0;
 }
-.s2b-gen-view-body {
+.s2b-widget-view-body {
 	position: relative;
 	height: 100%;
 }
-/* Invisible stand-in for a hovered note link inside a frame (see ViewRenderChild). */
-.s2b-view-hover-proxy {
+/* Invisible stand-in for a hovered note link inside a frame (see WidgetRenderChild). */
+.s2b-widget-hover-proxy {
 	position: absolute;
 	z-index: 1;
 	cursor: pointer;
 	background: transparent;
 }
-.s2b-view-frame.s2b-view-fill {
-	--s2b-view-border-width: 0px;
+.s2b-widget-frame.s2b-widget-fill {
+	--s2b-widget-border-width: 0px;
 	height: 100%;
 	border: 0;
 	border-radius: 0;
 }
-.s2b-gen-view-source {
+.s2b-widget-view-source {
 	display: flex;
 	flex-direction: column;
 	gap: var(--size-4-2);
 	height: 100%;
 	padding: var(--size-4-3);
 }
-.s2b-gen-view-source-text {
+.s2b-widget-view-source-text {
 	flex: 1;
 	width: 100%;
 	resize: none;
@@ -1699,12 +1699,12 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	font-size: var(--font-smaller);
 	line-height: 1.5;
 }
-.s2b-gen-view-source-bar {
+.s2b-widget-view-source-bar {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-2);
 }
-.s2b-gen-view-source-hint {
+.s2b-widget-view-source-hint {
 	display: flex;
 	align-items: center;
 	gap: var(--size-2-2);
@@ -1712,11 +1712,11 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
-.s2b-gen-view-source-stale {
+.s2b-widget-view-source-stale {
 	margin-left: 0;
 	color: var(--text-warning);
 }
-.s2b-view-frame {
+.s2b-widget-frame {
 	display: block;
 	/* The host sets this frame's height to content + padding; the border must sit
 	   outside that box. With border-box (Tailwind's preflight default) the inner
@@ -1726,19 +1726,19 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	   room for it — otherwise the card overflows its column by 2px and the message
 	   grows a horizontal scrollbar. */
 	box-sizing: content-box;
-	--s2b-view-border-width: 1px;
-	width: calc(100% - 2 * var(--s2b-view-border-width));
-	border: var(--s2b-view-border-width) solid var(--background-modifier-border);
+	--s2b-widget-border-width: 1px;
+	width: calc(100% - 2 * var(--s2b-widget-border-width));
+	border: var(--s2b-widget-border-width) solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
 	background: var(--background-primary);
 }
-.s2b-view-toolbar {
+.s2b-widget-toolbar {
 	display: flex;
 	align-items: center;
 	gap: var(--size-4-1);
 	margin-bottom: var(--size-4-1);
 }
-.s2b-view-toolbar-title {
+.s2b-widget-toolbar-title {
 	flex: 1;
 	min-width: 0;
 	overflow: hidden;
@@ -1747,7 +1747,7 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	font-size: var(--font-ui-small);
 	color: var(--text-muted);
 }
-.s2b-view-blocked {
+.s2b-widget-blocked {
 	padding: var(--size-4-4);
 	border: 1px dashed var(--text-error);
 	border-radius: var(--radius-m);
@@ -1755,9 +1755,9 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	color: var(--text-error);
 }
 /* One blank rounded card lit by the same faint→bright→faint band that sweeps the
-   thinking-process header, with the label centred in it: "a view is being drawn
+   thinking-process header, with the label centred in it: "a widget is being drawn
    here", without implying what kind. */
-.s2b-view-placeholder {
+.s2b-widget-placeholder {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -1773,9 +1773,9 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 		var(--background-modifier-border) 100%
 	);
 	background-size: 220% 100%;
-	animation: s2b-view-sweep 1.8s linear infinite;
+	animation: s2b-widget-sweep 1.8s linear infinite;
 }
-.s2b-view-placeholder-label {
+.s2b-widget-placeholder-label {
 	font-size: var(--font-ui-small);
 	background: linear-gradient(
 		100deg,
@@ -1790,9 +1790,9 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	-webkit-background-clip: text;
 	color: transparent;
 	-webkit-text-fill-color: transparent;
-	animation: s2b-view-sweep 1.8s linear infinite;
+	animation: s2b-widget-sweep 1.8s linear infinite;
 }
-@keyframes s2b-view-sweep {
+@keyframes s2b-widget-sweep {
 	0% {
 		background-position: 130% 0;
 	}
@@ -1801,18 +1801,18 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	}
 }
 @media (prefers-reduced-motion: reduce) {
-	.s2b-view-placeholder {
+	.s2b-widget-placeholder {
 		animation: none;
 		background: var(--background-modifier-border);
 	}
-	.s2b-view-placeholder-label {
+	.s2b-widget-placeholder-label {
 		animation: none;
 		background: none;
 		color: var(--text-muted);
 		-webkit-text-fill-color: var(--text-muted);
 	}
 }
-@keyframes s2b-view-pulse {
+@keyframes s2b-widget-pulse {
 	0%,
 	100% {
 		opacity: 0.55;
@@ -1822,8 +1822,8 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	}
 }
 @media (prefers-reduced-motion: reduce) {
-	.s2b-view-skeleton-bar,
-	.s2b-view-placeholder-label {
+	.s2b-widget-skeleton-bar,
+	.s2b-widget-placeholder-label {
 		animation: none;
 	}
 }

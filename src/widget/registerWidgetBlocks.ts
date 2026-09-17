@@ -2,38 +2,44 @@ import { type App, Notice, normalizePath, setIcon, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
-import { VIEW_FILE_EXTENSION } from "../views/gen-view/GenView";
-import { ViewRenderChild } from "./ViewRenderChild";
-import { resolveViewLibs, VIEW_LIBS } from "./viewLibs";
-import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wrapViewFence } from "./viewSpec";
+import { WIDGET_FILE_EXTENSION } from "../views/widget/WidgetView";
+import { WidgetRenderChild } from "./WidgetRenderChild";
+import { resolveWidgetLibs, WIDGET_LIBS } from "./widgetLibs";
+import {
+	parseWidgetSpec,
+	WIDGET_BLOCK_LANGUAGE,
+	type WidgetSpec,
+	widgetFileBasename,
+	wrapWidgetFence,
+} from "./widgetSpec";
 
 /**
  * Set on the chat renderer's staging element for the still-streaming tail of a reply
  * (`MarkdownRenderer.svelte`). An unclosed fence renders as a code block on every
- * frame of the stream, so without this guard a half-written view would spin up a
+ * frame of the stream, so without this guard a half-written widget would spin up a
  * fresh iframe (and run half a script) per token. Once the fence closes and its
  * paragraph is sealed it renders outside the tail, and the frame appears right then —
  * not only when the whole reply has settled.
  */
 export const STREAMING_TAIL_CLASS = "s2b-md-tail";
 
-/** Must match the `s2b-view-sweep` keyframes duration in styles.css. */
+/** Must match the `s2b-widget-sweep` keyframes duration in styles.css. */
 const SWEEP_PERIOD_MS = 1800;
 
-/** Register the `s2b-view` code-block processor. Applies everywhere markdown renders. */
-export function registerViewBlocks(plugin: SecondBrainPlugin): void {
-	plugin.registerMarkdownCodeBlockProcessor(VIEW_BLOCK_LANGUAGE, (source, el, ctx) => {
-		el.addClass("s2b-view");
+/** Register the `s2b-widget` code-block processor. Applies everywhere markdown renders. */
+export function registerWidgetBlocks(plugin: SecondBrainPlugin): void {
+	plugin.registerMarkdownCodeBlockProcessor(WIDGET_BLOCK_LANGUAGE, (source, el, ctx) => {
+		el.addClass("s2b-widget");
 		if (el.closest(`.${STREAMING_TAIL_CLASS}`)) {
 			renderPlaceholder(el);
 			return;
 		}
-		const spec = parseViewSpec(source);
-		const { unknown } = resolveViewLibs(spec.libs);
+		const spec = parseWidgetSpec(source);
+		const { unknown } = resolveWidgetLibs(spec.libs);
 		if (unknown.length > 0) {
 			el.createDiv({
-				cls: "s2b-view-blocked",
-				text: `This view asks for a library that is not bundled: ${unknown.join(", ")}. Available: ${Object.keys(VIEW_LIBS).join(", ")}.`,
+				cls: "s2b-widget-blocked",
+				text: `This widget asks for a library that is not bundled: ${unknown.join(", ")}. Available: ${Object.keys(WIDGET_LIBS).join(", ")}.`,
 			});
 			return;
 		}
@@ -42,7 +48,7 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 		if (el.closest(`.workspace-leaf-content[data-type="${VIEW_TYPE_CHAT}"]`)) {
 			renderChatToolbar(plugin, el, spec, source);
 		}
-		ctx.addChild(new ViewRenderChild(el, plugin.app, spec, ctx.sourcePath));
+		ctx.addChild(new WidgetRenderChild(el, plugin.app, spec, ctx.sourcePath));
 	});
 }
 
@@ -54,25 +60,26 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
  * animation rather than restarting with each rebuild.
  */
 function renderPlaceholder(el: HTMLElement): void {
-	const placeholder = el.createDiv({ cls: "s2b-view-placeholder" });
+	const placeholder = el.createDiv({ cls: "s2b-widget-placeholder" });
 	const phase = `-${Math.round(performance.now() % SWEEP_PERIOD_MS)}ms`;
 	placeholder.style.animationDelay = phase;
-	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" }).style.animationDelay = phase;
+	placeholder.createDiv({ cls: "s2b-widget-placeholder-label", text: "Generating widget…" }).style.animationDelay =
+		phase;
 }
 
 /**
- * Two ways to keep a view from the chat: copy it as a fence to paste inline into a
- * note, or save it as a standalone `.view` file — which opens as its own pane, is
- * embeddable with `![[name.view]]`, and stays out of the search indexes.
+ * Two ways to keep a widget from the chat: copy it as a fence to paste inline into a
+ * note, or save it as a standalone `.widget` file — which opens as its own pane, is
+ * embeddable with `![[name.widget]]`, and stays out of the search indexes.
  */
-function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {
-	const bar = el.createDiv({ cls: "s2b-view-toolbar" });
-	bar.createSpan({ cls: "s2b-view-toolbar-title", text: spec.title ?? "View" });
+function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: WidgetSpec, source: string): void {
+	const bar = el.createDiv({ cls: "s2b-widget-toolbar" });
+	bar.createSpan({ cls: "s2b-widget-toolbar-title", text: spec.title ?? "Widget" });
 	// Saving twice from the same block would create a second file: share one in-flight
 	// save, and forget it only if it failed.
 	let saving: Promise<TFile> | null = null;
 	const save = (): Promise<TFile> => {
-		saving ??= saveViewFile(plugin.app, getData().viewsFolder, spec, source).catch((error: unknown) => {
+		saving ??= saveWidgetFile(plugin.app, getData().widgetsFolder, spec, source).catch((error: unknown) => {
 			saving = null;
 			throw error;
 		});
@@ -80,15 +87,15 @@ function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: Vie
 	};
 
 	iconButton(bar, "copy", "Copy as block to paste into a note", async () => {
-		await navigator.clipboard.writeText(wrapViewFence(source));
-		new Notice("View block copied. Paste it into any note.");
+		await navigator.clipboard.writeText(wrapWidgetFence(source));
+		new Notice("Widget block copied. Paste it into any note.");
 	});
-	iconButton(bar, "save", "Save as a view file and open it", async () => {
+	iconButton(bar, "save", "Save as a widget file and open it", async () => {
 		try {
 			const file = await save();
 			await plugin.app.workspace.getLeaf("tab").openFile(file);
 		} catch (error) {
-			new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(`Could not save widget: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	});
 }
@@ -108,14 +115,14 @@ function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (
 	});
 }
 
-/** Write the view as `<folder>/<title>.view`, suffixing the name on collision. */
-export async function saveViewFile(app: App, folder: string, spec: ViewSpec, source: string): Promise<TFile> {
-	const folderPath = normalizePath(folder || "Views");
+/** Write the widget as `<folder>/<title>.widget`, suffixing the name on collision. */
+export async function saveWidgetFile(app: App, folder: string, spec: WidgetSpec, source: string): Promise<TFile> {
+	const folderPath = normalizePath(folder || "Widgets");
 	await ensureFolder(app, folderPath);
-	const base = viewFileBasename(spec.title);
-	let path = normalizePath(`${folderPath}/${base}.${VIEW_FILE_EXTENSION}`);
+	const base = widgetFileBasename(spec.title);
+	let path = normalizePath(`${folderPath}/${base}.${WIDGET_FILE_EXTENSION}`);
 	for (let n = 2; app.vault.getAbstractFileByPath(path); n++) {
-		path = normalizePath(`${folderPath}/${base} ${n}.${VIEW_FILE_EXTENSION}`);
+		path = normalizePath(`${folderPath}/${base} ${n}.${WIDGET_FILE_EXTENSION}`);
 	}
 	return app.vault.create(path, `${source.trim()}\n`);
 }

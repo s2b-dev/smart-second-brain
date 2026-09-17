@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
-import { DATAVIEW_MISSING_ERROR, runViewQueries, serializeDataviewValue } from "../../src/genview/viewQueries";
+import { DATAVIEW_MISSING_ERROR, runWidgetQueries, serializeDataviewValue } from "../../src/widget/widgetQueries";
 
 function appWithDataview(api: unknown): App {
 	return { plugins: { plugins: api ? { dataview: { api } } : {} } } as unknown as App;
@@ -54,13 +54,13 @@ describe("serializeDataviewValue", () => {
 	});
 });
 
-describe("runViewQueries", () => {
-	it("returns nothing for a view without queries and never touches Dataview", async () => {
-		expect(await runViewQueries(appWithDataview(null), {}, "x.md")).toEqual({});
+describe("runWidgetQueries", () => {
+	it("returns nothing for a widget without queries and never touches Dataview", async () => {
+		expect(await runWidgetQueries(appWithDataview(null), {}, "x.md")).toEqual({});
 	});
 
 	it("reports a missing Dataview plugin per query", async () => {
-		const results = await runViewQueries(appWithDataview(null), { a: "LIST", b: "TABLE" }, "x.md");
+		const results = await runWidgetQueries(appWithDataview(null), { a: "LIST", b: "TABLE" }, "x.md");
 		expect(results).toEqual({ a: { error: DATAVIEW_MISSING_ERROR }, b: { error: DATAVIEW_MISSING_ERROR } });
 	});
 
@@ -82,7 +82,7 @@ describe("runViewQueries", () => {
 			if (source.startsWith("BOOM")) throw new Error("kaboom");
 			return { successful: false, error: "  bad query " };
 		});
-		const results = await runViewQueries(
+		const results = await runWidgetQueries(
 			appWithDataview({ query }),
 			{ t: "TABLE n FROM #x", l: "LIST", e: "BOOM", f: "nope" },
 			"Notes/origin.md",

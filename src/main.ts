@@ -29,10 +29,10 @@ import { setPlugin } from "./stores/state.svelte";
 import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
-import { registerViewBlocks } from "./genview/registerViewBlocks";
-import { VIEW_HOVER_SOURCE } from "./genview/ViewRenderChild";
-import { GenView, VIEW_FILE_EXTENSION, VIEW_TYPE_GEN_VIEW } from "./views/gen-view/GenView";
-import { registerViewEmbed, unregisterViewEmbed } from "./views/gen-view/viewEmbed";
+import { registerWidgetBlocks } from "./widget/registerWidgetBlocks";
+import { WIDGET_HOVER_SOURCE } from "./widget/WidgetRenderChild";
+import { WidgetView, WIDGET_FILE_EXTENSION, VIEW_TYPE_WIDGET } from "./views/widget/WidgetView";
+import { registerWidgetEmbed, unregisterWidgetEmbed } from "./views/widget/widgetEmbed";
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
@@ -482,13 +482,13 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
-		// `.view` files: a standalone view as its own leaf, plus `![[x.view]]` embeds and
-		// hover previews (see views/gen-view/). Torn down in onunload with the chat's.
-		this.registerView(VIEW_TYPE_GEN_VIEW, (leaf) => new GenView(leaf, this));
-		this.registerExtensions([VIEW_FILE_EXTENSION], VIEW_TYPE_GEN_VIEW);
-		registerViewEmbed(this);
-		// Note links inside view frames (`data-note`) preview like links in a note.
-		this.registerHoverLinkSource(VIEW_HOVER_SOURCE, { display: "S2B Views", defaultMod: false });
+		// `.widget` files: a standalone widget as its own leaf, plus `![[x.widget]]` embeds and
+		// hover previews (see views/widget/). Torn down in onunload with the chat's.
+		this.registerView(VIEW_TYPE_WIDGET, (leaf) => new WidgetView(leaf, this));
+		this.registerExtensions([WIDGET_FILE_EXTENSION], VIEW_TYPE_WIDGET);
+		registerWidgetEmbed(this);
+		// Note links inside widget frames (`data-note`) preview like links in a note.
+		this.registerHoverLinkSource(WIDGET_HOVER_SOURCE, { display: "S2B Widgets", defaultMod: false });
 
 		if (this.manifest.dir === undefined) {
 			this.unload();
@@ -822,9 +822,9 @@ export default class SecondBrainPlugin extends Plugin {
 		// Register reading view diff highlighting
 		this.registerMarkdownPostProcessor(createReadingViewDiffPostProcessor(this));
 
-		// Render `s2b-view` fences (agent-generated views) as sandboxed frames — in
+		// Render `s2b-widget` fences (agent-generated widgets) as sandboxed frames — in
 		// chat replies, notes, and embeds alike.
-		registerViewBlocks(this);
+		registerWidgetBlocks(this);
 
 		// Re-render reading views when pending changes update. `rerender(true)`
 		// rebuilds the preview from scratch and Obsidian re-asserts its OWN scroll
@@ -889,9 +889,9 @@ export default class SecondBrainPlugin extends Plugin {
 		// during unload.
 		(
 			this.app as typeof this.app & { viewRegistry?: { unregisterExtensions?: (extensions: string[]) => void } }
-		).viewRegistry?.unregisterExtensions?.(["chat", VIEW_FILE_EXTENSION]);
+		).viewRegistry?.unregisterExtensions?.(["chat", WIDGET_FILE_EXTENSION]);
 		unregisterChatEmbed(this);
-		unregisterViewEmbed(this);
+		unregisterWidgetEmbed(this);
 	}
 
 	async createNewChat() {

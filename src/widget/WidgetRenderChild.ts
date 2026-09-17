@@ -1,15 +1,15 @@
 import { type App, type EventRef, type HoverPopover, Keymap, MarkdownRenderChild } from "obsidian";
 import {
-	buildViewFrameSrcdoc,
+	buildWidgetFrameSrcdoc,
 	collectThemeCss,
 	type HoverNoteMessage,
 	parseFrameMessage,
-	VIEW_FRAME_PADDING_PX,
-	VIEW_READY_EVENT,
-} from "./viewFrame";
-import { resolveViewLibs } from "./viewLibs";
-import { runViewQueries } from "./viewQueries";
-import type { ViewSpec } from "./viewSpec";
+	WIDGET_FRAME_PADDING_PX,
+	WIDGET_READY_EVENT,
+} from "./widgetFrame";
+import { resolveWidgetLibs } from "./widgetLibs";
+import { runWidgetQueries } from "./widgetQueries";
+import type { WidgetSpec } from "./widgetSpec";
 
 const LIVE_UPDATE_DEBOUNCE_MS = 400;
 const DEFAULT_AUTO_HEIGHT = 96;
@@ -25,20 +25,20 @@ const MAX_AUTO_HEIGHT = 4000;
 const REFRESH_EVENTS = ["changed", "dataview:metadata-change", "dataview:index-ready"];
 
 /** Hover-link source id registered in main.ts so page preview knows these links. */
-export const VIEW_HOVER_SOURCE = "smart-second-brain-view";
+export const WIDGET_HOVER_SOURCE = "smart-second-brain-widget";
 
 /**
- * One rendered view: owns the sandboxed frame, feeds it query results, keeps those
+ * One rendered widget: owns the sandboxed frame, feeds it query results, keeps those
  * results live while the vault changes, and tears everything down with the block.
  *
- * `this.frame` is the trusted outer relay frame (see `viewFrame.ts`); the view's own
+ * `this.frame` is the trusted outer relay frame (see `viewFrame.ts`); the widget's own
  * document is nested inside it and never talks to the host directly.
  *
  * Lifecycle is Obsidian's `MarkdownRenderChild`: `onload` when the block is attached
  * to a loaded parent component, `onunload` when that parent unloads (the reading
- * view re-renders, the chat message is replaced, the note closes).
+ * widget re-renders, the chat message is replaced, the note closes).
  */
-export class ViewRenderChild extends MarkdownRenderChild {
+export class WidgetRenderChild extends MarkdownRenderChild {
 	/** Page preview attaches its popover here (`HoverParent`). */
 	hoverPopover: HoverPopover | null = null;
 	private frame: HTMLIFrameElement | null = null;
@@ -51,7 +51,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 	constructor(
 		containerEl: HTMLElement,
 		private readonly app: App,
-		private readonly spec: ViewSpec,
+		private readonly spec: WidgetSpec,
 		private readonly sourcePath: string,
 		/** `fill`: the frame takes its container's height (a leaf) instead of sizing to content. */
 		private readonly options: { fill?: boolean } = {},
@@ -61,15 +61,15 @@ export class ViewRenderChild extends MarkdownRenderChild {
 
 	onload(): void {
 		const frame = this.containerEl.createEl("iframe", {
-			cls: "s2b-view-frame",
+			cls: "s2b-widget-frame",
 			attr: {
 				sandbox: "allow-scripts",
 				referrerpolicy: "no-referrer",
-				title: this.spec.title ?? "View",
+				title: this.spec.title ?? "Widget",
 			},
 		});
-		if (this.options.fill) frame.addClass("s2b-view-fill");
-		else frame.style.height = `${(this.spec.height ?? DEFAULT_AUTO_HEIGHT) + 2 * VIEW_FRAME_PADDING_PX}px`;
+		if (this.options.fill) frame.addClass("s2b-widget-fill");
+		else frame.style.height = `${(this.spec.height ?? DEFAULT_AUTO_HEIGHT) + 2 * WIDGET_FRAME_PADDING_PX}px`;
 		this.frame = frame;
 
 		this.registerDomEvent(window, "message", (event: MessageEvent) => this.onMessage(event));
@@ -99,10 +99,10 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		}
 
 		// Set last: the frame starts loading (and may post `ready`) as soon as srcdoc is assigned.
-		frame.srcdoc = buildViewFrameSrcdoc(
+		frame.srcdoc = buildWidgetFrameSrcdoc(
 			this.spec.body,
 			collectThemeCss(),
-			resolveViewLibs(this.spec.libs).sources,
+			resolveWidgetLibs(this.spec.libs).sources,
 			!this.options.fill && this.spec.height === undefined,
 		);
 	}
@@ -124,8 +124,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		if (!message) return;
 		switch (message.type) {
 			case "ready":
-				this.frame.dataset.s2bViewReady = "true";
-				this.containerEl.dispatchEvent(new CustomEvent(VIEW_READY_EVENT, { bubbles: true }));
+				this.frame.dataset.s2bWidgetReady = "true";
+				this.containerEl.dispatchEvent(new CustomEvent(WIDGET_READY_EVENT, { bubbles: true }));
 				void this.postData();
 				break;
 			case "requery":
@@ -141,7 +141,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 					this.spec.height === undefined
 						? Math.min(MAX_AUTO_HEIGHT, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.height)))
 						: Math.min(this.spec.height, Math.max(MIN_AUTO_HEIGHT, Math.ceil(message.extent)));
-				this.frame.style.height = `${height + 2 * VIEW_FRAME_PADDING_PX}px`;
+				this.frame.style.height = `${height + 2 * WIDGET_FRAME_PADDING_PX}px`;
 				break;
 			}
 			case "open-note":
@@ -162,7 +162,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 	}
 
 	/**
-	 * The outer frame reports that the view document was replaced (a navigation the
+	 * The outer frame reports that the widget document was replaced (a navigation the
 	 * CSP backstop did not refuse). Nothing may be posted to whatever loaded in its
 	 * place: drop the frame and say why in its stead.
 	 */
@@ -171,8 +171,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		this.frame?.remove();
 		this.frame = null;
 		this.containerEl.createDiv({
-			cls: "s2b-view-blocked",
-			text: "This view was stopped because it tried to navigate away from its sandbox.",
+			cls: "s2b-widget-blocked",
+			text: "This widget was stopped because it tried to navigate away from its sandbox.",
 		});
 	}
 
@@ -189,17 +189,17 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		const frameBox = frame.getBoundingClientRect();
 		const hostBox = this.containerEl.getBoundingClientRect();
 		const style = getComputedStyle(frame);
-		const insetX = (Number.parseFloat(style.borderLeftWidth) || 0) + VIEW_FRAME_PADDING_PX;
-		const insetY = (Number.parseFloat(style.borderTopWidth) || 0) + VIEW_FRAME_PADDING_PX;
+		const insetX = (Number.parseFloat(style.borderLeftWidth) || 0) + WIDGET_FRAME_PADDING_PX;
+		const insetY = (Number.parseFloat(style.borderTopWidth) || 0) + WIDGET_FRAME_PADDING_PX;
 		const innerWidth = frameBox.width - 2 * insetX;
 		const innerHeight = frameBox.height - 2 * insetY;
-		// Clamp to the visible part of the view document.
+		// Clamp to the visible part of the widget document.
 		const x = Math.max(0, Math.min(rect.x, innerWidth));
 		const y = Math.max(0, Math.min(rect.y, innerHeight));
 		const width = Math.max(1, Math.min(rect.width - (x - rect.x), innerWidth - x));
 		const height = Math.max(1, Math.min(rect.height - (y - rect.y), innerHeight - y));
 
-		const proxy = this.containerEl.createDiv({ cls: "s2b-view-hover-proxy" });
+		const proxy = this.containerEl.createDiv({ cls: "s2b-widget-hover-proxy" });
 		proxy.style.left = `${frameBox.left - hostBox.left + insetX + x}px`;
 		proxy.style.top = `${frameBox.top - hostBox.top + insetY + y}px`;
 		proxy.style.width = `${width}px`;
@@ -222,7 +222,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 				clientX: proxyBox.left + proxyBox.width / 2,
 				clientY: proxyBox.top + proxyBox.height / 2,
 			}),
-			source: VIEW_HOVER_SOURCE,
+			source: WIDGET_HOVER_SOURCE,
 			hoverParent: this,
 			targetEl: proxy,
 			linktext: path,
@@ -239,7 +239,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 	private post(message: Record<string, unknown>): void {
 		// The frame has an opaque origin (sandbox without allow-same-origin), so "*" is the
 		// only target that reaches it; the CSP inside keeps what it receives from leaving.
-		this.frame?.contentWindow?.postMessage({ s2bView: true, ...message }, "*");
+		this.frame?.contentWindow?.postMessage({ s2bWidget: true, ...message }, "*");
 	}
 
 	private postTheme(): void {
@@ -256,7 +256,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 
 	private async postData(): Promise<void> {
 		const generation = ++this.queryGeneration;
-		const data = await runViewQueries(this.app, this.spec.queries, this.sourcePath);
+		const data = await runWidgetQueries(this.app, this.spec.queries, this.sourcePath);
 		if (generation !== this.queryGeneration || !this.frame) return;
 		this.post({ type: "data", data });
 	}

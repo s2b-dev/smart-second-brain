@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseViewSpec, viewFileBasename, wrapViewFence } from "../../src/genview/viewSpec";
+import { parseWidgetSpec, widgetFileBasename, wrapWidgetFence } from "../../src/widget/widgetSpec";
 
-describe("parseViewSpec", () => {
+describe("parseWidgetSpec", () => {
 	it("treats a source without frontmatter as body only", () => {
-		const spec = parseViewSpec("\n<div>hi</div>\n");
+		const spec = parseWidgetSpec("\n<div>hi</div>\n");
 		expect(spec).toEqual({ queries: {}, libs: [], body: "<div>hi</div>" });
 	});
 
 	it("parses title, height and scalar queries", () => {
-		const spec = parseViewSpec(
+		const spec = parseWidgetSpec(
 			[
 				"---",
 				'title: "Tags overview"',
@@ -30,7 +30,7 @@ describe("parseViewSpec", () => {
 	});
 
 	it("parses block-scalar queries and stops at the next top-level key", () => {
-		const spec = parseViewSpec(
+		const spec = parseWidgetSpec(
 			[
 				"---",
 				"queries:",
@@ -51,48 +51,48 @@ describe("parseViewSpec", () => {
 	});
 
 	it("ignores unknown keys, comments and invalid heights", () => {
-		const spec = parseViewSpec("---\n# comment\nfoo: bar\nheight: tall\ntitle:\n---\nx");
+		const spec = parseWidgetSpec("---\n# comment\nfoo: bar\nheight: tall\ntitle:\n---\nx");
 		expect(spec.title).toBeUndefined();
 		expect(spec.height).toBeUndefined();
 		expect(spec.body).toBe("x");
 	});
 
 	it("parses libs as a scalar, a flow list, or a block list", () => {
-		expect(parseViewSpec("---\nlibs: plotly\n---\nx").libs).toEqual(["plotly"]);
-		expect(parseViewSpec("---\nlibs: plotly, three\n---\nx").libs).toEqual(["plotly", "three"]);
-		expect(parseViewSpec('---\nlibs: ["plotly", three]\n---\nx').libs).toEqual(["plotly", "three"]);
-		const block = parseViewSpec("---\nlibs:\n  - plotly\n  - 'three'\ntitle: T\n---\nx");
+		expect(parseWidgetSpec("---\nlibs: plotly\n---\nx").libs).toEqual(["plotly"]);
+		expect(parseWidgetSpec("---\nlibs: plotly, three\n---\nx").libs).toEqual(["plotly", "three"]);
+		expect(parseWidgetSpec('---\nlibs: ["plotly", three]\n---\nx').libs).toEqual(["plotly", "three"]);
+		const block = parseWidgetSpec("---\nlibs:\n  - plotly\n  - 'three'\ntitle: T\n---\nx");
 		expect(block.libs).toEqual(["plotly", "three"]);
 		expect(block.title).toBe("T");
-		expect(parseViewSpec("---\ntitle: T\n---\nx").libs).toEqual([]);
+		expect(parseWidgetSpec("---\ntitle: T\n---\nx").libs).toEqual([]);
 	});
 
 	it("falls back to body-only when the frontmatter never closes", () => {
-		const spec = parseViewSpec("---\ntitle: nope\n<div></div>");
+		const spec = parseWidgetSpec("---\ntitle: nope\n<div></div>");
 		expect(spec.title).toBeUndefined();
 		expect(spec.body).toBe("---\ntitle: nope\n<div></div>");
 	});
 });
 
-describe("wrapViewFence", () => {
+describe("wrapWidgetFence", () => {
 	it("wraps in a three-backtick fence by default", () => {
-		expect(wrapViewFence("<b>x</b>\n")).toBe("```s2b-view\n<b>x</b>\n```\n");
+		expect(wrapWidgetFence("<b>x</b>\n")).toBe("```s2b-widget\n<b>x</b>\n```\n");
 	});
 
 	it("uses a longer fence when the body contains backtick runs", () => {
-		const fenced = wrapViewFence("<script>const s = `a`; /* ``` */</script>");
-		expect(fenced.startsWith("````s2b-view\n")).toBe(true);
+		const fenced = wrapWidgetFence("<script>const s = `a`; /* ``` */</script>");
+		expect(fenced.startsWith("````s2b-widget\n")).toBe(true);
 		expect(fenced.endsWith("\n````\n")).toBe(true);
 	});
 });
 
-describe("viewFileBasename", () => {
+describe("widgetFileBasename", () => {
 	it("strips characters that are illegal in vault paths", () => {
-		expect(viewFileBasename('Tasks: due/overdue? [#1] "now"')).toBe("Tasks due overdue 1 now");
+		expect(widgetFileBasename('Tasks: due/overdue? [#1] "now"')).toBe("Tasks due overdue 1 now");
 	});
 
-	it("falls back to View", () => {
-		expect(viewFileBasename(undefined)).toBe("View");
-		expect(viewFileBasename("///")).toBe("View");
+	it("falls back to Widget", () => {
+		expect(widgetFileBasename(undefined)).toBe("Widget");
+		expect(widgetFileBasename("///")).toBe("Widget");
 	});
 });

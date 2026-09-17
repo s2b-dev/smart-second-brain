@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { findViewFences, stripViewFences } from "../../src/genview/viewFences";
+import { findWidgetFences, stripWidgetFences } from "../../src/widget/widgetFences";
 
 const NOTE = [
 	"# Dashboard",
 	"",
-	"```s2b-view",
+	"```s2b-widget",
 	"---",
 	"title: First",
 	"---",
@@ -14,27 +14,27 @@ const NOTE = [
 	"Some prose with ```inline``` backticks.",
 	"",
 	"````markdown",
-	"```s2b-view",
-	"<p>this is an example inside a longer fence, not a view</p>",
+	"```s2b-widget",
+	"<p>this is an example inside a longer fence, not a widget</p>",
 	"```",
 	"````",
 	"",
-	"~~~s2b-view",
+	"~~~s2b-widget",
 	"<p>two</p>",
 	"~~~",
 	"",
 	"```js",
-	"console.log('```s2b-view is just text here');",
+	"console.log('```s2b-widget is just text here');",
 	"```",
 	"",
-	"  ```s2b-view",
+	"  ```s2b-widget",
 	"  <p>three, indented</p>",
 	"  ```",
 ].join("\n");
 
-describe("findViewFences", () => {
-	it("finds top-level view fences of either marker and skips nested and foreign ones", () => {
-		const fences = findViewFences(NOTE);
+describe("findWidgetFences", () => {
+	it("finds top-level widget fences of either marker and skips nested and foreign ones", () => {
+		const fences = findWidgetFences(NOTE);
 		expect(fences.map((f) => f.index)).toEqual([0, 1, 2]);
 		expect(fences[0].spec.title).toBe("First");
 		expect(fences[0].source).toBe("---\ntitle: First\n---\n<p>one</p>");
@@ -45,29 +45,29 @@ describe("findViewFences", () => {
 	});
 
 	it("ignores an unclosed fence", () => {
-		expect(findViewFences("```s2b-view\n<p>never closed</p>")).toEqual([]);
+		expect(findWidgetFences("```s2b-widget\n<p>never closed</p>")).toEqual([]);
 	});
 
-	it("returns nothing for notes without views", () => {
-		expect(findViewFences("# Just a note\n\n```js\nlet x = 1;\n```")).toEqual([]);
+	it("returns nothing for notes without widgets", () => {
+		expect(findWidgetFences("# Just a note\n\n```js\nlet x = 1;\n```")).toEqual([]);
 	});
 });
 
-describe("stripViewFences", () => {
+describe("stripWidgetFences", () => {
 	it("replaces each fence with a titled marker and leaves the rest untouched", () => {
-		const stripped = stripViewFences(NOTE);
+		const stripped = stripWidgetFences(NOTE);
 		expect(stripped).not.toContain("<p>one</p>");
 		expect(stripped).not.toContain("<p>two</p>");
-		expect(stripped).toContain("(view: First)");
-		expect(stripped).toContain("(view)");
+		expect(stripped).toContain("(widget: First)");
+		expect(stripped).toContain("(widget)");
 		// Content that only looked like a fence (nested, or inside a js block) stays.
 		expect(stripped).toContain("this is an example inside a longer fence");
-		expect(stripped).toContain("console.log('```s2b-view is just text here');");
-		expect(stripped.startsWith("# Dashboard\n\n(view: First)\n\nSome prose")).toBe(true);
+		expect(stripped).toContain("console.log('```s2b-widget is just text here');");
+		expect(stripped.startsWith("# Dashboard\n\n(widget: First)\n\nSome prose")).toBe(true);
 	});
 
 	it("returns the input unchanged when there is nothing to strip", () => {
 		const note = "# Just a note\n\n```js\nlet x = 1;\n```";
-		expect(stripViewFences(note)).toBe(note);
+		expect(stripWidgetFences(note)).toBe(note);
 	});
 });

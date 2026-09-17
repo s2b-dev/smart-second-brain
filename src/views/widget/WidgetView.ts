@@ -1,26 +1,26 @@
 import { FileView, Notice, setIcon, type TFile, type WorkspaceLeaf } from "obsidian";
 import type SecondBrainPlugin from "../../main";
-import { ViewRenderChild } from "../../genview/ViewRenderChild";
-import { parseViewSpec } from "../../genview/viewSpec";
+import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
+import { parseWidgetSpec } from "../../widget/widgetSpec";
 
-export const VIEW_TYPE_GEN_VIEW = "smart-second-brain-view";
-/** Extension of a standalone view file. Its content is a view fence's body: optional frontmatter, then HTML. */
-export const VIEW_FILE_EXTENSION = "view";
+export const VIEW_TYPE_WIDGET = "smart-second-brain-widget";
+/** Extension of a standalone widget file. Its content is a widget fence's body: optional frontmatter, then HTML. */
+export const WIDGET_FILE_EXTENSION = "widget";
 
 const RERENDER_DEBOUNCE_MS = 500;
 
 /**
- * A `.view` file as a workspace leaf: the frame fills the pane, no chrome around it.
+ * A `.widget` file as a workspace leaf: the frame fills the pane, no chrome around it.
  * The file is the source of truth — the leaf re-renders when it changes on disk (which
  * is how an agent edit accepted through the review flow lands here) and follows renames
  * and deletes the way any `FileView` does. Obsidian has no text editor for the
  * extension, so the leaf carries a minimal source mode of its own (a textarea with
  * save/cancel) behind a header action, next to a refresh action.
  */
-export class GenView extends FileView {
+export class WidgetView extends FileView {
 	navigation = true;
 	private body: HTMLElement | null = null;
-	private child: ViewRenderChild | null = null;
+	private child: WidgetRenderChild | null = null;
 	private source: HTMLElement | null = null;
 	/** mtime of the file when the source editor loaded it; a save refuses if the file moved on. */
 	private sourceMtime = 0;
@@ -35,7 +35,7 @@ export class GenView extends FileView {
 	}
 
 	getViewType(): string {
-		return VIEW_TYPE_GEN_VIEW;
+		return VIEW_TYPE_WIDGET;
 	}
 
 	getIcon(): string {
@@ -43,14 +43,14 @@ export class GenView extends FileView {
 	}
 
 	canAcceptExtension(extension: string): boolean {
-		return extension === VIEW_FILE_EXTENSION;
+		return extension === WIDGET_FILE_EXTENSION;
 	}
 
 	async onOpen(): Promise<void> {
 		await super.onOpen();
 		this.contentEl.empty();
-		this.contentEl.addClass("s2b-gen-view");
-		this.body = this.contentEl.createDiv({ cls: "s2b-gen-view-body" });
+		this.contentEl.addClass("s2b-widget-widget");
+		this.body = this.contentEl.createDiv({ cls: "s2b-widget-widget-body" });
 
 		this.addAction("pencil", "Edit source", () => void this.toggleSource());
 		this.addAction("refresh-cw", "Refresh", () => void this.render());
@@ -99,7 +99,9 @@ export class GenView extends FileView {
 		if (this.file !== file || !this.body) return;
 		this.dropChild();
 		this.body.empty();
-		this.child = new ViewRenderChild(this.body, this.plugin.app, parseViewSpec(text), file.path, { fill: true });
+		this.child = new WidgetRenderChild(this.body, this.plugin.app, parseWidgetSpec(text), file.path, {
+			fill: true,
+		});
 		this.addChild(this.child);
 	}
 
@@ -124,19 +126,19 @@ export class GenView extends FileView {
 		this.dropChild();
 		this.body.empty();
 		this.sourceMtime = file.stat.mtime;
-		this.source = this.body.createDiv({ cls: "s2b-gen-view-source" });
+		this.source = this.body.createDiv({ cls: "s2b-widget-widget-source" });
 		const textarea = this.source.createEl("textarea", {
-			cls: "s2b-gen-view-source-text",
-			attr: { spellcheck: "false", "aria-label": "View source" },
+			cls: "s2b-widget-widget-source-text",
+			attr: { spellcheck: "false", "aria-label": "Widget source" },
 		});
 		textarea.value = text;
-		const bar = this.source.createDiv({ cls: "s2b-gen-view-source-bar" });
+		const bar = this.source.createDiv({ cls: "s2b-widget-widget-source-bar" });
 		const save = bar.createEl("button", { text: "Save", cls: "mod-cta" });
 		const cancel = bar.createEl("button", { text: "Cancel" });
-		const hint = bar.createSpan({ cls: "s2b-gen-view-source-hint" });
+		const hint = bar.createSpan({ cls: "s2b-widget-widget-source-hint" });
 		setIcon(hint, "info");
 		hint.createSpan({ text: "Frontmatter (title, height, queries, libs), then the HTML." });
-		this.sourceStaleHint = bar.createSpan({ cls: "s2b-gen-view-source-hint s2b-gen-view-source-stale" });
+		this.sourceStaleHint = bar.createSpan({ cls: "s2b-widget-widget-source-hint s2b-widget-widget-source-stale" });
 		this.sourceStaleHint.hide();
 		save.addEventListener("click", () => void this.saveSource(textarea.value));
 		cancel.addEventListener("click", () => void this.toggleSource());
@@ -170,13 +172,13 @@ export class GenView extends FileView {
 		if (!file) return;
 		if (this.isSourceStale()) {
 			this.markSourceStale();
-			new Notice("This view changed on disk while you were editing. Cancel to reload it, then edit again.");
+			new Notice("This widget changed on disk while you were editing. Cancel to reload it, then edit again.");
 			return;
 		}
 		try {
 			await this.plugin.app.vault.modify(file, text.endsWith("\n") ? text : `${text}\n`);
 		} catch (error) {
-			new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(`Could not save widget: ${error instanceof Error ? error.message : String(error)}`);
 			return;
 		}
 		this.closeSource();

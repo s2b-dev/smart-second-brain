@@ -1,11 +1,11 @@
 /**
- * The `s2b-view` fence: an agent-generated view.
+ * The `s2b-widget` fence: an agent-generated widget.
  *
  * The fence body is an HTML document fragment (markup, `<style>`, `<script>`) that is
  * rendered inside a sandboxed iframe (see `viewFrame.ts`). An optional leading
  * frontmatter block declares what the host should do for it:
  *
- * ```s2b-view
+ * ```s2b-widget
  * ---
  * title: Notes per tag
  * height: 320
@@ -24,9 +24,9 @@
  * list, or a `- item` block — which is all a model needs.
  */
 
-export const VIEW_BLOCK_LANGUAGE = "s2b-view";
+export const WIDGET_BLOCK_LANGUAGE = "s2b-widget";
 
-export interface ViewSpec {
+export interface WidgetSpec {
 	/** Shown in the chat toolbar and used as the note name when saved. */
 	title?: string;
 	/** Fixed frame height in px. When absent the frame follows its content height. */
@@ -45,7 +45,7 @@ const NESTED_KEY = /^\s+([A-Za-z_][\w-]*):\s*(.*)$/;
 const BLOCK_SCALAR_INDICATORS = new Set(["|", "|-", "|+", ">", ">-", ">+"]);
 
 /** Parse a fence body into its spec. Never throws: malformed frontmatter is treated as body. */
-export function parseViewSpec(source: string): ViewSpec {
+export function parseWidgetSpec(source: string): WidgetSpec {
 	const lines = source.replace(/\r\n?/g, "\n").split("\n");
 	let start = 0;
 	while (start < lines.length && lines[start].trim() === "") start++;
@@ -69,8 +69,8 @@ export function parseViewSpec(source: string): ViewSpec {
 	return spec;
 }
 
-function parseFrontmatter(lines: string[]): ViewSpec {
-	const spec: ViewSpec = { queries: {}, libs: [], body: "" };
+function parseFrontmatter(lines: string[]): WidgetSpec {
+	const spec: WidgetSpec = { queries: {}, libs: [], body: "" };
 	let i = 0;
 	while (i < lines.length) {
 		const line = lines[i];
@@ -193,17 +193,17 @@ function unquote(value: string): string {
  * Wrap a fence body back into a markdown fence. The fence is made longer than any
  * backtick run inside the body so a ``` in a `<script>` can't close it early.
  */
-export function wrapViewFence(source: string): string {
+export function wrapWidgetFence(source: string): string {
 	const longest = Math.max(2, ...[...source.matchAll(/`+/g)].map((m) => m[0].length));
 	const fence = "`".repeat(longest + 1);
-	return `${fence}${VIEW_BLOCK_LANGUAGE}\n${source.trim()}\n${fence}\n`;
+	return `${fence}${WIDGET_BLOCK_LANGUAGE}\n${source.trim()}\n${fence}\n`;
 }
 
-/** A vault-safe note basename for a view, from its title. */
-export function viewFileBasename(title: string | undefined): string {
+/** A vault-safe note basename for a widget, from its title. */
+export function widgetFileBasename(title: string | undefined): string {
 	const cleaned = (title ?? "")
 		.replace(/[\\/:*?"<>|#^[\]]/g, " ")
 		.replace(/\s+/g, " ")
 		.trim();
-	return cleaned || "View";
+	return cleaned || "Widget";
 }

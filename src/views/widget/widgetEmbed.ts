@@ -1,12 +1,12 @@
 import { type App, MarkdownRenderChild, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../../main";
-import { ViewRenderChild } from "../../genview/ViewRenderChild";
-import { parseViewSpec } from "../../genview/viewSpec";
+import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
+import { parseWidgetSpec } from "../../widget/widgetSpec";
 import { Logger } from "../../utils/logging";
-import { VIEW_FILE_EXTENSION } from "./GenView";
+import { WIDGET_FILE_EXTENSION } from "./WidgetView";
 
 /** Shape of the context Obsidian's (internal) embed registry passes to an embed creator. */
-interface ViewEmbedContext {
+interface WidgetEmbedContext {
 	app: App;
 	containerEl: HTMLElement;
 	linktext: string;
@@ -14,7 +14,7 @@ interface ViewEmbedContext {
 	displayMode?: boolean;
 }
 
-type EmbedCreator = (ctx: ViewEmbedContext, file: TFile) => MarkdownRenderChild;
+type EmbedCreator = (ctx: WidgetEmbedContext, file: TFile) => MarkdownRenderChild;
 
 interface EmbedRegistry {
 	registerExtensions?: (extensions: string[], creator: EmbedCreator) => void;
@@ -22,13 +22,13 @@ interface EmbedRegistry {
 }
 
 /**
- * `![[dashboard.view]]` inside a note, and the hover preview of a `.view` link: the
+ * `![[dashboard.widget]]` inside a note, and the hover preview of a `.widget` link: the
  * file rendered the same way a fence in a note is (auto height, card border). Obsidian's
  * embed pipeline calls `loadFile()` after construction, and again when the embedded
  * file changes on disk.
  */
-class ViewEmbed extends MarkdownRenderChild {
-	private child: ViewRenderChild | null = null;
+class WidgetEmbed extends MarkdownRenderChild {
+	private child: WidgetRenderChild | null = null;
 	/** Bumped per load and on unload so a slower, older read cannot install stale content. */
 	private generation = 0;
 
@@ -51,12 +51,17 @@ class ViewEmbed extends MarkdownRenderChild {
 			if (generation !== this.generation) return;
 			this.drop();
 			this.containerEl.empty();
-			this.containerEl.addClass("s2b-view", "s2b-view-embed");
-			this.child = new ViewRenderChild(this.containerEl, this.plugin.app, parseViewSpec(text), this.file.path);
+			this.containerEl.addClass("s2b-widget", "s2b-widget-embed");
+			this.child = new WidgetRenderChild(
+				this.containerEl,
+				this.plugin.app,
+				parseWidgetSpec(text),
+				this.file.path,
+			);
 			this.addChild(this.child);
 		} catch (error) {
-			Logger.error(`Failed to render .view embed for ${this.file.path}:`, error);
-			this.containerEl.setText("Could not load view.");
+			Logger.error(`Failed to render .widget embed for ${this.file.path}:`, error);
+			this.containerEl.setText("Could not load widget.");
 		}
 	}
 
@@ -76,24 +81,24 @@ class ViewEmbed extends MarkdownRenderChild {
 let warnedMissingRegistry = false;
 
 /**
- * Register the `.view` embed renderer with Obsidian's internal embed registry. Not part
+ * Register the `.widget` embed renderer with Obsidian's internal embed registry. Not part
  * of the public API and not torn down by the Component lifecycle: pair with
- * {@link unregisterViewEmbed} in onunload (see `chatEmbed.ts` for the history).
+ * {@link unregisterWidgetEmbed} in onunload (see `chatEmbed.ts` for the history).
  */
-export function registerViewEmbed(plugin: SecondBrainPlugin): void {
+export function registerWidgetEmbed(plugin: SecondBrainPlugin): void {
 	const registry = (plugin.app as unknown as { embedRegistry?: EmbedRegistry }).embedRegistry;
 	if (!registry?.registerExtensions) {
 		if (!warnedMissingRegistry) {
 			warnedMissingRegistry = true;
-			Logger.warn("app.embedRegistry unavailable — .view embed/hover previews disabled.");
+			Logger.warn("app.embedRegistry unavailable — .widget embed/hover previews disabled.");
 		}
 		return;
 	}
-	registry.registerExtensions([VIEW_FILE_EXTENSION], (ctx, file) => new ViewEmbed(ctx.containerEl, plugin, file));
+	registry.registerExtensions([WIDGET_FILE_EXTENSION], (ctx, file) => new WidgetEmbed(ctx.containerEl, plugin, file));
 }
 
-/** Reverses {@link registerViewEmbed}; call from onunload. */
-export function unregisterViewEmbed(plugin: SecondBrainPlugin): void {
+/** Reverses {@link registerWidgetEmbed}; call from onunload. */
+export function unregisterWidgetEmbed(plugin: SecondBrainPlugin): void {
 	const registry = (plugin.app as unknown as { embedRegistry?: EmbedRegistry }).embedRegistry;
-	registry?.unregisterExtensions?.([VIEW_FILE_EXTENSION]);
+	registry?.unregisterExtensions?.([WIDGET_FILE_EXTENSION]);
 }

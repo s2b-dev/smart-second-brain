@@ -1,18 +1,18 @@
 /**
- * Locate `s2b-view` fences in a note's markdown. Used to keep view code out of the
+ * Locate `s2b-widget` fences in a note's markdown. Used to keep widget code out of the
  * search indexes: a fence's HTML and JavaScript are noise to retrieval, so
- * {@link stripViewFences} replaces each with a one-line marker carrying its title.
+ * {@link stripWidgetFences} replaces each with a one-line marker carrying its title.
  *
- * Fence-aware in the CommonMark sense: a fence opened inside another fence (the views
- * skill's own ````markdown examples) is content, not a view. Opening markers may be
+ * Fence-aware in the CommonMark sense: a fence opened inside another fence (the widgets
+ * skill's own ````markdown examples) is content, not a widget. Opening markers may be
  * indented up to three spaces; the closing marker uses the same character, at least
  * the same length, and carries no info string.
  */
 
-import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec } from "./viewSpec";
+import { parseWidgetSpec, WIDGET_BLOCK_LANGUAGE, type WidgetSpec } from "./widgetSpec";
 
-export interface ViewFence {
-	/** Position among the note's view fences, top to bottom. */
+export interface WidgetFence {
+	/** Position among the note's widget fences, top to bottom. */
 	index: number;
 	/** Zero-based line of the opening marker. */
 	lineStart: number;
@@ -20,7 +20,7 @@ export interface ViewFence {
 	lineEnd: number;
 	/** The fence body, verbatim. */
 	source: string;
-	spec: ViewSpec;
+	spec: WidgetSpec;
 }
 
 const OPENING = /^ {0,3}(`{3,}|~{3,})\s*([^\s`]*)/;
@@ -30,24 +30,24 @@ function closes(line: string, char: string, length: number): boolean {
 	return match !== null && match[1][0] === char && match[1].length >= length;
 }
 
-/** Every top-level `s2b-view` fence in `markdown`, in document order. */
-export function findViewFences(markdown: string): ViewFence[] {
+/** Every top-level `s2b-widget` fence in `markdown`, in document order. */
+export function findWidgetFences(markdown: string): WidgetFence[] {
 	const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-	const fences: ViewFence[] = [];
+	const fences: WidgetFence[] = [];
 	let open: { char: string; length: number; lang: string; lineStart: number } | null = null;
 	let body: string[] = [];
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		if (open) {
 			if (closes(line, open.char, open.length)) {
-				if (open.lang === VIEW_BLOCK_LANGUAGE) {
+				if (open.lang === WIDGET_BLOCK_LANGUAGE) {
 					const source = body.join("\n");
 					fences.push({
 						index: fences.length,
 						lineStart: open.lineStart,
 						lineEnd: i,
 						source,
-						spec: parseViewSpec(source),
+						spec: parseWidgetSpec(source),
 					});
 				}
 				open = null;
@@ -64,19 +64,19 @@ export function findViewFences(markdown: string): ViewFence[] {
 }
 
 /**
- * `markdown` with every view fence replaced by `(view: <title>)` — or `(view)` when it
+ * `markdown` with every widget fence replaced by `(widget: <title>)` — or `(widget)` when it
  * has none — so a note that holds a dashboard is still findable by its name while its
  * code stays out of the index. Returns the input untouched when there is nothing to strip.
  */
-export function stripViewFences(markdown: string): string {
-	const fences = findViewFences(markdown);
+export function stripWidgetFences(markdown: string): string {
+	const fences = findWidgetFences(markdown);
 	if (fences.length === 0) return markdown;
 	const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
 	const out: string[] = [];
 	let cursor = 0;
 	for (const fence of fences) {
 		out.push(...lines.slice(cursor, fence.lineStart));
-		out.push(fence.spec.title ? `(view: ${fence.spec.title})` : "(view)");
+		out.push(fence.spec.title ? `(widget: ${fence.spec.title})` : "(widget)");
 		cursor = fence.lineEnd + 1;
 	}
 	out.push(...lines.slice(cursor));

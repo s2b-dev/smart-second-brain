@@ -1,8 +1,8 @@
 /**
- * Source patches applied at build time to the browser bundles a view can request
+ * Source patches applied at build time to the browser bundles a widget can request
  * (`viewLibs.ts`). Those bundles ship inside main.js as string literals, and the
  * production build refuses a main.js containing `new Function(` or `eval(` — the
- * plugin-review scan reads text, not semantics, and a view library's global-detection
+ * plugin-review scan reads text, not semantics, and a widget library's global-detection
  * fallback would read as the plugin executing dynamic code.
  *
  * Every patch is semantics-preserving for the runtimes a frame can run in, is pinned to
@@ -32,7 +32,7 @@ export const VENDORED_LIB_PATCHES: Readonly<Record<string, readonly VendoredLibP
 			count: 1,
 			why:
 				"A `global` polyfill's last-resort fallback for finding the global object, reached only when " +
-				"`globalThis` is not an object. Every runtime a view frame runs in (Chromium in Electron, " +
+				"`globalThis` is not an object. Every runtime a widget frame runs in (Chromium in Electron, " +
 				"WebKit on iOS) defines `globalThis`, so the fallback is dead; naming `globalThis` directly " +
 				"keeps the same result without constructing code from a string.",
 		},
@@ -46,7 +46,7 @@ export const VENDORED_LIB_FORBIDDEN: ReadonlyArray<[label: string, pattern: RegE
 	["importScripts()", /importScripts\(/],
 ];
 
-/** The patch set for a vendored file path, or null when the path is not a vendored view library. */
+/** The patch set for a vendored file path, or null when the path is not a vendored widget library. */
 export function vendoredLibPatchesFor(path: string): readonly VendoredLibPatch[] | null {
 	for (const [tail, patches] of Object.entries(VENDORED_LIB_PATCHES)) {
 		if (path.endsWith(tail)) return patches;
@@ -57,12 +57,12 @@ export function vendoredLibPatchesFor(path: string): readonly VendoredLibPatch[]
 /** Apply a library's patches to its source and verify nothing forbidden remains. Throws on any drift. */
 export function patchVendoredLib(path: string, source: string): string {
 	const patches = vendoredLibPatchesFor(path);
-	if (!patches) throw new Error(`vendored-lib-patches: ${path} is not a vendored view library`);
+	if (!patches) throw new Error(`vendored-lib-patches: ${path} is not a vendored widget library`);
 	let patched = source;
 	for (const { from, to, count } of patches) {
 		const occurrences = patched.split(from).length - 1;
 		if (occurrences !== count) {
-			const hint = "The library changed; review the patch in src/genview/vendoredLibPatches.ts.";
+			const hint = "The library changed; review the patch in src/widget/vendoredLibPatches.ts.";
 			throw new Error(
 				`vendored-lib-patches: expected ${count} occurrence(s) of ${JSON.stringify(from)} in ${path}, found ${occurrences}. ${hint}`,
 			);
