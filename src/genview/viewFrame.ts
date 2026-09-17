@@ -38,6 +38,13 @@
  * model-authored code and should be treated with the same trust as the agent's tools.
  */
 
+/**
+ * DOM event a rendered view dispatches (bubbling) on its block once its document
+ * reported `ready`; the frame also gets `data-s2b-view-ready`. The chat renderer uses
+ * both to hold a settling document off-screen until its views are showing.
+ */
+export const VIEW_READY_EVENT = "s2b-view-ready";
+
 /** Inner (view) document: only inline script/style and data/blob media; no network, no navigation targets. */
 export const VIEW_CSP =
 	"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";

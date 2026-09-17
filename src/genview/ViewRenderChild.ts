@@ -1,5 +1,11 @@
 import { type App, type EventRef, MarkdownRenderChild } from "obsidian";
-import { buildViewFrameSrcdoc, collectThemeCss, parseFrameMessage, VIEW_FRAME_PADDING_PX } from "./viewFrame";
+import {
+	buildViewFrameSrcdoc,
+	collectThemeCss,
+	parseFrameMessage,
+	VIEW_FRAME_PADDING_PX,
+	VIEW_READY_EVENT,
+} from "./viewFrame";
 import { resolveViewLibs } from "./viewLibs";
 import { runViewQueries } from "./viewQueries";
 import type { ViewSpec } from "./viewSpec";
@@ -86,6 +92,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		if (!message) return;
 		switch (message.type) {
 			case "ready":
+				this.frame.dataset.s2bViewReady = "true";
+				this.containerEl.dispatchEvent(new CustomEvent(VIEW_READY_EVENT, { bubbles: true }));
 				void this.postData();
 				break;
 			case "requery":
