@@ -17,8 +17,9 @@ const RERENDER_DEBOUNCE_MS = 500;
  * is how an agent edit accepted through the review flow lands here) and follows renames
  * and deletes the way any `FileView` does. Obsidian has no text editor for the
  * extension, so the leaf carries a minimal source mode of its own (a textarea with
- * save/cancel) behind a header action. Rename lives in the tab's context menu, where
- * Obsidian keeps file actions (there is no native rename for a non-markdown tab).
+ * save/cancel). It and Rename live in the tab's context menu, where Obsidian keeps
+ * file actions (there is no native rename for a non-markdown tab); the header stays
+ * as bare as a PDF or image tab, since editing a widget's source is a rare thing to do.
  */
 export class WidgetView extends FileView {
 	navigation = true;
@@ -56,8 +57,6 @@ export class WidgetView extends FileView {
 		this.contentEl.addClass("s2b-widget-view");
 		this.body = this.contentEl.createDiv({ cls: "s2b-widget-view-body" });
 
-		this.addAction("pencil", "Edit source", () => void this.toggleSource());
-
 		this.registerEvent(
 			this.plugin.app.vault.on("modify", (file) => {
 				if (file.path !== this.file?.path) return;
@@ -70,6 +69,13 @@ export class WidgetView extends FileView {
 	onPaneMenu(menu: Menu, source: string): void {
 		super.onPaneMenu(menu, source);
 		if (!this.file) return;
+		menu.addItem((item) =>
+			item
+				.setSection("action")
+				.setTitle(this.source ? "Show widget" : "Edit source")
+				.setIcon(this.source ? "layout-template" : "code")
+				.onClick(() => void this.toggleSource()),
+		);
 		menu.addItem((item) =>
 			item
 				.setSection("action")
