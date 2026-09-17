@@ -49,8 +49,11 @@ export class RenameWidgetModal extends Modal {
 			new Notice("Enter a name.");
 			return;
 		}
-		if (/[\\/:*?"<>|]/.test(name)) {
-			new Notice('A name cannot contain \\ / : * ? " < > |');
+		// Same set the chat-save naming strips (`widgetFileBasename`): the OS-illegal
+		// characters plus the ones Obsidian reads as link syntax (# ^ [ ]), which would
+		// make the file unresolvable by path for the agent's tools.
+		if (/[\\/:*?"<>|#^[\]]/.test(name)) {
+			new Notice('A name cannot contain \\ / : * ? " < > | # ^ [ ]');
 			return;
 		}
 		if (name === this.file.basename) {
