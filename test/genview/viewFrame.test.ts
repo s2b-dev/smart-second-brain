@@ -41,6 +41,14 @@ describe("buildViewSrcdoc (inner document)", () => {
 		expect(VIEW_CSP).not.toContain("connect-src");
 	});
 
+	it("is valid JavaScript exactly as the frame receives it", () => {
+		// The runtime is a template literal, so an escape the formatter rewrites can turn
+		// into something else entirely (`\\/` → `//` once ended a regex and killed every
+		// handler after it). Parsing catches that; nothing is executed.
+		expect(() => new Function(VIEW_RUNTIME_SCRIPT)).not.toThrow();
+		expect(() => new Function(`const INNER = "";${OUTER_RELAY_SCRIPT}`)).not.toThrow();
+	});
+
 	it("keeps the runtime free of template placeholders and script terminators", () => {
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("${");
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("</script");

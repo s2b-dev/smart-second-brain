@@ -43,6 +43,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 	hoverPopover: HoverPopover | null = null;
 	private frame: HTMLIFrameElement | null = null;
 	private hoverProxy: HTMLElement | null = null;
+	/** The note the current proxy stands for, so a modifier press can re-trigger its preview. */
+	private hoverPath: string | null = null;
 	private refreshTimer: number | null = null;
 	private queryGeneration = 0;
 
@@ -71,6 +73,20 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		this.frame = frame;
 
 		this.registerDomEvent(window, "message", (event: MessageEvent) => this.onMessage(event));
+		// Page preview can be set to require Cmd/Ctrl per source; for a link in a note it
+		// reacts to the key being pressed while already hovering. The proxy gets the same:
+		// the pointer is over it (so the host owns keyboard events), and a modifier press
+		// re-triggers the preview with the current modifier state.
+		this.registerDomEvent(window, "keydown", (event: KeyboardEvent) => {
+			if (this.hoverProxy && this.hoverPath && ["Meta", "Control", "Alt", "Shift"].includes(event.key)) {
+				this.triggerHover(
+					this.hoverProxy,
+					this.hoverPath,
+					event.ctrlKey || event.key === "Control",
+					event.metaKey || event.key === "Meta",
+				);
+			}
+		});
 		this.registerEvent(this.app.workspace.on("css-change", () => this.postTheme()));
 
 		if (Object.keys(this.spec.queries).length > 0) {
@@ -193,7 +209,11 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			void this.app.workspace.openLinkText(path, this.sourcePath, Keymap.isModEvent(event));
 		});
 		this.hoverProxy = proxy;
+		this.hoverPath = path;
+		this.triggerHover(proxy, path, ctrlKey, metaKey);
+	}
 
+	private triggerHover(proxy: HTMLElement, path: string, ctrlKey: boolean, metaKey: boolean): void {
 		const proxyBox = proxy.getBoundingClientRect();
 		this.app.workspace.trigger("hover-link", {
 			event: new MouseEvent("mouseover", {
@@ -213,6 +233,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 	private removeHoverProxy(): void {
 		this.hoverProxy?.remove();
 		this.hoverProxy = null;
+		this.hoverPath = null;
 	}
 
 	private post(message: Record<string, unknown>): void {

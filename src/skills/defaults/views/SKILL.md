@@ -82,8 +82,8 @@ static content.
   (clear, then draw).
 - `s2b.data` — the latest results.
 - `data-note="Path/To/Note.md"` on any element makes it a note link: click opens the
-  note, hovering shows Obsidian's page preview. Prefer this over click handlers. Plain
-  `<a href>` cannot leave the frame.
+  note, hovering shows Obsidian's page preview. An `<a href="Path/To/Note.md">` with a
+  vault path (not a URL) works the same way. Prefer these over click handlers.
 - `s2b.openNote(path)` — open a note programmatically (e.g. from a chart's click handler).
 - `s2b.refresh()` — ask for a re-run of the queries.
 

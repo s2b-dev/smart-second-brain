@@ -172,14 +172,31 @@ export const VIEW_RUNTIME_SCRIPT = `
 			send({ type: "requery" });
 		},
 	};
-	const noteLinkOf = (target) => (target && target.closest ? target.closest("[data-note]") : null);
+	// A note link is any element with data-note, or an anchor whose href is a vault
+	// path rather than a URL, fragment or script — the shape a model writes unprompted.
+	// No backslashes here: this text lives in a template literal, the formatter collapses
+	// escapes, and an escaped slash pair would become a comment marker that ends the regex.
+	const NOT_A_NOTE = /^(?:[a-z][a-z0-9+.-]*:|#|[/][/])/i;
+	const notePathOf = (element) => {
+		if (!element) return null;
+		const explicit = element.getAttribute("data-note");
+		if (explicit) return explicit;
+		const href = element.tagName === "A" ? element.getAttribute("href") : null;
+		if (href && !NOT_A_NOTE.test(href.trim())) return decodeURIComponent(href.trim());
+		return null;
+	};
+	const noteLinkOf = (target) => {
+		if (!target || !target.closest) return null;
+		const candidate = target.closest("[data-note], a[href]");
+		return candidate && notePathOf(candidate) ? candidate : null;
+	};
 	document.addEventListener("click", (event) => {
 		const link = noteLinkOf(event.target);
 		if (!link) return;
 		event.preventDefault();
 		send({
 			type: "open-note",
-			path: String(link.getAttribute("data-note")),
+			path: String(notePathOf(link)),
 			modifiers: { ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, shiftKey: event.shiftKey },
 		});
 	});
@@ -191,7 +208,7 @@ export const VIEW_RUNTIME_SCRIPT = `
 		const rect = link.getBoundingClientRect();
 		send({
 			type: "hover-note",
-			path: String(link.getAttribute("data-note")),
+			path: String(notePathOf(link)),
 			rect: { x: rect.left, y: rect.top, width: rect.width, height: rect.height },
 			ctrlKey: event.ctrlKey,
 			metaKey: event.metaKey,
@@ -228,8 +245,8 @@ export const VIEW_RUNTIME_SCRIPT = `
 		const style = getComputedStyle(body);
 		return (
 			Math.max(body.offsetHeight, body.scrollHeight) +
-			parseFloat(style.marginTop || "0") +
-			parseFloat(style.marginBottom || "0")
+			Number.parseFloat(style.marginTop || "0") +
+			Number.parseFloat(style.marginBottom || "0")
 		);
 	};
 	// The bottom edge of what is actually drawn: for a declared height the host shrinks
@@ -244,7 +261,7 @@ export const VIEW_RUNTIME_SCRIPT = `
 			if (rect.height > 0 || rect.width > 0) bottom = Math.max(bottom, rect.bottom + window.scrollY);
 		}
 		const style = getComputedStyle(body);
-		return bottom + parseFloat(style.paddingBottom || "0") + parseFloat(style.marginBottom || "0");
+		return bottom + Number.parseFloat(style.paddingBottom || "0") + Number.parseFloat(style.marginBottom || "0");
 	};
 	let lastExtent = -1;
 	const reportHeight = () => {
