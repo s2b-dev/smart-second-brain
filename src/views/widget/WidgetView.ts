@@ -49,8 +49,8 @@ export class WidgetView extends FileView {
 	async onOpen(): Promise<void> {
 		await super.onOpen();
 		this.contentEl.empty();
-		this.contentEl.addClass("s2b-widget-widget");
-		this.body = this.contentEl.createDiv({ cls: "s2b-widget-widget-body" });
+		this.contentEl.addClass("s2b-widget-view");
+		this.body = this.contentEl.createDiv({ cls: "s2b-widget-view-body" });
 
 		this.addAction("pencil", "Edit source", () => void this.toggleSource());
 		this.addAction("refresh-cw", "Refresh", () => void this.render());
@@ -126,19 +126,19 @@ export class WidgetView extends FileView {
 		this.dropChild();
 		this.body.empty();
 		this.sourceMtime = file.stat.mtime;
-		this.source = this.body.createDiv({ cls: "s2b-widget-widget-source" });
+		this.source = this.body.createDiv({ cls: "s2b-widget-view-source" });
 		const textarea = this.source.createEl("textarea", {
-			cls: "s2b-widget-widget-source-text",
+			cls: "s2b-widget-view-source-text",
 			attr: { spellcheck: "false", "aria-label": "Widget source" },
 		});
 		textarea.value = text;
-		const bar = this.source.createDiv({ cls: "s2b-widget-widget-source-bar" });
+		const bar = this.source.createDiv({ cls: "s2b-widget-view-source-bar" });
 		const save = bar.createEl("button", { text: "Save", cls: "mod-cta" });
 		const cancel = bar.createEl("button", { text: "Cancel" });
-		const hint = bar.createSpan({ cls: "s2b-widget-widget-source-hint" });
+		const hint = bar.createSpan({ cls: "s2b-widget-view-source-hint" });
 		setIcon(hint, "info");
 		hint.createSpan({ text: "Frontmatter (title, height, queries, libs), then the HTML." });
-		this.sourceStaleHint = bar.createSpan({ cls: "s2b-widget-widget-source-hint s2b-widget-widget-source-stale" });
+		this.sourceStaleHint = bar.createSpan({ cls: "s2b-widget-view-source-hint s2b-widget-view-source-stale" });
 		this.sourceStaleHint.hide();
 		save.addEventListener("click", () => void this.saveSource(textarea.value));
 		cancel.addEventListener("click", () => void this.toggleSource());
