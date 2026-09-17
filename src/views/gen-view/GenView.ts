@@ -5,10 +5,17 @@ import { ViewRenderChild } from "../../genview/ViewRenderChild";
 
 export const VIEW_TYPE_GEN_VIEW = "smart-second-brain-view";
 
-/** Which fence of which note this leaf shows; persisted with the workspace layout. */
+/**
+ * Which fence of which note this leaf shows; persisted with the workspace layout. The
+ * fence's `title` (when it has one) is stored beside its ordinal so an edit that inserts
+ * or removes an earlier fence does not silently redirect the leaf: a fence with the
+ * stored title wins, the ordinal is the fallback, and a target that no longer exists
+ * shows as missing rather than as some other view.
+ */
 export interface GenViewState {
 	path: string;
 	index: number;
+	title?: string;
 }
 
 const RERENDER_DEBOUNCE_MS = 500;
@@ -79,7 +86,9 @@ export class GenView extends ItemView {
 			this.plugin.app.vault.on("rename", (file, oldPath) => {
 				if (this.state && oldPath === this.state.path && file instanceof TFile) {
 					this.state = { ...this.state, path: file.path };
-					this.refreshHeader();
+					// The renderer resolves queries and note links against its source path;
+					// rebuild it so the view follows the note to its new folder.
+					void this.render();
 				}
 			}),
 		);
@@ -112,11 +121,16 @@ export class GenView extends ItemView {
 			return;
 		}
 		const fences = findViewFences(await this.plugin.app.vault.read(file));
-		const fence: ViewFence | undefined = fences[this.state.index] ?? fences[0];
+		const fence = resolveFence(fences, this.state);
 		if (!fence) {
-			this.showMessage("This note has no view block.");
+			this.showMessage(
+				fences.length === 0
+					? "This note has no view block."
+					: "The view this pane was opened for is no longer in the note.",
+			);
 			return;
 		}
+		this.state = { ...this.state, index: fence.index, title: fence.spec.title };
 		this.dropChild();
 		this.body.empty();
 		this.title = fence.spec.title ?? null;
@@ -159,7 +173,23 @@ function toState(value: unknown): GenViewState | null {
 	if (typeof record.path !== "string" || !record.path) return null;
 	const index =
 		typeof record.index === "number" && Number.isInteger(record.index) && record.index >= 0 ? record.index : 0;
-	return { path: record.path, index };
+	const title = typeof record.title === "string" && record.title ? record.title : undefined;
+	return { path: record.path, index, title };
+}
+
+/** The fence `state` refers to: by stored title first, then by ordinal; null when neither holds. */
+export function resolveFence(fences: readonly ViewFence[], state: GenViewState): ViewFence | null {
+	if (state.title) {
+		const byTitle = fences.find((fence) => fence.spec.title === state.title);
+		if (byTitle) return byTitle;
+	}
+	const byIndex = fences[state.index];
+	if (!byIndex) return null;
+	// A stored title that matches nothing but whose ordinal is still a view: the user most
+	// likely retitled it. A stored title that matches nothing while the ordinal now shows a
+	// *different* titled view is a redirect; refuse it.
+	if (state.title && byIndex.spec.title && byIndex.spec.title !== state.title && fences.length > 1) return null;
+	return byIndex;
 }
 
 /** Show `path`'s `index`-th view in its own leaf, reusing one already showing it. */
@@ -169,6 +199,10 @@ export async function openGenView(plugin: SecondBrainPlugin, state: GenViewState
 		const shown = leaf.view instanceof GenView ? toState(leaf.view.getState()) : null;
 		return shown?.path === state.path && shown.index === state.index;
 	});
+	if (existing) {
+		// The requested target is authoritative (a fresh index/title from the note).
+		await existing.setViewState({ type: VIEW_TYPE_GEN_VIEW, state: { ...state }, active: true });
+	}
 	const leaf = existing ?? workspace.getLeaf("tab");
 	if (!existing) await leaf.setViewState({ type: VIEW_TYPE_GEN_VIEW, state: { ...state }, active: true });
 	await workspace.revealLeaf(leaf);

@@ -543,11 +543,12 @@ export default class SecondBrainPlugin extends Plugin {
 				if (!file || file.extension !== "md") return false;
 				if (!checking) {
 					void (async () => {
-						if (findViewFences(await this.app.vault.read(file)).length === 0) {
+						const [first] = findViewFences(await this.app.vault.read(file));
+						if (!first) {
 							new Notice("This note has no view block.");
 							return;
 						}
-						await openGenView(this, { path: file.path, index: 0 });
+						await openGenView(this, { path: file.path, index: 0, title: first.spec.title });
 					})();
 				}
 				return true;

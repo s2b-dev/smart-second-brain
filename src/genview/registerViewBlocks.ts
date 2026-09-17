@@ -81,7 +81,7 @@ function renderNoteAction(
 		el,
 		"maximize-2",
 		"Open as view",
-		() => openGenView(plugin, { path: sourcePath, index: fence.index }),
+		() => openGenView(plugin, { path: sourcePath, index: fence.index, title: fence.spec.title }),
 		"s2b-view-open",
 	);
 }
@@ -89,11 +89,15 @@ function renderNoteAction(
 function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {
 	const bar = el.createDiv({ cls: "s2b-view-toolbar" });
 	bar.createSpan({ cls: "s2b-view-toolbar-title", text: spec.title ?? "View" });
-	// Saving twice from the same block would create a second note; remember the first.
-	let saved: TFile | null = null;
-	const save = async (): Promise<TFile> => {
-		saved ??= await saveViewAsNote(plugin.app, getData().viewsFolder, spec, source);
-		return saved;
+	// Saving twice from the same block would create a second note: share one in-flight
+	// save between both buttons, and forget it only if it failed.
+	let saving: Promise<TFile> | null = null;
+	const save = (): Promise<TFile> => {
+		saving ??= saveViewAsNote(plugin.app, getData().viewsFolder, spec, source).catch((error: unknown) => {
+			saving = null;
+			throw error;
+		});
+		return saving;
 	};
 	const report = (error: unknown) =>
 		new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
@@ -114,7 +118,7 @@ function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: Vie
 	iconButton(bar, "maximize-2", "Save and open as its own view", async () => {
 		try {
 			const file = await save();
-			await openGenView(plugin, { path: file.path, index: 0 });
+			await openGenView(plugin, { path: file.path, index: 0, title: spec.title });
 		} catch (error) {
 			report(error);
 		}
