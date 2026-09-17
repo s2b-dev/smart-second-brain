@@ -183,20 +183,18 @@ export const VIEW_RUNTIME_SCRIPT = `
 		}
 	});
 	let lastHeight = -1;
-	// Content height is the bottom edge of the body's children, not the document's
-	// own height: views routinely style html/body with height: 100% or
-	// min-height: 100vh, which inside a frame equals the frame's current height and
-	// would keep the frame from ever shrinking to short content.
+	// In auto-height mode html/body are forced to content height (see AUTO_HEIGHT_CSS),
+	// so the body's box is the content's box; scrollHeight also counts overflowing
+	// children. Body is not the scrolling element, so neither has the viewport floor.
 	const contentHeight = () => {
 		const body = document.body;
 		if (!body) return document.documentElement.offsetHeight;
-		let bottom = 0;
-		for (const child of body.children) {
-			const rect = child.getBoundingClientRect();
-			if (rect.height > 0 || rect.width > 0) bottom = Math.max(bottom, rect.bottom + window.scrollY);
-		}
 		const style = getComputedStyle(body);
-		return bottom + parseFloat(style.paddingBottom || "0") + parseFloat(style.marginBottom || "0");
+		return (
+			Math.max(body.offsetHeight, body.scrollHeight) +
+			parseFloat(style.marginTop || "0") +
+			parseFloat(style.marginBottom || "0")
+		);
 	};
 	const reportHeight = () => {
 		const height = Math.ceil(contentHeight());
@@ -223,6 +221,16 @@ export const VIEW_RUNTIME_SCRIPT = `
 `;
 
 /**
+ * Applied in auto-height mode: views routinely style html/body with `height: 100%` or
+ * `min-height: 100vh`, which inside a frame equals the frame's current height and would
+ * keep it from ever shrinking to short content (and would make percentage-sized
+ * children fill the frame instead of their content). With a declared `height` the
+ * frame is fixed and percentage layouts are the point, so this is left out.
+ */
+export const AUTO_HEIGHT_CSS =
+	"html, body { height: auto !important; min-height: 0 !important; max-height: none !important; }";
+
+/**
  * Make arbitrary JavaScript safe to place inside an inline `<script>`: the only sequence
  * that can end the element early is `</script`, and `<\/script` is the same text to the
  * JavaScript parser in every context (string, regex, comment) where a bundle could carry it.
@@ -236,7 +244,12 @@ export function escapeInlineScript(source: string): string {
  * the view's own body. Libraries are inlined whole (see `viewLibs.ts`); a sandboxed frame
  * has nowhere else to load them from.
  */
-export function buildViewSrcdoc(body: string, themeCss: string, libSources: readonly string[] = []): string {
+export function buildViewSrcdoc(
+	body: string,
+	themeCss: string,
+	libSources: readonly string[] = [],
+	autoHeight = true,
+): string {
 	const libScripts = libSources.map((source) => `<script>${escapeInlineScript(source)}</script>`).join("\n");
 	return `<!doctype html>
 <html>
@@ -257,6 +270,7 @@ body {
 }
 *, *::before, *::after { box-sizing: inherit; }
 a { color: var(--text-accent, inherit); cursor: pointer; }
+${autoHeight ? AUTO_HEIGHT_CSS : ""}
 </style>
 <script>${VIEW_RUNTIME_SCRIPT}</script>
 ${libScripts}
@@ -310,7 +324,12 @@ function scriptStringLiteral(value: string): string {
 }
 
 /** The full `srcdoc` for a view: the trusted outer relay frame wrapping the inner view document. */
-export function buildViewFrameSrcdoc(body: string, themeCss: string, libSources: readonly string[] = []): string {
+export function buildViewFrameSrcdoc(
+	body: string,
+	themeCss: string,
+	libSources: readonly string[] = [],
+	autoHeight = true,
+): string {
 	return `<!doctype html>
 <html>
 <head>
@@ -323,7 +342,7 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>
 <body>
-<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss, libSources))};${OUTER_RELAY_SCRIPT}</script>
+<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss, libSources, autoHeight))};${OUTER_RELAY_SCRIPT}</script>
 </body>
 </html>`;
 }

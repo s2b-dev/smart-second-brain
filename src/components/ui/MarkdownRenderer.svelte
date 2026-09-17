@@ -167,8 +167,10 @@ function normalizeLinks(containerEl: HTMLElement) {
 // blocks and loose lists that a seam between segments would cut). That render is
 // double-buffered: it happens in a hidden wrapper while the previous DOM stays on
 // screen, and swaps in once the wrapper's view frames report ready (capped), so
-// settling never blanks a frame that was already showing. The wrapper is kept —
-// moving an iframe out of it would reload it.
+// settling never blanks a frame that was already showing. The wrapper is then
+// unwrapped so the container stays flat (call sites style with direct-child
+// selectors such as `[&>p]`) — unless it holds an iframe, which a DOM move would
+// reload; only then does the wrapper stay.
 
 const TAIL_CLASS = "s2b-md-tail";
 const DOC_CLASS = "s2b-md-doc";
@@ -185,8 +187,8 @@ let destroyed = false;
 let sealedText = "";
 /** Nodes belonging to the live tail; replaced on every render while streaming. */
 let tailNodes: ChildNode[] = [];
-/** The whole-document wrapper currently showing, if the last render was one. */
-let doc: HTMLElement | null = null;
+/** The last render was a whole document (so a resumed stream must start over). */
+let settled = false;
 /**
  * Owners of the render children Obsidian's processors attach to rendered blocks
  * (Dataview tables, `s2b-view` frames, embeds). Handing the renderer the plugin
@@ -256,7 +258,7 @@ async function renderLatest() {
 	// Streaming: content normally extends what is already sealed. Anything else
 	// (a settled document on screen, a reset at a tool-call boundary, an edit)
 	// starts over.
-	if (doc !== null || !text.startsWith(sealedText)) resetDom();
+	if (settled || !text.startsWith(sealedText)) resetDom();
 	const remainder = text.slice(sealedText.length);
 	const sealEnd = findSealableEnd(remainder);
 	removeTail();
@@ -284,13 +286,14 @@ async function renderDocument(text: string, path: string) {
 	}
 	for (const node of [...container.childNodes]) if (node !== next) node.remove();
 	next.classList.remove(DOC_PENDING_CLASS);
+	if (!next.querySelector("iframe")) next.replaceWith(...next.childNodes);
 	docComponent.unload();
 	tailComponent?.unload();
 	tailComponent = null;
 	tailNodes = [];
 	sealedText = "";
 	docComponent = nextComponent;
-	doc = next;
+	settled = true;
 }
 
 /** Resolve once every view frame under `root` has reported ready, or after the grace period. */
@@ -315,7 +318,7 @@ function resetDom() {
 	removeTail();
 	container?.empty();
 	sealedText = "";
-	doc = null;
+	settled = false;
 	docComponent.unload();
 	docComponent = loadedComponent();
 }

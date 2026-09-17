@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	AUTO_HEIGHT_CSS,
 	buildThemeCss,
 	buildViewFrameSrcdoc,
 	buildViewSrcdoc,
@@ -43,6 +44,12 @@ describe("buildViewSrcdoc (inner document)", () => {
 	it("keeps the runtime free of template placeholders and script terminators", () => {
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("${");
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("</script");
+	});
+
+	it("forces html/body to content height only in auto-height mode", () => {
+		expect(buildViewSrcdoc("x", "")).toContain(AUTO_HEIGHT_CSS);
+		expect(buildViewSrcdoc("x", "", [], false)).not.toContain(AUTO_HEIGHT_CSS);
+		expect(buildViewFrameSrcdoc("x", "", [], false)).not.toContain("min-height: 0 !important");
 	});
 
 	it("inlines requested libraries between the runtime and the body, escaped for inline script", () => {

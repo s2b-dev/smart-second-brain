@@ -73,7 +73,12 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		}
 
 		// Set last: the frame starts loading (and may post `ready`) as soon as srcdoc is assigned.
-		frame.srcdoc = buildViewFrameSrcdoc(this.spec.body, collectThemeCss(), resolveViewLibs(this.spec.libs).sources);
+		frame.srcdoc = buildViewFrameSrcdoc(
+			this.spec.body,
+			collectThemeCss(),
+			resolveViewLibs(this.spec.libs).sources,
+			this.spec.height === undefined,
+		);
 	}
 
 	onunload(): void {
