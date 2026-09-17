@@ -2,6 +2,8 @@ import { type App, Notice, normalizePath, setIcon, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
+import { openGenView } from "../views/gen-view/GenView";
+import { viewFenceAtLine } from "./viewFences";
 import { ViewRenderChild } from "./ViewRenderChild";
 import { resolveViewLibs, VIEW_LIBS } from "./viewLibs";
 import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wrapViewFence } from "./viewSpec";
@@ -36,10 +38,12 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 			});
 			return;
 		}
-		// Inside a chat the block is a proposal the user may want to keep; in a note it
-		// already is the note, so the toolbar only appears in the chat.
+		// Inside a chat the block is a proposal the user may want to keep, so it gets a
+		// toolbar; in a note it already is the note and only offers to open as a pane.
 		if (el.closest(`.workspace-leaf-content[data-type="${VIEW_TYPE_CHAT}"]`)) {
 			renderChatToolbar(plugin, el, spec, source);
+		} else {
+			renderNoteAction(plugin, el, ctx.sourcePath, ctx.getSectionInfo(el));
 		}
 		ctx.addChild(new ViewRenderChild(el, plugin.app, spec, ctx.sourcePath));
 	});
@@ -59,9 +63,40 @@ function renderPlaceholder(el: HTMLElement): void {
 	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" }).style.animationDelay = phase;
 }
 
+/**
+ * In a note, a hover-revealed corner button that opens this block as its own pane.
+ * The block's index among the note's view fences comes from the section info Obsidian
+ * hands the processor; without it (some embed contexts) there is no safe target.
+ */
+function renderNoteAction(
+	plugin: SecondBrainPlugin,
+	el: HTMLElement,
+	sourcePath: string,
+	section: { text: string; lineStart: number } | null,
+): void {
+	if (!section || !sourcePath) return;
+	const fence = viewFenceAtLine(section.text, section.lineStart);
+	if (!fence) return;
+	iconButton(
+		el,
+		"maximize-2",
+		"Open as view",
+		() => openGenView(plugin, { path: sourcePath, index: fence.index }),
+		"s2b-view-open",
+	);
+}
+
 function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {
 	const bar = el.createDiv({ cls: "s2b-view-toolbar" });
 	bar.createSpan({ cls: "s2b-view-toolbar-title", text: spec.title ?? "View" });
+	// Saving twice from the same block would create a second note; remember the first.
+	let saved: TFile | null = null;
+	const save = async (): Promise<TFile> => {
+		saved ??= await saveViewAsNote(plugin.app, getData().viewsFolder, spec, source);
+		return saved;
+	};
+	const report = (error: unknown) =>
+		new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
 
 	iconButton(bar, "copy", "Copy as block to paste into a note", async () => {
 		await navigator.clipboard.writeText(wrapViewFence(source));
@@ -69,18 +104,26 @@ function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: Vie
 	});
 	iconButton(bar, "save", "Save as a note in the vault", async () => {
 		try {
-			const file = await saveViewAsNote(plugin.app, getData().viewsFolder, spec, source);
+			const file = await save();
 			new Notice(`Saved view to ${file.path}`);
 			await plugin.app.workspace.getLeaf("tab").openFile(file);
 		} catch (error) {
-			new Notice(`Could not save view: ${error instanceof Error ? error.message : String(error)}`);
+			report(error);
+		}
+	});
+	iconButton(bar, "maximize-2", "Save and open as its own view", async () => {
+		try {
+			const file = await save();
+			await openGenView(plugin, { path: file.path, index: 0 });
+		} catch (error) {
+			report(error);
 		}
 	});
 }
 
-function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => Promise<void>): void {
+function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => Promise<void>, cls = ""): void {
 	const button = parent.createDiv({
-		cls: "clickable-icon",
+		cls: `clickable-icon ${cls}`.trim(),
 		attr: { role: "button", tabindex: "0", "aria-label": label },
 	});
 	setIcon(button, icon);

@@ -44,6 +44,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		private readonly app: App,
 		private readonly spec: ViewSpec,
 		private readonly sourcePath: string,
+		/** `fill`: the frame takes its container's height (a leaf) instead of sizing to content. */
+		private readonly options: { fill?: boolean } = {},
 	) {
 		super(containerEl);
 	}
@@ -57,7 +59,8 @@ export class ViewRenderChild extends MarkdownRenderChild {
 				title: this.spec.title ?? "View",
 			},
 		});
-		frame.style.height = `${(this.spec.height ?? DEFAULT_AUTO_HEIGHT) + 2 * VIEW_FRAME_PADDING_PX}px`;
+		if (this.options.fill) frame.addClass("s2b-view-fill");
+		else frame.style.height = `${(this.spec.height ?? DEFAULT_AUTO_HEIGHT) + 2 * VIEW_FRAME_PADDING_PX}px`;
 		this.frame = frame;
 
 		this.registerDomEvent(window, "message", (event: MessageEvent) => this.onMessage(event));
@@ -77,7 +80,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 			this.spec.body,
 			collectThemeCss(),
 			resolveViewLibs(this.spec.libs).sources,
-			this.spec.height === undefined,
+			!this.options.fill && this.spec.height === undefined,
 		);
 	}
 
@@ -105,6 +108,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 				this.scheduleRefresh();
 				break;
 			case "resize": {
+				if (this.options.fill) break;
 				// Auto: follow the content. Declared: the layout gets that height, but the frame
 				// shrinks to the content's drawn extent when that is shorter — models over-estimate
 				// heights, and the surplus would show as empty space. Percentage-sized children

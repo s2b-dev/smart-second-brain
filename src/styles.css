@@ -1660,7 +1660,37 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 
 /* ---- Agent-generated views (`s2b-view` fences, src/genview) ---------------- */
 .s2b-view {
+	position: relative;
 	margin: var(--size-4-2) 0;
+}
+/* In a note: hover-revealed corner button that opens the block as its own pane. */
+.s2b-view-open {
+	position: absolute;
+	top: var(--size-4-2);
+	right: var(--size-4-2);
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+.s2b-view:hover .s2b-view-open,
+.s2b-view-open:focus-visible {
+	opacity: 1;
+}
+@media (hover: none) {
+	.s2b-view-open {
+		opacity: 1;
+	}
+}
+/* ---- A view as its own leaf (views/gen-view) ---- */
+.view-content.s2b-gen-view {
+	padding: 0;
+}
+.s2b-gen-view-body {
+	height: 100%;
+}
+.s2b-view-frame.s2b-view-fill {
+	height: 100%;
+	border: 0;
+	border-radius: 0;
 }
 .s2b-view-frame {
 	display: block;

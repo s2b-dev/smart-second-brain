@@ -30,6 +30,8 @@ import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerViewBlocks } from "./genview/registerViewBlocks";
+import { findViewFences } from "./genview/viewFences";
+import { GenView, openGenView, VIEW_TYPE_GEN_VIEW } from "./views/gen-view/GenView";
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
@@ -479,6 +481,8 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
+		// A note's `s2b-view` fence as its own leaf (see views/gen-view/GenView.ts).
+		this.registerView(VIEW_TYPE_GEN_VIEW, (leaf) => new GenView(leaf, this));
 
 		if (this.manifest.dir === undefined) {
 			this.unload();
@@ -529,6 +533,26 @@ export default class SecondBrainPlugin extends Plugin {
 		});
 
 		this.registerMobileNavbarSearchOverride();
+
+		this.addCommand({
+			id: "open-note-as-view",
+			name: "Open note as view",
+			icon: "layout-dashboard",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!file || file.extension !== "md") return false;
+				if (!checking) {
+					void (async () => {
+						if (findViewFences(await this.app.vault.read(file)).length === 0) {
+							new Notice("This note has no view block.");
+							return;
+						}
+						await openGenView(this, { path: file.path, index: 0 });
+					})();
+				}
+				return true;
+			},
+		});
 
 		this.addCommand({
 			id: "open-smart-graph",

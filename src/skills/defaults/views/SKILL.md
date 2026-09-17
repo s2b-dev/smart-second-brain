@@ -15,8 +15,9 @@ wrote it. An optional frontmatter block at the top declares a title, a fixed hei
 named Dataview queries that the host runs for you and keeps live as the vault changes.
 
 The user keeps a view from the toolbar above it: copy it as a block to paste into any
-note, or save it as its own note. Do not create that note yourself unless asked; if the
-user does ask, stage it with `manage_notes` and put the same fence in the note body.
+note, save it as its own note, or save and open it as its own pane. A view in a note
+can be opened as a pane at any time. Do not create that note yourself unless asked; if
+the user does ask, stage it with `manage_notes` and put the same fence in the note body.
 
 ## Format
 ````markdown
