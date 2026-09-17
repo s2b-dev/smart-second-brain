@@ -23,7 +23,7 @@ export class WidgetView extends FileView {
 	private body: HTMLElement | null = null;
 	private child: WidgetRenderChild | null = null;
 	private source: HTMLElement | null = null;
-	private icon = DEFAULT_WIDGET_ICON;
+	private tabIcon = DEFAULT_WIDGET_ICON;
 	/** mtime of the file when the source editor loaded it; a save refuses if the file moved on. */
 	private sourceMtime = 0;
 	private sourceStaleHint: HTMLElement | null = null;
@@ -41,7 +41,7 @@ export class WidgetView extends FileView {
 	}
 
 	getIcon(): string {
-		return this.icon;
+		return this.tabIcon;
 	}
 
 	canAcceptExtension(extension: string): boolean {
@@ -103,8 +103,8 @@ export class WidgetView extends FileView {
 		this.body.empty();
 		const spec = parseWidgetSpec(text);
 		const icon = resolveWidgetIcon(spec.icon);
-		if (icon !== this.icon) {
-			this.icon = icon;
+		if (icon !== this.tabIcon) {
+			this.tabIcon = icon;
 			// The tab header read getIcon() before the file was parsed; internal leaf API.
 			(this.leaf as unknown as { updateHeader?: () => void }).updateHeader?.();
 		}
