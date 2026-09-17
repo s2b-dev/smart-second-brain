@@ -93,3 +93,13 @@ export function findSealableEnd(remainder: string): number {
 	}
 	return sealable;
 }
+
+/**
+ * Whether `markdown` defines link references or footnotes (`[label]: …`, `[^n]: …`).
+ * A definition resolves references anywhere in the document, so a reply that has
+ * any must be rendered as one document at settle; without them each sealed
+ * segment is already exactly what the full document would have produced.
+ */
+export function hasReferenceDefinitions(markdown: string): boolean {
+	return /^ {0,3}\[[^\]\n]+\]:/m.test(markdown);
+}

@@ -7,12 +7,14 @@ import { resolveViewLibs, VIEW_LIBS } from "./viewLibs";
 import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wrapViewFence } from "./viewSpec";
 
 /**
- * Set on the chat's markdown container while a reply is still streaming. An unclosed
- * fence renders as a code block on every frame of the stream, so without this guard a
- * half-written view would spin up a fresh iframe (and run half a script) per token.
- * The final, settled render has the class removed and renders the frame once.
+ * Set on the chat renderer's staging element for the still-streaming tail of a reply
+ * (`MarkdownRenderer.svelte`). An unclosed fence renders as a code block on every
+ * frame of the stream, so without this guard a half-written view would spin up a
+ * fresh iframe (and run half a script) per token. Once the fence closes and its
+ * paragraph is sealed it renders outside the tail, and the frame appears right then —
+ * not only when the whole reply has settled.
  */
-export const STREAMING_CONTAINER_CLASS = "s2b-md-streaming";
+export const STREAMING_TAIL_CLASS = "s2b-md-tail";
 
 /** Must match the `s2b-view-sweep` keyframes duration in styles.css. */
 const SWEEP_PERIOD_MS = 1800;
@@ -21,7 +23,7 @@ const SWEEP_PERIOD_MS = 1800;
 export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor(VIEW_BLOCK_LANGUAGE, (source, el, ctx) => {
 		el.addClass("s2b-view");
-		if (el.closest(`.${STREAMING_CONTAINER_CLASS}`)) {
+		if (el.closest(`.${STREAMING_TAIL_CLASS}`)) {
 			renderPlaceholder(el);
 			return;
 		}

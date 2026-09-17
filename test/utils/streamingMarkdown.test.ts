@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findSealableEnd } from "../../src/utils/streamingMarkdown";
+import { findSealableEnd, hasReferenceDefinitions } from "../../src/utils/streamingMarkdown";
 
 describe("findSealableEnd", () => {
 	it("seals nothing while the first paragraph is still streaming", () => {
@@ -116,5 +116,20 @@ describe("findSealableEnd", () => {
 		expect(findSealableEnd(text)).toBe(text.indexOf("next"));
 		// Tilde fences may carry anything in the info string.
 		expect(findSealableEnd("~~~foo`bar\n\nstill code\n")).toBe(0);
+	});
+});
+
+describe("hasReferenceDefinitions", () => {
+	it("detects link-reference and footnote definitions", () => {
+		expect(hasReferenceDefinitions("See [docs][ref].\n\n[ref]: https://example.com")).toBe(true);
+		expect(hasReferenceDefinitions("A claim.[^1]\n\n[^1]: The source.")).toBe(true);
+		expect(hasReferenceDefinitions("   [indented]: x")).toBe(true);
+	});
+
+	it("ignores ordinary links, tasks and bracketed text", () => {
+		expect(hasReferenceDefinitions("See [docs](https://example.com).")).toBe(false);
+		expect(hasReferenceDefinitions("- [ ] todo\n- [x] done")).toBe(false);
+		expect(hasReferenceDefinitions("Array[0]: value")).toBe(false);
+		expect(hasReferenceDefinitions("    [code]: in an indented code block")).toBe(false);
 	});
 });

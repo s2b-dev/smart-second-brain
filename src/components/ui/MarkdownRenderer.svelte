@@ -2,7 +2,7 @@
 import { Component, Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
 import { onDestroy } from "svelte";
 import { getPlugin } from "../../stores/state.svelte";
-import { findSealableEnd } from "../../utils/streamingMarkdown";
+import { findSealableEnd, hasReferenceDefinitions } from "../../utils/streamingMarkdown";
 import { openTagSearch } from "../../utils/tagSearch";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 
@@ -155,9 +155,16 @@ function normalizeLinks(containerEl: HTMLElement) {
 // untouched, and a live tail — the block still being written — that is the only
 // part re-parsed each frame. Without this the whole accumulated reply was torn
 // down and re-parsed every frame, O(length) per frame, which pinned the main
-// thread for the duration of a long reply (#482). Outside streaming, and when the
-// reply settles, the content is rendered as one document, so link-reference and
-// footnote definitions resolve exactly as before.
+// thread for the duration of a long reply (#482). Outside streaming the content is
+// rendered as one document. When a reply settles, only the unsealed remainder is
+// rendered — the sealed prefix is final DOM, and rebuilding it would reload every
+// stateful block in it (a view frame re-parses its libraries) — unless the reply
+// defines link references or footnotes, which resolve across segments and so still
+// get the whole document rendered as one.
+//
+// The tail's staging element carries `s2b-md-tail` while it renders, so a block
+// processor can tell "still being written" (show a placeholder) from "sealed"
+// (render for real) — see `registerViewBlocks.ts`.
 
 let latest = { content: "", sourcePath: "", enableMath: true, streaming: false };
 let frame: number | null = null;
@@ -175,6 +182,8 @@ let tailNodes: ChildNode[] = [];
  * the DOM they belong to goes away — the tail's on every tail render, the
  * document's on reset and destroy.
  */
+/** On the tail's staging element while it renders; see the rendering notes above. */
+const TAIL_CLASS = "s2b-md-tail";
 let docComponent = loadedComponent();
 let tailComponent: Component | null = null;
 
@@ -230,6 +239,13 @@ async function renderLatest() {
 	if (destroyed || !container) return;
 
 	if (!live) {
+		if (sealedText && text.startsWith(sealedText) && !hasReferenceDefinitions(text)) {
+			removeTail();
+			await appendSegment(text.slice(sealedText.length), path, docComponent);
+			if (destroyed || !container) return;
+			sealedText = text;
+			return;
+		}
 		resetDom();
 		await appendSegment(text, path, docComponent);
 		return;
@@ -248,7 +264,7 @@ async function renderLatest() {
 		sealedText += segment;
 	}
 	tailComponent = loadedComponent();
-	tailNodes = await appendSegment(text.slice(sealedText.length), path, tailComponent);
+	tailNodes = await appendSegment(text.slice(sealedText.length), path, tailComponent, true);
 }
 
 function resetDom() {
@@ -273,9 +289,9 @@ function removeTail() {
  * the container stays flat: no wrapper element, so `:first-child`/`:last-child`
  * styling on the container keeps working across segment seams.
  */
-async function appendSegment(markdown: string, path: string, component: Component): Promise<ChildNode[]> {
+async function appendSegment(markdown: string, path: string, component: Component, tail = false): Promise<ChildNode[]> {
 	if (!markdown || !container) return [];
-	const staging = container.createDiv({ attr: { style: "display: contents" } });
+	const staging = container.createDiv({ cls: tail ? TAIL_CLASS : "", attr: { style: "display: contents" } });
 	await MarkdownRenderer.render(plugin.app, markdown, staging, path, component);
 	if (destroyed || !container) {
 		staging.remove();
@@ -296,7 +312,6 @@ async function appendSegment(markdown: string, path: string, component: Componen
 <div
   bind:this={container}
   class={className}
-  class:s2b-md-streaming={streaming}
   onclick={handleClick}
   onmouseover={handleMouseOver}
   onmouseout={handleMouseOut}
