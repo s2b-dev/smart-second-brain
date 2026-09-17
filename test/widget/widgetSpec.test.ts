@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseWidgetSpec, widgetFileBasename, widgetIndexText, wrapWidgetFence } from "../../src/widget/widgetSpec";
+import {
+	isWidgetFilePath,
+	parseWidgetSpec,
+	widgetFileBasename,
+	widgetIndexText,
+	wrapWidgetFence,
+} from "../../src/widget/widgetSpec";
 
 describe("parseWidgetSpec", () => {
 	it("treats a source without frontmatter as body only", () => {
@@ -110,5 +116,18 @@ describe("widgetFileBasename", () => {
 	it("falls back to Widget", () => {
 		expect(widgetFileBasename(undefined)).toBe("Widget");
 		expect(widgetFileBasename("///")).toBe("Widget");
+	});
+});
+
+describe("isWidgetFilePath", () => {
+	it("matches the widget extension regardless of case or folder", () => {
+		expect(isWidgetFilePath("Widgets/Home.widget")).toBe(true);
+		expect(isWidgetFilePath("Home.WIDGET")).toBe(true);
+	});
+
+	it("rejects notes and look-alikes", () => {
+		expect(isWidgetFilePath("Home.md")).toBe(false);
+		expect(isWidgetFilePath("Home.widget.md")).toBe(false);
+		expect(isWidgetFilePath("widget")).toBe(false);
 	});
 });

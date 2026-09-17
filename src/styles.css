@@ -1681,10 +1681,36 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 /* ---- A widget as its own leaf (views/widget) ---- */
 .view-content.s2b-widget-view {
 	padding: 0;
+	display: flex;
+	flex-direction: column;
 }
 .s2b-widget-view-body {
 	position: relative;
-	height: 100%;
+	flex: 1;
+	min-height: 0;
+}
+/* Review bar above the frame while a chat's update to this widget is pending; the
+   bar itself is the notes' `.s2b-diff-actions-bar`, so the two surfaces match. */
+.s2b-widget-view-review {
+	flex-shrink: 0;
+	padding: var(--size-4-2) var(--size-4-2) 0;
+}
+.s2b-widget-view-review .s2b-diff-actions-bar {
+	margin: 0;
+}
+.s2b-widget-view-review-toggle {
+	padding: 2px 8px;
+	border: none;
+	border-radius: var(--radius-s);
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	cursor: pointer;
+}
+.s2b-widget-view-review-toggle:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
 }
 /* Invisible stand-in for a hovered note link inside a frame (see WidgetRenderChild). */
 .s2b-widget-hover-proxy {

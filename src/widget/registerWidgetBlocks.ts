@@ -2,13 +2,13 @@ import { type App, Notice, normalizePath, setIcon, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
-import { WIDGET_FILE_EXTENSION } from "../views/widget/WidgetView";
 import { resolveWidgetIcon } from "./widgetIcon";
 import { WidgetRenderChild } from "./WidgetRenderChild";
 import { resolveWidgetLibs, WIDGET_LIBS } from "./widgetLibs";
 import {
 	parseWidgetSpec,
 	WIDGET_BLOCK_LANGUAGE,
+	WIDGET_FILE_EXTENSION,
 	type WidgetSpec,
 	widgetFileBasename,
 	wrapWidgetFence,

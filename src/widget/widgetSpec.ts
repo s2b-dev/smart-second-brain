@@ -225,3 +225,11 @@ export function widgetFileBasename(title: string | undefined): string {
 		.trim();
 	return cleaned || "Widget";
 }
+
+/** Extension of a standalone widget file. Its content is a widget fence's body: optional frontmatter, then HTML. */
+export const WIDGET_FILE_EXTENSION = "widget";
+
+/** Whether a vault path names a standalone widget file (as opposed to a note holding widget fences). */
+export function isWidgetFilePath(path: string): boolean {
+	return path.toLowerCase().endsWith(`.${WIDGET_FILE_EXTENSION}`);
+}

@@ -1,9 +1,8 @@
 import { type App, MarkdownRenderChild, type TFile } from "obsidian";
 import type SecondBrainPlugin from "../../main";
 import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
-import { parseWidgetSpec } from "../../widget/widgetSpec";
+import { parseWidgetSpec, WIDGET_FILE_EXTENSION } from "../../widget/widgetSpec";
 import { Logger } from "../../utils/logging";
-import { WIDGET_FILE_EXTENSION } from "./WidgetView";
 
 /** Shape of the context Obsidian's (internal) embed registry passes to an embed creator. */
 interface WidgetEmbedContext {

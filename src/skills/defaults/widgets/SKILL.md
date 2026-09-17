@@ -29,8 +29,9 @@ note of links) unless the user asks for one.
 
 To **change an existing widget file**, read it first with `read_content` (it is plain text),
 then stage the edit with `manage_notes` — a targeted find/replace for a small change, a full
-rewrite for a redesign. The user reviews the diff; once accepted, an open pane and every
-embed of that widget re-render by themselves. `search_notes` finds a saved widget by its
+rewrite for a redesign. The user reviews the proposal as the rendered widget — in the
+chat's pending-changes bar and in the widget's open pane, with the source diff a click
+away — and once accepted, the pane and every embed of that widget re-render by themselves. `search_notes` finds a saved widget by its
 title and description only (never its code); if that fails, use `list_directory` on the
 widgets folder or ask the user for the path.
 
