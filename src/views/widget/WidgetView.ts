@@ -39,7 +39,7 @@ export class WidgetView extends FileView {
 	}
 
 	getIcon(): string {
-		return "layout-dashboard";
+		return "app-window";
 	}
 
 	canAcceptExtension(extension: string): boolean {
