@@ -17,9 +17,11 @@
  * ```
  *
  * `queries` are Dataview DQL strings the host runs and re-runs on vault changes; the
- * results are posted into the frame (see `viewQueries.ts`). The parser here is a small
- * purpose-built one rather than a YAML library: the block has three known keys, and a
- * query is either a one-line scalar or a `|`/`>` block, which is all a model needs.
+ * results are posted into the frame (see `viewQueries.ts`). `libs` names vendored
+ * browser libraries to inline into the frame (see `viewLibs.ts`). The parser here is a
+ * small purpose-built one rather than a YAML library: the block has four known keys, a
+ * query is either a one-line scalar or a `|`/`>` block, and a list is a scalar, a flow
+ * list, or a `- item` block — which is all a model needs.
  */
 
 export const VIEW_BLOCK_LANGUAGE = "s2b-view";
@@ -31,6 +33,8 @@ export interface ViewSpec {
 	height?: number;
 	/** Named Dataview queries, run by the host and kept live. */
 	queries: Record<string, string>;
+	/** Ids of vendored libraries to inline into the frame (`viewLibs.ts`), in order. */
+	libs: string[];
 	/** The HTML rendered inside the frame. */
 	body: string;
 }
@@ -46,7 +50,7 @@ export function parseViewSpec(source: string): ViewSpec {
 	let start = 0;
 	while (start < lines.length && lines[start].trim() === "") start++;
 	if (lines[start]?.trim() !== FRONTMATTER_DELIMITER) {
-		return { queries: {}, body: source.trim() };
+		return { queries: {}, libs: [], body: source.trim() };
 	}
 	let end = -1;
 	for (let i = start + 1; i < lines.length; i++) {
@@ -55,7 +59,7 @@ export function parseViewSpec(source: string): ViewSpec {
 			break;
 		}
 	}
-	if (end === -1) return { queries: {}, body: source.trim() };
+	if (end === -1) return { queries: {}, libs: [], body: source.trim() };
 
 	const spec = parseFrontmatter(lines.slice(start + 1, end));
 	spec.body = lines
@@ -66,7 +70,7 @@ export function parseViewSpec(source: string): ViewSpec {
 }
 
 function parseFrontmatter(lines: string[]): ViewSpec {
-	const spec: ViewSpec = { queries: {}, body: "" };
+	const spec: ViewSpec = { queries: {}, libs: [], body: "" };
 	let i = 0;
 	while (i < lines.length) {
 		const line = lines[i];
@@ -83,6 +87,10 @@ function parseFrontmatter(lines: string[]): ViewSpec {
 		const [, key, rawValue] = match;
 		if (key === "queries") {
 			i = parseQueries(lines, i + 1, spec.queries);
+			continue;
+		}
+		if (key === "libs") {
+			i = parseList(lines, i + 1, rawValue, spec.libs);
 			continue;
 		}
 		const value = unquote(rawValue);
@@ -132,6 +140,35 @@ function parseQueries(lines: string[], from: number, out: Record<string, string>
 		} else {
 			out[name] = unquote(rawValue);
 		}
+	}
+	return i;
+}
+
+/**
+ * Parse a list value: a scalar (`a`, `a b`, `a, b`), a flow list (`[a, b]`), or — when
+ * the value is empty — the `- item` lines that follow. Returns the index after the list.
+ */
+function parseList(lines: string[], from: number, rawValue: string, out: string[]): number {
+	const inline = rawValue.trim();
+	if (inline) {
+		for (const item of inline.replace(/^\[|\]$/g, "").split(/[\s,]+/)) {
+			const value = unquote(item);
+			if (value) out.push(value);
+		}
+		return from;
+	}
+	let i = from;
+	while (i < lines.length) {
+		const line = lines[i];
+		if (line.trim() === "") {
+			i++;
+			continue;
+		}
+		const match = /^\s*-\s*(.+)$/.exec(line);
+		if (!match || indentOf(line) === 0) return i;
+		const value = unquote(match[1]);
+		if (value) out.push(value);
+		i++;
 	}
 	return i;
 }

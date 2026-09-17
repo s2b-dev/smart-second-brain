@@ -1,5 +1,6 @@
 import { type App, type EventRef, MarkdownRenderChild } from "obsidian";
 import { buildViewFrameSrcdoc, collectThemeCss, parseFrameMessage } from "./viewFrame";
+import { resolveViewLibs } from "./viewLibs";
 import { runViewQueries } from "./viewQueries";
 import type { ViewSpec } from "./viewSpec";
 
@@ -66,7 +67,7 @@ export class ViewRenderChild extends MarkdownRenderChild {
 		}
 
 		// Set last: the frame starts loading (and may post `ready`) as soon as srcdoc is assigned.
-		frame.srcdoc = buildViewFrameSrcdoc(this.spec.body, collectThemeCss());
+		frame.srcdoc = buildViewFrameSrcdoc(this.spec.body, collectThemeCss(), resolveViewLibs(this.spec.libs).sources);
 	}
 
 	onunload(): void {

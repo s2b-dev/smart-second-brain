@@ -17,6 +17,7 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.4.0",
     "obsidian": "^1.13.1",
+    "plotly.js-gl3d-dist-min": "^4.1.1",
     "postcss": "^8.5.28",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",

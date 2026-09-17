@@ -195,8 +195,22 @@ export const VIEW_RUNTIME_SCRIPT = `
 })();
 `;
 
-/** The inner document: CSP, theme, base styles, runtime, then the view's own body. */
-export function buildViewSrcdoc(body: string, themeCss: string): string {
+/**
+ * Make arbitrary JavaScript safe to place inside an inline `<script>`: the only sequence
+ * that can end the element early is `</script`, and `<\/script` is the same text to the
+ * JavaScript parser in every context (string, regex, comment) where a bundle could carry it.
+ */
+export function escapeInlineScript(source: string): string {
+	return source.replace(/<\/script/gi, "<\\/script");
+}
+
+/**
+ * The inner document: CSP, theme, base styles, runtime, the requested libraries, then
+ * the view's own body. Libraries are inlined whole (see `viewLibs.ts`); a sandboxed frame
+ * has nowhere else to load them from.
+ */
+export function buildViewSrcdoc(body: string, themeCss: string, libSources: readonly string[] = []): string {
+	const libScripts = libSources.map((source) => `<script>${escapeInlineScript(source)}</script>`).join("\n");
 	return `<!doctype html>
 <html>
 <head>
@@ -219,6 +233,7 @@ body {
 a { color: var(--text-accent, inherit); cursor: pointer; }
 </style>
 <script>${VIEW_RUNTIME_SCRIPT}</script>
+${libScripts}
 </head>
 <body>
 ${body}
@@ -269,7 +284,7 @@ function scriptStringLiteral(value: string): string {
 }
 
 /** The full `srcdoc` for a view: the trusted outer relay frame wrapping the inner view document. */
-export function buildViewFrameSrcdoc(body: string, themeCss: string): string {
+export function buildViewFrameSrcdoc(body: string, themeCss: string, libSources: readonly string[] = []): string {
 	return `<!doctype html>
 <html>
 <head>
@@ -281,7 +296,7 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 </style>
 </head>
 <body>
-<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss))};${OUTER_RELAY_SCRIPT}</script>
+<script>const INNER = ${scriptStringLiteral(buildViewSrcdoc(body, themeCss, libSources))};${OUTER_RELAY_SCRIPT}</script>
 </body>
 </html>`;
 }

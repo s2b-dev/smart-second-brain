@@ -4,7 +4,7 @@ import { parseViewSpec, viewFileBasename, wrapViewFence } from "../../src/genvie
 describe("parseViewSpec", () => {
 	it("treats a source without frontmatter as body only", () => {
 		const spec = parseViewSpec("\n<div>hi</div>\n");
-		expect(spec).toEqual({ queries: {}, body: "<div>hi</div>" });
+		expect(spec).toEqual({ queries: {}, libs: [], body: "<div>hi</div>" });
 	});
 
 	it("parses title, height and scalar queries", () => {
@@ -55,6 +55,16 @@ describe("parseViewSpec", () => {
 		expect(spec.title).toBeUndefined();
 		expect(spec.height).toBeUndefined();
 		expect(spec.body).toBe("x");
+	});
+
+	it("parses libs as a scalar, a flow list, or a block list", () => {
+		expect(parseViewSpec("---\nlibs: plotly\n---\nx").libs).toEqual(["plotly"]);
+		expect(parseViewSpec("---\nlibs: plotly, three\n---\nx").libs).toEqual(["plotly", "three"]);
+		expect(parseViewSpec('---\nlibs: ["plotly", three]\n---\nx').libs).toEqual(["plotly", "three"]);
+		const block = parseViewSpec("---\nlibs:\n  - plotly\n  - 'three'\ntitle: T\n---\nx");
+		expect(block.libs).toEqual(["plotly", "three"]);
+		expect(block.title).toBe("T");
+		expect(parseViewSpec("---\ntitle: T\n---\nx").libs).toEqual([]);
 	});
 
 	it("falls back to body-only when the frontmatter never closes", () => {

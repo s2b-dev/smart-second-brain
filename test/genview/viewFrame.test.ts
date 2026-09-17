@@ -3,6 +3,7 @@ import {
 	buildThemeCss,
 	buildViewFrameSrcdoc,
 	buildViewSrcdoc,
+	escapeInlineScript,
 	OUTER_FRAME_CSP,
 	OUTER_RELAY_SCRIPT,
 	parseFrameMessage,
@@ -43,6 +44,17 @@ describe("buildViewSrcdoc (inner document)", () => {
 		expect(VIEW_RUNTIME_SCRIPT).not.toContain("</script");
 	});
 
+	it("inlines requested libraries between the runtime and the body, escaped for inline script", () => {
+		const lib = 'window.LIB = 1; const s = "</script><img src=x>"; /* </SCRIPT */';
+		const doc = buildViewSrcdoc("<p id=x>hi</p>", "", [lib]);
+		expect(doc).toContain(`<script>${escapeInlineScript(lib)}</script>`);
+		expect(doc.indexOf(VIEW_RUNTIME_SCRIPT)).toBeLessThan(doc.indexOf("window.LIB = 1"));
+		expect(doc.indexOf("window.LIB = 1")).toBeLessThan(doc.indexOf("<p id=x>hi</p>"));
+		// Every </script> in the document must close a script we opened: runtime + lib.
+		expect(doc.split("</script>")).toHaveLength(3);
+		expect(buildViewSrcdoc("x", "")).not.toContain("<script></script>");
+	});
+
 	it("reports ready from the load event, after the document itself has loaded", () => {
 		const loadHandler = VIEW_RUNTIME_SCRIPT.indexOf('window.addEventListener("load"');
 		const ready = VIEW_RUNTIME_SCRIPT.indexOf('send({ type: "ready" })');
@@ -69,10 +81,14 @@ describe("buildViewFrameSrcdoc (outer relay document)", () => {
 		expect(outer).toContain(OUTER_RELAY_SCRIPT);
 	});
 
-	it("round-trips the inner document through the literal", () => {
-		const match = /const INNER = ("(?:[^"\\]|\\.)*");/.exec(outer);
+	it("round-trips the inner document, libraries included, through the literal", () => {
+		const withLib = buildViewFrameSrcdoc(body, ":root { --a: b; }", ["window.LIB = '</script>';"]);
+		const match = /const INNER = ("(?:[^"\\]|\\.)*");/.exec(withLib);
 		expect(match).not.toBeNull();
-		expect(JSON.parse(match?.[1] ?? '""')).toBe(buildViewSrcdoc(body, ":root { --a: b; }"));
+		expect(JSON.parse(match?.[1] ?? '""')).toBe(
+			buildViewSrcdoc(body, ":root { --a: b; }", ["window.LIB = '</script>';"]),
+		);
+		expect(withLib.split("</script>")).toHaveLength(2);
 	});
 
 	it("keeps the relay free of template placeholders", () => {

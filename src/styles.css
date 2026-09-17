@@ -1699,30 +1699,65 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 .s2b-view-placeholder {
 	display: flex;
 	flex-direction: column;
+	align-items: flex-start;
 	gap: var(--size-4-2);
 }
-.s2b-view-skeleton-bar {
-	height: 0.75em;
-	border-radius: var(--radius-s);
+/* A bar-chart silhouette (CSS mask) lit by the same faint→bright→faint band that
+   sweeps the thinking-process header, so "a view is on its way" reads like every
+   other in-flight state in the chat. */
+.s2b-view-placeholder-chart {
+	width: 100%;
+	max-width: 280px;
+	height: 72px;
 	background: linear-gradient(
-		90deg,
-		var(--background-modifier-hover) 0%,
-		var(--background-modifier-border) 50%,
-		var(--background-modifier-hover) 100%
+		100deg,
+		var(--background-modifier-border) 0%,
+		var(--background-modifier-border) 35%,
+		var(--text-faint) 50%,
+		var(--background-modifier-border) 65%,
+		var(--background-modifier-border) 100%
 	);
-	background-size: 200% 100%;
-	animation: s2b-view-shimmer 1600ms linear infinite;
+	background-size: 220% 100%;
+	-webkit-mask: var(--s2b-view-chart-mask) no-repeat left center / contain;
+	mask: var(--s2b-view-chart-mask) no-repeat left center / contain;
+	animation: s2b-view-sweep 1.8s linear infinite;
+	--s2b-view-chart-mask: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 72' preserveAspectRatio='xMinYMid meet'%3E%3Crect x='0' y='0' width='2' height='72' rx='1'/%3E%3Crect x='0' y='70' width='280' height='2' rx='1'/%3E%3Crect x='16' y='40' width='26' height='30' rx='3'/%3E%3Crect x='52' y='18' width='26' height='52' rx='3'/%3E%3Crect x='88' y='30' width='26' height='40' rx='3'/%3E%3Crect x='124' y='6' width='26' height='64' rx='3'/%3E%3Crect x='160' y='24' width='26' height='46' rx='3'/%3E%3Crect x='196' y='12' width='26' height='58' rx='3'/%3E%3Crect x='232' y='34' width='26' height='36' rx='3'/%3E%3C/svg%3E");
 }
 .s2b-view-placeholder-label {
-	margin-top: var(--size-4-1);
-	animation: s2b-view-pulse 1600ms ease-in-out infinite;
+	font-size: var(--font-ui-small);
+	background: linear-gradient(
+		100deg,
+		var(--text-faint) 0%,
+		var(--text-faint) 35%,
+		var(--text-normal) 50%,
+		var(--text-faint) 65%,
+		var(--text-faint) 100%
+	);
+	background-size: 220% 100%;
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+	animation: s2b-view-sweep 1.8s linear infinite;
 }
-@keyframes s2b-view-shimmer {
-	from {
-		background-position: 200% 0;
+@keyframes s2b-view-sweep {
+	0% {
+		background-position: 130% 0;
 	}
-	to {
-		background-position: -200% 0;
+	100% {
+		background-position: -30% 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.s2b-view-placeholder-chart {
+		animation: none;
+		background: var(--background-modifier-border);
+	}
+	.s2b-view-placeholder-label {
+		animation: none;
+		background: none;
+		color: var(--text-muted);
+		-webkit-text-fill-color: var(--text-muted);
 	}
 }
 @keyframes s2b-view-pulse {

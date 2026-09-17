@@ -3,6 +3,7 @@ import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { ViewRenderChild } from "./ViewRenderChild";
+import { resolveViewLibs, VIEW_LIBS } from "./viewLibs";
 import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wrapViewFence } from "./viewSpec";
 
 /**
@@ -13,9 +14,8 @@ import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wr
  */
 export const STREAMING_CONTAINER_CLASS = "s2b-md-streaming";
 
-/** Must match the `s2b-view-shimmer` keyframes duration in styles.css. */
-const SHIMMER_PERIOD_MS = 1600;
-const SKELETON_BAR_WIDTHS = ["42%", "78%", "60%"];
+/** Must match the `s2b-view-sweep` keyframes duration in styles.css. */
+const SWEEP_PERIOD_MS = 1800;
 
 /** Register the `s2b-view` code-block processor. Applies everywhere markdown renders. */
 export function registerViewBlocks(plugin: SecondBrainPlugin): void {
@@ -26,6 +26,14 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 			return;
 		}
 		const spec = parseViewSpec(source);
+		const { unknown } = resolveViewLibs(spec.libs);
+		if (unknown.length > 0) {
+			el.createDiv({
+				cls: "s2b-view-blocked",
+				text: `This view asks for a library that is not bundled: ${unknown.join(", ")}. Available: ${Object.keys(VIEW_LIBS).join(", ")}.`,
+			});
+			return;
+		}
 		// Inside a chat the block is a proposal the user may want to keep; in a note it
 		// already is the note, so the toolbar only appears in the chat.
 		if (el.closest(`.workspace-leaf-content[data-type="${VIEW_TYPE_CHAT}"]`)) {
@@ -36,20 +44,17 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 }
 
 /**
- * Skeleton shown while the fence is still being streamed. The streaming tail is
- * re-rendered on every frame, so this element is recreated many times a second; the
- * shimmer's phase is pinned to wall-clock time so it reads as one continuous
+ * Placeholder shown while the fence is still being streamed: a chart silhouette and a
+ * label, both carrying the same gradient sweep the thinking-process header uses. The
+ * streaming tail is re-rendered on every frame, so this element is recreated many times
+ * a second; the sweep's phase is pinned to wall-clock time so it reads as one continuous
  * animation rather than restarting with each rebuild.
  */
 function renderPlaceholder(el: HTMLElement): void {
 	const placeholder = el.createDiv({ cls: "s2b-view-placeholder" });
-	const phase = `-${Math.round(performance.now() % SHIMMER_PERIOD_MS)}ms`;
-	for (const width of SKELETON_BAR_WIDTHS) {
-		const bar = placeholder.createDiv({ cls: "s2b-view-skeleton-bar" });
-		bar.style.width = width;
-		bar.style.animationDelay = phase;
-	}
-	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" });
+	const phase = `-${Math.round(performance.now() % SWEEP_PERIOD_MS)}ms`;
+	placeholder.createDiv({ cls: "s2b-view-placeholder-chart" }).style.animationDelay = phase;
+	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" }).style.animationDelay = phase;
 }
 
 function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {
