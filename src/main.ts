@@ -29,6 +29,7 @@ import { setPlugin } from "./stores/state.svelte";
 import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
+import { registerViewBlocks } from "./genview/registerViewBlocks";
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
@@ -810,6 +811,10 @@ export default class SecondBrainPlugin extends Plugin {
 
 		// Register reading view diff highlighting
 		this.registerMarkdownPostProcessor(createReadingViewDiffPostProcessor(this));
+
+		// Render `s2b-view` fences (agent-generated views) as sandboxed frames — in
+		// chat replies, notes, and embeds alike.
+		registerViewBlocks(this);
 
 		// Re-render reading views when pending changes update. `rerender(true)`
 		// rebuilds the preview from scratch and Obsidian re-asserts its OWN scroll

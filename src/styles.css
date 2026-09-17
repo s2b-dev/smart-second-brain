@@ -1657,3 +1657,37 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	height: 100%;
 	pointer-events: none;
 }
+
+/* ---- Agent-generated views (`s2b-view` fences, src/genview) ---------------- */
+.s2b-view {
+	margin: var(--size-4-2) 0;
+}
+.s2b-view-frame {
+	display: block;
+	width: 100%;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+}
+.s2b-view-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+	margin-bottom: var(--size-4-1);
+}
+.s2b-view-toolbar-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+.s2b-view-placeholder {
+	padding: var(--size-4-4);
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}

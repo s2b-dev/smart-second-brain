@@ -266,6 +266,25 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
       </SettingItem>
     {/if}
   </SettingGroup>
+
+  <SettingGroup heading="Views">
+    <SettingItem
+      name="Views folder"
+      desc="Where a view generated in chat is saved when you click its save button."
+    >
+      <FolderSuggest
+        app={plugin.app}
+        value={pluginData.viewsFolder}
+        placeholder="Views"
+        suggestionFn={(query) =>
+          suggestFolders().filter((folder) =>
+            folder.path.toLowerCase().includes(query.toLowerCase()),
+          )}
+        onSelected={(path: string) => (pluginData.viewsFolder = path)}
+        onSubmit={(path: string) => (pluginData.viewsFolder = path)}
+      />
+    </SettingItem>
+  </SettingGroup>
 </div>
 
 <style>

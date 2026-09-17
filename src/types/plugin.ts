@@ -474,6 +474,8 @@ export interface PluginData {
 
 	targetFolder: string;
 	attachmentFolder: string;
+	/** Folder where views generated in chat (`s2b-view` blocks) are saved as notes. */
+	viewsFolder: string;
 	/**
 	 * Configurable root vault folder for all agent context (default "Agents"). Holds three
 	 * fixed subdirectories: `Memories/` (shared memory notes) and `Skills/` (skill

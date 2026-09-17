@@ -213,6 +213,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	// Chat settings
 	targetFolder: "Chats",
 	attachmentFolder: "",
+	viewsFolder: "Views",
 	agentFolder: "Agents",
 	agentFolderMigrated: false,
 	coreSkillsSeeded: false,
@@ -535,6 +536,14 @@ export class PluginDataStore {
 		} catch {
 			// ignore
 		}
+		void this.saveSettings();
+	}
+
+	get viewsFolder() {
+		return this.#data.viewsFolder;
+	}
+	set viewsFolder(val: string) {
+		this.#data.viewsFolder = normalizePath(val || "Views");
 		void this.saveSettings();
 	}
 

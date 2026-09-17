@@ -9,7 +9,7 @@ import {
 } from "../../src/skills/defaults";
 
 /** The 4 core skills always seeded at startup (from src/skills/defaults/). */
-const CORE_SKILL_NAMES = ["explore-vault", "manage-notes", "manage-skills", "web"];
+const CORE_SKILL_NAMES = ["explore-vault", "manage-notes", "manage-skills", "views", "web"];
 
 /** The 6 integration skills (from src/skills/integrations/), seeded conditionally. */
 const CORE_PLUGIN_INTEGRATIONS: Record<string, string> = { canvas: "canvas", bases: "bases" };
@@ -21,7 +21,7 @@ const COMMUNITY_PLUGIN_INTEGRATIONS: Record<string, string> = {
 };
 
 describe("bundled skills split (defaults vs integrations)", () => {
-	it("BUNDLED_CORE_SKILLS is exactly the 4 core skills", () => {
+	it("BUNDLED_CORE_SKILLS is exactly the 5 core skills", () => {
 		expect(BUNDLED_CORE_SKILLS.map((s) => s.name).sort()).toEqual([...CORE_SKILL_NAMES].sort());
 	});
 

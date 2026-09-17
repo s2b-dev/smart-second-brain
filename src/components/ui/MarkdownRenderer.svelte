@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
+import { Component, Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
 import { onDestroy } from "svelte";
 import { getPlugin } from "../../stores/state.svelte";
 import { findSealableEnd } from "../../utils/streamingMarkdown";
@@ -168,6 +168,21 @@ let destroyed = false;
 let sealedText = "";
 /** Nodes belonging to the live tail; replaced on every render while streaming. */
 let tailNodes: ChildNode[] = [];
+/**
+ * Owners of the render children Obsidian's processors attach to rendered blocks
+ * (Dataview tables, `s2b-view` frames, embeds). Handing the renderer the plugin
+ * itself kept every such child alive until plugin unload; these are unloaded when
+ * the DOM they belong to goes away — the tail's on every tail render, the
+ * document's on reset and destroy.
+ */
+let docComponent = loadedComponent();
+let tailComponent: Component | null = null;
+
+function loadedComponent(): Component {
+	const component = new Component();
+	component.load();
+	return component;
+}
 
 $effect(() => {
 	// Read every reactive dep here so the effect re-runs when any of them change;
@@ -179,6 +194,8 @@ $effect(() => {
 onDestroy(() => {
 	destroyed = true;
 	if (frame !== null) cancelAnimationFrame(frame);
+	tailComponent?.unload();
+	docComponent.unload();
 });
 
 function schedule() {
@@ -214,7 +231,7 @@ async function renderLatest() {
 
 	if (!live) {
 		resetDom();
-		await appendSegment(text, path);
+		await appendSegment(text, path, docComponent);
 		return;
 	}
 
@@ -226,22 +243,27 @@ async function renderLatest() {
 	removeTail();
 	if (sealEnd > 0) {
 		const segment = remainder.slice(0, sealEnd);
-		await appendSegment(segment, path);
+		await appendSegment(segment, path, docComponent);
 		if (destroyed || !container) return;
 		sealedText += segment;
 	}
-	tailNodes = await appendSegment(text.slice(sealedText.length), path);
+	tailComponent = loadedComponent();
+	tailNodes = await appendSegment(text.slice(sealedText.length), path, tailComponent);
 }
 
 function resetDom() {
+	removeTail();
 	container?.empty();
 	sealedText = "";
-	tailNodes = [];
+	docComponent.unload();
+	docComponent = loadedComponent();
 }
 
 function removeTail() {
 	for (const node of tailNodes) node.remove();
 	tailNodes = [];
+	tailComponent?.unload();
+	tailComponent = null;
 }
 
 /**
@@ -251,10 +273,10 @@ function removeTail() {
  * the container stays flat: no wrapper element, so `:first-child`/`:last-child`
  * styling on the container keeps working across segment seams.
  */
-async function appendSegment(markdown: string, path: string): Promise<ChildNode[]> {
+async function appendSegment(markdown: string, path: string, component: Component): Promise<ChildNode[]> {
 	if (!markdown || !container) return [];
 	const staging = container.createDiv({ attr: { style: "display: contents" } });
-	await MarkdownRenderer.render(plugin.app, markdown, staging, path, plugin);
+	await MarkdownRenderer.render(plugin.app, markdown, staging, path, component);
 	if (destroyed || !container) {
 		staging.remove();
 		return [];
@@ -274,6 +296,7 @@ async function appendSegment(markdown: string, path: string): Promise<ChildNode[
 <div
   bind:this={container}
   class={className}
+  class:s2b-md-streaming={streaming}
   onclick={handleClick}
   onmouseover={handleMouseOver}
   onmouseout={handleMouseOut}
