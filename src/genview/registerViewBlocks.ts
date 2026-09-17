@@ -44,8 +44,8 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 }
 
 /**
- * Placeholder shown while the fence is still being streamed: a blank surface and a
- * label, both carrying the same gradient sweep the thinking-process header uses. The
+ * Placeholder shown while the fence is still being streamed: one blank card with the
+ * label centred in it, both carrying the sweep the thinking-process header uses. The
  * streaming tail is re-rendered on every frame, so this element is recreated many times
  * a second; the sweep's phase is pinned to wall-clock time so it reads as one continuous
  * animation rather than restarting with each rebuild.
@@ -53,7 +53,7 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 function renderPlaceholder(el: HTMLElement): void {
 	const placeholder = el.createDiv({ cls: "s2b-view-placeholder" });
 	const phase = `-${Math.round(performance.now() % SWEEP_PERIOD_MS)}ms`;
-	placeholder.createDiv({ cls: "s2b-view-placeholder-surface" }).style.animationDelay = phase;
+	placeholder.style.animationDelay = phase;
 	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" }).style.animationDelay = phase;
 }
 
