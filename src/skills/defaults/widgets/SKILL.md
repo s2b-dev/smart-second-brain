@@ -14,11 +14,18 @@ fragment — markup, `<style>`, `<script>` — rendered in a sandboxed frame rig
 wrote it. An optional frontmatter block at the top declares a title, a fixed height, and
 named Dataview queries that the host runs for you and keeps live as the vault changes.
 
-The user keeps a widget from the toolbar above it: copy it as a block to paste into a
-note, or save it as a standalone `.widget` file, which opens as its own pane and can be
-embedded in any note with `![[Name.widget]]`. Do not create that file yourself unless
-asked; if the user does ask, stage it with `manage_notes` as `<folder>/<Name>.widget` whose
-content is the fence **body** only — frontmatter, then HTML, no fence markers.
+**Always show a widget in the chat first**, as a fence in your reply — also when the user
+says "create", "build" or "make" a dashboard or chart. That *is* creating it. The user
+keeps it from the toolbar above it: copy it as a block to paste into a note, or save it as
+a standalone `.widget` file, which opens as its own pane and can be embedded in any note
+with `![[Name.widget]]`.
+
+Write a `.widget` file yourself only when the user explicitly asks to save, persist or
+file it (or names a file or folder for it), and even then put the fence in your reply as
+well. Stage the file with `manage_notes` as `<folder>/<Name>.widget` whose content is the
+fence **body** only — frontmatter, then HTML, no fence markers. The widget is the
+deliverable: do not wrap it in an extra note (a landing page, a note that embeds it, a
+note of links) unless the user asks for one.
 
 To **change an existing widget file**, read it first with `read_content` (it is plain text),
 then stage the edit with `manage_notes` — a targeted find/replace for a small change, a full

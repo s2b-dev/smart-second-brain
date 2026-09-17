@@ -3,6 +3,7 @@ import type SecondBrainPlugin from "../../main";
 import { DEFAULT_WIDGET_ICON, resolveWidgetIcon } from "../../widget/widgetIcon";
 import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
 import { parseWidgetSpec } from "../../widget/widgetSpec";
+import { RenameWidgetModal } from "./RenameWidgetModal";
 
 export const VIEW_TYPE_WIDGET = "smart-second-brain-widget";
 /** Extension of a standalone widget file. Its content is a widget fence's body: optional frontmatter, then HTML. */
@@ -56,6 +57,7 @@ export class WidgetView extends FileView {
 
 		this.addAction("pencil", "Edit source", () => void this.toggleSource());
 		this.addAction("refresh-cw", "Refresh", () => void this.render());
+		this.addAction("text-cursor-input", "Rename", () => this.promptRename());
 
 		this.registerEvent(
 			this.plugin.app.vault.on("modify", (file) => {
@@ -190,6 +192,10 @@ export class WidgetView extends FileView {
 		}
 		this.closeSource();
 		await this.render();
+	}
+
+	private promptRename(): void {
+		if (this.file) new RenameWidgetModal(this.plugin.app, this.file).open();
 	}
 
 	private closeSource(): void {
