@@ -22,6 +22,9 @@ export class GenView extends FileView {
 	private body: HTMLElement | null = null;
 	private child: ViewRenderChild | null = null;
 	private source: HTMLElement | null = null;
+	/** mtime of the file when the source editor loaded it; a save refuses if the file moved on. */
+	private sourceMtime = 0;
+	private sourceStaleHint: HTMLElement | null = null;
 	private rerenderTimer: number | null = null;
 
 	constructor(
@@ -54,7 +57,9 @@ export class GenView extends FileView {
 
 		this.registerEvent(
 			this.plugin.app.vault.on("modify", (file) => {
-				if (file.path === this.file?.path && !this.source) this.scheduleRender();
+				if (file.path !== this.file?.path) return;
+				if (this.source) this.markSourceStale();
+				else this.scheduleRender();
 			}),
 		);
 	}
@@ -118,6 +123,7 @@ export class GenView extends FileView {
 		if (this.file !== file || !this.body) return;
 		this.dropChild();
 		this.body.empty();
+		this.sourceMtime = file.stat.mtime;
 		this.source = this.body.createDiv({ cls: "s2b-gen-view-source" });
 		const textarea = this.source.createEl("textarea", {
 			cls: "s2b-gen-view-source-text",
@@ -130,6 +136,8 @@ export class GenView extends FileView {
 		const hint = bar.createSpan({ cls: "s2b-gen-view-source-hint" });
 		setIcon(hint, "info");
 		hint.createSpan({ text: "Frontmatter (title, height, queries, libs), then the HTML." });
+		this.sourceStaleHint = bar.createSpan({ cls: "s2b-gen-view-source-hint s2b-gen-view-source-stale" });
+		this.sourceStaleHint.hide();
 		save.addEventListener("click", () => void this.saveSource(textarea.value));
 		cancel.addEventListener("click", () => void this.toggleSource());
 		textarea.addEventListener("keydown", (event) => {
@@ -141,9 +149,30 @@ export class GenView extends FileView {
 		textarea.focus();
 	}
 
+	/** The file changed on disk while the editor holds an older copy: say so, and refuse to save over it. */
+	private markSourceStale(): void {
+		const hint = this.sourceStaleHint;
+		if (!hint || !hint.isShown()) {
+			if (hint) {
+				setIcon(hint, "alert-triangle");
+				hint.createSpan({ text: "Changed on disk while editing — Cancel to reload; Save is disabled." });
+				hint.show();
+			}
+		}
+	}
+
+	private isSourceStale(): boolean {
+		return this.file !== null && this.file.stat.mtime !== this.sourceMtime;
+	}
+
 	private async saveSource(text: string): Promise<void> {
 		const file = this.file;
 		if (!file) return;
+		if (this.isSourceStale()) {
+			this.markSourceStale();
+			new Notice("This view changed on disk while you were editing. Cancel to reload it, then edit again.");
+			return;
+		}
 		try {
 			await this.plugin.app.vault.modify(file, text.endsWith("\n") ? text : `${text}\n`);
 		} catch (error) {
@@ -157,5 +186,6 @@ export class GenView extends FileView {
 	private closeSource(): void {
 		this.source?.remove();
 		this.source = null;
+		this.sourceStaleHint = null;
 	}
 }

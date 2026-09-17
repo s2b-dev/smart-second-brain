@@ -1704,6 +1704,10 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 }
+.s2b-gen-view-source-stale {
+	margin-left: 0;
+	color: var(--text-warning);
+}
 .s2b-view-frame {
 	display: block;
 	/* The host sets this frame's height to content + padding; the border must sit

@@ -29,6 +29,8 @@ interface EmbedRegistry {
  */
 class ViewEmbed extends MarkdownRenderChild {
 	private child: ViewRenderChild | null = null;
+	/** Bumped per load and on unload so a slower, older read cannot install stale content. */
+	private generation = 0;
 
 	constructor(
 		containerEl: HTMLElement,
@@ -43,8 +45,10 @@ class ViewEmbed extends MarkdownRenderChild {
 	}
 
 	private async render(): Promise<void> {
+		const generation = ++this.generation;
 		try {
 			const text = await this.plugin.app.vault.cachedRead(this.file);
+			if (generation !== this.generation) return;
 			this.drop();
 			this.containerEl.empty();
 			this.containerEl.addClass("s2b-view", "s2b-view-embed");
@@ -57,6 +61,7 @@ class ViewEmbed extends MarkdownRenderChild {
 	}
 
 	onunload(): void {
+		this.generation++;
 		this.drop();
 	}
 
