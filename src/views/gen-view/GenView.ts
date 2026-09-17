@@ -148,6 +148,9 @@ export class GenView extends ItemView {
 		this.dropChild();
 		this.body?.empty();
 		this.body?.createDiv({ cls: "s2b-view-blocked", text });
+		// No fence title to show; the tab falls back to the note's name.
+		this.title = null;
+		this.refreshHeader();
 	}
 
 	private dropChild(): void {
