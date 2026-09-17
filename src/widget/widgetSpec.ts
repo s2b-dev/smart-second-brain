@@ -27,8 +27,10 @@
 export const WIDGET_BLOCK_LANGUAGE = "s2b-widget";
 
 export interface WidgetSpec {
-	/** Shown in the chat toolbar and used as the note name when saved. */
+	/** Shown in the chat toolbar and used as the file name when saved. */
 	title?: string;
+	/** One line on what the widget shows. With the title, the only text of a `.widget` file that is indexed. */
+	description?: string;
 	/** Fixed frame height in px. When absent the frame follows its content height. */
 	height?: number;
 	/** Named Dataview queries, run by the host and kept live. */
@@ -96,6 +98,8 @@ function parseFrontmatter(lines: string[]): WidgetSpec {
 		const value = unquote(rawValue);
 		if (key === "title" && value) {
 			spec.title = value;
+		} else if (key === "description" && value) {
+			spec.description = value;
 		} else if (key === "height") {
 			const height = Number.parseInt(value, 10);
 			if (Number.isFinite(height) && height > 0) spec.height = height;
@@ -197,6 +201,16 @@ export function wrapWidgetFence(source: string): string {
 	const longest = Math.max(2, ...[...source.matchAll(/`+/g)].map((m) => m[0].length));
 	const fence = "`".repeat(longest + 1);
 	return `${fence}${WIDGET_BLOCK_LANGUAGE}\n${source.trim()}\n${fence}\n`;
+}
+
+/**
+ * The text a `.widget` file contributes to the search indexes: its title and description,
+ * never its body. Enough to find a widget by what it is about; no markup or script becomes
+ * a chunk. Empty when it has neither (the indexer then falls back to the file name).
+ */
+export function widgetIndexText(source: string): string {
+	const { title, description } = parseWidgetSpec(source);
+	return [title, description].filter((part): part is string => Boolean(part)).join("\n");
 }
 
 /** A vault-safe note basename for a widget, from its title. */

@@ -23,8 +23,9 @@ content is the fence **body** only — frontmatter, then HTML, no fence markers.
 To **change an existing widget file**, read it first with `read_content` (it is plain text),
 then stage the edit with `manage_notes` — a targeted find/replace for a small change, a full
 rewrite for a redesign. The user reviews the diff; once accepted, an open pane and every
-embed of that widget re-render by themselves. Widget files are not in search results, so ask
-the user for the path or use `list_directory` on the widgets folder if you do not know it.
+embed of that widget re-render by themselves. `search_notes` finds a saved widget by its
+title and description only (never its code); if that fails, use `list_directory` on the
+widgets folder or ask the user for the path.
 
 ## Format
 ````markdown
@@ -58,7 +59,9 @@ queries:
 ```
 ````
 
-Frontmatter keys (all optional): `title` (toolbar label and note name when saved),
+Frontmatter keys (all optional): `title` (toolbar label and file name when saved),
+`description` (one line on what the widget shows — with the title, the only text of a saved
+widget that search sees, so always give one),
 `height` (frame height in px; omit to size to content — with it, the layout gets that
 height and the frame still shrinks if the drawn content is shorter), `queries` (name → Dataview DQL
 string; use `|` for a multi-line query), `libs` (bundled libraries to load, see

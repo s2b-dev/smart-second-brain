@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWidgetSpec, widgetFileBasename, wrapWidgetFence } from "../../src/widget/widgetSpec";
+import { parseWidgetSpec, widgetFileBasename, widgetIndexText, wrapWidgetFence } from "../../src/widget/widgetSpec";
 
 describe("parseWidgetSpec", () => {
 	it("treats a source without frontmatter as body only", () => {
@@ -71,6 +71,21 @@ describe("parseWidgetSpec", () => {
 		const spec = parseWidgetSpec("---\ntitle: nope\n<div></div>");
 		expect(spec.title).toBeUndefined();
 		expect(spec.body).toBe("---\ntitle: nope\n<div></div>");
+	});
+});
+
+describe("widgetIndexText", () => {
+	it("indexes the title and description only, never the body", () => {
+		const text = widgetIndexText(
+			"---\ntitle: Vault dashboard\ndescription: Edits per day and open tasks\n---\n<div id=app>secret markup</div><script>const x = 1;</script>",
+		);
+		expect(text).toBe("Vault dashboard\nEdits per day and open tasks");
+		expect(text).not.toContain("markup");
+	});
+
+	it("is empty for a widget without title or description", () => {
+		expect(widgetIndexText("<p>body only</p>")).toBe("");
+		expect(parseWidgetSpec("---\ndescription: Only this\n---\nx").description).toBe("Only this");
 	});
 });
 
