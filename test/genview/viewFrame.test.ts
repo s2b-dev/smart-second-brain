@@ -70,7 +70,8 @@ describe("buildViewFrameSrcdoc (outer relay document)", () => {
 
 	it("pads the view from the card edge in the trusted document", () => {
 		expect(outer).toContain(`padding: ${VIEW_FRAME_PADDING_PX}px`);
-		expect(buildViewSrcdoc("x", "")).not.toMatch(/body \{[^}]*padding/);
+		// The inner body carries no padding of its own (only the margin/padding reset).
+		expect(buildViewSrcdoc("x", "")).not.toContain("padding: var(");
 	});
 
 	it("forbids the inner frame from navigating anywhere", () => {
