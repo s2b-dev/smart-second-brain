@@ -13,12 +13,16 @@ import { parseViewSpec, VIEW_BLOCK_LANGUAGE, type ViewSpec, viewFileBasename, wr
  */
 export const STREAMING_CONTAINER_CLASS = "s2b-md-streaming";
 
+/** Must match the `s2b-view-shimmer` keyframes duration in styles.css. */
+const SHIMMER_PERIOD_MS = 1600;
+const SKELETON_BAR_WIDTHS = ["42%", "78%", "60%"];
+
 /** Register the `s2b-view` code-block processor. Applies everywhere markdown renders. */
 export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 	plugin.registerMarkdownCodeBlockProcessor(VIEW_BLOCK_LANGUAGE, (source, el, ctx) => {
 		el.addClass("s2b-view");
 		if (el.closest(`.${STREAMING_CONTAINER_CLASS}`)) {
-			el.createDiv({ cls: "s2b-view-placeholder", text: "Generating view…" });
+			renderPlaceholder(el);
 			return;
 		}
 		const spec = parseViewSpec(source);
@@ -29,6 +33,23 @@ export function registerViewBlocks(plugin: SecondBrainPlugin): void {
 		}
 		ctx.addChild(new ViewRenderChild(el, plugin.app, spec, ctx.sourcePath));
 	});
+}
+
+/**
+ * Skeleton shown while the fence is still being streamed. The streaming tail is
+ * re-rendered on every frame, so this element is recreated many times a second; the
+ * shimmer's phase is pinned to wall-clock time so it reads as one continuous
+ * animation rather than restarting with each rebuild.
+ */
+function renderPlaceholder(el: HTMLElement): void {
+	const placeholder = el.createDiv({ cls: "s2b-view-placeholder" });
+	const phase = `-${Math.round(performance.now() % SHIMMER_PERIOD_MS)}ms`;
+	for (const width of SKELETON_BAR_WIDTHS) {
+		const bar = placeholder.createDiv({ cls: "s2b-view-skeleton-bar" });
+		bar.style.width = width;
+		bar.style.animationDelay = phase;
+	}
+	placeholder.createDiv({ cls: "s2b-view-placeholder-label", text: "Generating view…" });
 }
 
 function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: ViewSpec, source: string): void {

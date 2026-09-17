@@ -1696,3 +1696,47 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	border-color: var(--text-error);
 	color: var(--text-error);
 }
+.s2b-view-placeholder {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+.s2b-view-skeleton-bar {
+	height: 0.75em;
+	border-radius: var(--radius-s);
+	background: linear-gradient(
+		90deg,
+		var(--background-modifier-hover) 0%,
+		var(--background-modifier-border) 50%,
+		var(--background-modifier-hover) 100%
+	);
+	background-size: 200% 100%;
+	animation: s2b-view-shimmer 1600ms linear infinite;
+}
+.s2b-view-placeholder-label {
+	margin-top: var(--size-4-1);
+	animation: s2b-view-pulse 1600ms ease-in-out infinite;
+}
+@keyframes s2b-view-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}
+@keyframes s2b-view-pulse {
+	0%,
+	100% {
+		opacity: 0.55;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.s2b-view-skeleton-bar,
+	.s2b-view-placeholder-label {
+		animation: none;
+	}
+}
