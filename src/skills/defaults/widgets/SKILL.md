@@ -20,6 +20,12 @@ embedded in any note with `![[Name.widget]]`. Do not create that file yourself u
 asked; if the user does ask, stage it with `manage_notes` as `<folder>/<Name>.widget` whose
 content is the fence **body** only — frontmatter, then HTML, no fence markers.
 
+To **change an existing widget file**, read it first with `read_content` (it is plain text),
+then stage the edit with `manage_notes` — a targeted find/replace for a small change, a full
+rewrite for a redesign. The user reviews the diff; once accepted, an open pane and every
+embed of that widget re-render by themselves. Widget files are not in search results, so ask
+the user for the path or use `list_directory` on the widgets folder if you do not know it.
+
 ## Format
 ````markdown
 ```s2b-widget
