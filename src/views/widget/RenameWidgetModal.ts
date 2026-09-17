@@ -19,9 +19,7 @@ export class RenameWidgetModal extends Modal {
 
 	onOpen(): void {
 		this.titleEl.setText("Rename widget");
-		let input: HTMLInputElement | null = null;
-		new Setting(this.contentEl).setName("Name").addText((text) => {
-			input = text.inputEl;
+		const nameSetting = new Setting(this.contentEl).setName("Name").addText((text) => {
 			text.setValue(this.name).onChange((value) => {
 				this.name = value;
 			});
@@ -40,6 +38,7 @@ export class RenameWidgetModal extends Modal {
 					.setCta()
 					.onClick(() => void this.submit()),
 			);
+		const input = nameSetting.controlEl.querySelector("input");
 		input?.focus();
 		input?.select();
 	}
