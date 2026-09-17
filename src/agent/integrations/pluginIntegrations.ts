@@ -70,6 +70,26 @@ export function isCommunityPluginEnabled(app: App, pluginId: string): boolean {
 	return Boolean(app.plugins?.enabledPlugins?.has(pluginId));
 }
 
+export type CommunityPluginStatus = "enabled" | "disabled" | "missing";
+
+/**
+ * Installed-and-enabled / installed-but-disabled / not installed, for a community
+ * plugin id. "Installed" is read from the manifests Obsidian loaded from the plugins
+ * folder, so a plugin the user turned off still reads as installed.
+ */
+export function communityPluginStatus(app: App, pluginId: string): CommunityPluginStatus {
+	if (isCommunityPluginEnabled(app, pluginId)) return "enabled";
+	// @ts-ignore - Obsidian plugin API (not in official types)
+	return app.plugins?.manifests?.[pluginId] ? "disabled" : "missing";
+}
+
+/** Human-friendly name for a community plugin id, from the curated table; the id otherwise. */
+export function communityPluginDisplayName(pluginId: string): string {
+	return (
+		CURATED_PLUGIN_INTEGRATIONS.find((integration) => integration.pluginId === pluginId)?.displayName ?? pluginId
+	);
+}
+
 /**
  * Whether an Obsidian core (internal) plugin is enabled (e.g. "canvas", "bases").
  * Uses undocumented internal API — may need updates with Obsidian changes.

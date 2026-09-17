@@ -82,6 +82,8 @@ import {
 	type PluginIntegration,
 	pluginExposesApi,
 	isCommunityPluginEnabled,
+	communityPluginDisplayName,
+	communityPluginStatus,
 	isInternalPluginEnabled,
 	getPluginIcon,
 	skillIcon,
@@ -959,6 +961,10 @@ export class AgentManager {
 							if (toolId.startsWith("exec_")) return boundExecTools.has(toolId);
 							return true;
 						},
+						pluginStatus: (pluginId) => ({
+							status: communityPluginStatus(this.plugin.app, pluginId),
+							displayName: communityPluginDisplayName(pluginId),
+						}),
 					}),
 				);
 			}

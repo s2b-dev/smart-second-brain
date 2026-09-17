@@ -1,6 +1,26 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { SkillsService } from "../../skills/SkillsService";
+import type { CommunityPluginStatus } from "../integrations/pluginIntegrations";
+
+/** Frontmatter key (under `metadata:`) listing community plugin ids a skill can make use of. */
+export const OPTIONAL_PLUGINS_METADATA_KEY = "optionalPlugins";
+
+const STATUS_TEXT: Record<CommunityPluginStatus, string> = {
+	enabled: "enabled",
+	disabled: "installed but disabled — the user can enable it under Settings → Community plugins",
+	missing: "not installed — the user can install it from Settings → Community plugins → Browse",
+};
+
+/** Split a space- or comma-separated id list from frontmatter. */
+export function parseOptionalPlugins(metadata: Record<string, string> | undefined): string[] {
+	const raw = metadata?.[OPTIONAL_PLUGINS_METADATA_KEY];
+	if (!raw) return [];
+	return raw
+		.split(/[\s,]+/)
+		.map((id) => id.trim())
+		.filter(Boolean);
+}
 
 export interface LoadSkillToolOptions {
 	/**
@@ -17,6 +37,13 @@ export interface LoadSkillToolOptions {
 	 * and without the note the model would call a tool that doesn't exist.
 	 */
 	isToolAvailable?: (toolId: string) => boolean;
+	/**
+	 * Live status of a community plugin a skill lists under `metadata.optionalPlugins`.
+	 * Appended to the loaded body so a skill whose *best* path depends on another
+	 * plugin (the views skill's Dataview queries) can tell the model up front whether
+	 * that path exists, instead of letting it find out from a failed result.
+	 */
+	pluginStatus?: (pluginId: string) => { status: CommunityPluginStatus; displayName: string };
 }
 
 /**
@@ -28,7 +55,7 @@ export interface LoadSkillToolOptions {
  * @returns A LangChain tool for loading skill content
  */
 export function createLoadSkillTool(skillsService: SkillsService, options: LoadSkillToolOptions) {
-	const { skillNames, isToolAvailable } = options;
+	const { skillNames, isToolAvailable, pluginStatus } = options;
 
 	// If no skills available, return a tool that explains this
 	if (skillNames.length === 0) {
@@ -74,6 +101,20 @@ export function createLoadSkillTool(skillsService: SkillsService, options: LoadS
 					lines.push(
 						`**Note:** The following tool(s) are currently disabled and cannot be called: ${unavailable.join(", ")}. Follow the rest of the instructions without them, and tell the user a disabled tool would have helped if it blocks the task.`,
 					);
+				}
+			}
+
+			const optionalPlugins = pluginStatus ? parseOptionalPlugins(skill.frontmatter.metadata) : [];
+			if (optionalPlugins.length > 0) {
+				lines.push("");
+				lines.push("## Plugin availability");
+				lines.push("");
+				for (const pluginId of optionalPlugins) {
+					const { status, displayName } = pluginStatus?.(pluginId) ?? {
+						status: "missing",
+						displayName: pluginId,
+					};
+					lines.push(`- ${displayName} (\`${pluginId}\`): ${STATUS_TEXT[status]}`);
 				}
 			}
 

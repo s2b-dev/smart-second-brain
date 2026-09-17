@@ -5,6 +5,7 @@ metadata:
   author: "S2B"
   version: "1.0"
   category: "core"
+  optionalPlugins: "dataview"
 ---
 
 ## What a view is
@@ -61,12 +62,15 @@ for static content.
   - `LIST` → `{ type: "list", items: unknown[] }`; `TASK` → `{ type: "task", items }`.
   - A failed query → `{ error: string }`. Always handle this branch visibly.
 - Links are `{ path, display, subpath }`; dates and durations are ISO strings.
-- Queries need the Dataview plugin. Without it every query yields `{ error }`, so if the
-  user has no Dataview, say so and fall back to data you gather with your other tools
-  and inline as a JSON constant.
-- Prefer queries over inlined data whenever the data lives in the vault: queries stay
-  live after the view is saved, a constant goes stale. Inline data only for things that
-  are not in the vault (a formula to plot, a worked example).
+- Queries need the Dataview plugin. **Check "Plugin availability" above before writing
+  any.** Only declare `queries` when Dataview is *enabled*. If it is disabled or not
+  installed, build the view from data you gather with your other tools (`search_notes`,
+  `get_properties`, `read_content`, …) inlined as a JSON constant, and tell the user in
+  one sentence that enabling or installing Dataview would let the view query the vault
+  itself and stay up to date. Never write a query that you know will fail.
+- With Dataview enabled, prefer queries over inlined data whenever the data lives in the
+  vault: queries stay live after the view is saved, a constant goes stale. Inline data
+  only for things that are not in the vault (a formula to plot, a worked example).
 
 ## Runtime API (inside the frame)
 - `s2b.onData(callback)` — receives `{ <name>: result }`. Runs as soon as data is
