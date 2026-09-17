@@ -177,7 +177,11 @@ export const VIEW_RUNTIME_SCRIPT = `
 		const link = noteLinkOf(event.target);
 		if (!link) return;
 		event.preventDefault();
-		send({ type: "open-note", path: String(link.getAttribute("data-note")) });
+		send({
+			type: "open-note",
+			path: String(link.getAttribute("data-note")),
+			modifiers: { ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, shiftKey: event.shiftKey },
+		});
 	});
 	let hoveredLink = null;
 	document.addEventListener("mouseover", (event) => {
@@ -429,10 +433,18 @@ export interface HoverNoteMessage {
 	metaKey: boolean;
 }
 
+/** Modifier keys of the click that asked to open a note; Obsidian maps them to tab/split/window. */
+export interface ClickModifiers {
+	ctrlKey: boolean;
+	metaKey: boolean;
+	altKey: boolean;
+	shiftKey: boolean;
+}
+
 export type FrameToHostMessage =
 	| { type: "ready" }
 	| { type: "resize"; height: number; extent: number }
-	| { type: "open-note"; path: string }
+	| { type: "open-note"; path: string; modifiers: ClickModifiers }
 	| HoverNoteMessage
 	| { type: "requery" }
 	| { type: "navigated" };
@@ -455,10 +467,21 @@ export function parseFrameMessage(data: unknown): FrameToHostMessage | null {
 			const validExtent = typeof extent === "number" && Number.isFinite(extent) ? extent : height;
 			return { type: "resize", height, extent: validExtent };
 		}
-		case "open-note":
-			return typeof message.path === "string" && message.path.length > 0
-				? { type: "open-note", path: message.path }
-				: null;
+		case "open-note": {
+			if (typeof message.path !== "string" || !message.path) return null;
+			const raw = (typeof message.modifiers === "object" && message.modifiers) || {};
+			const flags = raw as Record<string, unknown>;
+			return {
+				type: "open-note",
+				path: message.path,
+				modifiers: {
+					ctrlKey: flags.ctrlKey === true,
+					metaKey: flags.metaKey === true,
+					altKey: flags.altKey === true,
+					shiftKey: flags.shiftKey === true,
+				},
+			};
+		}
 		case "hover-note": {
 			const rect = message.rect as Record<string, unknown> | undefined;
 			if (typeof message.path !== "string" || !message.path || typeof rect !== "object" || rect === null)

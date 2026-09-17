@@ -129,7 +129,12 @@ export class ViewRenderChild extends MarkdownRenderChild {
 				break;
 			}
 			case "open-note":
-				void this.app.workspace.openLinkText(message.path, this.sourcePath, false);
+				// Same tab/split/window mapping a modified click gets on a link in a note.
+				void this.app.workspace.openLinkText(
+					message.path,
+					this.sourcePath,
+					Keymap.isModEvent(new MouseEvent("click", message.modifiers)),
+				);
 				break;
 			case "hover-note":
 				this.showHoverProxy(message);

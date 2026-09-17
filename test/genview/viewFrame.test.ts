@@ -130,6 +130,19 @@ describe("parseFrameMessage", () => {
 		expect(parseFrameMessage({ s2bView: true, type: "open-note", path: "a/b.md" })).toEqual({
 			type: "open-note",
 			path: "a/b.md",
+			modifiers: { ctrlKey: false, metaKey: false, altKey: false, shiftKey: false },
+		});
+		expect(
+			parseFrameMessage({
+				s2bView: true,
+				type: "open-note",
+				path: "a/b.md",
+				modifiers: { metaKey: true, altKey: "yes" },
+			}),
+		).toEqual({
+			type: "open-note",
+			path: "a/b.md",
+			modifiers: { ctrlKey: false, metaKey: true, altKey: false, shiftKey: false },
 		});
 		expect(
 			parseFrameMessage({
