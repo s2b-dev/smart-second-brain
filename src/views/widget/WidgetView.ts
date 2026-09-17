@@ -39,6 +39,8 @@ export class WidgetView extends FileView {
 	private sourceMtime = 0;
 	private sourceStaleHint: HTMLElement | null = null;
 	private rerenderTimer: number | null = null;
+	/** Bumped per render; a render that awaited disk drops out if a newer one started meanwhile. */
+	private renderGeneration = 0;
 	private review: HTMLElement | null = null;
 	/** The pending update the pane is reviewing, if any. */
 	private proposal: PendingUpdateEntry | null = null;
@@ -168,13 +170,15 @@ export class WidgetView extends FileView {
 	private async render(): Promise<void> {
 		const file = this.file;
 		if (!this.body || !file) return;
+		const generation = ++this.renderGeneration;
 		const proposal = this.latestProposal(file.path);
 		if (proposal?.id !== this.proposal?.id) this.showProposal = true;
 		this.proposal = proposal;
 		const useProposal = proposal !== null && this.showProposal;
 		const text = useProposal ? proposal.change.newContent : await this.plugin.app.vault.read(file);
-		// The leaf may have moved on to another file (or closed) during the read.
-		if (this.file !== file || !this.body) return;
+		// The leaf may have moved on to another file (or closed) during the read — or a
+		// newer render (a proposal staged meanwhile) already drew; its bar must stay.
+		if (this.file !== file || !this.body || generation !== this.renderGeneration) return;
 		this.renderedProposal = useProposal ? text : null;
 		this.dropChild();
 		this.body.empty();
