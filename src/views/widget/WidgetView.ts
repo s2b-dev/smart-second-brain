@@ -1,4 +1,4 @@
-import { FileView, Notice, setIcon, type TFile, type WorkspaceLeaf } from "obsidian";
+import { FileView, type Menu, Notice, setIcon, type TFile, type WorkspaceLeaf } from "obsidian";
 import type SecondBrainPlugin from "../../main";
 import { DEFAULT_WIDGET_ICON, resolveWidgetIcon } from "../../widget/widgetIcon";
 import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
@@ -17,7 +17,8 @@ const RERENDER_DEBOUNCE_MS = 500;
  * is how an agent edit accepted through the review flow lands here) and follows renames
  * and deletes the way any `FileView` does. Obsidian has no text editor for the
  * extension, so the leaf carries a minimal source mode of its own (a textarea with
- * save/cancel) behind a header action, next to a refresh action.
+ * save/cancel) behind a header action. Rename lives in the tab's context menu, where
+ * Obsidian keeps file actions (there is no native rename for a non-markdown tab).
  */
 export class WidgetView extends FileView {
 	navigation = true;
@@ -56,8 +57,6 @@ export class WidgetView extends FileView {
 		this.body = this.contentEl.createDiv({ cls: "s2b-widget-view-body" });
 
 		this.addAction("pencil", "Edit source", () => void this.toggleSource());
-		this.addAction("refresh-cw", "Refresh", () => void this.render());
-		this.addAction("text-cursor-input", "Rename", () => this.promptRename());
 
 		this.registerEvent(
 			this.plugin.app.vault.on("modify", (file) => {
@@ -65,6 +64,18 @@ export class WidgetView extends FileView {
 				if (this.source) this.markSourceStale();
 				else this.scheduleRender();
 			}),
+		);
+	}
+
+	onPaneMenu(menu: Menu, source: string): void {
+		super.onPaneMenu(menu, source);
+		if (!this.file) return;
+		menu.addItem((item) =>
+			item
+				.setSection("action")
+				.setTitle("Rename...")
+				.setIcon("pencil")
+				.onClick(() => this.promptRename()),
 		);
 	}
 
