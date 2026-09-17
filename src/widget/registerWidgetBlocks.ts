@@ -46,7 +46,7 @@ export function registerWidgetBlocks(plugin: SecondBrainPlugin): void {
 		// Inside a chat the block is a proposal the user may want to keep, so it gets a
 		// toolbar; in a note it already is the note's content.
 		if (el.closest(`.workspace-leaf-content[data-type="${VIEW_TYPE_CHAT}"]`)) {
-			renderChatToolbar(plugin, el, spec, source);
+			renderChatToolbar(plugin, el, spec, source, ctx.sourcePath);
 		}
 		ctx.addChild(new WidgetRenderChild(el, plugin.app, spec, ctx.sourcePath));
 	});
@@ -68,11 +68,17 @@ function renderPlaceholder(el: HTMLElement): void {
 }
 
 /**
- * Two ways to keep a widget from the chat: copy it as a fence to paste inline into a
- * note, or save it as a standalone `.widget` file — which opens as its own pane, is
- * embeddable with `![[name.widget]]`, and stays out of the search indexes.
+ * From the chat a widget can be expanded for a closer look, copied as a fence to paste
+ * inline into a note, or saved as a standalone `.widget` file — which opens as its own
+ * pane, is embeddable with `![[name.widget]]`, and stays out of the search indexes.
  */
-function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: WidgetSpec, source: string): void {
+function renderChatToolbar(
+	plugin: SecondBrainPlugin,
+	el: HTMLElement,
+	spec: WidgetSpec,
+	source: string,
+	sourcePath: string,
+): void {
 	const bar = el.createDiv({ cls: "s2b-widget-toolbar" });
 	bar.createSpan({ cls: "s2b-widget-toolbar-title", text: spec.title ?? "Widget" });
 	// Saving twice from the same block would create a second file: share one in-flight
@@ -86,6 +92,9 @@ function renderChatToolbar(plugin: SecondBrainPlugin, el: HTMLElement, spec: Wid
 		return saving;
 	};
 
+	iconButton(bar, "maximize-2", "Expand", async () => {
+		plugin.openWidgetModal(spec, sourcePath);
+	});
 	iconButton(bar, "copy", "Copy as block to paste into a note", async () => {
 		await navigator.clipboard.writeText(wrapWidgetFence(source));
 		new Notice("Widget block copied. Paste it into any note.");

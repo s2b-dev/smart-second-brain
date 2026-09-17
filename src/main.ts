@@ -30,6 +30,8 @@ import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerWidgetBlocks } from "./widget/registerWidgetBlocks";
+import { WidgetModal } from "./widget/WidgetModal";
+import type { WidgetSpec } from "./widget/widgetSpec";
 import { WIDGET_HOVER_SOURCE } from "./widget/WidgetRenderChild";
 import { WidgetView, WIDGET_FILE_EXTENSION, VIEW_TYPE_WIDGET } from "./views/widget/WidgetView";
 import { registerWidgetEmbed, unregisterWidgetEmbed } from "./views/widget/widgetEmbed";
@@ -929,6 +931,11 @@ export default class SecondBrainPlugin extends Plugin {
 
 	async openLatestChat() {
 		return this.agentManager.openLatestChat();
+	}
+
+	/** Show a widget expanded to almost the whole window (the chat toolbar's "Expand"). */
+	openWidgetModal(spec: WidgetSpec, sourcePath = ""): void {
+		new WidgetModal(this.app, spec, sourcePath).open();
 	}
 
 	async activateSmartGraphView() {

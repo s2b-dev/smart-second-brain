@@ -1663,6 +1663,21 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	position: relative;
 	margin: var(--size-4-2) 0;
 }
+/* ---- A widget expanded from the chat (widget/WidgetModal) ---- */
+.modal.s2b-widget-modal {
+	width: min(96vw, 1800px);
+	max-width: none;
+	height: 92vh;
+	max-height: 92vh;
+	display: flex;
+	flex-direction: column;
+}
+.s2b-widget-modal .modal-content.s2b-widget-modal-content {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	padding: 0;
+}
 /* ---- A widget as its own leaf (views/widget) ---- */
 .view-content.s2b-widget-view {
 	padding: 0;
