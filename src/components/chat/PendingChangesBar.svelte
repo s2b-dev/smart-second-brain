@@ -9,8 +9,10 @@ import type { RevertSkip } from "../../stores/pendingChangesStore.svelte";
 import { icon } from "../../utils/utils";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 import { ConfirmModal } from "../modal/ConfirmModal";
+import { isWidgetFilePath } from "../../widget/widgetSpec";
 import MarkdownRenderer from "../ui/MarkdownRenderer.svelte";
 import PendingDiffHunks from "./PendingDiffHunks.svelte";
+import PendingWidgetPreview from "./PendingWidgetPreview.svelte";
 
 interface Props {
 	threadPath: string | null;
@@ -206,6 +208,39 @@ function previewContentOf(entry: PendingChangeEntry): string | null {
  * (no groups left to show), and its remaining action is Undo, not review. */
 function hasDiffPreview(entry: PendingChangeEntry): boolean {
 	return entry.change.type === "update" && entry.status === "pending";
+}
+
+/**
+ * The `.widget` file content a row previews as a RENDERED widget, or null when the
+ * row is not about a widget file (or has nothing to render: a move, a resolved
+ * update). A widget's source is HTML and script — a code diff says little about
+ * what the user would get, and a create previewed as markdown is unreadable — so
+ * for widget files the proposal itself is shown: the widget as it would be after
+ * accepting. For a pending update the source diff stays reachable inside the
+ * preview (`sourceDiffEntryIds`).
+ */
+function widgetPreviewContent(entry: PendingChangeEntry): string | null {
+	void store.revision;
+	if (!isWidgetFilePath(entry.change.path)) return null;
+	switch (entry.change.type) {
+		case "create":
+			return entry.change.content;
+		case "update":
+			return entry.status === "pending" ? entry.change.newContent : null;
+		case "delete":
+			return entry.change.originalContent;
+		case "move":
+			return null;
+	}
+}
+
+/** Ids of widget-update rows whose source diff is unfolded under the rendered preview. */
+let sourceDiffEntryIds = $state(new Set<string>());
+
+function toggleSourceDiff(entryId: string) {
+	const next = new Set(sourceDiffEntryIds);
+	if (!next.delete(entryId)) next.add(entryId);
+	sourceDiffEntryIds = next;
 }
 
 function changeTypeLabel(entry: PendingChangeEntry): string {
@@ -478,6 +513,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
         {#each actionableEntries as entry (entry.id)}
           {@const previewContent = previewContentOf(entry)}
           {@const showsDiff = hasDiffPreview(entry)}
+          {@const widgetContent = widgetPreviewContent(entry)}
           {@const isPreviewOpen = previewedEntryIds.has(entry.id)}
           <div class="pcb-entry">
             <div class="pcb-entry-header">
@@ -487,20 +523,28 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     class="pcb-preview-toggle"
                     class:pcb-preview-toggle-open={isPreviewOpen}
                     onclick={() => togglePreview(entry.id)}
-                    title={showsDiff
+                    title={widgetContent !== null
                       ? isPreviewOpen
-                        ? "Hide changes"
-                        : "Show changes"
-                      : isPreviewOpen
-                        ? "Hide content"
-                        : "Show content"}
-                    aria-label={showsDiff
+                        ? "Hide widget preview"
+                        : "Preview widget"
+                      : showsDiff
+                        ? isPreviewOpen
+                          ? "Hide changes"
+                          : "Show changes"
+                        : isPreviewOpen
+                          ? "Hide content"
+                          : "Show content"}
+                    aria-label={widgetContent !== null
                       ? isPreviewOpen
-                        ? `Hide changes to ${entry.change.path}`
-                        : `Show changes to ${entry.change.path}`
-                      : isPreviewOpen
-                        ? `Hide content of ${entry.change.path}`
-                        : `Show content of ${entry.change.path}`}
+                        ? `Hide preview of ${entry.change.path}`
+                        : `Preview ${entry.change.path}`
+                      : showsDiff
+                        ? isPreviewOpen
+                          ? `Hide changes to ${entry.change.path}`
+                          : `Show changes to ${entry.change.path}`
+                        : isPreviewOpen
+                          ? `Hide content of ${entry.change.path}`
+                          : `Show content of ${entry.change.path}`}
                     aria-expanded={isPreviewOpen}
                     type="button"
                   >
@@ -647,7 +691,28 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
               </div>
             </div>
 
-            {#if isPreviewOpen && showsDiff}
+            {#if isPreviewOpen && widgetContent !== null}
+              {@const sourceDiffOpen = sourceDiffEntryIds.has(entry.id)}
+              <div class="pcb-preview pcb-preview-widget">
+                <!-- What accepting yields, rendered. A delete previews the widget
+                     that would go; a create/update the one that would exist. -->
+                <PendingWidgetPreview content={widgetContent} sourcePath={entry.change.path} />
+                {#if showsDiff}
+                  <button
+                    class="pcb-source-toggle"
+                    onclick={() => toggleSourceDiff(entry.id)}
+                    aria-expanded={sourceDiffOpen}
+                    type="button"
+                  >
+                    <span use:icon={"file-diff"} style="--icon-size: 11px"></span>
+                    {sourceDiffOpen ? "Hide source changes" : "Show source changes"}
+                  </button>
+                  {#if sourceDiffOpen}
+                    <PendingDiffHunks {entry} stale={staleEntryIds.has(entry.id)} />
+                  {/if}
+                {/if}
+              </div>
+            {:else if isPreviewOpen && showsDiff}
               <div class="pcb-preview">
                 <PendingDiffHunks {entry} stale={staleEntryIds.has(entry.id)} />
               </div>
@@ -1007,6 +1072,33 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
     font-style: italic;
+  }
+
+  /* A rendered widget needs room above the frame's own border, and more height
+     than a text preview: a dashboard at 260px is mostly scrollbar. */
+  .pcb-preview-widget {
+    padding-top: 8px;
+    max-height: 360px;
+  }
+
+  .pcb-source-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 2px 6px;
+    border: none;
+    border-radius: var(--radius-s);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: var(--font-smallest);
+    cursor: pointer;
+  }
+
+  .pcb-source-toggle:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
   }
 
   .pcb-badge {

@@ -4,7 +4,7 @@
   "description": "Search, explore, and chat with your notes using hybrid semantic search, an interactive knowledge graph, and an AI assistant powered by local or cloud providers like Ollama, OpenAI, and Anthropic.",
   "author": "Leo310, nicobrauchtgit",
   "authorUrl": "https://smartsecondbrain.dev",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "minAppVersion": "1.11.4",
   "isDesktopOnly": false
 }

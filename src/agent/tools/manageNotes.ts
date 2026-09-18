@@ -30,12 +30,20 @@ const editSchema = z.object({
 		.describe("Replace all occurrences instead of requiring a single unique match. Default false."),
 });
 
+/** What the agent may create, edit, move and delete: notes, and standalone widgets (`.widget`, see views/widget). */
+const AGENT_WRITABLE_EXTENSIONS = [".md", ".widget"];
+const isAgentWritablePath = (path: string): boolean => AGENT_WRITABLE_EXTENSIONS.some((ext) => path.endsWith(ext));
+
 const createOperationSchema = z.object({
 	type: z.literal("create"),
 	path: z
 		.string()
-		.describe("Vault-relative path for the new markdown note. Must end in .md. Example: Notes/my-note.md"),
-	content: z.string().describe("Full markdown content for the new note"),
+		.describe(
+			"Vault-relative path for the new file. Must end in .md (a note) or .widget (a standalone widget: frontmatter, then HTML). Example: Notes/my-note.md",
+		),
+	content: z
+		.string()
+		.describe("Full content for the new file (markdown for a note; a widget fence's body for a .widget)"),
 });
 
 const REPLACE_PENDING_DESCRIPTION =
@@ -65,7 +73,9 @@ const deleteOperationSchema = z.object({
 const moveOperationSchema = z.object({
 	type: z.literal("move"),
 	path: z.string().describe("Current file path or wiki link reference to move"),
-	newPath: z.string().describe("Destination vault-relative path for the markdown note. Must end in .md."),
+	newPath: z
+		.string()
+		.describe("Destination vault-relative path. Must end in .md (a note) or .widget (a standalone widget)."),
 });
 
 const replaceOperationSchema = z.object({
@@ -147,9 +157,9 @@ function validateExistingMarkdownFile(
 	}
 
 	const file = result.file;
-	if (!file.path.endsWith(".md")) {
+	if (!isAgentWritablePath(file.path)) {
 		return {
-			error: `Error in operation ${operationNumber}: Only markdown files (.md) can be ${action}d. "${file.path}" is not a markdown file.`,
+			error: `Error in operation ${operationNumber}: Only notes (.md) and widgets (.widget) can be ${action}d. "${file.path}" is neither.`,
 		};
 	}
 
@@ -510,8 +520,8 @@ async function stageNoteOperations(
 			const duplicateError = ensureUniqueTarget(seenPaths, normalizedPath, operationNumber);
 			if (duplicateError) return duplicateError;
 
-			if (!normalizedPath.endsWith(".md")) {
-				return `Error in operation ${operationNumber}: Only markdown files (.md) can be created. Got: "${normalizedPath}"`;
+			if (!isAgentWritablePath(normalizedPath)) {
+				return `Error in operation ${operationNumber}: Only notes (.md) and widgets (.widget) can be created. Got: "${normalizedPath}"`;
 			}
 
 			if (!store.isPathAllowed(normalizedPath)) {
@@ -617,8 +627,8 @@ async function stageNoteOperations(
 			if (sourceDuplicateError) return sourceDuplicateError;
 
 			const normalizedNewPath = normalizePath(operation.newPath);
-			if (!normalizedNewPath.endsWith(".md")) {
-				return `Error in operation ${operationNumber}: Only markdown files (.md) can be moved. Got destination "${normalizedNewPath}"`;
+			if (!isAgentWritablePath(normalizedNewPath)) {
+				return `Error in operation ${operationNumber}: Only notes (.md) and widgets (.widget) can be moved. Got destination "${normalizedNewPath}"`;
 			}
 
 			const destinationDuplicateError = ensureUniqueTarget(seenPaths, normalizedNewPath, operationNumber);

@@ -25,7 +25,7 @@ Search surfaces your notes, the graph groups them into the topics your vault is 
 
 - **[Search](https://smartsecondbrain.dev/search/)** that combines keyword matching with meaning, so you find the note you were thinking of rather than the one you typed ([how it works](https://smartsecondbrain.dev/search/how-it-works/))
 - **[Smart Graph](https://smartsecondbrain.dev/graph/)** that works out what your vault is about: notes grouped into topics from your links, your tags, and what you wrote, with nothing to maintain ([how it works](https://smartsecondbrain.dev/graph/how-it-works/))
-- **[Agents](https://smartsecondbrain.dev/agents/)** that read and write your notes, with skills, memory, MCP, and integrations with your other plugins
+- **[Agents](https://smartsecondbrain.dev/agents/)** that read and write your notes, draw charts and dashboards live from them as [widgets](https://smartsecondbrain.dev/agents/widgets/), with skills, memory, MCP, and integrations with your other plugins
 
 ## Install
 

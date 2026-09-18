@@ -1,4 +1,6 @@
 import { Platform, type TFile, type Vault } from "obsidian";
+import { stripWidgetFences } from "../widget/widgetFences";
+import { widgetIndexText } from "../widget/widgetSpec";
 import { getAgentPathSource } from "./agentPathSource";
 import { agentRootDir } from "./agentPaths";
 import { THREAD_DATA_DEDUP_VERSION, inflateThreadData, sniffThreadDataVersion } from "../agent/threadDataCodec";
@@ -102,7 +104,7 @@ export function shouldProcessVaultPath(filePath: string, targetFolder: string): 
  * Extensions whose content can be read as UTF-8 text via `vault.cachedRead()`
  * or `vault.read()`. Canvas files are JSON internally and included here.
  */
-const TEXT_INDEXABLE_EXTENSIONS = new Set(["md", "txt", "csv", "json", "yaml", "yml", "canvas", "chat"]);
+const TEXT_INDEXABLE_EXTENSIONS = new Set(["md", "txt", "csv", "json", "yaml", "yml", "canvas", "chat", "widget"]);
 
 /**
  * Extensions whose text is extracted from a binary container rather than read
@@ -250,7 +252,12 @@ export function getEmbeddableVaultFiles(vault: Vault): TFile[] {
  * before calling this helper.
  */
 export async function readIndexableContent(vault: Vault, file: TFile): Promise<string> {
-	const content = await readIndexableContentRaw(vault, file);
+	const raw = await readIndexableContentRaw(vault, file);
+	// A widget's HTML/JS is noise to retrieval (and would surface as chunks). A fence in a
+	// note is replaced by a marker with its title; a `.widget` file contributes its title
+	// and description only — enough to be found by what it is about.
+	const content =
+		file.extension === "md" ? stripWidgetFences(raw) : file.extension === "widget" ? widgetIndexText(raw) : raw;
 	const cap = maxIndexedTextChars(file);
 	return content.length > cap ? content.slice(0, cap) : content;
 }

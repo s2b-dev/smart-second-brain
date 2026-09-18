@@ -213,6 +213,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	// Chat settings
 	targetFolder: "Chats",
 	attachmentFolder: "",
+	widgetsFolder: "Widgets",
 	agentFolder: "Agents",
 	agentFolderMigrated: false,
 	coreSkillsSeeded: false,
@@ -535,6 +536,14 @@ export class PluginDataStore {
 		} catch {
 			// ignore
 		}
+		void this.saveSettings();
+	}
+
+	get widgetsFolder() {
+		return this.#data.widgetsFolder;
+	}
+	set widgetsFolder(val: string) {
+		this.#data.widgetsFolder = normalizePath(val || "Widgets");
 		void this.saveSettings();
 	}
 

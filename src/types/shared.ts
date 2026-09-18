@@ -33,7 +33,14 @@ export const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 /** File extensions considered PDFs */
 export const PDF_EXTENSIONS = new Set(["pdf"]);
 /** File extensions considered plain-text documents */
-export const TEXT_EXTENSIONS = new Set(["md", "txt", "csv", "json"]);
+export const TEXT_EXTENSIONS = new Set([
+	"md",
+	"txt",
+	"csv",
+	"json",
+	// A standalone widget (`.widget`, see views/widget): frontmatter, then HTML — text the agent reads to revise it.
+	"widget",
+]);
 
 // ============================================================================
 // Pending Changes (Staged Write Operations)

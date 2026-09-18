@@ -220,7 +220,7 @@ describe("manageNotes tool (update operations)", () => {
 			THREAD_CONFIG,
 		);
 
-		expect(result).toContain("Only markdown files");
+		expect(result).toContain("Only notes (.md) and widgets (.widget)");
 		expect(mockAddChanges).not.toHaveBeenCalled();
 	});
 

@@ -137,6 +137,23 @@ export class SuggestModal<T> {
 	onChooseSuggestion = vi.fn();
 }
 
+export class Component {
+	load(): void {}
+	unload(): void {}
+	addChild<T extends Component>(child: T): T {
+		return child;
+	}
+	registerEvent(): void {}
+	registerDomEvent(): void {}
+	register(): void {}
+}
+
+export class MarkdownRenderChild extends Component {
+	constructor(public containerEl: HTMLElement) {
+		super();
+	}
+}
+
 export class Notice {
 	message: string;
 	timeout?: number;
@@ -282,3 +299,5 @@ export type DataAdapter = Vault["adapter"];
 export function getLanguage(): string {
 	return "en";
 }
+
+export const getIcon = vi.fn((_id: string): SVGSVGElement | null => null);

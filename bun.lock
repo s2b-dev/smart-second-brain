@@ -48,6 +48,7 @@
         "fake-indexeddb": "^6.2.5",
         "jsdom": "^27.4.0",
         "obsidian": "^1.13.1",
+        "plotly.js-gl3d-dist-min": "^4.1.1",
         "postcss": "^8.5.28",
         "svelte": "^5.57.0",
         "svelte-check": "^4.7.6",
@@ -792,6 +793,8 @@
     "pixi.js": ["pixi.js@8.20.1", "", { "dependencies": { "@pixi/colord": "^2.9.6", "@types/earcut": "^3.0.0", "@webgpu/types": "^0.1.69", "@xmldom/xmldom": "^0.8.15", "earcut": "^3.0.2", "eventemitter3": "^5.0.1", "gifuct-js": "^2.1.2", "ismobilejs": "^1.1.1", "parse-svg-path": "^0.2.0", "tiny-lru": "^11.4.7" } }, "sha512-akLVBMLvQbaEViqsmVraK0Njer1q4Q4lm4iNKuzvBiFrV8q+6/+HluJN3sWIwO663IBeQtUUS/CaXFJZs6ffXQ=="],
 
     "pkce-challenge": ["pkce-challenge@5.0.1", "", {}, "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="],
+
+    "plotly.js-gl3d-dist-min": ["plotly.js-gl3d-dist-min@4.1.1", "", {}, "sha512-HNdhOi/mVr29u6BbzJvz1kAjEzCxwfaZNLipjNCxg33JE3RmRHhPDUd0LCuQMDcRR5LLFFfaSMMdtOWl0bERZA=="],
 
     "postcss": ["postcss@8.5.28", "", { "dependencies": { "nanoid": "^3.3.18", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A=="],
 

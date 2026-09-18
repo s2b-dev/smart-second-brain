@@ -266,6 +266,25 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
       </SettingItem>
     {/if}
   </SettingGroup>
+
+  <SettingGroup heading="Widgets">
+    <SettingItem
+      name="Widgets folder"
+      desc="Where a widget generated in chat is saved when you click its save button."
+    >
+      <FolderSuggest
+        app={plugin.app}
+        value={pluginData.widgetsFolder}
+        placeholder="Widgets"
+        suggestionFn={(query) =>
+          suggestFolders().filter((folder) =>
+            folder.path.toLowerCase().includes(query.toLowerCase()),
+          )}
+        onSelected={(path: string) => (pluginData.widgetsFolder = path)}
+        onSubmit={(path: string) => (pluginData.widgetsFolder = path)}
+      />
+    </SettingItem>
+  </SettingGroup>
 </div>
 
 <style>

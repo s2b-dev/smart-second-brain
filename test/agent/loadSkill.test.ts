@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createLoadSkillTool } from "../../src/agent/tools/loadSkill";
 import type { SkillsService } from "../../src/skills/SkillsService";
 
-function mockSkillsService(skills: Record<string, { description?: string; allowedTools?: string; body?: string }>) {
+function mockSkillsService(
+	skills: Record<
+		string,
+		{ description?: string; allowedTools?: string; body?: string; metadata?: Record<string, string> }
+	>,
+) {
 	return {
 		loadSkill: vi.fn(async (name: string) => {
 			const skill = skills[name];
@@ -13,6 +18,7 @@ function mockSkillsService(skills: Record<string, { description?: string; allowe
 					name,
 					description: skill.description ?? `${name} description`,
 					allowedTools: skill.allowedTools,
+					metadata: skill.metadata,
 				},
 				content: skill.body ?? `${name} instructions`,
 			};
@@ -21,6 +27,30 @@ function mockSkillsService(skills: Record<string, { description?: string; allowe
 }
 
 describe("load_skill tool", () => {
+	it("reports the live status of plugins a skill lists as optional", async () => {
+		const service = mockSkillsService({
+			views: { metadata: { optionalPlugins: "dataview, obsidian-charts" }, body: "Write s2b-view fences." },
+			web: { body: "No plugins here." },
+		});
+		const tool = createLoadSkillTool(service, {
+			skillNames: ["views", "web"],
+			pluginStatus: (id) =>
+				id === "dataview"
+					? { status: "disabled", displayName: "Dataview" }
+					: { status: "missing", displayName: id },
+		});
+
+		const views = String(await tool.invoke({ skillName: "views" }));
+		expect(views).toContain("## Plugin availability");
+		expect(views).toContain("- Dataview (`dataview`): installed but disabled");
+		expect(views).toContain("- obsidian-charts (`obsidian-charts`): not installed");
+		// The status block precedes the instructions the skill tells the model to consult it from.
+		expect(views.indexOf("## Plugin availability")).toBeLessThan(views.indexOf("## Instructions"));
+
+		const web = String(await tool.invoke({ skillName: "web" }));
+		expect(web).not.toContain("## Plugin availability");
+	});
+
 	it("only offers (and loads) the skill names the caller passed", async () => {
 		const service = mockSkillsService({
 			"explore-vault": {},
