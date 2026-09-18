@@ -141,6 +141,8 @@ export type ToolOutputRenderModel =
 	  };
 
 const JSON_FENCE = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+export const MAX_RENDERED_TOOL_OUTPUT_CHARS = 20_000;
+const UI_TRUNCATION_MARKER = "[UI preview truncated:";
 const MARKDOWN_PATTERNS = [
 	/^#{1,6}\s/m,
 	/^[-*+]\s/m,
@@ -194,7 +196,8 @@ function buildStringOutputRenderModel(
 	output: string,
 	input?: Record<string, unknown> | null,
 ): ToolOutputRenderModel {
-	const trimmed = output.trim();
+	const renderOutput = truncateToolOutputForRendering(output);
+	const trimmed = renderOutput.trim();
 	if (!trimmed) return { kind: "empty", rawText: output };
 
 	const parsed = parseJsonString(trimmed);
@@ -203,6 +206,9 @@ function buildStringOutputRenderModel(
 	}
 
 	const specialized = buildSpecializedStringModel(toolName, trimmed, input);
+	if (specialized?.kind === "read_content" && output.length > MAX_RENDERED_TOOL_OUTPUT_CHARS) {
+		specialized.payload.truncated = true;
+	}
 	if (specialized) return specialized;
 
 	if (looksLikeMarkdown(trimmed)) {
@@ -210,6 +216,13 @@ function buildStringOutputRenderModel(
 	}
 
 	return { kind: "markdown", markdown: trimmed, rawText: trimmed };
+}
+
+function truncateToolOutputForRendering(output: string): string {
+	if (output.length <= MAX_RENDERED_TOOL_OUTPUT_CHARS) return output;
+
+	const omitted = output.length - MAX_RENDERED_TOOL_OUTPUT_CHARS;
+	return `${output.slice(0, MAX_RENDERED_TOOL_OUTPUT_CHARS)}\n\n${UI_TRUNCATION_MARKER} ${omitted} characters omitted]`;
 }
 
 function buildSpecializedStringModel(

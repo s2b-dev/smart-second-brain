@@ -1,7 +1,54 @@
 import { describe, expect, it } from "vitest";
-import { buildToolOutputRenderModel } from "../../src/components/chat/toolOutputRenderModel";
+import {
+	buildToolOutputRenderModel,
+	MAX_RENDERED_TOOL_OUTPUT_CHARS,
+} from "../../src/components/chat/toolOutputRenderModel";
 
 describe("buildToolOutputRenderModel", () => {
+	it.each([MAX_RENDERED_TOOL_OUTPUT_CHARS - 1, MAX_RENDERED_TOOL_OUTPUT_CHARS, MAX_RENDERED_TOOL_OUTPUT_CHARS + 1])(
+		"caps string previews at 20k characters plus a truncation notice, length %s",
+		(length) => {
+			const output = "x".repeat(length);
+			const model = buildToolOutputRenderModel("mcp_tool", output);
+			const expected =
+				length <= MAX_RENDERED_TOOL_OUTPUT_CHARS
+					? output
+					: `${output.slice(0, MAX_RENDERED_TOOL_OUTPUT_CHARS)}\n\n[UI preview truncated: 1 characters omitted]`;
+			expect(model).toEqual({ kind: "markdown", markdown: expected, rawText: expected });
+		},
+	);
+
+	it.each([
+		'Content of "Large.md"',
+		'Content of PDF "Large.pdf"',
+		'Content of Excalidraw drawing "Large.excalidraw"',
+	])("marks large read_content previews as truncated: %s", (header) => {
+		const output = { type: "text", text: `${header}:\n\n${"x".repeat(MAX_RENDERED_TOOL_OUTPUT_CHARS * 8)}` };
+		const original = output.text;
+		const model = buildToolOutputRenderModel("read_content", output);
+		expect(model.kind).toBe("read_content");
+		if (model.kind !== "read_content") return;
+		expect(model.payload.truncated).toBe(true);
+		expect(model.payload.content).toContain("[UI preview truncated:");
+		expect(model.rawText.length).toBeLessThan(MAX_RENDERED_TOOL_OUTPUT_CHARS + 100);
+		expect(output.text).toBe(original);
+	});
+
+	it.each(['Content of "Note.md"', 'Content of PDF "Note.pdf"', 'Content of Excalidraw drawing "Note.excalidraw"'])(
+		"does not treat literal UI markers as truncation: %s",
+		(header) => {
+			const content = "Example notice:\n\n[UI preview truncated: 123 characters omitted]";
+			const model = buildToolOutputRenderModel("read_content", `${header}:\n\n${content}`);
+			expect(model).toMatchObject({ kind: "read_content", payload: { content, truncated: false } });
+
+			const toolTruncated = buildToolOutputRenderModel(
+				"read_content",
+				`${header}:\n\n[Content truncated at 100 characters]`,
+			);
+			expect(toolTruncated).toMatchObject({ kind: "read_content", payload: { truncated: true } });
+		},
+	);
+
 	it("renders search_notes payloads as a specialized model", () => {
 		const model = buildToolOutputRenderModel(
 			"search_notes",
