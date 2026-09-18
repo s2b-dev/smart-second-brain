@@ -75,7 +75,8 @@ type BuiltInTool =
 	| "fetch_url"
 	| "web_search"
 	| "load_skill"
-	| "task";
+	| "task"
+	| "ask_question";
 
 const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
 	"search_notes",
@@ -90,6 +91,7 @@ const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
 	"web_search",
 	"load_skill",
 	"task",
+	"ask_question",
 ]);
 
 function asBuiltIn(toolName: string): BuiltInTool | undefined {
@@ -283,6 +285,22 @@ function summarizeLoadSkill(input: Record<string, unknown> | null | undefined): 
 	return { label, summary: "" };
 }
 
+function summarizeAskQuestion(
+	input: Record<string, unknown> | null | undefined,
+	model: ToolOutputRenderModel | undefined,
+): RawSummary {
+	const questions = Array.isArray(input?.questions) ? input.questions : [];
+	const count = questions.length;
+	const countStr = count > 1 ? `${count} questions` : "a question";
+	return {
+		label: {
+			verb: verb("Asking user", "Asked user"),
+			rest: countStr,
+		},
+		summary: model?.kind === "ask_question" ? "answered" : "",
+	};
+}
+
 /* ── Generic fallback (unknown / renamed tools) ── */
 
 function summarizeGeneric(
@@ -403,6 +421,8 @@ export function buildToolSummary(
 				return summarizeWebSearch(input, model);
 			case "load_skill":
 				return summarizeLoadSkill(input);
+			case "ask_question":
+				return summarizeAskQuestion(input, model);
 			default:
 				return summarizeGeneric(toolName, input, model);
 		}

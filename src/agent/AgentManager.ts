@@ -64,6 +64,7 @@ import {
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
+import { createAskQuestionTool } from "./tools/askQuestion";
 import { createExecuteJavaScriptTool } from "./tools/executeJavaScript";
 import { createPluginApiExecTool } from "./tools/executePluginApi";
 import { createFetchUrlTool } from "./tools/fetchUrl";
@@ -818,7 +819,10 @@ export class AgentManager {
 	 * reading `toolsConfig[id].enabled` alone, which is only half the condition.
 	 */
 	isToolBound(agentCfg: AgentConfig, toolId: BuiltInToolId): boolean {
-		return this.attachedToolIds(agentCfg).has(toolId) && (agentCfg.toolsConfig[toolId]?.enabled ?? true);
+		return (
+			(this.attachedToolIds(agentCfg).has(toolId) || toolId === "ask_question") &&
+			(agentCfg.toolsConfig[toolId]?.enabled ?? true)
+		);
 	}
 
 	/**
@@ -835,7 +839,9 @@ export class AgentManager {
 		// walked a single time while building the whole tool list.
 		const attached = this.attachedToolIds(agentCfg);
 		const isToolEnabled = (toolId: BuiltInToolId): boolean => {
-			return attached.has(toolId) && (agentCfg.toolsConfig[toolId]?.enabled ?? true);
+			return (
+				(attached.has(toolId) || toolId === "ask_question") && (agentCfg.toolsConfig[toolId]?.enabled ?? true)
+			);
 		};
 
 		// Instantiate vision processor models for read_content.
@@ -903,6 +909,7 @@ export class AgentManager {
 			["fetch_url", () => createFetchUrlTool()],
 			["web_search", () => createWebSearchTool(agentCfg.id)],
 			["manage_skills", () => createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id)],
+			["ask_question", () => createAskQuestionTool(agentCfg.id)],
 		];
 
 		for (const [toolId, factory] of builtInTools) {
