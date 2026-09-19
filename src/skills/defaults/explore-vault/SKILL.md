@@ -10,6 +10,7 @@ metadata:
 
 ## Finding Notes
 1. **Unknown Organization**: If the user asks for a category of notes (e.g. "daily notes", "meetings", "books", "ideas") and you don't know how they are organized:
+   - If a `dataview` skill is listed in your available skills, load it: a category of notes, a filter by tag/property/date, or a count across notes is one Dataview query returning a compact table, where search plus many reads is not. Still verify the tag and property names below first.
    - Call `get_all_tags` FIRST to check if a relevant tag exists (e.g. #daily, #meeting, #book).
    - ALSO call `get_properties` and omit 'note_name' to check if there are relevant frontmatter properties (e.g. "type", "category", "status").
    - If the folder layout matters and you don't know it, call `list_directory` with no path: it returns the top folders with file counts, not file names, so it stays small in any vault. Pass a folder's path only when you need that folder's contents. Never walk the tree to find a note — that is what `search_notes` and `grep_notes` are for.
@@ -33,4 +34,4 @@ metadata:
 
 5. **Read the `message` field.** When a result includes one, it is authoritative about what actually ran. If it reports that semantic search is unavailable because no embedding index is configured, do **not** retry with `semantic` or `hybrid` — that cannot change during the conversation. Vary your terms instead.
 
-6. **Compute, don't estimate.** When the answer requires counting, aggregating, or date arithmetic over data you have gathered (e.g. "how many meetings in March", a total across notes), collect the raw values with the tools above, then run the calculation with `execute_javascript` instead of doing it in your head.
+6. **Compute, don't estimate.** When the answer requires counting, aggregating, or date arithmetic over notes (e.g. "how many meetings in March", a total across notes), don't do it in your head. If the `dataview` skill is available, a `GROUP BY` / `sum` query over the notes' metadata is the cheapest way; otherwise collect the raw values with the tools above and run the calculation with `execute_javascript`.

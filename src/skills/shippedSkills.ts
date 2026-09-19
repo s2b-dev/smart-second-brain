@@ -14,6 +14,7 @@
 import { BUNDLED_SKILLS } from "./defaults";
 import { type ShippedHistory, currentShippedVersion, fingerprint } from "../utils/shippedDefaults";
 import dataview10 from "./history/dataview-1.0.md?raw";
+import dataview11 from "./history/dataview-1.1.md?raw";
 import editNotes10 from "./history/edit-notes-1.0.md?raw";
 import editNotes11 from "./history/edit-notes-1.1.md?raw";
 import exploreVault10 from "./history/explore-vault-1.0.md?raw";
@@ -69,7 +70,15 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 	//
 	// Note this is the tagged body, not the pre-#381 one: that earlier text was never
 	// released, so no vault holds it and fingerprinting it would protect nothing.
-	["dataview", new Map([["1.0", fingerprint(dataview10)]])],
+	// 1.1: before the "When to reach for it" section and the description that names the
+	//      category / filter / count questions Dataview answers in one query.
+	[
+		"dataview",
+		new Map([
+			["1.0", fingerprint(dataview10)],
+			["1.1", fingerprint(dataview11)],
+		]),
+	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
 ]);
 

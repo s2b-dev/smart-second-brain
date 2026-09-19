@@ -1,36 +1,15 @@
 ---
 name: dataview
-description: Query the vault by its structure through the Dataview plugin — tags, frontmatter properties, folders, dates, links, tasks. Load this whenever the user asks for a category of notes ("my meeting notes", "books rated above 3", "everything tagged #project"), for notes filtered by a property or date, or for counts, totals, or groupings across notes; one DQL query answers those in a compact table where search plus many reads would not. Not for questions about what notes say — that stays with search_notes. Requires the Dataview plugin and the exec_dataview tool.
+description: Script the Dataview plugin via its public JavaScript API to query and analyze notes — tables, lists, aggregation, and DQL run through the API. Use when the user needs data from vault metadata/frontmatter and you have an exec_dataview tool. Requires Dataview plugin.
 license: MIT
 compatibility: Requires Dataview plugin to be installed and enabled in Obsidian
 metadata:
   author: "S2B"
-  version: "1.2"
+  version: "1.1"
   linkedPlugin: "dataview"
 ---
 
 # Dataview Integration
-
-## When to reach for it
-
-Dataview indexes the vault's *structure*: tags, frontmatter properties, folders, file dates,
-links, and tasks. Use it, instead of `search_notes` and a series of `read_content` calls, when
-the question is about which notes exist or how they add up:
-
-- a category of notes ("my meeting notes", "all books", "notes tagged #idea from last month");
-- notes filtered or sorted by a property, tag, folder, or date;
-- counts, totals, averages, or groupings across notes ("how many meetings in March", "tasks per
-  project").
-
-One query returns the answer as a compact table with just the fields you asked for, which costs a
-fraction of the context that scanning notes one by one would. Verify the tag or property names
-first (`get_all_tags`, `get_properties`) rather than guessing them in the query.
-
-Do **not** use it for questions about what notes *say* — Dataview does not see prose, so "what
-did I write about X" stays with `search_notes`. A common shape is both: find the candidate notes
-with Dataview, then `read_content` the few that matter.
-
-## How it works
 
 You script Dataview through its public JavaScript `api` object. When the Dataview integration is
 enabled you have an `exec_dataview` tool (check your available tools) that runs JavaScript against
