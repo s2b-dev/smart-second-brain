@@ -168,11 +168,13 @@ describe("turnCoordinator narration", () => {
 		expect(deliveries(a1)).toEqual([]);
 		expect(a1.some((a) => a.type === "narrate")).toBe(false);
 
+		// The answer lands while the user's window is still closed; when it opens,
+		// the answer goes out and the stale progress line is gone.
 		const { state: s2, actions: a2 } = play(
 			[
 				{ type: "speechStopped" },
-				{ type: "autoResponseTimedOut" },
 				{ type: "outputReady", callId: "c1", output: "o" },
+				{ type: "autoResponseTimedOut" },
 			],
 			s1,
 		);
