@@ -67,6 +67,20 @@ interface ChatSessionOptions {
 	onThreadIdChange?: (oldPath: string, newPath: string) => void;
 }
 
+/**
+ * Terminal outcome of one chat turn, as observed by `ChatSession.sendMessageAndAwait`.
+ * `content` is the final assistant text (checkpoint-derived on success, whatever had
+ * streamed on cancel/error).
+ */
+export interface SettledTurn {
+	state: AssistantState;
+	content: string;
+	errorCode?: string;
+}
+
+/** How many settled outcomes to keep for pairs nobody awaited before dropping the oldest. */
+const MAX_UNCLAIMED_TURN_RESULTS = 16;
+
 export class ChatSession {
 	id = $state<string>("");
 	messages: MessagePair[] = $state<MessagePair[]>([]);
@@ -77,6 +91,13 @@ export class ChatSession {
 
 	// Streaming / lifecycle
 	private abortController: AbortController | null = null;
+	/**
+	 * Settled outcomes keyed by the pre-run pair id `sendMessage` returned. Recorded in
+	 * `runStream`'s `finally` because the pair object itself is re-minted after a
+	 * successful run (`syncGraphAfterRun`), so a caller holding the original id could
+	 * not read the state off it afterwards.
+	 */
+	private turnResults = new Map<UUIDv7, SettledTurn>();
 	private cancelled = false;
 	// Reactive mirror of "a stream is in flight". `abortController` is an
 	// imperative handle (not $state), so UI that reacts to running state — the
@@ -275,17 +296,17 @@ export class ChatSession {
 	}
 
 	/**
-	 * Send a user message:
-	 *  - Create MessagePair with idle assistant
-	 *  - Kick off streaming process
+	 * Push a fresh user/assistant pair and kick off the assistant run. Shared by the
+	 * fire-and-forget `sendMessage` and the awaiting `sendMessageAndAwait`; the run
+	 * promise is handed back so the awaiting variant can observe the same chain.
 	 */
-	async sendMessage(
+	private startTurn(
 		content: string,
 		attachments?: ChatAttachment[],
 		visibleNotes?: VisibleNoteRef[],
 		selection?: SelectionRef,
 		graphNotes?: GraphNoteRef[],
-	): Promise<UUIDv7> {
+	): { pairId: UUIDv7; run: Promise<void> } {
 		const pairId = genUUIDv7();
 
 		// Capture the current model at send time
@@ -309,9 +330,65 @@ export class ChatSession {
 		this.messages.push(pair);
 
 		// Stream assistant reply (pass attachments and visible notes so they reach the agent)
-		void this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
+		const run = this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
+		return { pairId, run };
+	}
 
+	/**
+	 * Send a user message:
+	 *  - Create MessagePair with idle assistant
+	 *  - Kick off streaming process (fire-and-forget)
+	 */
+	async sendMessage(
+		content: string,
+		attachments?: ChatAttachment[],
+		visibleNotes?: VisibleNoteRef[],
+		selection?: SelectionRef,
+		graphNotes?: GraphNoteRef[],
+	): Promise<UUIDv7> {
+		const { pairId, run } = this.startTurn(content, attachments, visibleNotes, selection, graphNotes);
+		void run.catch((err) => Logger.error("[ChatSession] Send failed:", err));
 		return pairId;
+	}
+
+	/**
+	 * `sendMessage`, but resolved only once the turn has settled, with its terminal
+	 * state and final assistant text. Never rejects: a synchronous refusal (e.g. a
+	 * response already in progress) comes back as an `error` outcome so a caller that
+	 * relays the result elsewhere — the voice bridge hands it to the speech model —
+	 * always has something to say.
+	 */
+	async sendMessageAndAwait(
+		content: string,
+		attachments?: ChatAttachment[],
+		visibleNotes?: VisibleNoteRef[],
+		selection?: SelectionRef,
+		graphNotes?: GraphNoteRef[],
+	): Promise<SettledTurn> {
+		const { pairId, run } = this.startTurn(content, attachments, visibleNotes, selection, graphNotes);
+		try {
+			await run;
+		} catch (err) {
+			this.turnResults.delete(pairId);
+			return { state: AssistantState.error, content: "", errorCode: extractErrorMessage(err) };
+		}
+		const result = this.turnResults.get(pairId);
+		this.turnResults.delete(pairId);
+		return result ?? { state: AssistantState.error, content: "", errorCode: "The turn produced no result." };
+	}
+
+	private recordTurnResult(pairId: UUIDv7, source: MessagePair): void {
+		this.turnResults.set(pairId, {
+			state: source.assistantMessage.state,
+			content: source.assistantMessage.content,
+			errorCode: source.assistantMessage.errorCode,
+		});
+		// Fire-and-forget callers never claim their entry; keep the map bounded.
+		while (this.turnResults.size > MAX_UNCLAIMED_TURN_RESULTS) {
+			const oldest = this.turnResults.keys().next().value;
+			if (oldest === undefined) break;
+			this.turnResults.delete(oldest);
+		}
 	}
 
 	/** Abort current streaming (if any) */
@@ -736,6 +813,7 @@ export class ChatSession {
 			if (settledPair) {
 				settledPair.assistantMessage.runStartedAtMs = undefined;
 			}
+			this.recordTurnResult(pairId, settledPair ?? pair);
 			this.abortController = null;
 			this.running = false;
 			this.cancelled = false;
