@@ -28,7 +28,8 @@ export interface SupervisorSession {
 export type SessionResolver = (threadPath: string) => SupervisorSession | null;
 
 export interface SupervisorRequest {
-	threadPath: string;
+	/** The thread to run on; a function is resolved when the run starts (renames may land while queued). */
+	threadPath: string | (() => string | null);
 	request: string;
 	/** Voice exchanges since the previous delegation, oldest first. */
 	transcript: readonly TranscriptLine[];
@@ -100,7 +101,8 @@ export class SupervisorBridge {
 
 	private async execute(req: SupervisorRequest): Promise<string> {
 		if (this.aborted) return ABORTED_OUTPUT;
-		const session = this.resolveSession(req.threadPath);
+		const threadPath = typeof req.threadPath === "function" ? req.threadPath() : req.threadPath;
+		const session = threadPath ? this.resolveSession(threadPath) : null;
 		if (!session) return NO_SESSION_OUTPUT;
 		this.active = session;
 		try {

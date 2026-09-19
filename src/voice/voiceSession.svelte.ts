@@ -1,4 +1,4 @@
-import { Notice, Platform } from "obsidian";
+import { type EventRef, Notice, Platform, TFile } from "obsidian";
 import { getData } from "../stores/dataStore.svelte";
 import { getPlugin } from "../stores/state.svelte";
 import { showSettingsLinkNotice } from "../utils/actionNotice";
@@ -86,6 +86,8 @@ export class VoiceSession {
 
 	/** Which thread each mounted chat view currently shows, keyed by the view's token. */
 	private viewPaths = new Map<symbol, string | null>();
+	private detachCheckQueued = false;
+	private renameRef: EventRef | null = null;
 
 	get isActive(): boolean {
 		return this.status !== "off";
@@ -103,11 +105,28 @@ export class VoiceSession {
 
 	detachView(token: symbol): void {
 		this.viewPaths.delete(token);
-		if (!this.isActive || this.threadPath === null) return;
-		for (const path of this.viewPaths.values()) {
-			if (path === this.threadPath) return;
-		}
-		this.stop();
+		// Decide after the current flush: a view whose thread path just changed
+		// (the auto-title rename) detaches and re-attaches in the same effect run,
+		// and must not read as "the last view closed" in between.
+		if (this.detachCheckQueued) return;
+		this.detachCheckQueued = true;
+		queueMicrotask(() => {
+			this.detachCheckQueued = false;
+			if (!this.isActive || this.threadPath === null) return;
+			for (const path of this.viewPaths.values()) {
+				if (path === this.threadPath) return;
+			}
+			this.stop();
+		});
+	}
+
+	/**
+	 * A chat renames itself after its first turn (auto-title). The registry re-keys
+	 * the session and the view follows; the voice session must too, or its next
+	 * delegation resolves a thread that no longer exists.
+	 */
+	handleThreadRenamed(oldPath: string, newPath: string): void {
+		if (this.threadPath === oldPath) this.threadPath = newPath;
 	}
 
 	isBoundTo(threadPath: string | null): boolean {
@@ -174,6 +193,10 @@ export class VoiceSession {
 		this.coordinator = createInitialState();
 		this.bridge.reset();
 		this.status = "connecting";
+		const vault = getPlugin().app.vault;
+		this.renameRef = vault.on("rename", (file, oldPath) => {
+			if (file instanceof TFile) this.handleThreadRenamed(oldPath, file.path);
+		});
 
 		try {
 			const playback = new AudioPlayback(() => this.onPlaybackDrained());
@@ -233,6 +256,10 @@ export class VoiceSession {
 	stop(): void {
 		this.generation++;
 		this.clearAutoResponseTimer();
+		if (this.renameRef) {
+			getPlugin().app.vault.offref(this.renameRef);
+			this.renameRef = null;
+		}
 		this.bridge.abort();
 		this.capture?.stop();
 		this.capture = null;
@@ -325,8 +352,7 @@ export class VoiceSession {
 			this.deliver(callId, JSON.stringify({ error: "The request was empty." }));
 			return;
 		}
-		const threadPath = this.threadPath;
-		if (!threadPath) return;
+		if (!this.threadPath) return;
 
 		const context = this.transcript.slice(this.lastDelegationIndex);
 		this.lastDelegationIndex = this.transcript.length;
@@ -335,6 +361,9 @@ export class VoiceSession {
 		this.refreshIdleStatus();
 
 		const generation = this.generation;
+		// The path is resolved when the queued run actually starts, so a rename that
+		// lands while an earlier delegation is still running does not strand this one.
+		const threadPath = () => this.threadPath;
 		void this.bridge.run({ threadPath, request, transcript: context }).then((output) => {
 			if (generation !== this.generation) return;
 			this.dispatch({ type: "outputReady", callId, output });

@@ -78,6 +78,20 @@ describe("SupervisorBridge", () => {
 		expect(seen[0]).toContain("User: yo");
 	});
 
+	it("resolves a thread-path function when the run starts, so a rename while queued is honoured", async () => {
+		const seen: string[] = [];
+		const bridge = new SupervisorBridge((path) => {
+			seen.push(path);
+			return path === "new.chat" ? fakeSession(async () => ok("hi")) : null;
+		});
+		let current = "old.chat";
+		const first = bridge.run({ threadPath: () => current, request: "a", transcript: [] });
+		current = "new.chat";
+		const out = await first;
+		expect(seen).toEqual(["new.chat"]);
+		expect(JSON.parse(out)).toEqual({ answer: "hi" });
+	});
+
 	it("reports a missing session without throwing", async () => {
 		const bridge = new SupervisorBridge(() => null);
 		expect(JSON.parse(await bridge.run({ threadPath: "gone", request: "q", transcript: [] }))).toEqual({
