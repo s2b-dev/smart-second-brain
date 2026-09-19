@@ -117,6 +117,9 @@ describe("narration responses", () => {
 		expect(ev.response.conversation).toBe("none");
 		expect(ev.response.output_modalities).toEqual(["audio"]);
 		expect(ev.response.instructions).toContain("Searching your notes for graph physics");
+		expect(ev.response.instructions).not.toContain("already said");
+		const varied = buildNarrationResponse("Reading a note", ["Searching your notes for todos"]);
+		expect(varied.response.instructions).toContain('You already said: "Searching your notes for todos"');
 		expect(isNarrationResponse(ev.response.metadata)).toBe(true);
 		expect(isNarrationResponse(null)).toBe(false);
 		expect(isNarrationResponse({ other: 1 })).toBe(false);

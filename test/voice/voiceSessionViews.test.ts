@@ -108,14 +108,3 @@ describe("VoiceSession view attachment", () => {
 		expect(session.status).toBe("off");
 	});
 });
-
-describe("progressToNarration", () => {
-	it("prefers the model's own lead-in and falls back to a readable tool name", async () => {
-		const { progressToNarration } = await import("../../src/voice/voiceSession.svelte");
-		expect(progressToNarration({ toolName: "search_notes", preamble: "Let me check your notes." })).toBe(
-			"Let me check your notes.",
-		);
-		expect(progressToNarration({ toolName: "search_notes" })).toBe('Running "Search Notes"');
-		expect(progressToNarration({ toolName: "some_mcp_tool" })).toBe('Running "some mcp tool"');
-	});
-});

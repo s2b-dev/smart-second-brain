@@ -182,14 +182,18 @@ export const NARRATION_METADATA = { s2b: "narration" } as const;
  * conversation state, so it can never be mistaken for the answer to the pending
  * function call, and the audio it produces is not an item that can be truncated.
  */
-export function buildNarrationResponse(progressText: string) {
+export function buildNarrationResponse(progressText: string, alreadySaid: readonly string[] = []) {
+	const avoid =
+		alreadySaid.length > 0
+			? ` You already said: ${alreadySaid.map((line) => `"${line}"`).join(", ")}. Say something different, or if this update adds nothing new, just say "Still on it."`
+			: "";
 	return {
 		type: EV.responseCreate,
 		response: {
 			conversation: "none",
 			output_modalities: ["audio"],
 			metadata: NARRATION_METADATA,
-			instructions: `Progress update from the assistant working on the user's request: "${progressText}". In one short spoken sentence, in the user's language, tell the user what is happening right now, in your own words. Present tense. Do not ask anything, do not add filler, do not read out technical tool names.`,
+			instructions: `Progress update from the assistant working on the user's request: "${progressText}". Tell the user what is happening right now, in the user's language, in one short spoken sentence of at most twelve words. Mention the specific detail from the update (the search terms, the note or page name) when there is one. Present tense, no filler, no questions, no technical tool names.${avoid}`,
 		},
 	};
 }

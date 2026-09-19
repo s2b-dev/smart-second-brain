@@ -85,6 +85,8 @@ export interface SettledTurn {
 export interface TurnProgress {
 	toolName: string;
 	preamble?: string;
+	/** The tool's input as the model produced it; summarised for spoken progress. */
+	input?: unknown;
 }
 
 /** How many settled outcomes to keep for pairs nobody awaited before dropping the oldest. */
@@ -1189,6 +1191,7 @@ export class ChatSession {
 				this.notifyTurnProgress({
 					toolName: chunk.toolName,
 					preamble: isFirstWithPreamble ? preambleTrimmed : undefined,
+					input: chunk.input,
 				});
 				tokenBuffer = "";
 				assistantMsg.content = "";

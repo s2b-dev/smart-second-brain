@@ -1,6 +1,4 @@
 import { type EventRef, Notice, Platform, TFile } from "obsidian";
-import { BUILT_IN_TOOL_IDS, type BuiltInToolId } from "../types/plugin";
-import { getToolDisplayName } from "../agent/tools/builtInToolDefaults";
 import type { TurnProgress } from "../stores/chatStore.svelte";
 import { getData } from "../stores/dataStore.svelte";
 import { getPlugin } from "../stores/state.svelte";
@@ -23,6 +21,7 @@ import {
 	buildTruncate,
 	isFunctionCallItem,
 } from "./realtimeProtocol";
+import { describeProgress } from "./progressNarration";
 import { type SupervisorBridge, type TranscriptLine, createSupervisorBridge } from "./supervisorBridge";
 import {
 	type CoordinatorEvent,
@@ -52,15 +51,11 @@ export type VoiceStatus = "off" | "connecting" | "listening" | "speaking" | "age
 /** How long to wait after `speech_stopped` for the server's own response before assuming none is coming. */
 const AUTO_RESPONSE_GRACE_MS = 1500;
 /** Minimum gap between spoken progress lines; steps often arrive seconds apart and narrating every one is noise. */
-const MIN_NARRATION_GAP_MS = 4000;
-
-/** What to tell the speech model about a tool start: the model's own lead-in if it wrote one, else the tool's name. */
-export function progressToNarration(progress: TurnProgress): string {
-	if (progress.preamble) return progress.preamble;
-	const known = (BUILT_IN_TOOL_IDS as readonly string[]).includes(progress.toolName);
-	const name = known ? getToolDisplayName(progress.toolName as BuiltInToolId) : progress.toolName.replace(/_/g, " ");
-	return `Running "${name}"`;
-}
+const MIN_NARRATION_GAP_MS = 5000;
+/** After this many progress lines for one request the user knows it is working; stay quiet until the answer. */
+const MAX_NARRATIONS_PER_DELEGATION = 3;
+/** How many spoken lines the model is reminded of so it varies its wording. */
+const RECENT_NARRATIONS = 4;
 
 interface OpenAiCredentials {
 	apiKey: string;
@@ -98,7 +93,9 @@ export class VoiceSession {
 	private assistantDrafts = new Map<string, string>();
 	private activeResponseIsNarration = false;
 	private lastNarrationAt = 0;
-	private lastNarrationText: string | null = null;
+	/** The last few progress lines actually sent, newest last. Dedupes and feeds the model's "already said". */
+	private recentNarrations: string[] = [];
+	private narrationsThisDelegation = 0;
 	private narrationTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
 	private generation = 0;
@@ -290,7 +287,8 @@ export class VoiceSession {
 		this.activeResponseId = null;
 		this.activeResponseIsNarration = false;
 		this.dropHeldNarration();
-		this.lastNarrationText = null;
+		this.recentNarrations = [];
+		this.narrationsThisDelegation = 0;
 		this.assistantDrafts.clear();
 		this.pendingCalls = 0;
 		this.liveAssistantText = "";
@@ -391,8 +389,12 @@ export class VoiceSession {
 		// The path is resolved when the queued run actually starts, so a rename that
 		// lands while an earlier delegation is still running does not strand this one.
 		const threadPath = () => this.threadPath;
+		// A fresh request (nothing else pending) gets a fresh narration budget.
+		if (this.coordinator.pending.size === 0) this.narrationsThisDelegation = 0;
 		const onProgress = (progress: TurnProgress) => {
-			if (generation === this.generation) this.queueNarration(progressToNarration(progress));
+			if (generation !== this.generation) return;
+			const text = describeProgress(progress);
+			if (text) this.queueNarration(text);
 		};
 		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
 			if (generation !== this.generation) return;
@@ -444,8 +446,9 @@ export class VoiceSession {
 					break;
 				case "narrate":
 					this.lastNarrationAt = Date.now();
-					this.lastNarrationText = action.text;
-					this.client?.send(buildNarrationResponse(action.text));
+					this.narrationsThisDelegation += 1;
+					this.client?.send(buildNarrationResponse(action.text, this.recentNarrations));
+					this.recentNarrations = [...this.recentNarrations, action.text].slice(-RECENT_NARRATIONS);
 					break;
 			}
 		}
@@ -466,7 +469,10 @@ export class VoiceSession {
 	 * newest survives) and released when the gap has passed. Repeats are dropped.
 	 */
 	private queueNarration(text: string): void {
-		if (!text.trim() || text === this.lastNarrationText) return;
+		if (!text.trim()) return;
+		if (this.narrationsThisDelegation >= MAX_NARRATIONS_PER_DELEGATION) return;
+		const key = text.toLowerCase();
+		if (this.recentNarrations.some((line) => line.toLowerCase() === key)) return;
 		const wait = MIN_NARRATION_GAP_MS - (Date.now() - this.lastNarrationAt);
 		if (wait <= 0) {
 			this.dispatch({ type: "narrationReady", text });
