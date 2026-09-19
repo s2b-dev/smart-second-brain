@@ -17,6 +17,7 @@ import dataview10 from "./history/dataview-1.0.md?raw";
 import editNotes10 from "./history/edit-notes-1.0.md?raw";
 import editNotes11 from "./history/edit-notes-1.1.md?raw";
 import exploreVault10 from "./history/explore-vault-1.0.md?raw";
+import exploreVault11 from "./history/explore-vault-1.1.md?raw";
 import tasknotes10 from "./history/tasknotes-1.0.md?raw";
 
 /**
@@ -50,7 +51,16 @@ import tasknotes10 from "./history/tasknotes-1.0.md?raw";
  */
 const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([
 	// 1.0: before the "Compute, don't estimate" execute_javascript guidance was added.
-	["explore-vault", new Map([["1.0", fingerprint(exploreVault10)]])],
+	// 1.1: still told the model to call `list_directory` first, before tags and properties,
+	//      when the vault's organisation was unknown — the root cause of context-filling
+	//      listings in large vaults once the tool itself was bounded.
+	[
+		"explore-vault",
+		new Map([
+			["1.0", fingerprint(exploreVault10)],
+			["1.1", fingerprint(exploreVault11)],
+		]),
+	],
 	// 1.0 as actually released in 2.0.2-beta — i.e. the post-#381 body, which #381 edited
 	// *without* bumping the version. That silent reuse is the same failure as an unretained
 	// body, just quieter: the new text went out still labelled 1.0, so the version could no

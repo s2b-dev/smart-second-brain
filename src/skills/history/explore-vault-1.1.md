@@ -4,15 +4,15 @@ description: Search, read, and explore the user's vault — find notes by tag, p
 allowed-tools: search_notes list_directory read_content grep_notes get_all_tags get_properties execute_javascript
 metadata:
   author: "S2B"
-  version: "1.2"
+  version: "1.1"
   category: "core"
 ---
 
 ## Finding Notes
 1. **Unknown Organization**: If the user asks for a category of notes (e.g. "daily notes", "meetings", "books", "ideas") and you don't know how they are organized:
+	- Call `list_directory` first (starting at root or a likely folder) to understand folder layout before deciding search scope.
    - Call `get_all_tags` FIRST to check if a relevant tag exists (e.g. #daily, #meeting, #book).
    - ALSO call `get_properties` and omit 'note_name' to check if there are relevant frontmatter properties (e.g. "type", "category", "status").
-   - If the folder layout matters and you don't know it, call `list_directory` with no path: it returns the top folders with file counts, not file names, so it stays small in any vault. Pass a folder's path only when you need that folder's contents. Never walk the tree to find a note — that is what `search_notes` and `grep_notes` are for.
    - If you find a matching tag or property, use it to filter your search or query.
    - If no relevant tag or property is found, call `search_notes` with a broad term to find example files and see their paths/names/properties.
    - **Do NOT guess** tag names, property keys, or folder paths without verifying first.

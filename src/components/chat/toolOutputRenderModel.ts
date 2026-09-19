@@ -20,25 +20,25 @@ interface SearchNotesPayload {
 	results?: SearchNotesResult[];
 }
 
-interface DirectoryFileEntry {
-	name?: string;
-	extension?: string;
-	size?: number;
-}
-
+/** Mirrors `DirectoryListNode` in `agent/tools/listDirectory.ts`, loosened for parsing. */
 interface DirectoryTreeNode {
+	fileCount?: number;
+	folderCount?: number;
+	files?: string[];
+	moreFiles?: number;
 	folders?: Record<string, DirectoryTreeNode>;
-	files?: DirectoryFileEntry[];
+	moreFolders?: number;
 }
 
 interface ListDirectoryPayload {
 	root?: string;
-	recursive?: boolean;
 	maxDepth?: number;
+	includeFiles?: boolean;
 	tree?: DirectoryTreeNode;
 	totalFolders?: number;
 	totalFiles?: number;
 	skippedPrivateFiles?: number;
+	note?: string;
 }
 
 interface ManageNotesSummary {
@@ -590,19 +590,19 @@ function stringifyPrettyValue(value: unknown): string {
 	}
 }
 
-function isDirectoryFileEntry(value: unknown): value is DirectoryFileEntry {
-	if (!isPlainObject(value)) return false;
-	if ("name" in value && value.name !== undefined && typeof value.name !== "string") return false;
-	if ("extension" in value && value.extension !== undefined && typeof value.extension !== "string") return false;
-	if ("size" in value && value.size !== undefined && typeof value.size !== "number") return false;
-	return true;
+function isOptionalNumber(value: unknown): boolean {
+	return value === undefined || typeof value === "number";
 }
 
 function isDirectoryTreeNode(value: unknown): value is DirectoryTreeNode {
 	if (!isPlainObject(value)) return false;
 
+	for (const key of ["fileCount", "folderCount", "moreFiles", "moreFolders"]) {
+		if (key in value && !isOptionalNumber(value[key])) return false;
+	}
+
 	if ("files" in value) {
-		if (!Array.isArray(value.files) || !value.files.every(isDirectoryFileEntry)) return false;
+		if (!Array.isArray(value.files) || !value.files.every((file) => typeof file === "string")) return false;
 	}
 
 	if ("folders" in value) {
@@ -636,8 +636,10 @@ function isSearchNotesPayload(value: unknown): value is SearchNotesPayload {
 function isListDirectoryPayload(value: unknown): value is ListDirectoryPayload {
 	if (!isPlainObject(value)) return false;
 	if ("root" in value && value.root !== undefined && typeof value.root !== "string") return false;
-	if ("recursive" in value && value.recursive !== undefined && typeof value.recursive !== "boolean") return false;
+	if ("includeFiles" in value && value.includeFiles !== undefined && typeof value.includeFiles !== "boolean")
+		return false;
 	if ("maxDepth" in value && value.maxDepth !== undefined && typeof value.maxDepth !== "number") return false;
+	if ("note" in value && value.note !== undefined && typeof value.note !== "string") return false;
 	if ("totalFolders" in value && value.totalFolders !== undefined && typeof value.totalFolders !== "number")
 		return false;
 	if ("totalFiles" in value && value.totalFiles !== undefined && typeof value.totalFiles !== "number") return false;

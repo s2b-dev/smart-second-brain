@@ -3,70 +3,87 @@ import { type App, normalizePath } from "obsidian";
 import { z } from "zod";
 import { DEFAULT_TOOLS_CONFIG } from "./builtInToolDefaults";
 import { getPendingChangesStore } from "../../stores/pendingChangesStore.svelte";
+import {
+	LIST_DIRECTORY_BUDGET_FRACTION,
+	LIST_DIRECTORY_MAX_CHARS,
+	contextWindowToCharBudget,
+} from "../../utils/contentBudget";
 import { isPathInFolder, normalizeFolderPrefix, normalizeVaultPath } from "../../utils/pathUtils";
 import { isAgentFilePath } from "../../utils/fileFiltering";
 import { memoriesDir } from "../../utils/agentPaths";
 import { resolveToolAgent, resolveToolProvider } from "./toolAgentContext";
 
-interface DirectoryTreeFileEntry {
-	name: string;
-	extension: string;
-	size: number;
+/**
+ * One folder in the model-facing listing. Deliberately compact: file entries are bare names
+ * (the extension is part of the name; sizes were never acted on), and every folder carries a
+ * recursive `fileCount` so an unexpanded subtree still conveys its weight.
+ *
+ * `moreFiles` / `moreFolders` are the collapse markers — direct children that exist but are
+ * not listed, either because file names were not requested (the root overview) or because the
+ * listing had to shrink to fit the context budget. `folderCount` appears only on a folder at
+ * the depth limit, where its subfolders are not rendered at all.
+ */
+export interface DirectoryListNode {
+	fileCount: number;
+	folderCount?: number;
+	files?: string[];
+	moreFiles?: number;
+	folders?: Record<string, DirectoryListNode>;
+	moreFolders?: number;
 }
 
-interface DirectoryTreeNode {
-	folders?: Record<string, DirectoryTreeNode>;
-	files?: DirectoryTreeFileEntry[];
-}
-
-interface MutableDirectoryTreeNode {
-	folders: Record<string, MutableDirectoryTreeNode>;
-	files: DirectoryTreeFileEntry[];
-}
-
-interface DirectoryListResult {
+export interface DirectoryListResult {
 	root: string;
-	recursive: boolean;
-	maxDepth: number;
-	tree: DirectoryTreeNode;
-	totalFolders: number;
-	totalFiles: number;
-	skippedPrivateFiles: number;
-}
-
-interface DirectoryScanOptions {
-	rootPath: string;
-	recursive: boolean;
 	maxDepth: number;
 	includeFiles: boolean;
-	includeFolders: boolean;
-	currentProvider?: string;
-	store: ReturnType<typeof getPendingChangesStore>;
-	/** Normalized memory-folder path when the owning agent has memory enabled.
-	 *  Files inside it are exempt from the agent-machinery skip below — the memory
-	 *  folder is excluded from vault search, so `list_directory` is the agent's ONLY
-	 *  way to discover its own memory notes (the memory prompt directs it here). */
-	visibleMemoryFolder?: string;
+	/** Every folder below the root, at any depth — not just the rendered ones. */
+	totalFolders: number;
+	/** Every visible file below the root, at any depth. */
+	totalFiles: number;
+	skippedPrivateFiles: number;
+	tree: DirectoryListNode;
+	/** Set when the listing was collapsed, telling the model how to see what was left out. */
+	note?: string;
 }
 
-interface DirectoryScanResult {
-	folderSet: Set<string>;
-	fileEntries: Array<DirectoryTreeFileEntry & { path: string }>;
-	skippedPrivateFiles: number;
+interface MutableNode {
+	folders: Map<string, MutableNode>;
+	files: string[];
+	fileCount: number;
 }
+
+interface RenderOptions {
+	maxDepth: number;
+	includeFiles: boolean;
+	fileCap: number;
+	folderCap: number;
+}
+
+/** Default depth of the root overview (folders + counts) — enough to see how a vault is organised. */
+const ROOT_OVERVIEW_DEPTH = 2;
+/** Default depth inside a folder — its direct contents. */
+const FOLDER_LISTING_DEPTH = 1;
+
+/**
+ * Successively tighter per-folder caps tried, in order, until the serialized listing fits the
+ * budget. The first rung is uncapped so a listing that fits is never collapsed at all; the
+ * last rung (no files, a handful of folders) is small enough at any depth to always fit.
+ */
+const COLLAPSE_LADDER: ReadonlyArray<readonly [fileCap: number, folderCap: number]> = [
+	[Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+	[500, 500],
+	[100, 200],
+	[30, 100],
+	[10, 50],
+	[0, 20],
+];
 
 const listDirectorySchema = z.object({
 	path: z
 		.string()
 		.optional()
 		.describe(
-			"Optional vault-relative folder path to list (e.g. 'Projects/research'). Omit to list from the vault root.",
-		),
-	recursive: z
-		.boolean()
-		.optional()
-		.describe(
-			"Whether to recursively include nested directories. Defaults to true when maxDepth is provided, otherwise false.",
+			"Vault-relative folder to list (e.g. 'Projects/research'). Omit for an overview of the whole vault: folders with file counts, no file names.",
 		),
 	maxDepth: z
 		.number()
@@ -75,10 +92,14 @@ const listDirectorySchema = z.object({
 		.max(8)
 		.optional()
 		.describe(
-			"Maximum recursive depth. Providing maxDepth enables recursive listing automatically. Default depth: 3.",
+			`How many folder levels to descend. Default: ${ROOT_OVERVIEW_DEPTH} for the vault overview, ${FOLDER_LISTING_DEPTH} inside a folder.`,
 		),
-	includeFiles: z.boolean().optional().describe("Include files in the output. Default: true."),
-	includeFolders: z.boolean().optional().describe("Include folders in the output. Default: true."),
+	includeFiles: z
+		.boolean()
+		.optional()
+		.describe(
+			"Whether to list file names. Default: false for the vault overview (folders and counts only), true inside a folder. Pass true with no path to also list files at the vault root.",
+		),
 });
 
 type ListDirectoryInput = z.infer<typeof listDirectorySchema>;
@@ -89,8 +110,17 @@ function getListDirectoryToolConfig(agentId: string): { name: string; descriptio
 
 	return {
 		name: selectedConfig?.name ?? defaultConfig.name,
-		description: selectedConfig?.description ?? defaultConfig.description,
+		// Always the shipped default. Tool descriptions aren't user-editable (ToolConfigForm
+		// renders no input for them), so a stored value is only ever an older default, and
+		// honouring it would keep describing the previous output shape to the model.
+		description: defaultConfig.description,
 	};
+}
+
+/** Character budget for one listing, derived from the model's context window but capped. */
+function resolveListBudget(agentId: string): number {
+	const contextWindow = resolveToolAgent(agentId).chatModel?.modelConfig?.contextWindow;
+	return Math.min(contextWindowToCharBudget(contextWindow, LIST_DIRECTORY_BUDGET_FRACTION), LIST_DIRECTORY_MAX_CHARS);
 }
 
 function getRelativePath(root: string, filePath: string): string {
@@ -99,110 +129,17 @@ function getRelativePath(root: string, filePath: string): string {
 	return normalizeVaultPath(filePath).slice(normalizedRoot.length);
 }
 
-function collectFoldersForFile(relativePath: string, recursive: boolean, maxDepth: number): string[] {
-	const segments = relativePath.split("/");
-	if (segments.length <= 1) return [];
-
-	const maxFolderDepth = recursive ? Math.min(maxDepth, segments.length - 1) : 1;
-	const folders: string[] = [];
-	for (let depth = 1; depth <= maxFolderDepth; depth++) {
-		folders.push(segments.slice(0, depth).join("/"));
-	}
-	return folders;
-}
-
-function buildDirectoryTree(
-	folders: string[],
-	files: Array<DirectoryTreeFileEntry & { path: string }>,
-): DirectoryTreeNode {
-	const treeRoot: MutableDirectoryTreeNode = {
-		folders: {},
-		files: [],
-	};
-
-	const nodeByPath = new Map<string, MutableDirectoryTreeNode>();
-	nodeByPath.set("", treeRoot);
-
-	const ensureFolderNode = (folderPath: string): MutableDirectoryTreeNode => {
-		if (!folderPath) return treeRoot;
-
-		const existingNode = nodeByPath.get(folderPath);
-		if (existingNode) return existingNode;
-
-		const segments = folderPath.split("/").filter(Boolean);
-		let currentPath = "";
-		let parentNode = treeRoot;
-
-		for (const segment of segments) {
-			currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-			let currentNode = nodeByPath.get(currentPath);
-
-			if (!currentNode) {
-				currentNode = {
-					folders: {},
-					files: [],
-				};
-				nodeByPath.set(currentPath, currentNode);
-				parentNode.folders[segment] = currentNode;
-			}
-
-			parentNode = currentNode;
-		}
-
-		return parentNode;
-	};
-
-	for (const folder of folders) {
-		ensureFolderNode(folder);
-	}
-
-	for (const file of files) {
-		const slashIndex = file.path.lastIndexOf("/");
-		const parentPath = slashIndex >= 0 ? file.path.slice(0, slashIndex) : "";
-		ensureFolderNode(parentPath).files.push({
-			name: file.name,
-			extension: file.extension,
-			size: file.size,
-		});
-	}
-
-	const sortNode = (node: MutableDirectoryTreeNode): void => {
-		const sortedFolders = Object.entries(node.folders).toSorted(([left], [right]) => left.localeCompare(right));
-		node.folders = Object.fromEntries(sortedFolders);
-		node.files.sort((a, b) => a.name.localeCompare(b.name));
-		for (const child of Object.values(node.folders)) sortNode(child);
-	};
-
-	const finalizeNode = (node: MutableDirectoryTreeNode): DirectoryTreeNode => {
-		const finalizedFolders = Object.entries(node.folders).reduce<Record<string, DirectoryTreeNode>>(
-			(acc, [name, child]) => {
-				acc[name] = finalizeNode(child);
-				return acc;
-			},
-			{},
-		);
-
-		const finalizedNode: DirectoryTreeNode = {};
-		if (Object.keys(finalizedFolders).length > 0) finalizedNode.folders = finalizedFolders;
-		if (node.files.length > 0) finalizedNode.files = node.files;
-		return finalizedNode;
-	};
-
-	sortNode(treeRoot);
-	return finalizeNode(treeRoot);
-}
-
 function isDirectoryFileVisible(
 	filePath: string,
 	rootPath: string,
-	store: DirectoryScanOptions["store"],
+	store: ReturnType<typeof getPendingChangesStore>,
 	currentProvider?: string,
 	visibleMemoryFolder?: string,
 ): "include" | "skip" | "private" {
 	if (!isPathInFolder(filePath, rootPath)) return "skip";
 	// Skills live in a vault folder but are plugin machinery, not user notes — hide them.
-	// Exception: the agent's memory folder, when memory is enabled. It is excluded from
-	// the search index, so this listing is the agent's only discovery path for memories.
+	// Exception: the agent's memory folder. It is excluded from the search index, so this
+	// listing is the agent's only discovery path for memories.
 	const isMemoryFile = visibleMemoryFolder ? isPathInFolder(filePath, visibleMemoryFolder) : false;
 	if (!isMemoryFile && isAgentFilePath(filePath)) return "skip";
 	if (!store.isPathAllowed(filePath)) return "skip";
@@ -210,102 +147,139 @@ function isDirectoryFileVisible(
 	return "include";
 }
 
-function addDirectoryFolders(folderSet: Set<string>, relativePath: string, recursive: boolean, maxDepth: number): void {
-	for (const folder of collectFoldersForFile(relativePath, recursive, maxDepth)) {
-		folderSet.add(folder);
-	}
+function newNode(): MutableNode {
+	return { folders: new Map(), files: [], fileCount: 0 };
 }
 
-function addVisibleDirectoryEntry(
-	file: { path: string; name: string; extension: string; stat: { size: number } },
-	result: DirectoryScanResult,
-	options: DirectoryScanOptions,
-): void {
-	const relativePath = getRelativePath(options.rootPath, file.path);
-	const relativeSegments = relativePath.split("/");
-	const fileDepth = relativeSegments.length;
+/**
+ * The complete visible subtree under `rootPath`, at every depth. Depth limits and caps are
+ * applied at render time, so recursive counts stay exact however much is shown.
+ */
+function scanTree(
+	app: App,
+	rootPath: string,
+	agentId: string,
+): { root: MutableNode; totalFolders: number; skippedPrivateFiles: number } {
+	const store = getPendingChangesStore();
+	const currentProvider = resolveToolProvider(agentId);
+	// The one re-inclusion in the otherwise fully excluded agent folder: memory notes are
+	// absent from the search index, so listing them here is the agent's only way to
+	// discover what it remembers. Always visible — there is no per-agent memory flag;
+	// an agent that shouldn't use memory simply has no `# Memory` section telling it the
+	// folder exists. Resolved per call because the agent root can change mid-session.
+	const visibleMemoryFolder = normalizePath(memoriesDir());
 
-	if (!options.recursive && fileDepth > 1) {
-		if (options.includeFolders) result.folderSet.add(relativeSegments[0]);
-		return;
-	}
-
-	if (options.recursive && fileDepth > options.maxDepth + 1) {
-		if (options.includeFolders) addDirectoryFolders(result.folderSet, relativePath, true, options.maxDepth);
-		return;
-	}
-
-	if (options.includeFolders)
-		addDirectoryFolders(result.folderSet, relativePath, options.recursive, options.maxDepth);
-
-	if (!options.includeFiles) return;
-
-	result.fileEntries.push({
-		name: file.name,
-		path: options.rootPath ? relativePath : normalizeVaultPath(file.path),
-		extension: file.extension,
-		size: file.stat.size,
-	});
-}
-
-function collectDirectoryEntries(app: App, options: DirectoryScanOptions): DirectoryScanResult {
-	const result: DirectoryScanResult = {
-		folderSet: new Set<string>(),
-		fileEntries: [],
-		skippedPrivateFiles: 0,
-	};
+	const root = newNode();
+	let totalFolders = 0;
+	let skippedPrivateFiles = 0;
 
 	for (const file of app.vault.getFiles()) {
-		const visibility = isDirectoryFileVisible(
-			file.path,
-			options.rootPath,
-			options.store,
-			options.currentProvider,
-			options.visibleMemoryFolder,
-		);
+		const visibility = isDirectoryFileVisible(file.path, rootPath, store, currentProvider, visibleMemoryFolder);
 		if (visibility === "skip") continue;
 		if (visibility === "private") {
-			result.skippedPrivateFiles++;
+			skippedPrivateFiles++;
 			continue;
 		}
 
-		addVisibleDirectoryEntry(file, result, options);
+		const segments = getRelativePath(rootPath, file.path).split("/").filter(Boolean);
+		let node = root;
+		node.fileCount++;
+		for (const segment of segments.slice(0, -1)) {
+			let child = node.folders.get(segment);
+			if (!child) {
+				child = newNode();
+				node.folders.set(segment, child);
+				totalFolders++;
+			}
+			child.fileCount++;
+			node = child;
+		}
+		node.files.push(file.name);
 	}
 
-	return result;
+	return { root, totalFolders, skippedPrivateFiles };
 }
 
-function buildDirectoryListResult(
-	requestedPath: string,
-	options: Omit<DirectoryScanOptions, "store" | "currentProvider">,
-	scanResult: DirectoryScanResult,
-): DirectoryListResult {
-	const sortedFolders = options.includeFolders
-		? Array.from(scanResult.folderSet).toSorted((a, b) => a.localeCompare(b))
-		: [];
-	const sortedFiles = options.includeFiles
-		? scanResult.fileEntries.toSorted((a, b) => a.path.localeCompare(b.path))
-		: [];
+/** Render one folder, applying the depth limit and per-folder caps; `depth` is 0 at the root. */
+function renderNode(node: MutableNode, depth: number, options: RenderOptions): DirectoryListNode {
+	const out: DirectoryListNode = { fileCount: node.fileCount };
 
-	return {
-		root: requestedPath,
-		recursive: options.recursive,
-		maxDepth: options.maxDepth,
-		tree: buildDirectoryTree(sortedFolders, sortedFiles),
-		totalFolders: options.includeFolders ? scanResult.folderSet.size : 0,
-		totalFiles: options.includeFiles ? scanResult.fileEntries.length : 0,
-		skippedPrivateFiles: scanResult.skippedPrivateFiles,
-	};
+	if (node.files.length > 0) {
+		const shown = options.includeFiles ? Math.min(node.files.length, options.fileCap) : 0;
+		if (shown > 0) {
+			out.files = node.files.toSorted((a, b) => a.localeCompare(b)).slice(0, shown);
+		}
+		if (node.files.length > shown) out.moreFiles = node.files.length - shown;
+	}
+
+	if (node.folders.size > 0) {
+		if (depth >= options.maxDepth) {
+			out.folderCount = node.folders.size;
+		} else {
+			const names = Array.from(node.folders.keys()).toSorted((a, b) => a.localeCompare(b));
+			const shown = Math.min(names.length, options.folderCap);
+			if (shown > 0) {
+				out.folders = {};
+				for (const name of names.slice(0, shown)) {
+					out.folders[name] = renderNode(node.folders.get(name) as MutableNode, depth + 1, options);
+				}
+			}
+			if (names.length > shown) out.moreFolders = names.length - shown;
+		}
+	}
+
+	return out;
+}
+
+function collapseNote(requestedPath: string, includeFiles: boolean, depthReduced: boolean): string {
+	const parts: string[] = [];
+	if (depthReduced) parts.push("depth was reduced");
+	if (includeFiles) parts.push("some entries are omitted (see moreFiles / moreFolders)");
+	const cause = parts.length > 0 ? ` — ${parts.join("; ")}` : "";
+	const scope = requestedPath === "/" ? "" : ` under ${requestedPath}`;
+	return `Listing collapsed to fit the context budget${cause}. Call list_directory with a subfolder path${scope} to see its contents, or use search_notes / grep_notes to find specific notes instead of walking the tree.`;
+}
+
+function hasCollapse(node: DirectoryListNode): boolean {
+	if ((node.moreFiles ?? 0) > 0 || (node.moreFolders ?? 0) > 0) return true;
+	return Object.values(node.folders ?? {}).some(hasCollapse);
+}
+
+/**
+ * Render the listing, shrinking it structurally until it fits `budget` characters: first
+ * tighter per-folder caps at the requested depth, then one level shallower, and so on. The
+ * result is always a well-formed tree with explicit markers for what was left out — never a
+ * listing cut off mid-JSON.
+ */
+function renderWithinBudget(
+	scan: ReturnType<typeof scanTree>,
+	base: Omit<DirectoryListResult, "tree" | "note" | "maxDepth">,
+	requestedDepth: number,
+	budget: number,
+): string {
+	let last = "";
+	for (let maxDepth = requestedDepth; maxDepth >= 1; maxDepth--) {
+		for (const [fileCap, folderCap] of COLLAPSE_LADDER) {
+			const tree = renderNode(scan.root, 0, { maxDepth, includeFiles: base.includeFiles, fileCap, folderCap });
+			const result: DirectoryListResult = { ...base, maxDepth, tree };
+			const depthReduced = maxDepth < requestedDepth;
+			// Only the root overview legitimately omits files without being "collapsed"; any
+			// marker in a file-listing run, or a reduced depth, means something was cut.
+			if (depthReduced || (base.includeFiles && hasCollapse(tree))) {
+				result.note = collapseNote(base.root, base.includeFiles, depthReduced);
+			}
+			last = JSON.stringify(result);
+			if (last.length <= budget) return last;
+		}
+	}
+	return last;
 }
 
 export function createListDirectoryTool(app: App, agentId = "") {
 	const toolConfig = getListDirectoryToolConfig(agentId);
 
 	return tool(
-		async ({ path, recursive, maxDepth, includeFiles = true, includeFolders = true }: ListDirectoryInput) => {
-			const effectiveRecursive = recursive ?? maxDepth !== undefined;
-			const effectiveMaxDepth = maxDepth ?? 3;
-
+		async ({ path, maxDepth, includeFiles }: ListDirectoryInput) => {
 			const rootPath = normalizeVaultPath(path ?? "");
 			const requestedPath = rootPath || "/";
 			const rootEntity = rootPath ? app.vault.getAbstractFileByPath(rootPath) : null;
@@ -325,38 +299,26 @@ export function createListDirectoryTool(app: App, agentId = "") {
 				}
 			}
 
-			const store = getPendingChangesStore();
-			const currentProvider = resolveToolProvider(agentId);
-			// The one re-inclusion in the otherwise fully excluded agent folder: memory notes are
-			// absent from the search index, so listing them here is the agent's only way to
-			// discover what it remembers. Always visible — there is no per-agent memory flag;
-			// an agent that shouldn't use memory simply has no `# Memory` section telling it the
-			// folder exists. Resolved per call because the agent root can change mid-session.
-			const visibleMemoryFolder = normalizePath(memoriesDir());
-			const scanOptions: DirectoryScanOptions = {
-				rootPath,
-				recursive: effectiveRecursive,
-				maxDepth: effectiveMaxDepth,
-				includeFiles,
-				includeFolders,
-				currentProvider,
-				store,
-				visibleMemoryFolder,
-			};
-			const scanResult = collectDirectoryEntries(app, scanOptions);
-			const result = buildDirectoryListResult(
-				requestedPath,
-				{
-					rootPath,
-					recursive: effectiveRecursive,
-					maxDepth: effectiveMaxDepth,
-					includeFiles,
-					includeFolders,
-				},
-				scanResult,
-			);
+			// The root call is an orientation call: folders and counts tell the model how the
+			// vault is organised at a few hundred tokens regardless of size, whereas file names
+			// at the root would scale with the vault. Inside a folder, files are the point.
+			const isRoot = rootPath === "";
+			const effectiveIncludeFiles = includeFiles ?? !isRoot;
+			const effectiveDepth = maxDepth ?? (isRoot ? ROOT_OVERVIEW_DEPTH : FOLDER_LISTING_DEPTH);
 
-			return JSON.stringify(result);
+			const scan = scanTree(app, rootPath, agentId);
+			return renderWithinBudget(
+				scan,
+				{
+					root: requestedPath,
+					includeFiles: effectiveIncludeFiles,
+					totalFolders: scan.totalFolders,
+					totalFiles: scan.root.fileCount,
+					skippedPrivateFiles: scan.skippedPrivateFiles,
+				},
+				effectiveDepth,
+				resolveListBudget(agentId),
+			);
 		},
 		{
 			name: toolConfig.name,

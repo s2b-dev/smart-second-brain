@@ -23,12 +23,11 @@ describe("buildToolOutputRenderModel", () => {
 		const model = buildToolOutputRenderModel("list_directory", {
 			root: "/",
 			tree: {
+				fileCount: 2,
 				folders: {
-					Projects: {
-						files: [{ name: "Welcome.md", extension: "md", size: 12 }],
-					},
+					Projects: { fileCount: 1, files: ["Welcome.md"] },
 				},
-				files: [{ name: "root.md", extension: "md", size: 4 }],
+				files: ["root.md"],
 			},
 			totalFolders: 1,
 			totalFiles: 2,
@@ -36,8 +35,8 @@ describe("buildToolOutputRenderModel", () => {
 
 		expect(model.kind).toBe("list_directory");
 		if (model.kind !== "list_directory") return;
-		expect(model.payload.tree?.folders?.Projects?.files?.[0]?.name).toBe("Welcome.md");
-		expect(model.payload.tree?.files?.[0]?.name).toBe("root.md");
+		expect(model.payload.tree?.folders?.Projects?.files?.[0]).toBe("Welcome.md");
+		expect(model.payload.tree?.files?.[0]).toBe("root.md");
 	});
 
 	it("keeps raw object output compact while preserving pretty structured sections", () => {
@@ -58,7 +57,7 @@ describe("buildToolOutputRenderModel", () => {
 			tree: {
 				folders: {
 					Projects: {
-						files: [{ name: 42 }],
+						files: [42],
 					},
 				},
 			},

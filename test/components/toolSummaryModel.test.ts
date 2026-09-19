@@ -70,7 +70,7 @@ describe("buildToolSummary", () => {
 		it("labels with the folder basename and counts entries", () => {
 			const out = model("list_directory", {
 				root: "Projects",
-				tree: { folders: {}, files: [{ name: "a.md" }] },
+				tree: { fileCount: 2, files: ["a.md"] },
 				totalFolders: 1,
 				totalFiles: 2,
 			});
