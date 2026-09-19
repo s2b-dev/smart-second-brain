@@ -37,8 +37,19 @@ function hostOf(url: string): string {
 	}
 }
 
-export function describeProgress(progress: TurnProgress): string | null {
-	if (progress.preamble?.trim()) return progress.preamble.trim();
+export interface ProgressLine {
+	text: string;
+	/** The assistant's own sentence rather than a summary of the tool input. */
+	isLeadIn: boolean;
+}
+
+export function describeProgress(progress: TurnProgress): ProgressLine | null {
+	if (progress.preamble?.trim()) return { text: progress.preamble.trim(), isLeadIn: true };
+	const text = summariseToolInput(progress);
+	return text ? { text, isLeadIn: false } : null;
+}
+
+function summariseToolInput(progress: TurnProgress): string | null {
 	const { toolName, input } = progress;
 	switch (toolName) {
 		case "search_notes": {

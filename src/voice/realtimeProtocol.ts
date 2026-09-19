@@ -178,8 +178,14 @@ export function buildResponseCreate() {
 export const NARRATION_METADATA = { s2b: "narration" } as const;
 
 export interface NarrationContext {
-	/** The progress line to convey. */
+	/** The new step to convey: the assistant's own lead-in sentence, or a terse summary of the tool input. */
 	text: string;
+	/** True when `text` is a sentence the assistant wrote itself (worth speaking close to verbatim). */
+	isLeadIn?: boolean;
+	/** What the user asked the assistant to do, so the narration can relate steps to it. */
+	request?: string | null;
+	/** Every step so far for this request, oldest first, whether or not it was spoken. */
+	stepsSoFar?: readonly string[];
 	/** Lines already spoken for this request, oldest first; the model must not repeat them. */
 	alreadySaid?: readonly string[];
 	/** The user's most recent words, so the sentence comes out in their language. */
@@ -191,25 +197,33 @@ export interface NarrationContext {
  * conversation state, so it can never be mistaken for the answer to the pending
  * function call, and the audio it produces is not an item that can be truncated.
  *
- * `input` is set explicitly: without it the response would still see the whole
- * conversation, and the model then paraphrases the user's request instead of the
- * progress line — the same sentence every time. With its own two-item context the
- * update is all it has to go on.
+ * `input` is set explicitly. Without it the response sees the whole conversation,
+ * which ends in the user's question — and the model then answers that, in the same
+ * words every time, instead of conveying the step. What it gets instead is the
+ * context that actually matters for a good line: the request, the steps so far,
+ * what has already been said, and the new step.
  */
 export function buildNarrationResponse(context: NarrationContext) {
 	const alreadySaid = context.alreadySaid ?? [];
+	const steps = context.stepsSoFar ?? [];
 	const rules = [
-		"You narrate progress for a voice assistant while it works on the user's request in the background.",
-		"Say ONE short spoken sentence, at most twelve words, present tense, telling the user what is happening right now.",
-		"Base it only on the progress update below and keep its specific detail (search terms, note or page name).",
-		"Use the language of the user's last words. No filler, no questions, no technical tool names, no markdown.",
+		"You are the voice of an assistant that is working on the user's request in the background; you keep the user company by telling them what it is doing.",
+		"Speak ONE sentence, at most fifteen words, in the language of the user's last words. No filler, no questions, no technical tool names, no markdown.",
+		context.isLeadIn
+			? "The new step is a sentence the assistant wrote itself: say it in your own voice, close to its meaning, shortened if long. It usually explains why this step follows the last one — keep that."
+			: "The new step is terse: turn it into a natural sentence that keeps its specific detail (search terms, note or page name).",
+		"Vary how you start and phrase lines; never open two lines the same way. Relate the step to the request or to the previous step when that makes it more natural.",
 		alreadySaid.length > 0
-			? `Do not repeat these lines you already said: ${alreadySaid.map((line) => `"${line}"`).join("; ")}. If the update adds nothing new, say the equivalent of "Still on it."`
+			? `Lines you already said, do not repeat or rephrase them: ${alreadySaid.map((line) => `"${line}"`).join("; ")}. If the new step adds nothing new, say a very short "still on it" in the user's language.`
 			: "",
 	]
 		.filter(Boolean)
 		.join(" ");
-	const userLine = context.userLastWords?.trim() ? `User's last words: ${context.userLastWords.trim()}\n` : "";
+	const parts: string[] = [];
+	if (context.userLastWords?.trim()) parts.push(`User's last words: ${context.userLastWords.trim()}`);
+	if (context.request?.trim()) parts.push(`The user's request: ${context.request.trim()}`);
+	if (steps.length > 0) parts.push(`Steps so far:\n${steps.map((step, i) => `${i + 1}. ${step}`).join("\n")}`);
+	parts.push(`New step: ${context.text}`);
 	return {
 		type: EV.responseCreate,
 		response: {
@@ -217,13 +231,7 @@ export function buildNarrationResponse(context: NarrationContext) {
 			output_modalities: ["audio"],
 			metadata: NARRATION_METADATA,
 			instructions: rules,
-			input: [
-				{
-					type: "message",
-					role: "user",
-					content: [{ type: "input_text", text: `${userLine}Progress update: ${context.text}` }],
-				},
-			],
+			input: [{ type: "message", role: "user", content: [{ type: "input_text", text: parts.join("\n\n") }] }],
 		},
 	};
 }

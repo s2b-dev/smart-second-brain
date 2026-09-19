@@ -96,6 +96,10 @@ export class VoiceSession {
 	/** The last few progress lines actually sent, newest last. Dedupes and feeds the model's "already said". */
 	private recentNarrations: string[] = [];
 	private narrationsThisDelegation = 0;
+	/** Every progress line of the current request, spoken or not, so a narration can relate steps. */
+	private stepsThisDelegation: string[] = [];
+	private currentRequest: string | null = null;
+	private pendingLeadIn = new Map<string, boolean>();
 	private narrationTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
 	private generation = 0;
@@ -289,6 +293,9 @@ export class VoiceSession {
 		this.dropHeldNarration();
 		this.recentNarrations = [];
 		this.narrationsThisDelegation = 0;
+		this.stepsThisDelegation = [];
+		this.currentRequest = null;
+		this.pendingLeadIn.clear();
 		this.assistantDrafts.clear();
 		this.pendingCalls = 0;
 		this.liveAssistantText = "";
@@ -389,12 +396,20 @@ export class VoiceSession {
 		// The path is resolved when the queued run actually starts, so a rename that
 		// lands while an earlier delegation is still running does not strand this one.
 		const threadPath = () => this.threadPath;
-		// A fresh request (nothing else pending) gets a fresh narration budget.
-		if (this.coordinator.pending.size === 0) this.narrationsThisDelegation = 0;
+		// A fresh request (nothing else pending) gets a fresh narration budget and history.
+		if (this.coordinator.pending.size === 0) {
+			this.narrationsThisDelegation = 0;
+			this.stepsThisDelegation = [];
+			this.recentNarrations = [];
+		}
+		this.currentRequest = request;
 		const onProgress = (progress: TurnProgress) => {
 			if (generation !== this.generation) return;
-			const text = describeProgress(progress);
-			if (text) this.queueNarration(text);
+			const line = describeProgress(progress);
+			if (!line) return;
+			this.stepsThisDelegation = [...this.stepsThisDelegation, line.text].slice(-12);
+			this.pendingLeadIn.set(line.text, line.isLeadIn);
+			this.queueNarration(line.text);
 		};
 		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
 			if (generation !== this.generation) return;
@@ -450,10 +465,15 @@ export class VoiceSession {
 					this.client?.send(
 						buildNarrationResponse({
 							text: action.text,
+							isLeadIn: this.pendingLeadIn.get(action.text) ?? false,
+							request: this.currentRequest,
+							// Everything before the new step, so it can be related to what came earlier.
+							stepsSoFar: this.stepsThisDelegation.filter((step) => step !== action.text),
 							alreadySaid: this.recentNarrations,
 							userLastWords: this.transcript.findLast((line) => line.role === "user")?.text ?? null,
 						}),
 					);
+					this.pendingLeadIn.delete(action.text);
 					this.recentNarrations = [...this.recentNarrations, action.text].slice(-RECENT_NARRATIONS);
 					break;
 			}
