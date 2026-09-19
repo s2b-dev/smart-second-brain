@@ -452,7 +452,7 @@ export type PrivacyMode = "private-by-default" | "public-by-default";
 export type VoiceTurnDetection = "semantic_vad" | "server_vad";
 
 /** Visual style of the voice-mode orb. Switchable from Developer settings while the look is being explored. */
-export type VoiceOrbStyle = "pulse" | "aurora" | "ripple" | "spectrum" | "blob";
+export type VoiceOrbStyle = "pulse" | "aurora" | "ripple" | "spectrum" | "blob" | "nebula";
 
 /** Settings for the experimental voice mode. */
 export interface VoiceSettings {

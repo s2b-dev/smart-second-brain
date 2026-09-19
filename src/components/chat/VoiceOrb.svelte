@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { VoiceOrbStyle } from "../../types/plugin";
-import { drawBlob, drawSpectrum } from "../../voice/orbRenderers";
+import { drawBlob, drawNebula, drawSpectrum } from "../../voice/orbRenderers";
 import type { VoiceStatus } from "../../voice/voiceSession.svelte";
 
 /**
@@ -21,13 +21,14 @@ interface Props {
 	compact?: boolean;
 }
 
-const { status, level, spectrum, variant = "blob", compact = false }: Props = $props();
+const { status, level, spectrum, variant = "nebula", compact = false }: Props = $props();
 
-const isCanvas = $derived(variant === "blob" || variant === "spectrum");
+const isCanvas = $derived(variant === "blob" || variant === "spectrum" || variant === "nebula");
 
 let el = $state<HTMLDivElement>();
 let canvas = $state<HTMLCanvasElement>();
 let altProbe = $state<HTMLSpanElement>();
+let altProbe2 = $state<HTMLSpanElement>();
 
 $effect(() => {
 	const node = el;
@@ -39,7 +40,7 @@ $effect(() => {
 	let smoothed = 0;
 	let t = 0;
 	let last = performance.now();
-	let colours = { accent: "", accentAlt: "", error: "" };
+	let colours = { accent: "", accentAlt: "", accentAlt2: "", error: "" };
 	let colourAge = 60;
 
 	const tick = (now: number) => {
@@ -58,6 +59,7 @@ $effect(() => {
 				colours = {
 					accent: rootStyle.color,
 					accentAlt: altProbe ? getComputedStyle(altProbe).color : rootStyle.color,
+					accentAlt2: altProbe2 ? getComputedStyle(altProbe2).color : rootStyle.color,
 					error: rootStyle.getPropertyValue("--text-error").trim() || rootStyle.color,
 				};
 			}
@@ -81,6 +83,7 @@ $effect(() => {
 				...colours,
 			};
 			if (variant === "blob") drawBlob(ctx, frame);
+			else if (variant === "nebula") drawNebula(ctx, frame);
 			else drawSpectrum(ctx, frame);
 		}
 		raf = requestAnimationFrame(tick);
@@ -120,6 +123,7 @@ $effect(() => {
   {:else}
     <!-- Probe: resolves the colour-mixed alternate accent so the canvas can use it. -->
     <span bind:this={altProbe} class="s2b-voice-orb-probe"></span>
+    <span bind:this={altProbe2} class="s2b-voice-orb-probe s2b-voice-orb-probe-2"></span>
     <canvas bind:this={canvas} class="s2b-voice-orb-canvas"></canvas>
   {/if}
 </div>
@@ -154,6 +158,10 @@ $effect(() => {
     width: 0;
     height: 0;
     color: var(--s2b-orb-alt);
+  }
+
+  .s2b-voice-orb-probe-2 {
+    color: var(--s2b-orb-alt-2);
   }
 
   .s2b-voice-orb-canvas {

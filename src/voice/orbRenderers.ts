@@ -19,6 +19,7 @@ export interface OrbFrame {
 	/** Resolved CSS colours (canvas cannot read `var()`). */
 	accent: string;
 	accentAlt: string;
+	accentAlt2: string;
 	error: string;
 }
 
@@ -173,5 +174,81 @@ export function drawSpectrum(ctx: CanvasRenderingContext2D, f: OrbFrame): void {
 	ctx.restore();
 
 	if (status === "agentWorking") workingOrbit(ctx, cx, cy, R * 0.94, t, main);
+	ctx.globalAlpha = 1;
+}
+
+interface Cloud {
+	/** Orbit radius as a fraction of the blob radius, angular speed, phase, size as a fraction. */
+	orbit: number;
+	speed: number;
+	phase: number;
+	size: number;
+}
+
+const NEBULA_CLOUDS: readonly Cloud[] = [
+	{ orbit: 0.42, speed: 0.55, phase: 0, size: 0.95 },
+	{ orbit: 0.5, speed: -0.4, phase: 2.1, size: 0.85 },
+	{ orbit: 0.36, speed: 0.7, phase: 4.2, size: 0.7 },
+];
+
+/**
+ * Blob outline as a clip, aurora clouds inside: three soft radial gradients in the
+ * accent and its two colour-mixed companions, orbiting the centre at different
+ * speeds. The level speeds the drift up and brightens the clouds; the outline's
+ * own wobble already follows it.
+ */
+export function drawNebula(ctx: CanvasRenderingContext2D, f: OrbFrame): void {
+	const { width, height, status } = f;
+	const level = status === "error" || status === "connecting" ? 0 : f.level;
+	const cx = width / 2;
+	const cy = height / 2;
+	const R = Math.min(width, height) * 0.34;
+	const isError = status === "error";
+	const main = isError ? f.error : f.accent;
+	const colours = isError ? [f.error, f.error, f.error] : [f.accent, f.accentAlt, f.accentAlt2];
+	// Drift accelerates with the voice; the phase integrates so it never jumps.
+	const t = f.t * (1 + 1.5 * level);
+
+	ctx.clearRect(0, 0, width, height);
+	ctx.globalAlpha = status === "connecting" ? 0.4 : 1;
+
+	// Glow that follows the outline.
+	ctx.save();
+	ctx.fillStyle = main;
+	ctx.globalAlpha *= 0.35;
+	ctx.shadowColor = main;
+	ctx.shadowBlur = R * (0.3 + 1.0 * level);
+	blobPath(ctx, cx, cy, R, f.t, level, 0);
+	ctx.fill();
+	ctx.restore();
+
+	// Clouds, clipped to the morphing outline.
+	ctx.save();
+	blobPath(ctx, cx, cy, R, f.t, level, 0);
+	ctx.clip();
+	// Base tint so the gaps between clouds are never empty.
+	ctx.fillStyle = main;
+	ctx.globalAlpha *= 0.3;
+	ctx.fillRect(cx - R * 1.5, cy - R * 1.5, R * 3, R * 3);
+	ctx.globalAlpha = status === "connecting" ? 0.4 : 1;
+	ctx.filter = `blur(${Math.max(2, R * 0.14)}px)`;
+	for (const [i, cloud] of NEBULA_CLOUDS.entries()) {
+		const angle = cloud.phase + t * cloud.speed;
+		const x = cx + Math.cos(angle) * R * cloud.orbit;
+		const y = cy + Math.sin(angle * 0.9) * R * cloud.orbit;
+		const radius = R * cloud.size * (1 + 0.25 * level);
+		const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+		grad.addColorStop(0, colours[i]);
+		grad.addColorStop(1, "transparent");
+		ctx.fillStyle = grad;
+		ctx.globalAlpha = (status === "connecting" ? 0.4 : 1) * Math.min(1, 0.85 + 0.3 * level);
+		ctx.beginPath();
+		ctx.arc(x, y, radius, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	ctx.filter = "none";
+	ctx.restore();
+
+	if (status === "agentWorking") workingOrbit(ctx, cx, cy, R * 1.32, f.t, main);
 	ctx.globalAlpha = 1;
 }
