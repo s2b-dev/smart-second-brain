@@ -191,7 +191,7 @@ export function buildTruncate(itemId: string, audioEndMs: number) {
 // PCM16 codecs
 // ---------------------------------------------------------------------------
 
-export function float32ToPcm16(samples: Float32Array): Int16Array {
+export function float32ToPcm16(samples: Float32Array): Int16Array<ArrayBuffer> {
 	const out = new Int16Array(samples.length);
 	for (let i = 0; i < samples.length; i++) {
 		const s = Math.max(-1, Math.min(1, samples[i]));
@@ -200,7 +200,7 @@ export function float32ToPcm16(samples: Float32Array): Int16Array {
 	return out;
 }
 
-export function pcm16ToFloat32(samples: Int16Array): Float32Array {
+export function pcm16ToFloat32(samples: Int16Array): Float32Array<ArrayBuffer> {
 	const out = new Float32Array(samples.length);
 	for (let i = 0; i < samples.length; i++) {
 		const s = samples[i];
@@ -221,7 +221,7 @@ export function pcm16ToBase64(samples: Int16Array): string {
 }
 
 /** Inverse of `pcm16ToBase64`. A trailing odd byte (never expected) is dropped rather than misaligned. */
-export function base64ToPcm16(base64: string): Int16Array {
+export function base64ToPcm16(base64: string): Int16Array<ArrayBuffer> {
 	const binary = atob(base64);
 	const even = binary.length - (binary.length % 2);
 	const bytes = new Uint8Array(even);

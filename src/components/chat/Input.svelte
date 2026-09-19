@@ -26,6 +26,7 @@ import AttachPopover from "./AttachPopover.svelte";
 import { SearchModal } from "../modal/SearchModal";
 import { isMobileUI } from "../../utils/platform";
 import Button from "../ui/Button.svelte";
+import { getVoiceSession } from "../../voice/voiceSession.svelte";
 interface Props {
 	registry: SessionRegistry;
 	threadPath: string | null;
@@ -1366,6 +1367,18 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
              that isn't a control, and the phone action row has no width to
              spare for it (the same reason the narrowest container query below
              sheds it first on desktop). -->
+        {#if !isMobileUI() && getData().voice.enabled}
+          <Button
+            ariaLabel="Voice mode"
+            tooltip="Voice mode"
+            disabled={!threadPath}
+            onClick={() => {
+              if (threadPath) void getVoiceSession().toggle(threadPath);
+            }}
+            styles="chat-input-icon-button clickable-icon"
+            iconId="mic"
+          />
+        {/if}
         {#if !isMobileUI()}
           <ContextUsageCircle
             usagePercent={contextUsage.usagePercent}

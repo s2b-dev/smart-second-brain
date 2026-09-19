@@ -90,7 +90,11 @@ describe("SupervisorBridge", () => {
 		let release: (() => void) | undefined;
 		const session = fakeSession(async (c) => {
 			order.push(`start:${c}`);
-			if (c === "a") await new Promise<void>((r) => (release = r));
+			if (c === "a") {
+				await new Promise<void>((r) => {
+					release = r;
+				});
+			}
 			order.push(`end:${c}`);
 			return ok(c);
 		});
@@ -110,7 +114,9 @@ describe("SupervisorBridge", () => {
 	it("abort stops the in-flight run and short-circuits anything queued", async () => {
 		let release: (() => void) | undefined;
 		const session = fakeSession(async () => {
-			await new Promise<void>((r) => (release = r));
+			await new Promise<void>((r) => {
+				release = r;
+			});
 			return { state: AssistantState.cancelled, content: "" };
 		});
 		const bridge = new SupervisorBridge(() => session);

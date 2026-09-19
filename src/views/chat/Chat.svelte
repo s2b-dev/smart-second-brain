@@ -2,10 +2,12 @@
 import { QueryClientProvider } from "@tanstack/svelte-query";
 import Input from "../../components/chat/Input.svelte";
 import MessageContainer from "../../components/chat/MessageContainer.svelte";
+import VoiceSurface from "../../components/chat/VoiceSurface.svelte";
 import { getSessionRegistry } from "../../stores/chatStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
 import { isMobileUI } from "../../utils/platform";
+import { getVoiceSession } from "../../voice/voiceSession.svelte";
 import type { ThreadPathStore } from "./threadPathStore.svelte";
 
 interface Props {
@@ -19,6 +21,8 @@ const threadPath = $derived(threadPathStore.current);
 const plugin = getPlugin();
 
 const registry = getSessionRegistry();
+
+const voice = getVoiceSession();
 
 let messageContainer = $state<ReturnType<typeof MessageContainer> | undefined>();
 let input = $state<ReturnType<typeof Input> | undefined>();
@@ -313,7 +317,9 @@ function portalComposer(node: HTMLElement) {
     use:messageNavHotkeys
     use:portalComposer
   >
-    {#if registry}
+    {#if registry && voice.isBoundTo(threadPath)}
+      <VoiceSurface {registry} {threadPath} />
+    {:else if registry}
       <MessageContainer bind:this={messageContainer} {registry} {threadPath} />
       <Input
         bind:this={input}

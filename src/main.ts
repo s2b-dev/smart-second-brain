@@ -6,6 +6,7 @@ import { Logger as Log, applyVerboseLogging } from "./utils/logging";
 import { isAgentFilePath } from "./utils/fileFiltering";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { getVoiceSession } from "./voice/voiceSession.svelte";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -594,6 +595,21 @@ export default class SecondBrainPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-voice-mode",
+			name: "Toggle voice mode",
+			icon: "mic",
+			callback: () => {
+				const threadId = this.resolveChatThreadIdForNavigation();
+				if (!threadId) {
+					new Notice("No chat is currently open");
+					return;
+				}
+				// Platform, enablement and credential checks live in the session itself.
+				void getVoiceSession().toggle(threadId);
+			},
+		});
+
 		this.addSettingTab(new SettingsTab(this));
 
 		this.registerEvent(
@@ -868,6 +884,8 @@ export default class SecondBrainPlugin extends Plugin {
 		// reset, its QueryObservers keep fetching with the unloaded plugin's credentials
 		// and the next enable reuses a singleton bound to this (now dead) data store.
 		resetAvailableModels();
+		// Voice mode holds a socket and the microphone; both must go with the plugin.
+		getVoiceSession().stop();
 		if (this.runningIndicator) {
 			void unmount(this.runningIndicator);
 			this.runningIndicator = null;
