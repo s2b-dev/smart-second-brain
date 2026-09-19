@@ -65,9 +65,10 @@ const ROOT_OVERVIEW_DEPTH = 2;
 const FOLDER_LISTING_DEPTH = 1;
 
 /**
- * Successively tighter per-folder caps tried, in order, until the serialized listing fits the
- * budget. The first rung is uncapped so a listing that fits is never collapsed at all; the
- * last rung (no files, a handful of folders) is small enough at any depth to always fit.
+ * Successively tighter per-folder caps tried, in order, at each depth until the serialized
+ * listing fits the budget. The first rung is uncapped so a listing that fits is never
+ * collapsed at all. When the last rung still doesn't fit, depth is reduced by one and the
+ * ladder restarts — a wider view of the top level orients better than a narrow view of two.
  */
 const COLLAPSE_LADDER: ReadonlyArray<readonly [fileCap: number, folderCap: number]> = [
 	[Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
@@ -76,6 +77,17 @@ const COLLAPSE_LADDER: ReadonlyArray<readonly [fileCap: number, folderCap: numbe
 	[30, 100],
 	[10, 50],
 	[0, 20],
+];
+
+/**
+ * Tried only at depth 1, after the ladder above is exhausted. The final rung lists nothing —
+ * the root carries only its counts and collapse markers — so it is a few hundred characters
+ * whatever the vault holds, which is what makes the budget a guarantee rather than a hope
+ * (the floor budget is 4,000 characters).
+ */
+const LAST_RESORT_RUNGS: ReadonlyArray<readonly [fileCap: number, folderCap: number]> = [
+	[0, 5],
+	[0, 0],
 ];
 
 const listDirectorySchema = z.object({
@@ -231,25 +243,43 @@ function renderNode(node: MutableNode, depth: number, options: RenderOptions): D
 	return out;
 }
 
-function collapseNote(requestedPath: string, includeFiles: boolean, depthReduced: boolean): string {
+function collapseNote(
+	requestedPath: string,
+	includeFiles: boolean,
+	depthReduced: boolean,
+	entriesCut: boolean,
+): string {
 	const parts: string[] = [];
 	if (depthReduced) parts.push("depth was reduced");
-	if (includeFiles) parts.push("some entries are omitted (see moreFiles / moreFolders)");
+	if (entriesCut) {
+		parts.push(
+			includeFiles
+				? "some entries are omitted (see moreFiles / moreFolders)"
+				: "some folders are omitted (see moreFolders)",
+		);
+	}
 	const cause = parts.length > 0 ? ` — ${parts.join("; ")}` : "";
 	const scope = requestedPath === "/" ? "" : ` under ${requestedPath}`;
 	return `Listing collapsed to fit the context budget${cause}. Call list_directory with a subfolder path${scope} to see its contents, or use search_notes / grep_notes to find specific notes instead of walking the tree.`;
 }
 
-function hasCollapse(node: DirectoryListNode): boolean {
-	if ((node.moreFiles ?? 0) > 0 || (node.moreFolders ?? 0) > 0) return true;
-	return Object.values(node.folders ?? {}).some(hasCollapse);
+/**
+ * Whether the budget cut anything the caller asked for. Omitted folders always count; omitted
+ * files count only when file names were requested — the root overview leaves them unlisted
+ * by design, and `moreFiles` there is information, not a collapse.
+ */
+function hasCollapse(node: DirectoryListNode, includeFiles: boolean): boolean {
+	if ((node.moreFolders ?? 0) > 0) return true;
+	if (includeFiles && (node.moreFiles ?? 0) > 0) return true;
+	return Object.values(node.folders ?? {}).some((child) => hasCollapse(child, includeFiles));
 }
 
 /**
  * Render the listing, shrinking it structurally until it fits `budget` characters: first
  * tighter per-folder caps at the requested depth, then one level shallower, and so on. The
  * result is always a well-formed tree with explicit markers for what was left out — never a
- * listing cut off mid-JSON.
+ * listing cut off mid-JSON. The last rung at depth 1 always fits (see {@link LAST_RESORT_RUNGS}),
+ * so the loop's fall-through return is only reached with an output under budget.
  */
 function renderWithinBudget(
 	scan: ReturnType<typeof scanTree>,
@@ -259,14 +289,14 @@ function renderWithinBudget(
 ): string {
 	let last = "";
 	for (let maxDepth = requestedDepth; maxDepth >= 1; maxDepth--) {
-		for (const [fileCap, folderCap] of COLLAPSE_LADDER) {
+		const rungs = maxDepth === 1 ? [...COLLAPSE_LADDER, ...LAST_RESORT_RUNGS] : COLLAPSE_LADDER;
+		for (const [fileCap, folderCap] of rungs) {
 			const tree = renderNode(scan.root, 0, { maxDepth, includeFiles: base.includeFiles, fileCap, folderCap });
 			const result: DirectoryListResult = { ...base, maxDepth, tree };
 			const depthReduced = maxDepth < requestedDepth;
-			// Only the root overview legitimately omits files without being "collapsed"; any
-			// marker in a file-listing run, or a reduced depth, means something was cut.
-			if (depthReduced || (base.includeFiles && hasCollapse(tree))) {
-				result.note = collapseNote(base.root, base.includeFiles, depthReduced);
+			const entriesCut = hasCollapse(tree, base.includeFiles);
+			if (depthReduced || entriesCut) {
+				result.note = collapseNote(base.root, base.includeFiles, depthReduced, entriesCut);
 			}
 			last = JSON.stringify(result);
 			if (last.length <= budget) return last;

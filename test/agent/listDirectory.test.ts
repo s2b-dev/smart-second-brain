@@ -251,6 +251,38 @@ describe("listDirectory tool", () => {
 			expect(result.totalFiles).toBe(1600);
 		});
 
+		it("signals collapsed folders in a folders-only overview", async () => {
+			mockAgent(1_000);
+			const files = Array.from({ length: 300 }, (_, i) =>
+				createFile(`Area ${String(i).padStart(3, "0")} with a rather long descriptive name/note.md`),
+			);
+			const result = await list(createMockApp(files));
+
+			expect(result.includeFiles).toBe(false);
+			expect(result.tree.moreFolders).toBeGreaterThan(0);
+			expect(Object.keys(result.tree.folders ?? {}).length + (result.tree.moreFolders ?? 0)).toBe(300);
+			expect(result.note).toContain("some folders are omitted");
+			expect(result.note).not.toContain("moreFiles");
+		});
+
+		it("stays within budget even when top-level folder names alone would exceed it", async () => {
+			mockAgent(1_000);
+			// 30 folders × 250-char names ≈ 7.5k chars of names against a 4k budget: the usual
+			// rungs can't fit, so the depth-1 last-resort rungs must — down to counts only.
+			const files = Array.from({ length: 30 }, (_, i) =>
+				createFile(`${String(i).padStart(3, "x")}${"n".repeat(247)}/note.md`),
+			);
+			const raw = String(await createListDirectoryTool(createMockApp(files)).invoke({}));
+
+			expect(raw.length).toBeLessThanOrEqual(4_000);
+			const result = JSON.parse(raw) as DirectoryListResult;
+			const shown = Object.keys(result.tree.folders ?? {}).length;
+			expect(shown).toBeLessThan(30);
+			expect(shown + (result.tree.moreFolders ?? 0)).toBe(30);
+			expect(result.totalFolders).toBe(30);
+			expect(result.note).toContain("collapsed");
+		});
+
 		it("caps the budget for huge context windows", async () => {
 			mockAgent(2_000_000);
 			const raw = String(
