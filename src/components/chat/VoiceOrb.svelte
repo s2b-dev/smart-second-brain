@@ -227,13 +227,13 @@ $effect(() => {
     position: absolute;
     inset: 0;
     /* A gently wobbling edge: the corner radii lean away from 50% by
-       --s2b-wobble, which rests at 3% and grows to ~13% with the voice, so the
+       --s2b-wobble, which rests at 5% and grows to ~20% with the voice, so the
        disc leans harder while it talks and calms down when it listens. The
        keyframes read the custom property, and the level loop rewrites it every
        frame — the blob look with real bumps lives in the nebula variant. */
-    --s2b-wobble: calc(3% + 10% * var(--s2b-orb-level));
+    --s2b-wobble: calc(5% + 15% * var(--s2b-orb-level));
     border-radius: 50%;
-    animation: s2b-aurora-wobble 7s ease-in-out infinite;
+    animation: s2b-aurora-wobble 6s ease-in-out infinite;
     overflow: hidden;
     background: color-mix(in srgb, currentColor 22%, var(--background-secondary));
     box-shadow: 0 0 calc(8px + 40px * var(--s2b-orb-level)) color-mix(in srgb, currentColor 45%, transparent);
