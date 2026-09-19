@@ -226,11 +226,14 @@ $effect(() => {
   .s2b-voice-orb-aurora {
     position: absolute;
     inset: 0;
-    /* A gently wobbling edge: the corner radii drift between 46% and 54% so the
-       disc never quite settles into a circle, but stays flat and calm — the blob
-       look with its pronounced bumps lives in the nebula variant. */
+    /* A gently wobbling edge: the corner radii lean away from 50% by
+       --s2b-wobble, which rests at 3% and grows to ~13% with the voice, so the
+       disc leans harder while it talks and calms down when it listens. The
+       keyframes read the custom property, and the level loop rewrites it every
+       frame — the blob look with real bumps lives in the nebula variant. */
+    --s2b-wobble: calc(3% + 10% * var(--s2b-orb-level));
     border-radius: 50%;
-    animation: s2b-aurora-wobble 9s ease-in-out infinite;
+    animation: s2b-aurora-wobble 7s ease-in-out infinite;
     overflow: hidden;
     background: color-mix(in srgb, currentColor 22%, var(--background-secondary));
     box-shadow: 0 0 calc(8px + 40px * var(--s2b-orb-level)) color-mix(in srgb, currentColor 45%, transparent);
@@ -346,16 +349,28 @@ $effect(() => {
   @keyframes s2b-aurora-wobble {
     0%,
     100% {
-      border-radius: 52% 48% 47% 53% / 49% 51% 49% 51%;
+      border-radius: calc(50% + var(--s2b-wobble)) calc(50% - var(--s2b-wobble))
+        calc(50% - var(--s2b-wobble) * 0.6) calc(50% + var(--s2b-wobble) * 0.6) /
+        calc(50% - var(--s2b-wobble) * 0.3) calc(50% + var(--s2b-wobble) * 0.3)
+        calc(50% - var(--s2b-wobble) * 0.3) calc(50% + var(--s2b-wobble) * 0.3);
     }
     25% {
-      border-radius: 47% 53% 54% 46% / 53% 47% 52% 48%;
+      border-radius: calc(50% - var(--s2b-wobble) * 0.7) calc(50% + var(--s2b-wobble) * 0.7)
+        calc(50% + var(--s2b-wobble)) calc(50% - var(--s2b-wobble)) /
+        calc(50% + var(--s2b-wobble) * 0.8) calc(50% - var(--s2b-wobble) * 0.8)
+        calc(50% + var(--s2b-wobble) * 0.5) calc(50% - var(--s2b-wobble) * 0.5);
     }
     50% {
-      border-radius: 53% 47% 49% 51% / 46% 54% 47% 53%;
+      border-radius: calc(50% + var(--s2b-wobble) * 0.8) calc(50% - var(--s2b-wobble) * 0.8)
+        calc(50% - var(--s2b-wobble) * 0.3) calc(50% + var(--s2b-wobble) * 0.3) /
+        calc(50% - var(--s2b-wobble)) calc(50% + var(--s2b-wobble))
+        calc(50% - var(--s2b-wobble) * 0.7) calc(50% + var(--s2b-wobble) * 0.7);
     }
     75% {
-      border-radius: 48% 52% 46% 54% / 52% 48% 54% 46%;
+      border-radius: calc(50% - var(--s2b-wobble) * 0.5) calc(50% + var(--s2b-wobble) * 0.5)
+        calc(50% - var(--s2b-wobble)) calc(50% + var(--s2b-wobble)) /
+        calc(50% + var(--s2b-wobble) * 0.5) calc(50% - var(--s2b-wobble) * 0.5)
+        calc(50% + var(--s2b-wobble)) calc(50% - var(--s2b-wobble));
     }
   }
 
