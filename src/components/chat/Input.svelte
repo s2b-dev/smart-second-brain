@@ -1367,18 +1367,6 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
              that isn't a control, and the phone action row has no width to
              spare for it (the same reason the narrowest container query below
              sheds it first on desktop). -->
-        {#if !isMobileUI() && getData().voice.enabled}
-          <Button
-            ariaLabel="Voice mode"
-            tooltip="Voice mode"
-            disabled={!threadPath}
-            onClick={() => {
-              if (threadPath) void getVoiceSession().toggle(threadPath);
-            }}
-            styles="chat-input-icon-button clickable-icon"
-            iconId="mic"
-          />
-        {/if}
         {#if !isMobileUI()}
           <ContextUsageCircle
             usagePercent={contextUsage.usagePercent}
@@ -1387,6 +1375,21 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
             breakdown={contextBreakdown}
             {canSummarizeNow}
             onSummarizeNow={summarizeNow}
+          />
+        {/if}
+        <!-- Voice conversation sits next to Send: it is the other way to start a
+             turn. A waveform rather than a microphone, since a mic reads as
+             "dictate into the box" and this opens a live, spoken exchange. -->
+        {#if !isMobileUI() && getData().voice.enabled}
+          <Button
+            ariaLabel="Voice conversation"
+            tooltip="Voice conversation"
+            disabled={!threadPath}
+            onClick={() => {
+              if (threadPath) void getVoiceSession().toggle(threadPath);
+            }}
+            styles="chat-input-icon-button clickable-icon"
+            iconId="audio-lines"
           />
         {/if}
         {#if !session || session.messageState === MessageState.idle}

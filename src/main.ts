@@ -597,8 +597,8 @@ export default class SecondBrainPlugin extends Plugin {
 
 		this.addCommand({
 			id: "toggle-voice-mode",
-			name: "Toggle voice mode",
-			icon: "mic",
+			name: "Toggle voice conversation",
+			icon: "audio-lines",
 			callback: () => {
 				const threadId = this.resolveChatThreadIdForNavigation();
 				if (!threadId) {

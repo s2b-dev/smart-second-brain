@@ -5,26 +5,14 @@ import ProviderItem from "../../components/settings/ProviderItem.svelte";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
-import Dropdown from "../../components/ui/Dropdown.svelte";
-import Text from "../../components/ui/Text.svelte";
-import Toggle from "../../components/ui/Toggle.svelte";
 import DocsLink from "../../components/ui/DocsLink.svelte";
 import { getData } from "../../stores/dataStore.svelte";
-import { VOICE_OPTIONS } from "../../stores/voiceDefaults";
-import type { VoiceTurnDetection } from "../../types/plugin";
 import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
 import { ProviderSetupModal } from "../provider-setup/ProviderSetup";
-import { Platform } from "obsidian";
 
 const pluginData = getData();
 const plugin = getPlugin();
-
-const voiceOptions = VOICE_OPTIONS.map((v) => ({ display: v, value: v }));
-const turnDetectionOptions: { display: string; value: VoiceTurnDetection }[] = [
-	{ display: "Semantic (waits for a finished thought)", value: "semantic_vad" },
-	{ display: "Server VAD (cuts in on silence)", value: "server_vad" },
-];
 
 const privacyListModal = new PrivacyListModal(plugin.app);
 
@@ -76,46 +64,6 @@ function handleOpenProviderSetup() {
     <Button onClick={() => privacyListModal.open()} buttonText="Manage" />
   </SettingItem>
 </SettingGroup>
-
-{#if Platform.isDesktopApp}
-  <SettingGroup
-    heading="Voice (experimental)"
-    headingDesc="Talk to your agent through OpenAI's realtime speech model. It handles the conversation itself and hands anything about your notes to the regular agent in the open chat."
-  >
-    <SettingItem
-      name="Enable voice mode"
-      desc="Adds a microphone button to the chat composer. Uses your OpenAI provider's API key; audio is streamed to OpenAI and billed per audio minute. Headphones recommended — without them the model can hear itself."
-    >
-      <Toggle checked={pluginData.voice.enabled} onchange={(checked) => pluginData.setVoice({ enabled: checked })} />
-    </SettingItem>
-    {#if pluginData.voice.enabled}
-      <SettingItem name="Realtime model" desc="OpenAI realtime model id.">
-        <Text
-          inputType="text"
-          placeholder="gpt-realtime"
-          value={pluginData.voice.model}
-          onblur={(value) => pluginData.setVoice({ model: value.trim() || "gpt-realtime" })}
-        />
-      </SettingItem>
-      <SettingItem name="Voice" desc="Voice preset for spoken replies.">
-        <Dropdown
-          type="options"
-          dropdown={voiceOptions}
-          selected={pluginData.voice.voice}
-          onchange={(value) => pluginData.setVoice({ voice: value })}
-        />
-      </SettingItem>
-      <SettingItem name="Turn detection" desc="How the model decides you have finished speaking.">
-        <Dropdown
-          type="options"
-          dropdown={turnDetectionOptions}
-          selected={pluginData.voice.turnDetection}
-          onchange={(value) => pluginData.setVoice({ turnDetection: value })}
-        />
-      </SettingItem>
-    {/if}
-  </SettingGroup>
-{/if}
 
 <style>
   /* --icon-size drives the injected svg too: Obsidian's .svg-icon reads it for

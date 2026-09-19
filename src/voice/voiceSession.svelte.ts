@@ -138,7 +138,7 @@ export class VoiceSession {
 		const data = getData();
 		if (!data.voice.enabled) {
 			showSettingsLinkNotice(getPlugin().app, "Enable voice mode in settings first.", {
-				tab: "general",
+				tab: "agents",
 				linkText: "Open settings",
 			});
 			return;
@@ -146,7 +146,7 @@ export class VoiceSession {
 		const credentials = resolveOpenAiCredentials();
 		if (!credentials) {
 			showSettingsLinkNotice(getPlugin().app, "Voice mode needs an OpenAI provider with an API key.", {
-				tab: "general",
+				tab: "agents",
 				linkText: "Open settings",
 			});
 			return;
