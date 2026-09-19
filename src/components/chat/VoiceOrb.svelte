@@ -226,7 +226,11 @@ $effect(() => {
   .s2b-voice-orb-aurora {
     position: absolute;
     inset: 0;
+    /* A gently wobbling edge: the corner radii drift between 46% and 54% so the
+       disc never quite settles into a circle, but stays flat and calm — the blob
+       look with its pronounced bumps lives in the nebula variant. */
     border-radius: 50%;
+    animation: s2b-aurora-wobble 9s ease-in-out infinite;
     overflow: hidden;
     background: color-mix(in srgb, currentColor 22%, var(--background-secondary));
     box-shadow: 0 0 calc(8px + 40px * var(--s2b-orb-level)) color-mix(in srgb, currentColor 45%, transparent);
@@ -271,6 +275,11 @@ $effect(() => {
 
   .s2b-voice-orb[data-status="error"] .s2b-voice-orb-cloud {
     background: currentColor;
+    animation: none;
+  }
+
+  .s2b-voice-orb[data-status="error"] .s2b-voice-orb-aurora,
+  .s2b-voice-orb[data-status="connecting"] .s2b-voice-orb-aurora {
     animation: none;
   }
 
@@ -331,6 +340,22 @@ $effect(() => {
     to {
       transform: scale(2.7);
       opacity: 0;
+    }
+  }
+
+  @keyframes s2b-aurora-wobble {
+    0%,
+    100% {
+      border-radius: 52% 48% 47% 53% / 49% 51% 49% 51%;
+    }
+    25% {
+      border-radius: 47% 53% 54% 46% / 53% 47% 52% 48%;
+    }
+    50% {
+      border-radius: 53% 47% 49% 51% / 46% 54% 47% 53%;
+    }
+    75% {
+      border-radius: 48% 52% 46% 54% / 52% 48% 54% 46%;
     }
   }
 
