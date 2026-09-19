@@ -289,10 +289,7 @@ export class VoiceSession {
 		this.coordinator = createInitialState();
 		this.activeResponseId = null;
 		this.activeResponseIsNarration = false;
-		if (this.narrationTimer) {
-			clearTimeout(this.narrationTimer);
-			this.narrationTimer = null;
-		}
+		this.dropHeldNarration();
 		this.lastNarrationText = null;
 		this.assistantDrafts.clear();
 		this.pendingCalls = 0;
@@ -399,6 +396,8 @@ export class VoiceSession {
 		};
 		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
 			if (generation !== this.generation) return;
+			// Progress for this turn is moot now; the answer is what gets spoken.
+			this.dropHeldNarration();
 			this.dispatch({ type: "outputReady", callId, output });
 			this.pendingCalls = this.coordinator.pending.size;
 			this.refreshIdleStatus();
@@ -476,8 +475,18 @@ export class VoiceSession {
 		if (this.narrationTimer) clearTimeout(this.narrationTimer);
 		this.narrationTimer = setTimeout(() => {
 			this.narrationTimer = null;
+			// The turn this described may have settled meanwhile; a progress line with
+			// nothing pending would only be spoken at the start of the next request.
+			if (this.coordinator.pending.size === 0) return;
 			this.dispatch({ type: "narrationReady", text });
 		}, wait);
+	}
+
+	private dropHeldNarration(): void {
+		if (this.narrationTimer) {
+			clearTimeout(this.narrationTimer);
+			this.narrationTimer = null;
+		}
 	}
 
 	private armAutoResponseTimer(): void {
