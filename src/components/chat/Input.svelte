@@ -203,6 +203,11 @@ const contextUsage = $derived.by(() => {
 const hasChatModel = $derived(Boolean(selectedChatModel));
 const hasContentToSend = $derived(inputValue.trim().length > 0 || attachments.length > 0);
 const canSendMessage = $derived(hasContentToSend && hasChatModel);
+// The Send slot doubles as the voice-conversation button while there is nothing
+// to send: no text, no attachments, not editing. Desktop-only feature, opt-in.
+const voiceInSendSlot = $derived(
+	!isMobileUI() && getData().voice.enabled && !hasContentToSend && !isEditing && threadPath !== null,
+);
 const canSummarizeNow = $derived.by(() => {
 	return Boolean(session && session.messageState === MessageState.idle && session.messages.length > 0);
 });
@@ -1377,21 +1382,6 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
             onSummarizeNow={summarizeNow}
           />
         {/if}
-        <!-- Voice conversation sits next to Send: it is the other way to start a
-             turn. A waveform rather than a microphone, since a mic reads as
-             "dictate into the box" and this opens a live, spoken exchange. -->
-        {#if !isMobileUI() && getData().voice.enabled}
-          <Button
-            ariaLabel="Voice conversation"
-            tooltip="Voice conversation"
-            disabled={!threadPath}
-            onClick={() => {
-              if (threadPath) void getVoiceSession().toggle(threadPath);
-            }}
-            styles="chat-input-icon-button clickable-icon"
-            iconId="audio-lines"
-          />
-        {/if}
         {#if !session || session.messageState === MessageState.idle}
           {#if isEditing && isMobileUI()}
             <Button
@@ -1402,24 +1392,42 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
               iconId="x"
             />
           {/if}
-          <Button
-            disabled={!canSendMessage || savingFiles}
-            ariaLabel={isEditing ? "save edit" : "send message"}
-            tooltip={!hasChatModel
-              ? "Select a chat model first"
-              : isEditing
-                ? sendShortcutHint
-                  ? `Save edit (${sendShortcutHint})`
-                  : "Save edit"
-                : sendShortcutHint
-                  ? `Send message (${sendShortcutHint})`
-                  : "Send message"}
-            onClick={attemptSend}
-            dataTestId="send-message-button"
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
-            style={sendButtonStyle}
-            iconId={isEditing ? "check" : "arrow-up"}
-          />
+          {#if voiceInSendSlot}
+            <!-- Nothing to send yet, so the slot starts a voice conversation instead
+                 (the pattern ChatGPT's composer established). Typing anything, adding
+                 an attachment, or editing turns it back into Send. Only a click gets
+                 here: Enter on an empty box still does nothing. -->
+            <Button
+              ariaLabel="start voice conversation"
+              tooltip="Start voice conversation"
+              onClick={() => {
+                if (threadPath) void getVoiceSession().toggle(threadPath);
+              }}
+              dataTestId="voice-conversation-button"
+              styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200"
+              style={sendButtonStyle}
+              iconId="audio-lines"
+            />
+          {:else}
+            <Button
+              disabled={!canSendMessage || savingFiles}
+              ariaLabel={isEditing ? "save edit" : "send message"}
+              tooltip={!hasChatModel
+                ? "Select a chat model first"
+                : isEditing
+                  ? sendShortcutHint
+                    ? `Save edit (${sendShortcutHint})`
+                    : "Save edit"
+                  : sendShortcutHint
+                    ? `Send message (${sendShortcutHint})`
+                    : "Send message"}
+              onClick={attemptSend}
+              dataTestId="send-message-button"
+              styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
+              style={sendButtonStyle}
+              iconId={isEditing ? "check" : "arrow-up"}
+            />
+          {/if}
         {:else if session.messageState === MessageState.answering}
           <Button
             ariaLabel="stop streaming"
