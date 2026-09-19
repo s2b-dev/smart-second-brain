@@ -121,10 +121,13 @@ describe("ChatSession.sendMessageAndAwait", () => {
 		const { session, internals } = makeSession();
 		internals.abortController = new AbortController();
 
+		const before = session.messages.length;
 		const outcome = await session.sendMessageAndAwait("second send");
 
 		expect(outcome.state).toBe(AssistantState.error);
 		expect(outcome.errorCode).toContain("already in progress");
+		// The refused turn must not leave a phantom pair behind.
+		expect(session.messages.length).toBe(before);
 	});
 
 	it("keeps plain sendMessage fire-and-forget and still records the outcome", async () => {

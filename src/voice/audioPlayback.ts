@@ -23,7 +23,8 @@ export class AudioPlayback {
 	private readonly window: Float32Array<ArrayBuffer>;
 	private readonly sources = new Set<AudioBufferSourceNode>();
 	private nextStartTime = 0;
-	private current: { itemId: string; startTime: number; enqueuedMs: number } | null = null;
+	/** Every item with queued audio, in playback order; the last one is still receiving chunks. */
+	private items: { itemId: string; startTime: number; enqueuedMs: number }[] = [];
 	private closed = false;
 
 	constructor(private readonly onDrained?: () => void) {
@@ -49,10 +50,12 @@ export class AudioPlayback {
 
 		const startAt = Math.max(this.ctx.currentTime + START_LEAD_S, this.nextStartTime);
 		const durationMs = pcm16DurationMs(pcm16.length);
-		if (!this.current || this.current.itemId !== itemId) {
-			this.current = { itemId, startTime: startAt, enqueuedMs: 0 };
+		let item = this.items.at(-1);
+		if (!item || item.itemId !== itemId) {
+			item = { itemId, startTime: startAt, enqueuedMs: 0 };
+			this.items.push(item);
 		}
-		this.current.enqueuedMs += durationMs;
+		item.enqueuedMs += durationMs;
 
 		const source = this.ctx.createBufferSource();
 		source.buffer = buffer;
@@ -67,9 +70,14 @@ export class AudioPlayback {
 		this.nextStartTime = startAt + durationMs / 1000;
 	}
 
-	/** Stop everything now; report how much of the current item had played. */
+	/**
+	 * Stop everything now; report the item that was audible at this moment and how much
+	 * of it had played. Items queued behind it have not been heard at all, and an item
+	 * that already finished is not the one to truncate.
+	 */
 	flush(): FlushResult | null {
-		const current = this.current;
+		const now = this.ctx.currentTime;
+		const audible = this.items.filter((item) => item.startTime <= now).at(-1) ?? this.items[0] ?? null;
 		for (const source of this.sources) {
 			source.onended = null;
 			try {
@@ -81,10 +89,12 @@ export class AudioPlayback {
 		}
 		this.sources.clear();
 		this.nextStartTime = 0;
-		this.current = null;
-		if (!current) return null;
-		const playedMs = Math.max(0, Math.min(current.enqueuedMs, (this.ctx.currentTime - current.startTime) * 1000));
-		return { itemId: current.itemId, playedMs };
+		this.items = [];
+		if (!audible) return null;
+		// Whole milliseconds: that is what the truncate event carries, and it keeps the
+		// float clock's noise out of the number.
+		const playedMs = Math.round(Math.max(0, Math.min(audible.enqueuedMs, (now - audible.startTime) * 1000)));
+		return { itemId: audible.itemId, playedMs };
 	}
 
 	/** 0..1 RMS of what is being rendered right now, for the orb. */

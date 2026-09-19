@@ -309,6 +309,14 @@ export class ChatSession {
 	): { pairId: UUIDv7; run: Promise<void> } {
 		const pairId = genUUIDv7();
 
+		// Refuse before the pair exists: `runStream` would reject the overlap anyway, but
+		// by then the idle pair is already in `messages` with nothing to settle it — a
+		// phantom turn that never reaches the checkpoint graph. The composer disables
+		// Send while a reply runs, so this only bites callers like voice mode.
+		if (this.abortController) {
+			return { pairId, run: Promise.reject(new Error("A response is already in progress for this chat.")) };
+		}
+
 		// Capture the current model at send time
 		const selectedAgent = getData().getSelectedAgent();
 		const currentModel = selectedAgent.chatModel ?? undefined;

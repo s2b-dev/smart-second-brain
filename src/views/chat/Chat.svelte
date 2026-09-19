@@ -24,6 +24,17 @@ const registry = getSessionRegistry();
 
 const voice = getVoiceSession();
 
+// The voice session is global and owns the microphone; this view is its only
+// visible control. If the view closes or moves to another thread while bound,
+// end the session with it rather than leave the mic open behind a surface that
+// is no longer on screen. (Effect cleanup runs on both thread change and unmount.)
+$effect(() => {
+	const boundPath = threadPath;
+	return () => {
+		if (voice.isBoundTo(boundPath)) voice.stop();
+	};
+});
+
 let messageContainer = $state<ReturnType<typeof MessageContainer> | undefined>();
 let input = $state<ReturnType<typeof Input> | undefined>();
 let lastSessionId: string | null = null;
