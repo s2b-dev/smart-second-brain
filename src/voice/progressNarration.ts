@@ -69,8 +69,8 @@ function summariseToolInput(progress: TurnProgress): string | null {
 			return path ? `Looking through the folder "${noteTitle(path)}"` : null;
 		}
 		case "get_properties": {
-			const path = str(field(input, "path"));
-			return path ? `Checking the properties of "${noteTitle(path)}"` : null;
+			const note = str(field(input, "note_name"));
+			return note ? `Checking the properties of "${noteTitle(note)}"` : null;
 		}
 		case "web_search": {
 			const query = str(field(input, "query"));

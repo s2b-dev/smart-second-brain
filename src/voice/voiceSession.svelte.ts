@@ -57,6 +57,19 @@ const MAX_NARRATIONS_PER_DELEGATION = 3;
 /** How many spoken lines the model is reminded of so it varies its wording. */
 const RECENT_NARRATIONS = 4;
 
+/** Narration state of one delegated request, from its function call until its output is delivered. */
+interface Delegation {
+	callId: string;
+	request: string;
+	/** What the user had said when this request was made — the language the progress is spoken in. */
+	userWords: string | null;
+	/** Every progress line so far, spoken or not, oldest first. */
+	steps: string[];
+	/** Lines actually spoken, oldest first. */
+	said: string[];
+	spoken: number;
+}
+
 interface OpenAiCredentials {
 	apiKey: string;
 	baseUrl?: string;
@@ -93,14 +106,12 @@ export class VoiceSession {
 	private assistantDrafts = new Map<string, string>();
 	private activeResponseIsNarration = false;
 	private lastNarrationAt = 0;
-	/** The last few progress lines actually sent, newest last. Dedupes and feeds the model's "already said". */
-	private recentNarrations: string[] = [];
-	private narrationsThisDelegation = 0;
-	/** Every progress line of the current request, spoken or not, so a narration can relate steps. */
-	private stepsThisDelegation: string[] = [];
-	private currentRequest: string | null = null;
-	private pendingLeadIn = new Map<string, boolean>();
+	/** Narration state per in-flight delegation, keyed by call id; dropped when the call settles. */
+	private delegations = new Map<string, Delegation>();
+	/** Which delegation a queued progress line belongs to, and whether it is the agent's own sentence. */
+	private narrationOwners = new Map<string, { callId: string; isLeadIn: boolean }>();
 	private narrationTimer: ReturnType<typeof setTimeout> | null = null;
+	private heldNarrationCallId: string | null = null;
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
 	private generation = 0;
 
@@ -291,11 +302,8 @@ export class VoiceSession {
 		this.activeResponseId = null;
 		this.activeResponseIsNarration = false;
 		this.dropHeldNarration();
-		this.recentNarrations = [];
-		this.narrationsThisDelegation = 0;
-		this.stepsThisDelegation = [];
-		this.currentRequest = null;
-		this.pendingLeadIn.clear();
+		this.delegations.clear();
+		this.narrationOwners.clear();
 		this.assistantDrafts.clear();
 		this.pendingCalls = 0;
 		this.liveAssistantText = "";
@@ -396,25 +404,32 @@ export class VoiceSession {
 		// The path is resolved when the queued run actually starts, so a rename that
 		// lands while an earlier delegation is still running does not strand this one.
 		const threadPath = () => this.threadPath;
-		// A fresh request (nothing else pending) gets a fresh narration budget and history.
-		if (this.coordinator.pending.size === 0) {
-			this.narrationsThisDelegation = 0;
-			this.stepsThisDelegation = [];
-			this.recentNarrations = [];
-		}
-		this.currentRequest = request;
+		// Narration context is per call: the bridge runs delegations one after another,
+		// but the model can queue a second one before the first settles, and its
+		// progress must not be told in the second request's terms — nor in the language
+		// of whatever the user said later.
+		const delegation: Delegation = {
+			callId,
+			request,
+			userWords: this.transcript.findLast((line) => line.role === "user")?.text ?? null,
+			steps: [],
+			said: [],
+			spoken: 0,
+		};
+		this.delegations.set(callId, delegation);
 		const onProgress = (progress: TurnProgress) => {
-			if (generation !== this.generation) return;
+			if (generation !== this.generation || !this.delegations.has(callId)) return;
 			const line = describeProgress(progress);
 			if (!line) return;
-			this.stepsThisDelegation = [...this.stepsThisDelegation, line.text].slice(-12);
-			this.pendingLeadIn.set(line.text, line.isLeadIn);
-			this.queueNarration(line.text);
+			delegation.steps = [...delegation.steps, line.text].slice(-12);
+			this.narrationOwners.set(line.text, { callId, isLeadIn: line.isLeadIn });
+			this.queueNarration(line.text, delegation);
 		};
 		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
 			if (generation !== this.generation) return;
 			// Progress for this turn is moot now; the answer is what gets spoken.
-			this.dropHeldNarration();
+			this.delegations.delete(callId);
+			if (this.heldNarrationCallId === callId) this.dropHeldNarration();
 			this.dispatch({ type: "outputReady", callId, output });
 			this.pendingCalls = this.coordinator.pending.size;
 			this.refreshIdleStatus();
@@ -460,21 +475,7 @@ export class VoiceSession {
 					this.deliver(action.callId, action.output);
 					break;
 				case "narrate":
-					this.lastNarrationAt = Date.now();
-					this.narrationsThisDelegation += 1;
-					this.client?.send(
-						buildNarrationResponse({
-							text: action.text,
-							isLeadIn: this.pendingLeadIn.get(action.text) ?? false,
-							request: this.currentRequest,
-							// Everything before the new step, so it can be related to what came earlier.
-							stepsSoFar: this.stepsThisDelegation.filter((step) => step !== action.text),
-							alreadySaid: this.recentNarrations,
-							userLastWords: this.transcript.findLast((line) => line.role === "user")?.text ?? null,
-						}),
-					);
-					this.pendingLeadIn.delete(action.text);
-					this.recentNarrations = [...this.recentNarrations, action.text].slice(-RECENT_NARRATIONS);
+					this.speakNarration(action.text);
 					break;
 			}
 		}
@@ -494,24 +495,49 @@ export class VoiceSession {
 	 * Rate-limit progress lines: a step that lands within the gap is held (only the
 	 * newest survives) and released when the gap has passed. Repeats are dropped.
 	 */
-	private queueNarration(text: string): void {
+	private queueNarration(text: string, delegation: Delegation): void {
 		if (!text.trim()) return;
-		if (this.narrationsThisDelegation >= MAX_NARRATIONS_PER_DELEGATION) return;
+		if (delegation.spoken >= MAX_NARRATIONS_PER_DELEGATION) return;
 		const key = text.toLowerCase();
-		if (this.recentNarrations.some((line) => line.toLowerCase() === key)) return;
+		if (delegation.said.some((line) => line.toLowerCase() === key)) return;
 		const wait = MIN_NARRATION_GAP_MS - (Date.now() - this.lastNarrationAt);
 		if (wait <= 0) {
 			this.dispatch({ type: "narrationReady", text });
 			return;
 		}
-		if (this.narrationTimer) clearTimeout(this.narrationTimer);
+		// Only the newest held line survives; it stays tied to the call it describes.
+		this.dropHeldNarration();
+		this.heldNarrationCallId = delegation.callId;
 		this.narrationTimer = setTimeout(() => {
 			this.narrationTimer = null;
+			this.heldNarrationCallId = null;
 			// The turn this described may have settled meanwhile; a progress line with
 			// nothing pending would only be spoken at the start of the next request.
-			if (this.coordinator.pending.size === 0) return;
+			if (!this.delegations.has(delegation.callId)) return;
 			this.dispatch({ type: "narrationReady", text });
 		}, wait);
+	}
+
+	private speakNarration(text: string): void {
+		const owner = this.narrationOwners.get(text);
+		this.narrationOwners.delete(text);
+		const delegation = owner ? this.delegations.get(owner.callId) : undefined;
+		// The call this line described has settled or never existed: nothing to say.
+		if (!delegation) return;
+		this.lastNarrationAt = Date.now();
+		this.client?.send(
+			buildNarrationResponse({
+				text,
+				isLeadIn: owner?.isLeadIn ?? false,
+				request: delegation.request,
+				// Everything before the new step, so it can be related to what came earlier.
+				stepsSoFar: delegation.steps.filter((step) => step !== text),
+				alreadySaid: delegation.said,
+				userLastWords: delegation.userWords,
+			}),
+		);
+		delegation.spoken += 1;
+		delegation.said = [...delegation.said, text].slice(-RECENT_NARRATIONS);
 	}
 
 	private dropHeldNarration(): void {
@@ -519,6 +545,7 @@ export class VoiceSession {
 			clearTimeout(this.narrationTimer);
 			this.narrationTimer = null;
 		}
+		this.heldNarrationCallId = null;
 	}
 
 	private armAutoResponseTimer(): void {

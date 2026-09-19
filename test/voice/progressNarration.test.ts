@@ -23,6 +23,9 @@ describe("describeProgress", () => {
 		expect(describeProgress({ toolName: "fetch_url", input: { url: "https://www.example.org/a/b" } })?.text).toBe(
 			"Reading a page from example.org",
 		);
+		expect(
+			describeProgress({ toolName: "get_properties", input: { note_name: "Projects/Roadmap.md" } })?.text,
+		).toBe('Checking the properties of "Roadmap"');
 		expect(describeProgress({ toolName: "manage_notes", input: { operations: [] } })?.text).toBe(
 			"Drafting the note changes for review",
 		);
