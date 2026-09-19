@@ -84,8 +84,30 @@ export class VoiceSession {
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
 	private generation = 0;
 
+	/** Which thread each mounted chat view currently shows, keyed by the view's token. */
+	private viewPaths = new Map<symbol, string | null>();
+
 	get isActive(): boolean {
 		return this.status !== "off";
+	}
+
+	/**
+	 * A chat view reports the thread it shows (again on every thread change). The
+	 * session is global and owns the microphone, and the views are its only visible
+	 * controls — so when the last view showing the bound thread detaches, the session
+	 * ends with it. A second leaf on the same thread keeps it alive.
+	 */
+	attachView(token: symbol, threadPath: string | null): void {
+		this.viewPaths.set(token, threadPath);
+	}
+
+	detachView(token: symbol): void {
+		this.viewPaths.delete(token);
+		if (!this.isActive || this.threadPath === null) return;
+		for (const path of this.viewPaths.values()) {
+			if (path === this.threadPath) return;
+		}
+		this.stop();
 	}
 
 	isBoundTo(threadPath: string | null): boolean {

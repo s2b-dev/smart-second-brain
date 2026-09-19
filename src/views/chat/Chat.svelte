@@ -24,15 +24,14 @@ const registry = getSessionRegistry();
 
 const voice = getVoiceSession();
 
-// The voice session is global and owns the microphone; this view is its only
-// visible control. If the view closes or moves to another thread while bound,
-// end the session with it rather than leave the mic open behind a surface that
-// is no longer on screen. (Effect cleanup runs on both thread change and unmount.)
+// Report which thread this view shows so the global voice session can end when
+// the last view showing its thread closes or navigates away — without a second
+// leaf on the same thread being able to kill it. Cleanup runs on both thread
+// change and unmount; the session decides whether anything else still shows it.
+const voiceViewToken = Symbol("chat-view");
 $effect(() => {
-	const boundPath = threadPath;
-	return () => {
-		if (voice.isBoundTo(boundPath)) voice.stop();
-	};
+	voice.attachView(voiceViewToken, threadPath);
+	return () => voice.detachView(voiceViewToken);
 });
 
 let messageContainer = $state<ReturnType<typeof MessageContainer> | undefined>();
