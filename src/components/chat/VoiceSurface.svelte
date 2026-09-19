@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { SessionRegistry } from "../../stores/chatStore.svelte";
+import { getData } from "../../stores/dataStore.svelte";
 import { icon } from "../../utils/utils";
 import { getVoiceSession } from "../../voice/voiceSession.svelte";
 import MessageContainer from "./MessageContainer.svelte";
@@ -49,11 +50,14 @@ const recentLines = $derived.by(() => {
 });
 
 const level = () => voice.level();
+const spectrum = (out: Uint8Array<ArrayBuffer>) => voice.spectrum(out);
+// Read once per mount: the developer setting says "takes effect next start".
+const orbStyle = getData().voice.orbStyle;
 </script>
 
 <div class="s2b-voice-surface" class:is-split={showChat} data-testid="voice-surface">
   <div class="s2b-voice-stage">
-    <VoiceOrb status={voice.status} {level} compact={showChat} />
+    <VoiceOrb status={voice.status} {level} {spectrum} variant={orbStyle} compact={showChat} />
     <div class="s2b-voice-label" class:is-error={voice.status === "error"}>{label}</div>
     {#if !showChat}
       <div class="s2b-voice-lines">

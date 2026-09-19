@@ -4,11 +4,13 @@ import SettingGroup from "../../components/settings/SettingGroup.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import SecretSelect from "../../components/settings/SecretSelect.svelte";
 import Button from "../../components/ui/Button.svelte";
+import Dropdown from "../../components/ui/Dropdown.svelte";
 import Text from "../../components/ui/Text.svelte";
 import Toggle from "../../components/ui/Toggle.svelte";
 import { createObsidianFetch } from "../../lib/obsidianFetch";
 import { suggestSecretId } from "../../lib/secretStorage";
 import { getData } from "../../stores/dataStore.svelte";
+import { VOICE_ORB_STYLES } from "../../stores/voiceDefaults";
 import { getPlugin } from "../../stores/state.svelte";
 import { VIEW_TYPE_ONBOARDING } from "../onboarding/OnboardingView";
 
@@ -169,6 +171,14 @@ async function handleCheckLangSmithConnection() {
     <Toggle
       checked={pluginData.showToolIODetails}
       onchange={(checked) => (pluginData.showToolIODetails = checked)}
+    />
+  </SettingItem>
+  <SettingItem name="Voice orb style" desc="How the voice-mode orb looks and moves. Takes effect the next time voice mode starts.">
+    <Dropdown
+      type="options"
+      dropdown={VOICE_ORB_STYLES.map((s) => ({ display: s.display, value: s.value }))}
+      selected={pluginData.voice.orbStyle}
+      onchange={(value) => pluginData.setVoice({ orbStyle: value })}
     />
   </SettingItem>
 

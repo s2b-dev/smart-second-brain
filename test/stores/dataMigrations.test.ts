@@ -41,6 +41,22 @@ describe("dataMigrations", () => {
 		const custom = { enabled: true, model: "gpt-realtime-mini", voice: "cedar", turnDetection: "server_vad" };
 		const kept = { schemaVersion: 13, agents: {}, voice: { ...custom } } as unknown as PluginData;
 		runMigrations(kept);
-		expect(kept.voice).toEqual(custom);
+		expect(kept.voice).toEqual({ ...custom, orbStyle: DEFAULT_VOICE_SETTINGS.orbStyle });
+	});
+
+	it("v14 → v15 fills keys a stored voice block lacks without touching the ones it has", () => {
+		const data = {
+			schemaVersion: 14,
+			agents: {},
+			voice: { enabled: true, model: "m", voice: "cedar", turnDetection: "server_vad" },
+		} as unknown as PluginData;
+		runMigrations(data);
+		expect(data.voice).toEqual({
+			enabled: true,
+			model: "m",
+			voice: "cedar",
+			turnDetection: "server_vad",
+			orbStyle: DEFAULT_VOICE_SETTINGS.orbStyle,
+		});
 	});
 });

@@ -451,9 +451,13 @@ export type PrivacyMode = "private-by-default" | "public-by-default";
 /** Turn-detection mode passed to the realtime speech model. */
 export type VoiceTurnDetection = "semantic_vad" | "server_vad";
 
+/** Visual style of the voice-mode orb. Switchable from Developer settings while the look is being explored. */
+export type VoiceOrbStyle = "pulse" | "aurora" | "ripple" | "spectrum" | "blob";
+
 /** Settings for the experimental voice mode. */
 export interface VoiceSettings {
 	enabled: boolean;
+	orbStyle: VoiceOrbStyle;
 	/** Realtime model id, e.g. `gpt-realtime`. */
 	model: string;
 	/** Voice preset name, e.g. `marin`. */

@@ -121,6 +121,17 @@ export class VoiceSession {
 		return 0;
 	}
 
+	/** Frequency bins of whichever side is audible right now; zeroed otherwise. */
+	spectrum(out: Uint8Array<ArrayBuffer>): void {
+		if (this.status === "speaking" && this.playback) {
+			this.playback.getSpectrum(out);
+		} else if ((this.status === "listening" || this.status === "agentWorking") && this.capture) {
+			this.capture.getSpectrum(out);
+		} else {
+			out.fill(0);
+		}
+	}
+
 	async toggle(threadPath: string): Promise<void> {
 		// From the error surface a second click is a retry, not a dismissal.
 		if (this.isBoundTo(threadPath) && this.status !== "error") {

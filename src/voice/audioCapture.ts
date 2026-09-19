@@ -14,6 +14,8 @@ import { REALTIME_SAMPLE_RATE, float32ToPcm16, pcm16ToBase64 } from "./realtimeP
 export interface AudioCaptureHandle {
 	/** 0..1 RMS of the last analyser window, for the orb. */
 	getLevel(): number;
+	/** Byte frequency bins (0..255) into `out`, for the spectrum-style orb. */
+	getSpectrum(out: Uint8Array<ArrayBuffer>): void;
 	stop(): void;
 }
 
@@ -65,6 +67,13 @@ export async function startAudioCapture(onFrame: (base64Pcm16: string) => void):
 			let sum = 0;
 			for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i];
 			return Math.min(1, Math.sqrt(sum / frame.length) * 3);
+		},
+		getSpectrum(out) {
+			if (stopped) {
+				out.fill(0);
+				return;
+			}
+			analyser.getByteFrequencyData(out);
 		},
 		stop() {
 			if (stopped) return;

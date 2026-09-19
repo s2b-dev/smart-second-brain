@@ -106,6 +106,15 @@ export class AudioPlayback {
 		return Math.min(1, Math.sqrt(sum / this.window.length) * 3);
 	}
 
+	/** Byte frequency bins (0..255) of what is being rendered, for the spectrum-style orb. */
+	getSpectrum(out: Uint8Array<ArrayBuffer>): void {
+		if (this.closed || this.sources.size === 0) {
+			out.fill(0);
+			return;
+		}
+		this.analyser.getByteFrequencyData(out);
+	}
+
 	close(): void {
 		if (this.closed) return;
 		this.flush();

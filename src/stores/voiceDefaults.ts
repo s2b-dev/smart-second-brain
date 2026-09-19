@@ -1,4 +1,4 @@
-import type { VoiceSettings } from "../types/plugin";
+import type { VoiceOrbStyle, VoiceSettings } from "../types/plugin";
 
 /**
  * Factory defaults for the experimental voice mode. Lives in its own leaf (like
@@ -7,6 +7,7 @@ import type { VoiceSettings } from "../types/plugin";
  */
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 	enabled: false,
+	orbStyle: "blob",
 	model: "gpt-realtime",
 	voice: "marin",
 	turnDetection: "semantic_vad",
@@ -24,4 +25,13 @@ export const VOICE_OPTIONS: readonly string[] = [
 	"sage",
 	"shimmer",
 	"verse",
+];
+
+/** Orb looks offered in Developer settings, with their labels. */
+export const VOICE_ORB_STYLES: readonly { value: VoiceOrbStyle; display: string }[] = [
+	{ value: "blob", display: "Blob (morphing, Siri-like)" },
+	{ value: "aurora", display: "Aurora (drifting colour clouds)" },
+	{ value: "spectrum", display: "Spectrum (radial equaliser)" },
+	{ value: "ripple", display: "Ripple (sonar rings)" },
+	{ value: "pulse", display: "Pulse (plain glowing disc)" },
 ];
