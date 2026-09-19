@@ -30,6 +30,12 @@ export interface CoordinatorState {
 	pending: ReadonlySet<string>;
 	/** Finished results waiting for a safe delivery window, oldest first. */
 	ready: readonly ReadyOutput[];
+	/**
+	 * Latest progress line to speak while a call is pending. Only the newest is kept
+	 * (narrating stale steps is worse than skipping them), and a ready result always
+	 * wins over it.
+	 */
+	narration: string | null;
 }
 
 export type CoordinatorEvent =
@@ -42,15 +48,25 @@ export type CoordinatorEvent =
 	| { type: "outputReady"; callId: string; output: string }
 	/** The server rejected a delivery (active response). Re-queue it at the front. */
 	| { type: "deliveryRejected"; callId: string; output: string }
+	/** A progress line worth speaking; replaces any earlier one still waiting. */
+	| { type: "narrationReady"; text: string }
 	| { type: "reset" };
 
 export type CoordinatorAction =
 	| { type: "deliver"; callId: string; output: string }
+	| { type: "narrate"; text: string }
 	| { type: "cancelResponse" }
 	| { type: "flushPlayback" };
 
 export function createInitialState(): CoordinatorState {
-	return { model: "idle", user: "silent", awaitingAutoResponse: false, pending: new Set(), ready: [] };
+	return {
+		model: "idle",
+		user: "silent",
+		awaitingAutoResponse: false,
+		pending: new Set(),
+		ready: [],
+		narration: null,
+	};
 }
 
 export function canDeliver(state: CoordinatorState): boolean {
@@ -95,9 +111,18 @@ export function reduce(
 		case "outputReady": {
 			const pending = new Set(state.pending);
 			pending.delete(event.callId);
-			next = { ...state, pending, ready: [...state.ready, { callId: event.callId, output: event.output }] };
+			// The answer supersedes any progress line still waiting to be spoken.
+			next = {
+				...state,
+				pending,
+				ready: [...state.ready, { callId: event.callId, output: event.output }],
+				narration: null,
+			};
 			break;
 		}
+		case "narrationReady":
+			next = { ...state, narration: event.text };
+			break;
 		case "deliveryRejected":
 			next = {
 				...state,
@@ -109,11 +134,15 @@ export function reduce(
 			return { state: createInitialState(), actions };
 	}
 
-	// Drain at most one result per idle window; the next one waits for `response.done`.
+	// Drain at most one thing per idle window; the rest waits for `response.done`.
+	// A finished result always outranks a progress line.
 	if (canDeliver(next) && next.ready.length > 0) {
 		const [head, ...rest] = next.ready;
 		actions.push({ type: "deliver", callId: head.callId, output: head.output });
-		next = { ...next, model: "responding", ready: rest };
+		next = { ...next, model: "responding", ready: rest, narration: null };
+	} else if (canDeliver(next) && next.narration !== null && next.pending.size > 0) {
+		actions.push({ type: "narrate", text: next.narration });
+		next = { ...next, model: "responding", narration: null };
 	}
 
 	return { state: next, actions };

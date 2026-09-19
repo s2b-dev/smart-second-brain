@@ -161,3 +161,29 @@ describe("SupervisorBridge", () => {
 		});
 	});
 });
+
+describe("SupervisorBridge progress", () => {
+	it("forwards tool starts to onProgress while the turn runs and unsubscribes afterwards", async () => {
+		let listener: ((p: { toolName: string; preamble?: string }) => void) | null = null;
+		let unsubscribed = false;
+		const session: SupervisorSession = {
+			isRunning: false,
+			async sendMessageAndAwait() {
+				listener?.({ toolName: "search_notes", preamble: "Let me look." });
+				return ok("done");
+			},
+			stopStreaming() {},
+			subscribeTurnProgress(l) {
+				listener = l;
+				return () => {
+					unsubscribed = true;
+				};
+			},
+		};
+		const seen: unknown[] = [];
+		const bridge = new SupervisorBridge(() => session);
+		await bridge.run({ threadPath: "t", request: "q", transcript: [], onProgress: (p) => seen.push(p) });
+		expect(seen).toEqual([{ toolName: "search_notes", preamble: "Let me look." }]);
+		expect(unsubscribed).toBe(true);
+	});
+});

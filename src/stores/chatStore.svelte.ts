@@ -78,6 +78,15 @@ export interface SettledTurn {
 	errorCode?: string;
 }
 
+/**
+ * A tool starting inside a running turn, with the model's own lead-in sentence when
+ * it wrote one. Voice mode narrates these so the user hears what the agent is doing.
+ */
+export interface TurnProgress {
+	toolName: string;
+	preamble?: string;
+}
+
 /** How many settled outcomes to keep for pairs nobody awaited before dropping the oldest. */
 const MAX_UNCLAIMED_TURN_RESULTS = 16;
 
@@ -98,6 +107,7 @@ export class ChatSession {
 	 * not read the state off it afterwards.
 	 */
 	private turnResults = new Map<UUIDv7, SettledTurn>();
+	private progressListeners = new Set<(progress: TurnProgress) => void>();
 	private cancelled = false;
 	// Reactive mirror of "a stream is in flight". `abortController` is an
 	// imperative handle (not $state), so UI that reacts to running state — the
@@ -383,6 +393,22 @@ export class ChatSession {
 		const result = this.turnResults.get(pairId);
 		this.turnResults.delete(pairId);
 		return result ?? { state: AssistantState.error, content: "", errorCode: "The turn produced no result." };
+	}
+
+	/** Observe tool starts of whatever turn is running on this session. Returns the unsubscribe. */
+	subscribeTurnProgress(listener: (progress: TurnProgress) => void): () => void {
+		this.progressListeners.add(listener);
+		return () => this.progressListeners.delete(listener);
+	}
+
+	private notifyTurnProgress(progress: TurnProgress): void {
+		for (const listener of this.progressListeners) {
+			try {
+				listener(progress);
+			} catch (err) {
+				Logger.warn("[ChatSession] Turn progress listener threw:", err);
+			}
+		}
 	}
 
 	private recordTurnResult(pairId: UUIDv7, source: MessagePair): void {
@@ -1160,6 +1186,10 @@ export class ChatSession {
 				const preambleTrimmed = preamble.trim();
 				const isFirstWithPreamble = !!preambleTrimmed && !emittedStreamPreambles.has(preambleTrimmed);
 				if (isFirstWithPreamble) emittedStreamPreambles.add(preambleTrimmed);
+				this.notifyTurnProgress({
+					toolName: chunk.toolName,
+					preamble: isFirstWithPreamble ? preambleTrimmed : undefined,
+				});
 				tokenBuffer = "";
 				assistantMsg.content = "";
 				assistantMsg.contentAiMessageId = undefined;

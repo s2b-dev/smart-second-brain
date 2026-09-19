@@ -1,4 +1,7 @@
 import { type EventRef, Notice, Platform, TFile } from "obsidian";
+import { BUILT_IN_TOOL_IDS, type BuiltInToolId } from "../types/plugin";
+import { getToolDisplayName } from "../agent/tools/builtInToolDefaults";
+import type { TurnProgress } from "../stores/chatStore.svelte";
 import { getData } from "../stores/dataStore.svelte";
 import { getPlugin } from "../stores/state.svelte";
 import { showSettingsLinkNotice } from "../utils/actionNotice";
@@ -12,6 +15,8 @@ import {
 	base64ToPcm16,
 	buildAudioAppend,
 	buildFunctionCallOutput,
+	buildNarrationResponse,
+	isNarrationResponse,
 	buildResponseCancel,
 	buildResponseCreate,
 	buildSessionUpdate,
@@ -46,6 +51,16 @@ export type VoiceStatus = "off" | "connecting" | "listening" | "speaking" | "age
 
 /** How long to wait after `speech_stopped` for the server's own response before assuming none is coming. */
 const AUTO_RESPONSE_GRACE_MS = 1500;
+/** Minimum gap between spoken progress lines; steps often arrive seconds apart and narrating every one is noise. */
+const MIN_NARRATION_GAP_MS = 4000;
+
+/** What to tell the speech model about a tool start: the model's own lead-in if it wrote one, else the tool's name. */
+export function progressToNarration(progress: TurnProgress): string {
+	if (progress.preamble) return progress.preamble;
+	const known = (BUILT_IN_TOOL_IDS as readonly string[]).includes(progress.toolName);
+	const name = known ? getToolDisplayName(progress.toolName as BuiltInToolId) : progress.toolName.replace(/_/g, " ");
+	return `Running "${name}"`;
+}
 
 interface OpenAiCredentials {
 	apiKey: string;
@@ -81,6 +96,10 @@ export class VoiceSession {
 	private autoResponseTimer: ReturnType<typeof setTimeout> | null = null;
 	private lastDelegationIndex = 0;
 	private assistantDrafts = new Map<string, string>();
+	private activeResponseIsNarration = false;
+	private lastNarrationAt = 0;
+	private lastNarrationText: string | null = null;
+	private narrationTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
 	private generation = 0;
 
@@ -269,6 +288,12 @@ export class VoiceSession {
 		this.client = null;
 		this.coordinator = createInitialState();
 		this.activeResponseId = null;
+		this.activeResponseIsNarration = false;
+		if (this.narrationTimer) {
+			clearTimeout(this.narrationTimer);
+			this.narrationTimer = null;
+		}
+		this.lastNarrationText = null;
 		this.assistantDrafts.clear();
 		this.pendingCalls = 0;
 		this.liveAssistantText = "";
@@ -285,7 +310,8 @@ export class VoiceSession {
 			case EV.speechStarted: {
 				const flushed = this.playback?.flush() ?? null;
 				this.dispatch({ type: "speechStarted" });
-				if (flushed && this.activeResponseId) {
+				// Narration audio is out-of-band: not a conversation item, nothing to truncate.
+				if (flushed && this.activeResponseId && !this.activeResponseIsNarration) {
 					this.client?.send(buildTruncate(flushed.itemId, flushed.playedMs));
 				}
 				this.liveAssistantText = "";
@@ -299,10 +325,14 @@ export class VoiceSession {
 			case EV.responseCreated:
 				this.clearAutoResponseTimer();
 				this.activeResponseId = event.response.id;
+				this.activeResponseIsNarration = isNarrationResponse(event.response.metadata);
 				this.dispatch({ type: "responseCreated" });
 				break;
 			case EV.responseDone:
-				if (this.activeResponseId === event.response.id) this.activeResponseId = null;
+				if (this.activeResponseId === event.response.id) {
+					this.activeResponseId = null;
+					this.activeResponseIsNarration = false;
+				}
 				this.dispatch({ type: "responseDone" });
 				this.refreshIdleStatus();
 				break;
@@ -364,7 +394,10 @@ export class VoiceSession {
 		// The path is resolved when the queued run actually starts, so a rename that
 		// lands while an earlier delegation is still running does not strand this one.
 		const threadPath = () => this.threadPath;
-		void this.bridge.run({ threadPath, request, transcript: context }).then((output) => {
+		const onProgress = (progress: TurnProgress) => {
+			if (generation === this.generation) this.queueNarration(progressToNarration(progress));
+		};
+		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
 			if (generation !== this.generation) return;
 			this.dispatch({ type: "outputReady", callId, output });
 			this.pendingCalls = this.coordinator.pending.size;
@@ -410,6 +443,11 @@ export class VoiceSession {
 				case "deliver":
 					this.deliver(action.callId, action.output);
 					break;
+				case "narrate":
+					this.lastNarrationAt = Date.now();
+					this.lastNarrationText = action.text;
+					this.client?.send(buildNarrationResponse(action.text));
+					break;
 			}
 		}
 	}
@@ -422,6 +460,24 @@ export class VoiceSession {
 			this.client?.send(buildFunctionCallOutput(callId, output));
 		}
 		this.client?.send(buildResponseCreate());
+	}
+
+	/**
+	 * Rate-limit progress lines: a step that lands within the gap is held (only the
+	 * newest survives) and released when the gap has passed. Repeats are dropped.
+	 */
+	private queueNarration(text: string): void {
+		if (!text.trim() || text === this.lastNarrationText) return;
+		const wait = MIN_NARRATION_GAP_MS - (Date.now() - this.lastNarrationAt);
+		if (wait <= 0) {
+			this.dispatch({ type: "narrationReady", text });
+			return;
+		}
+		if (this.narrationTimer) clearTimeout(this.narrationTimer);
+		this.narrationTimer = setTimeout(() => {
+			this.narrationTimer = null;
+			this.dispatch({ type: "narrationReady", text });
+		}, wait);
 	}
 
 	private armAutoResponseTimer(): void {

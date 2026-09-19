@@ -108,3 +108,17 @@ describe("client event builders", () => {
 		expect(buildTruncate("i1", -5).audio_end_ms).toBe(0);
 	});
 });
+
+describe("narration responses", () => {
+	it("are out-of-band, audio-only, marked, and carry the progress text", async () => {
+		const { buildNarrationResponse, isNarrationResponse } = await import("../../src/voice/realtimeProtocol");
+		const ev = buildNarrationResponse("Searching your notes for graph physics");
+		expect(ev.type).toBe(EV.responseCreate);
+		expect(ev.response.conversation).toBe("none");
+		expect(ev.response.output_modalities).toEqual(["audio"]);
+		expect(ev.response.instructions).toContain("Searching your notes for graph physics");
+		expect(isNarrationResponse(ev.response.metadata)).toBe(true);
+		expect(isNarrationResponse(null)).toBe(false);
+		expect(isNarrationResponse({ other: 1 })).toBe(false);
+	});
+});

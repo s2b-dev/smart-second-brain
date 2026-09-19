@@ -60,7 +60,7 @@ export type ServerEvent =
 	| { type: typeof EV.sessionUpdated; session?: unknown }
 	| { type: typeof EV.speechStarted; item_id?: string }
 	| { type: typeof EV.speechStopped; item_id?: string }
-	| { type: typeof EV.responseCreated; response: { id: string } }
+	| { type: typeof EV.responseCreated; response: { id: string; metadata?: Record<string, unknown> | null } }
 	| { type: typeof EV.responseDone; response: { id: string; status?: string } }
 	| { type: typeof EV.audioDelta; response_id: string; item_id: string; delta: string }
 	| { type: typeof EV.audioTranscriptDelta; item_id: string; delta: string }
@@ -172,6 +172,30 @@ export function buildFunctionCallOutput(callId: string, output: string) {
 
 export function buildResponseCreate() {
 	return { type: EV.responseCreate };
+}
+
+/** Marker carried in `response.metadata` so the client can tell its own narration responses apart. */
+export const NARRATION_METADATA = { s2b: "narration" } as const;
+
+/**
+ * An out-of-band spoken progress line. `conversation: "none"` keeps it out of the
+ * conversation state, so it can never be mistaken for the answer to the pending
+ * function call, and the audio it produces is not an item that can be truncated.
+ */
+export function buildNarrationResponse(progressText: string) {
+	return {
+		type: EV.responseCreate,
+		response: {
+			conversation: "none",
+			output_modalities: ["audio"],
+			metadata: NARRATION_METADATA,
+			instructions: `Progress update from the assistant working on the user's request: "${progressText}". In one short spoken sentence, in the user's language, tell the user what is happening right now, in your own words. Present tense. Do not ask anything, do not add filler, do not read out technical tool names.`,
+		},
+	};
+}
+
+export function isNarrationResponse(metadata: Record<string, unknown> | null | undefined): boolean {
+	return metadata?.s2b === NARRATION_METADATA.s2b;
 }
 
 export function buildResponseCancel(responseId?: string) {

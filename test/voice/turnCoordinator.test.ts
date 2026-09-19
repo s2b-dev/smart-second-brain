@@ -133,3 +133,66 @@ describe("turnCoordinator", () => {
 		expect(state).toEqual(createInitialState());
 	});
 });
+
+describe("turnCoordinator narration", () => {
+	it("speaks a progress line while a call is pending and the model is idle", () => {
+		const { state, actions } = play([
+			{ type: "functionCall", callId: "c1" },
+			{ type: "narrationReady", text: "Searching your notes" },
+		]);
+		expect(actions).toEqual([{ type: "narrate", text: "Searching your notes" }]);
+		expect(state.model).toBe("responding");
+		expect(state.narration).toBeNull();
+	});
+
+	it("holds a progress line while the model responds and keeps only the newest", () => {
+		const { state: held, actions: a1 } = play([
+			{ type: "functionCall", callId: "c1" },
+			{ type: "responseCreated" },
+			{ type: "narrationReady", text: "first" },
+			{ type: "narrationReady", text: "second" },
+		]);
+		expect(a1).toEqual([]);
+		expect(held.narration).toBe("second");
+
+		const { actions: a2 } = play([{ type: "responseDone" }], held);
+		expect(a2).toEqual([{ type: "narrate", text: "second" }]);
+	});
+
+	it("never narrates over the user, and drops the line once the answer is ready", () => {
+		const { state: s1, actions: a1 } = play([
+			{ type: "functionCall", callId: "c1" },
+			{ type: "speechStarted" },
+			{ type: "narrationReady", text: "reading a note" },
+		]);
+		expect(deliveries(a1)).toEqual([]);
+		expect(a1.some((a) => a.type === "narrate")).toBe(false);
+
+		const { state: s2, actions: a2 } = play(
+			[
+				{ type: "speechStopped" },
+				{ type: "autoResponseTimedOut" },
+				{ type: "outputReady", callId: "c1", output: "o" },
+			],
+			s1,
+		);
+		expect(a2).toEqual([{ type: "deliver", callId: "c1", output: "o" }]);
+		expect(s2.narration).toBeNull();
+	});
+
+	it("prefers a ready result over a waiting progress line", () => {
+		const { actions } = play([
+			{ type: "functionCall", callId: "c1" },
+			{ type: "responseCreated" },
+			{ type: "narrationReady", text: "almost there" },
+			{ type: "outputReady", callId: "c1", output: "o" },
+			{ type: "responseDone" },
+		]);
+		expect(actions).toEqual([{ type: "deliver", callId: "c1", output: "o" }]);
+	});
+
+	it("does not narrate when nothing is pending", () => {
+		const { actions } = play([{ type: "narrationReady", text: "stray" }]);
+		expect(actions).toEqual([]);
+	});
+});

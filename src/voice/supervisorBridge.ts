@@ -1,5 +1,5 @@
 import { AssistantState } from "../stores/chatTimeline";
-import type { SettledTurn } from "../stores/chatStore.svelte";
+import type { SettledTurn, TurnProgress } from "../stores/chatStore.svelte";
 import { getSessionRegistry } from "../stores/chatStore.svelte";
 import { Logger } from "../utils/logging";
 
@@ -23,6 +23,7 @@ export interface SupervisorSession {
 	readonly isRunning: boolean;
 	sendMessageAndAwait(content: string): Promise<SettledTurn>;
 	stopStreaming(): void;
+	subscribeTurnProgress?(listener: (progress: TurnProgress) => void): () => void;
 }
 
 export type SessionResolver = (threadPath: string) => SupervisorSession | null;
@@ -33,6 +34,8 @@ export interface SupervisorRequest {
 	request: string;
 	/** Voice exchanges since the previous delegation, oldest first. */
 	transcript: readonly TranscriptLine[];
+	/** Tool starts while the turn runs, for spoken progress. */
+	onProgress?: (progress: TurnProgress) => void;
 }
 
 const NO_SESSION_OUTPUT = JSON.stringify({ error: "The chat this voice session belongs to is no longer open." });
@@ -105,6 +108,9 @@ export class SupervisorBridge {
 		const session = threadPath ? this.resolveSession(threadPath) : null;
 		if (!session) return NO_SESSION_OUTPUT;
 		this.active = session;
+		const onProgress = req.onProgress;
+		const unsubscribe =
+			onProgress && session.subscribeTurnProgress ? session.subscribeTurnProgress(onProgress) : null;
 		try {
 			const turn = await session.sendMessageAndAwait(buildDelegationMessage(req.request, req.transcript));
 			return formatSettledTurn(turn);
@@ -112,6 +118,7 @@ export class SupervisorBridge {
 			Logger.error("[voice] Supervisor turn threw:", err);
 			return JSON.stringify({ error: "The request failed unexpectedly." });
 		} finally {
+			unsubscribe?.();
 			this.active = null;
 		}
 	}
