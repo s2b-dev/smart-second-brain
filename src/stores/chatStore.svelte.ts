@@ -1563,6 +1563,19 @@ export class SessionRegistry {
 		};
 	}
 
+	/**
+	 * A `.chat` file was renamed in the vault — by auto-title, the file menu, or the
+	 * user dragging it. Keep the live session findable under its new path and let the
+	 * session know its id, so anything resolving by path (the view, voice mode) keeps
+	 * working. Idempotent with the auto-title path, which re-keys itself as well.
+	 */
+	handleFileRenamed(oldPath: string, newPath: string): void {
+		const session = this.sessions.get(oldPath);
+		if (!session || oldPath === newPath) return;
+		session.id = newPath;
+		this.rekeySession(oldPath, newPath);
+	}
+
 	/** Rekey a session in the map after its thread path changes (title rename).
 	 * Views bind by their own threadPath (updated via ChatView's rename handling),
 	 * so there is no registry-level active/running pointer to repoint here. */

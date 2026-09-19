@@ -760,6 +760,15 @@ export default class SecondBrainPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on("modify", refreshAgentContextOnVaultChange));
 		this.registerEvent(this.app.vault.on("create", refreshAgentContextOnVaultChange));
 		this.registerEvent(this.app.vault.on("delete", refreshAgentContextOnVaultChange));
+		// Live chat sessions are keyed by file path; a rename from the file menu (or a
+		// drag) must re-key them, not only the auto-title rename that re-keys itself.
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile && file.extension === "chat") {
+					this.sessionRegistry.handleFileRenamed(oldPath, file.path);
+				}
+			}),
+		);
 
 		this.registerEvent(
 			(
