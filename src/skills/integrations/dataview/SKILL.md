@@ -49,8 +49,10 @@ below. That renders natively and does not need the `exec_dataview` tool.
 
 ## Default Result Size
 
-Always include `LIMIT 10` in Dataview DQL (queries you show or run) unless the user asks for more or specifies a different limit.
+Include `LIMIT 10` in any DQL that lists notes (a `LIST` or `TABLE` you show or run) unless the user asks for more or specifies a different limit.
 If you need pagination or offsets, slice the pages array (e.g., `api.pages(...).slice(offset, offset + limit)`).
+
+The limit does **not** apply to aggregation. A `GROUP BY`, a count, or a sum is only correct over the whole result set — cutting it at ten groups gives a wrong answer, not a shorter one. Run those without a `LIMIT`, or use `api.pages(...)` and aggregate in JavaScript when the number of groups could be large; return only the aggregate, never the underlying rows.
 
 ## Dataview DQL Cheat Sheet
 
