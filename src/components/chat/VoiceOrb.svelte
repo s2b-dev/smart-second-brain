@@ -60,12 +60,15 @@ $effect(() => {
 					accentAlt: altProbe ? getComputedStyle(altProbe).color : rootStyle.color,
 					error: rootStyle.getPropertyValue("--text-error").trim() || rootStyle.color,
 				};
-				const dpr = window.devicePixelRatio || 1;
-				const size = Math.round(node.clientWidth * dpr);
-				if (canvas.width !== size || canvas.height !== size) {
-					canvas.width = size;
-					canvas.height = size;
-				}
+			}
+			// Backing size follows the displayed size every frame, so the compact
+			// toggle never paints an oversized or clipped orb while waiting for the
+			// next colour refresh. Setting width/height clears the canvas, hence the guard.
+			const dpr = window.devicePixelRatio || 1;
+			const size = Math.round(node.clientWidth * dpr);
+			if (canvas.width !== size || canvas.height !== size) {
+				canvas.width = size;
+				canvas.height = size;
 			}
 			if (variant === "spectrum") spectrum?.(bins);
 			const frame = {
