@@ -26,6 +26,14 @@ export const DEFAULT_CONTEXT_WINDOW = 128_000;
 export const READ_CONTENT_BUDGET_FRACTION = 0.5;
 export const SELECTION_BUDGET_FRACTION = 0.25;
 
+/**
+ * A directory listing is orientation, not content: it should never dominate the window the
+ * way a read note may. The fraction keeps small models safe; the absolute ceiling stops a
+ * million-token model from being handed a fifty-thousand-token folder tree it will never use.
+ */
+export const LIST_DIRECTORY_BUDGET_FRACTION = 0.05;
+export const LIST_DIRECTORY_MAX_CHARS = 40_000;
+
 /** Never derive a cap below this many chars, even for a tiny context window. */
 const MIN_CHAR_BUDGET = 4_000;
 

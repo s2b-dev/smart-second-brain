@@ -82,12 +82,12 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 	list_directory: {
 		displayName: "List Directory",
 		summary:
-			"List directories and files in the vault to understand folder structure before searching or editing notes.",
+			"List the vault's folder structure: an overview with file counts at the root, files and subfolders inside a folder. Output is collapsed to fit the context budget.",
 		config: {
 			enabled: true,
 			name: "list_directory",
 			description:
-				"List directories and files in the vault. Use this to understand folder structure before searching or editing notes. The 'path' parameter must be an actual vault folder path (e.g. 'Projects/research').",
+				"List the vault's folder structure. Without a path: an overview of the top folders with file counts (2 levels deep, no file names) — small in any vault. With a path: that folder's files and subfolders (1 level deep unless maxDepth is set); 'path' must be an actual vault folder (e.g. 'Projects/research'). Every folder carries a recursive fileCount; moreFiles / moreFolders report entries omitted to fit the context budget. To find specific notes use search_notes or grep_notes rather than walking the tree.",
 		},
 	},
 	read_content: {
