@@ -1,7 +1,8 @@
 import type { PluginData } from "../types/plugin";
+import { DEFAULT_VOICE_SETTINGS } from "./voiceDefaults";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 type Migration = (data: PluginData) => void;
 
@@ -189,6 +190,17 @@ const MIGRATIONS: Migration[] = [
 				if (server?.transport === "stdio") delete servers[id];
 			}
 		}
+	},
+	// v13 → v14: the experimental voice mode settings block was added. The top-level
+	//            default spread in `createData` would supply it anyway; seeding it here
+	//            keeps partially-written data (e.g. a sync conflict copy) well-formed.
+	(data) => {
+		data.voice ??= structuredClone(DEFAULT_VOICE_SETTINGS);
+	},
+	// v14 → v15: `voice.orbStyle` added. The top-level default spread does not reach
+	//            into nested blocks, so fill any key the stored block lacks.
+	(data) => {
+		data.voice = { ...structuredClone(DEFAULT_VOICE_SETTINGS), ...(data.voice ?? {}) };
 	},
 ];
 

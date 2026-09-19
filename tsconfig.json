@@ -32,4 +32,8 @@
     "src/**/*.js",
     "src/**/*.svelte",
   ],
+  // The voice-mode capture worklet is shipped as raw text (`?raw`) and evaluated in the
+  // AudioWorklet scope, never as a module of this program; checking it here only
+  // produces an "input file would be overwritten" warning.
+  "exclude": ["src/voice/capture.worklet.js"],
 }

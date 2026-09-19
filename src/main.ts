@@ -6,6 +6,7 @@ import { Logger as Log, applyVerboseLogging } from "./utils/logging";
 import { isAgentFilePath } from "./utils/fileFiltering";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { getVoiceSession } from "./voice/voiceSession.svelte";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -594,6 +595,21 @@ export default class SecondBrainPlugin extends Plugin {
 			},
 		});
 
+		this.addCommand({
+			id: "toggle-voice-mode",
+			name: "Toggle voice conversation",
+			icon: "audio-lines",
+			callback: () => {
+				const threadId = this.resolveChatThreadIdForNavigation();
+				if (!threadId) {
+					new Notice("No chat is currently open");
+					return;
+				}
+				// Platform, enablement and credential checks live in the session itself.
+				void getVoiceSession().toggle(threadId);
+			},
+		});
+
 		this.addSettingTab(new SettingsTab(this));
 
 		this.registerEvent(
@@ -744,6 +760,15 @@ export default class SecondBrainPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on("modify", refreshAgentContextOnVaultChange));
 		this.registerEvent(this.app.vault.on("create", refreshAgentContextOnVaultChange));
 		this.registerEvent(this.app.vault.on("delete", refreshAgentContextOnVaultChange));
+		// Live chat sessions are keyed by file path; a rename from the file menu (or a
+		// drag) must re-key them, not only the auto-title rename that re-keys itself.
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile && file.extension === "chat") {
+					this.sessionRegistry.handleFileRenamed(oldPath, file.path);
+				}
+			}),
+		);
 
 		this.registerEvent(
 			(
@@ -868,6 +893,8 @@ export default class SecondBrainPlugin extends Plugin {
 		// reset, its QueryObservers keep fetching with the unloaded plugin's credentials
 		// and the next enable reuses a singleton bound to this (now dead) data store.
 		resetAvailableModels();
+		// Voice mode holds a socket and the microphone; both must go with the plugin.
+		getVoiceSession().stop();
 		if (this.runningIndicator) {
 			void unmount(this.runningIndicator);
 			this.runningIndicator = null;

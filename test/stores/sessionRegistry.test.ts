@@ -228,3 +228,22 @@ describe("ChatSession — isRunning reflects an in-flight stream", () => {
 		expect(s.isRunning).toBe(false);
 	});
 });
+
+describe("SessionRegistry.handleFileRenamed", () => {
+	it("re-keys a live session and updates its id when its file is renamed", () => {
+		const registry = makeRegistry();
+		const session = seed(registry, "Chats/Old.chat");
+
+		registry.handleFileRenamed("Chats/Old.chat", "Chats/New.chat");
+
+		expect(registry.sessionFor("Chats/Old.chat")).toBeNull();
+		expect(registry.sessionFor("Chats/New.chat")).toBe(session);
+		expect(session.id).toBe("Chats/New.chat");
+	});
+
+	it("ignores renames of files it does not hold", () => {
+		const registry = makeRegistry();
+		registry.handleFileRenamed("Chats/Nope.chat", "Chats/Other.chat");
+		expect(registry.sessionFor("Chats/Other.chat")).toBeNull();
+	});
+});
