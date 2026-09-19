@@ -177,23 +177,53 @@ export function buildResponseCreate() {
 /** Marker carried in `response.metadata` so the client can tell its own narration responses apart. */
 export const NARRATION_METADATA = { s2b: "narration" } as const;
 
+export interface NarrationContext {
+	/** The progress line to convey. */
+	text: string;
+	/** Lines already spoken for this request, oldest first; the model must not repeat them. */
+	alreadySaid?: readonly string[];
+	/** The user's most recent words, so the sentence comes out in their language. */
+	userLastWords?: string | null;
+}
+
 /**
  * An out-of-band spoken progress line. `conversation: "none"` keeps it out of the
  * conversation state, so it can never be mistaken for the answer to the pending
  * function call, and the audio it produces is not an item that can be truncated.
+ *
+ * `input` is set explicitly: without it the response would still see the whole
+ * conversation, and the model then paraphrases the user's request instead of the
+ * progress line — the same sentence every time. With its own two-item context the
+ * update is all it has to go on.
  */
-export function buildNarrationResponse(progressText: string, alreadySaid: readonly string[] = []) {
-	const avoid =
+export function buildNarrationResponse(context: NarrationContext) {
+	const alreadySaid = context.alreadySaid ?? [];
+	const rules = [
+		"You narrate progress for a voice assistant while it works on the user's request in the background.",
+		"Say ONE short spoken sentence, at most twelve words, present tense, telling the user what is happening right now.",
+		"Base it only on the progress update below and keep its specific detail (search terms, note or page name).",
+		"Use the language of the user's last words. No filler, no questions, no technical tool names, no markdown.",
 		alreadySaid.length > 0
-			? ` You already said: ${alreadySaid.map((line) => `"${line}"`).join(", ")}. Say something different, or if this update adds nothing new, just say "Still on it."`
-			: "";
+			? `Do not repeat these lines you already said: ${alreadySaid.map((line) => `"${line}"`).join("; ")}. If the update adds nothing new, say the equivalent of "Still on it."`
+			: "",
+	]
+		.filter(Boolean)
+		.join(" ");
+	const userLine = context.userLastWords?.trim() ? `User's last words: ${context.userLastWords.trim()}\n` : "";
 	return {
 		type: EV.responseCreate,
 		response: {
 			conversation: "none",
 			output_modalities: ["audio"],
 			metadata: NARRATION_METADATA,
-			instructions: `Progress update from the assistant working on the user's request: "${progressText}". Tell the user what is happening right now, in the user's language, in one short spoken sentence of at most twelve words. Mention the specific detail from the update (the search terms, the note or page name) when there is one. Present tense, no filler, no questions, no technical tool names.${avoid}`,
+			instructions: rules,
+			input: [
+				{
+					type: "message",
+					role: "user",
+					content: [{ type: "input_text", text: `${userLine}Progress update: ${context.text}` }],
+				},
+			],
 		},
 	};
 }

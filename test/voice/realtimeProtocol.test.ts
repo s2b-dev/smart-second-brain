@@ -110,18 +110,30 @@ describe("client event builders", () => {
 });
 
 describe("narration responses", () => {
-	it("are out-of-band, audio-only, marked, and carry the progress text", async () => {
+	it("are out-of-band, audio-only, marked, and carry only their own context", async () => {
 		const { buildNarrationResponse, isNarrationResponse } = await import("../../src/voice/realtimeProtocol");
-		const ev = buildNarrationResponse("Searching your notes for graph physics");
+		const ev = buildNarrationResponse({ text: "Searching the notes for graph physics" });
 		expect(ev.type).toBe(EV.responseCreate);
 		expect(ev.response.conversation).toBe("none");
 		expect(ev.response.output_modalities).toEqual(["audio"]);
-		expect(ev.response.instructions).toContain("Searching your notes for graph physics");
+		expect(ev.response.input).toHaveLength(1);
+		expect(ev.response.input[0].content[0].text).toBe("Progress update: Searching the notes for graph physics");
 		expect(ev.response.instructions).not.toContain("already said");
-		const varied = buildNarrationResponse("Reading a note", ["Searching your notes for todos"]);
-		expect(varied.response.instructions).toContain('You already said: "Searching your notes for todos"');
 		expect(isNarrationResponse(ev.response.metadata)).toBe(true);
 		expect(isNarrationResponse(null)).toBe(false);
 		expect(isNarrationResponse({ other: 1 })).toBe(false);
+	});
+
+	it("passes the user's last words for language and the lines already spoken", async () => {
+		const { buildNarrationResponse } = await import("../../src/voice/realtimeProtocol");
+		const ev = buildNarrationResponse({
+			text: 'Reading "Weekly review"',
+			alreadySaid: ["Ich schaue nach deinen Aufgaben."],
+			userLastWords: "Welche Aufgaben hatte ich diese Woche?",
+		});
+		expect(ev.response.input[0].content[0].text).toBe(
+			'User\'s last words: Welche Aufgaben hatte ich diese Woche?\nProgress update: Reading "Weekly review"',
+		);
+		expect(ev.response.instructions).toContain('already said: "Ich schaue nach deinen Aufgaben."');
 	});
 });

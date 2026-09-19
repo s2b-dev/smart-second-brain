@@ -447,7 +447,13 @@ export class VoiceSession {
 				case "narrate":
 					this.lastNarrationAt = Date.now();
 					this.narrationsThisDelegation += 1;
-					this.client?.send(buildNarrationResponse(action.text, this.recentNarrations));
+					this.client?.send(
+						buildNarrationResponse({
+							text: action.text,
+							alreadySaid: this.recentNarrations,
+							userLastWords: this.transcript.findLast((line) => line.role === "user")?.text ?? null,
+						}),
+					);
 					this.recentNarrations = [...this.recentNarrations, action.text].slice(-RECENT_NARRATIONS);
 					break;
 			}
