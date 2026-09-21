@@ -11,6 +11,9 @@
  * was kept" notice for a file the user never touched, and never receives the new prompt.
  */
 
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { AGENT_PROMPT_VERSION, DEFAULT_AGENT_PROMPT, SHIPPED_AGENT_PROMPTS } from "../../src/agent/prompts";
@@ -26,9 +29,10 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * version, so the version no longer identified a body and every install read as customized.
  *
  * WHEN THIS FAILS: you changed DEFAULT_AGENT_PROMPT (or one of its building blocks). Either bump
- * AGENT_PROMPT_VERSION and retain the old text as a new constant (see the doc in prompts.ts), or
- * — if the edit is genuinely cosmetic and no shipped build carries the old text — update the
- * literal below.
+ * AGENT_PROMPT_VERSION and record the old text's fingerprint under its version (see the doc in
+ * prompts.ts), or — if the edit is genuinely cosmetic and no shipped build carries the old text —
+ * update the literal below. The tag replay at the bottom of this file checks the recorded old
+ * fingerprints against what each release actually shipped.
  */
 const CURRENT_FINGERPRINT = "064765504106e6f9"; // DEFAULT_AGENT_PROMPT at v2
 
@@ -84,14 +88,73 @@ describe("default agent prompt composition", () => {
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryIndex}}");
 	});
 
-	// v1 is a literal; the value it must equal is the one this test pinned as CURRENT while v1
-	// was current (see git history of this file at tag 2.2.0).
-	it("keeps the v1 fingerprint that shipped in 2.2.0", () => {
-		expect(history.get(1)).toBe("182f169c1d5c75fc");
-	});
-
 	it("orders the sections base → date → memory", () => {
 		const headings = DEFAULT_AGENT_PROMPT.split("\n").filter((line) => line.startsWith("# "));
 		expect(headings).toEqual(["# Role", "# User Context", "# Tools", "# Formatting", "# Current Date", "# Memory"]);
+	});
+});
+
+// --- git tag replay ---------------------------------------------------------------------------
+//
+// Old versions are recorded as bare hex literals (git holds the text), so nothing above can
+// tell a correct literal from a typo. This replays the prompt module as it stood at every
+// release tag and checks that the body each release shipped fingerprints to the version it
+// declared — the same guard `test/skills/shippedSkillHistory.test.ts` gives the bundled skills.
+// Tags, not commits: only tagged revisions reached a vault.
+
+const PROMPT_SOURCE = "src/agent/prompts.ts";
+const REPO = process.cwd().replace(/\\/g, "/");
+const SCRATCH = resolve(REPO, "build/.prompt-history");
+
+/** `prompts.ts` at every release tag that already carried a prompt version (earlier tags predate the history). */
+function releasedPromptModules(): { tag: string; code: string }[] {
+	const tags = execFileSync("git", ["tag", "--list"], { encoding: "utf8" }).split("\n").filter(Boolean);
+	const modules: { tag: string; code: string }[] = [];
+	for (const tag of tags) {
+		let code: string;
+		try {
+			code = execFileSync("git", ["show", `${tag}:${PROMPT_SOURCE}`], {
+				encoding: "utf8",
+				stdio: ["ignore", "pipe", "ignore"],
+			});
+		} catch {
+			continue; // the module didn't exist at that release
+		}
+		if (code.includes("AGENT_PROMPT_VERSION")) modules.push({ tag, code });
+	}
+	return modules;
+}
+
+/**
+ * Evaluate a released `prompts.ts`. Its relative imports are re-pointed at the live tree (an
+ * old release's helpers are whatever the current tree provides under the same path), and the
+ * rewritten module is written under the git-ignored `build/` so Vite can transform it.
+ */
+async function importReleasedPrompt(tag: string, code: string) {
+	const rewritten = code
+		.replace(/from "\.\//g, `from "${REPO}/src/agent/`)
+		.replace(/from "\.\.\//g, `from "${REPO}/src/`);
+	mkdirSync(SCRATCH, { recursive: true });
+	const file = resolve(SCRATCH, `prompts-${tag}.ts`);
+	writeFileSync(file, rewritten);
+	return (await import(/* @vite-ignore */ file)) as { AGENT_PROMPT_VERSION: number; DEFAULT_AGENT_PROMPT: string };
+}
+
+describe("released agent prompts (git tag replay)", () => {
+	const released = releasedPromptModules();
+
+	it("finds release tags to replay", () => {
+		expect(released.length).toBeGreaterThan(0);
+	});
+
+	it("fingerprints every released body under the version it shipped as", async () => {
+		for (const { tag, code } of released) {
+			const mod = await importReleasedPrompt(tag, code);
+			const shipped = fingerprint(mod.DEFAULT_AGENT_PROMPT);
+			expect(
+				history.get(mod.AGENT_PROMPT_VERSION),
+				`${tag} shipped prompt v${mod.AGENT_PROMPT_VERSION} as ${shipped}; history records ${history.get(mod.AGENT_PROMPT_VERSION) ?? "nothing"} for that version`,
+			).toBe(shipped);
+		}
 	});
 });
