@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createLoadSkillTool } from "../../src/agent/tools/loadSkill";
+import { resetSkillLoadRegistry, skillLoadState } from "../../src/agent/tools/skillLoadRegistry";
 import type { SkillsService } from "../../src/skills/SkillsService";
 
 function mockSkillsService(
@@ -98,5 +99,20 @@ describe("load_skill tool", () => {
 
 		const result = String(await tool.invoke({ skillName: "web" }));
 		expect(result).not.toContain("currently disabled");
+	});
+
+	// The gate manage_skills relies on: a load in this thread is what permits a later revision.
+	it("records a successful load against the run's thread", async () => {
+		resetSkillLoadRegistry();
+		const service = mockSkillsService({ web: {}, views: {} });
+		const tool = createLoadSkillTool(service, { skillNames: ["web", "views"] });
+
+		await tool.invoke({ skillName: "web" }, { configurable: { thread_id: "t-load" } });
+
+		expect(skillLoadState("t-load", "web", "web instructions")).toBe("current");
+		// The recorded text, not just the name: a body that moved on since reads as stale.
+		expect(skillLoadState("t-load", "web", "web instructions, since edited")).toBe("stale");
+		expect(skillLoadState("t-load", "views", "views instructions")).toBe("not-loaded");
+		expect(skillLoadState("t-other", "web", "web instructions")).toBe("not-loaded");
 	});
 });

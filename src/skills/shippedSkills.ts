@@ -83,7 +83,16 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
 	// 1.0 (shipped in 2.2.0): before the routing guidance — revise the skill you used when it
 	//      misled you; the user's corrections about a kind of task live in its skill, not memory.
-	["manage-skills", new Map([["1.0", "4f7b8ff2b47b60e2"]])],
+	// 1.1 (main after 2.2.0, unreleased): the routing guidance, before the patch operation
+	//      and the load-before-revise rule. Recorded so dev vaults seeded from main upgrade
+	//      silently rather than reading as customized; costs one literal.
+	[
+		"manage-skills",
+		new Map([
+			["1.0", "4f7b8ff2b47b60e2"],
+			["1.1", "6243bd2c4cf42f9a"],
+		]),
+	],
 	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
 	["manage-notes", new Map([["1.0", "eab47f33c57cb977"]])],
 ]);
