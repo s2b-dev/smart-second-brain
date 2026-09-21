@@ -33,6 +33,23 @@ export function isSafeMemoryNoteName(name: string): boolean {
 	return /^[^\\/:*?"<>|\p{Cc}]+$/u.test(name) && !name.startsWith(".") && name.trim() === name && name !== "..";
 }
 
+/**
+ * One write at a time per note path, across every reviewer. Two threads' reviews can finish
+ * together and both merge into `User.md`; without this the second check-then-write clobbers
+ * the first's merged content, or a duplicate create throws.
+ */
+const writeChains = new Map<string, Promise<unknown>>();
+
+function serialized<T>(key: string, work: () => Promise<T>): Promise<T> {
+	const previous = writeChains.get(key) ?? Promise.resolve();
+	const next = previous.then(work, work);
+	writeChains.set(
+		key,
+		next.catch(() => undefined),
+	);
+	return next;
+}
+
 export function createSaveMemoryTool(app: App, memoryFolder: string) {
 	const folder = normalizePath(memoryFolder);
 
@@ -43,18 +60,28 @@ export function createSaveMemoryTool(app: App, memoryFolder: string) {
 				return `Refused: "${name}" is not a plain note name. Give the note's name only; it is always created inside ${folder}/.`;
 			}
 			const path = normalizePath(`${folder}/${base}.md`);
-			try {
+			// A failure is thrown, not returned as text: the tool runner turns it into an
+			// error-status result, which is what keeps a failed save out of the "learned"
+			// notice (the model's own summary cannot be trusted for that).
+			return serialized(path, async () => {
 				if (!app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
 				const existing = app.vault.getFileByPath(path);
 				if (existing) {
 					await app.vault.modify(existing, content);
 					return `Updated memory note ${path} (applied, no review needed).`;
 				}
-				await app.vault.create(path, content);
+				try {
+					await app.vault.create(path, content);
+				} catch (error) {
+					// Lost a race with a writer outside this serialization (a hand edit, sync):
+					// the note exists now, so replace it rather than fail.
+					const created = app.vault.getFileByPath(path);
+					if (!created) throw error;
+					await app.vault.modify(created, content);
+					return `Updated memory note ${path} (applied, no review needed).`;
+				}
 				return `Created memory note ${path} (applied, no review needed).`;
-			} catch (error) {
-				return `Could not write ${path}: ${error instanceof Error ? error.message : String(error)}`;
-			}
+			});
 		},
 		{
 			name: "save_memory",

@@ -166,6 +166,50 @@ describe("summarizeReviewActions", () => {
 		expect(summarizeReviewActions(messages)).toEqual([]);
 	});
 
+	// A refused first attempt followed by a load and a successful retry is one revision.
+	it("reports a successful retry after a refusal, matching each call to its own result", () => {
+		const patch = { type: "patch", skillName: "dataview", oldText: "x", newText: "y" };
+		const messages = [
+			new AIMessage({ content: "", tool_calls: [{ id: "b1", name: "manage_skills", args: patch }] }),
+			new ToolMessage({
+				tool_call_id: "b1",
+				name: "manage_skills",
+				content: 'Load the "dataview" skill with load_skill first, then revise it.',
+			}),
+			new AIMessage({
+				content: "",
+				tool_calls: [{ id: "l", name: "load_skill", args: { skillName: "dataview" } }],
+			}),
+			new ToolMessage({ tool_call_id: "l", name: "load_skill", content: "# Skill: dataview" }),
+			new AIMessage({ content: "", tool_calls: [{ id: "b2", name: "manage_skills", args: patch }] }),
+			new ToolMessage({ tool_call_id: "b2", name: "manage_skills", content: 'Patched the "dataview" skill.' }),
+		];
+		expect(summarizeReviewActions(messages)).toEqual(["revised skill dataview"]);
+	});
+
+	it("does not report a refused or no-op memory save", () => {
+		const messages = [
+			new AIMessage({
+				content: "",
+				tool_calls: [
+					{ id: "s1", name: "save_memory", args: { name: "../x", content: "" } },
+					{ id: "s2", name: "save_memory", args: { name: "User", content: "" } },
+				],
+			}),
+			new ToolMessage({
+				tool_call_id: "s1",
+				name: "save_memory",
+				content: 'Refused: "../x" is not a plain note name.',
+			}),
+			new ToolMessage({
+				tool_call_id: "s2",
+				name: "save_memory",
+				content: "Updated memory note Agents/Memories/User.md (applied, no review needed).",
+			}),
+		];
+		expect(summarizeReviewActions(messages)).toEqual(["saved memory User"]);
+	});
+
 	it("drops a call whose tool result errored", () => {
 		const messages = [
 			new AIMessage({

@@ -75,8 +75,8 @@ import {
 } from "./postTurnReview";
 import { createSaveMemoryTool } from "./tools/saveMemory";
 
-/** The agent's own tools a reviewer may hold: read, load, and revise skills — nothing that writes a vault note. */
-const REVIEWER_TOOL_NAMES = new Set(["read_content", "list_directory", "grep_notes", "load_skill", "manage_skills"]);
+/** The agent's own tools a reviewer may hold as they are: reading and skill loading. Skill revision is added separately, without delete. */
+const REVIEWER_TOOL_NAMES = new Set(["read_content", "list_directory", "grep_notes", "load_skill"]);
 /** A review is a handful of reads and at most a few writes; anything longer is the model looping. */
 const REVIEWER_RECURSION_LIMIT = 40;
 import { getBundledSkill } from "../skills/defaults";
@@ -1934,6 +1934,11 @@ export class AgentManager {
 		const reviewerTools = this.buildToolsForAgent(agentCfg).filter((tool) =>
 			REVIEWER_TOOL_NAMES.has((tool as { name: string }).name),
 		);
+		if (canRevise) {
+			reviewerTools.push(
+				createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id, { allowDelete: false }),
+			);
+		}
 		if (canRemember) reviewerTools.push(createSaveMemoryTool(this.plugin.app, memoryFolder));
 
 		const skillsService = this.plugin.skillsService;

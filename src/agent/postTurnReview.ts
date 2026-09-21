@@ -183,47 +183,30 @@ export function buildReviewUserMessage(transcript: string): string {
  * final text: the model's summary can claim a save that a refused tool call never made.
  */
 export function summarizeReviewActions(messages: readonly BaseMessage[]): string[] {
-	const actions: string[] = [];
-	const failed = new Set<string>();
+	// Each call is judged by its own result, matched by id: a refusal on a first attempt must
+	// not hide a successful retry, and a success elsewhere must not vouch for a refusal.
+	const results = new Map<string, ToolMessage>();
 	for (const message of messages) {
-		if (ToolMessage.isInstance(message) && message.status === "error") failed.add(message.tool_call_id);
+		if (ToolMessage.isInstance(message)) results.set(message.tool_call_id, message);
 	}
+	const actions: string[] = [];
 	for (const message of messages) {
 		if (!AIMessage.isInstance(message)) continue;
 		for (const call of message.tool_calls ?? []) {
-			if (call.id && failed.has(call.id)) continue;
+			const result = call.id ? results.get(call.id) : undefined;
+			if (!result || result.status === "error") continue;
+			const outcome = textOf(result);
 			const args = (call.args ?? {}) as Record<string, unknown>;
+			// Positive matching on the tools' own success phrasings: anything else — a
+			// refusal, a "no changes" no-op, an unexpected reply — is not a save.
 			if (call.name === "manage_skills") {
-				const type = args.type;
 				const name = String(args.skillName ?? args.name ?? "");
-				if (type === "create") actions.push(`created skill ${name}`);
-				else if (type === "patch" || type === "update") actions.push(`revised skill ${name}`);
-				else if (type === "delete") actions.push(`deleted skill ${name}`);
-			} else if (call.name === "save_memory") {
+				if (/^Created and attached /.test(outcome)) actions.push(`created skill ${name}`);
+				else if (/^(Patched|Updated) the /.test(outcome)) actions.push(`revised skill ${name}`);
+			} else if (call.name === "save_memory" && /^(Created|Updated) memory note /.test(outcome)) {
 				actions.push(`saved memory ${String(args.name ?? "")}`);
 			}
 		}
 	}
-	// A refused save (e.g. a patch that found no match) returns a plain-text result, not an
-	// error status, so also drop actions whose tool result reads as a refusal.
-	return dedupe(actions.filter((action) => !resultRefused(messages, action)));
-}
-
-function dedupe(items: string[]): string[] {
-	return [...new Set(items)];
-}
-
-function resultRefused(messages: readonly BaseMessage[], action: string): boolean {
-	// Only `manage_skills` refuses with text; match its refusal phrasings to the skill name.
-	const name = action.replace(/^(created|revised|deleted) skill /, "");
-	if (name === action) return false;
-	return messages.some(
-		(message) =>
-			ToolMessage.isInstance(message) &&
-			message.name === "manage_skills" &&
-			textOf(message).includes(`"${name}"`) &&
-			/refused|rejected|Could not|not found|not attached|Load the|has changed since|appears \d+ times|frontmatter/.test(
-				textOf(message),
-			),
-	);
+	return [...new Set(actions)];
 }

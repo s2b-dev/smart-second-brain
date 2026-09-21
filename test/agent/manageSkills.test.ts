@@ -377,6 +377,24 @@ describe("manage_skills tool", () => {
 		});
 	});
 
+	describe("reviewer variant", () => {
+		it("has no delete operation in its schema but still patches", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1", { allowDelete: false });
+
+			await expect(t.invoke({ type: "delete", name: "dataview" }, RUN_CONFIG)).rejects.toThrow();
+			expect(t.description).not.toContain("delete");
+
+			const res = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." },
+				RUN_CONFIG,
+			);
+			expect(res).toMatch(/patched/i);
+			expect(write).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	describe("update operation", () => {
 		it("applies a valid body edit immediately", async () => {
 			const svc = makeSkillsService(dataviewCache());

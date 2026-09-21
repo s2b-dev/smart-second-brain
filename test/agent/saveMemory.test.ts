@@ -76,4 +76,40 @@ describe("save_memory tool", () => {
 		expect(app.vault.create).not.toHaveBeenCalled();
 		expect(app.vault.modify).not.toHaveBeenCalled();
 	});
+
+	// Two reviews can finish together and both merge into the same note; the second must see
+	// the first's write, not race it.
+	it("serializes writes to the same note", async () => {
+		const app = makeApp(["Agents/Memories/User.md"]);
+		const order: string[] = [];
+		vi.mocked(app.vault.modify).mockImplementation(async (_file: unknown, data: string) => {
+			order.push(`start ${data}`);
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			order.push(`end ${data}`);
+		});
+		const t = createSaveMemoryTool(app, "Agents/Memories");
+
+		await Promise.all([t.invoke({ name: "User", content: "a" }), t.invoke({ name: "User", content: "b" })]);
+
+		expect(order).toEqual(["start a", "end a", "start b", "end b"]);
+	});
+
+	// A failed write must surface as a tool error so the review notice cannot claim it.
+	it("throws when the vault write fails", async () => {
+		const app = makeApp();
+		vi.mocked(app.vault.create).mockRejectedValue(new Error("read-only vault"));
+		const t = createSaveMemoryTool(app, "Agents/Memories");
+		await expect(t.invoke({ name: "User", content: "x" })).rejects.toThrow(/read-only vault/);
+	});
+
+	it("falls back to replacing a note created underneath it", async () => {
+		const app = makeApp();
+		const file = new TFile();
+		file.path = "Agents/Memories/User.md";
+		vi.mocked(app.vault.create).mockRejectedValue(new Error("File already exists"));
+		vi.mocked(app.vault.getFileByPath).mockReturnValueOnce(null).mockReturnValue(file);
+		const t = createSaveMemoryTool(app, "Agents/Memories");
+		expect(await t.invoke({ name: "User", content: "x" })).toMatch(/Updated memory note/);
+		expect(app.vault.modify).toHaveBeenCalledWith(file, "x");
+	});
 });
