@@ -11,7 +11,7 @@
  */
 
 import { tool } from "@langchain/core/tools";
-import { type App, normalizePath } from "obsidian";
+import { type App, type TFile, normalizePath } from "obsidian";
 import { z } from "zod";
 
 const saveMemorySchema = z.object({
@@ -24,7 +24,13 @@ const saveMemorySchema = z.object({
 	content: z
 		.string()
 		.describe(
-			"Full note content including the frontmatter block with a one-line, quoted `description` of what the note holds and when to read it.",
+			"What to write. In append mode (the default for an existing note): the new facts only, as markdown; they are added at the end. In replace mode, or for a new note: the full note including the frontmatter block with a one-line, quoted `description` of what the note holds and when to read it.",
+		),
+	mode: z
+		.enum(["append", "replace"])
+		.optional()
+		.describe(
+			"How to write into a note that already exists. `append` (default) adds the content at the end and can never lose another writer's addition. `replace` rewrites the whole note — use it only for a note you read in this review, e.g. to reorganize it or update its description.",
 		),
 });
 
@@ -54,7 +60,7 @@ export function createSaveMemoryTool(app: App, memoryFolder: string) {
 	const folder = normalizePath(memoryFolder);
 
 	return tool(
-		async ({ name, content }: z.infer<typeof saveMemorySchema>) => {
+		async ({ name, content, mode }: z.infer<typeof saveMemorySchema>) => {
 			const base = name.endsWith(".md") ? name.slice(0, -3) : name;
 			if (!isSafeMemoryNoteName(base)) {
 				return `Refused: "${name}" is not a plain note name. Give the note's name only; it is always created inside ${folder}/.`;
@@ -66,26 +72,36 @@ export function createSaveMemoryTool(app: App, memoryFolder: string) {
 			return serialized(path, async () => {
 				if (!app.vault.getFolderByPath(folder)) await app.vault.createFolder(folder);
 				const existing = app.vault.getFileByPath(path);
-				if (existing) {
-					await app.vault.modify(existing, content);
-					return `Updated memory note ${path} (applied, no review needed).`;
-				}
+				if (existing) return writeExisting(existing);
 				try {
 					await app.vault.create(path, content);
 				} catch (error) {
 					// Lost a race with a writer outside this serialization (a hand edit, sync):
-					// the note exists now, so replace it rather than fail.
+					// the note exists now, so write into it rather than fail.
 					const created = app.vault.getFileByPath(path);
 					if (!created) throw error;
-					await app.vault.modify(created, content);
-					return `Updated memory note ${path} (applied, no review needed).`;
+					return writeExisting(created);
 				}
 				return `Created memory note ${path} (applied, no review needed).`;
 			});
+
+			// Append is the default and the safe one: it is computed against the text on disk
+			// at write time, inside the serialization, so two reviews that both read the old
+			// note and finish together both land — a replace computed from a stale read would
+			// drop whichever addition came first.
+			async function writeExisting(file: TFile): Promise<string> {
+				if (mode === "replace") {
+					await app.vault.modify(file, content);
+					return `Updated memory note ${path} (applied, no review needed).`;
+				}
+				const current = await app.vault.read(file);
+				await app.vault.modify(file, `${current.trimEnd()}\n\n${content.trim()}\n`);
+				return `Appended to memory note ${path} (applied, no review needed).`;
+			}
 		},
 		{
 			name: "save_memory",
-			description: `Create or replace one note in the memory folder (${folder}/). Applied immediately. Read the note first with read_content if it may exist, and write the merged content back — this replaces the whole note.`,
+			description: `Write one note in the memory folder (${folder}/), applied immediately. A new note is created from the content; an existing note gets the content appended by default, or replaced whole with mode "replace". Read a note with read_content before replacing it.`,
 			schema: saveMemorySchema,
 		},
 	);

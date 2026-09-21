@@ -1,6 +1,7 @@
 /**
  * `save_memory` is the reviewer's only write path, and its whole safety story is that it
- * cannot address anything outside the memory folder.
+ * cannot address anything outside the memory folder, and cannot lose another reviewer's
+ * addition to the same note.
  */
 
 import { App, TFile, TFolder } from "obsidian";
@@ -48,16 +49,31 @@ describe("save_memory tool", () => {
 		expect(app.vault.modify).not.toHaveBeenCalled();
 	});
 
-	it("replaces an existing note in place and tolerates a .md suffix", async () => {
+	// Append is the default for an existing note: computed against the text on disk inside
+	// the write lock, so two reviews that both read the old note cannot lose each other's facts.
+	it("appends to an existing note by default, reading it at write time", async () => {
+		const app = makeApp(["Agents/Memories/User.md"]);
+		vi.mocked(app.vault.read).mockResolvedValue('---\ndescription: "x"\n---\n# User\nName: Leo\n');
+		const t = createSaveMemoryTool(app, "Agents/Memories");
+		const res = await t.invoke({ name: "User.md", content: "Prefers short answers." });
+		expect(res).toMatch(/Appended to memory note/);
+		expect(app.vault.modify).toHaveBeenCalledWith(
+			expect.objectContaining({ path: "Agents/Memories/User.md" }),
+			'---\ndescription: "x"\n---\n# User\nName: Leo\n\nPrefers short answers.\n',
+		);
+		expect(app.vault.create).not.toHaveBeenCalled();
+	});
+
+	it("replaces an existing note only when asked to", async () => {
 		const app = makeApp(["Agents/Memories/User.md"]);
 		const t = createSaveMemoryTool(app, "Agents/Memories");
-		const res = await t.invoke({ name: "User.md", content: "new" });
+		const res = await t.invoke({ name: "User", content: "new", mode: "replace" });
 		expect(res).toMatch(/Updated memory note/);
 		expect(app.vault.modify).toHaveBeenCalledWith(
 			expect.objectContaining({ path: "Agents/Memories/User.md" }),
 			"new",
 		);
-		expect(app.vault.create).not.toHaveBeenCalled();
+		expect(app.vault.read).not.toHaveBeenCalled();
 	});
 
 	it("creates the folder when it is missing", async () => {
@@ -77,8 +93,8 @@ describe("save_memory tool", () => {
 		expect(app.vault.modify).not.toHaveBeenCalled();
 	});
 
-	// Two reviews can finish together and both merge into the same note; the second must see
-	// the first's write, not race it.
+	// Two reviews can finish together and both write the same note; the second must wait
+	// for the first, not race it.
 	it("serializes writes to the same note", async () => {
 		const app = makeApp(["Agents/Memories/User.md"]);
 		const order: string[] = [];
@@ -89,9 +105,29 @@ describe("save_memory tool", () => {
 		});
 		const t = createSaveMemoryTool(app, "Agents/Memories");
 
-		await Promise.all([t.invoke({ name: "User", content: "a" }), t.invoke({ name: "User", content: "b" })]);
+		await Promise.all([
+			t.invoke({ name: "User", content: "a", mode: "replace" }),
+			t.invoke({ name: "User", content: "b", mode: "replace" }),
+		]);
 
 		expect(order).toEqual(["start a", "end a", "start b", "end b"]);
+	});
+
+	// Two reviews that both read the old note and append: neither addition is lost.
+	it("keeps both additions when two appends race", async () => {
+		const app = makeApp(["Agents/Memories/User.md"]);
+		let disk = "# User\n";
+		vi.mocked(app.vault.read).mockImplementation(async () => disk);
+		vi.mocked(app.vault.modify).mockImplementation(async (_file: unknown, data: string) => {
+			await new Promise((resolve) => setTimeout(resolve, 10));
+			disk = data;
+		});
+		const t = createSaveMemoryTool(app, "Agents/Memories");
+		await Promise.all([
+			t.invoke({ name: "User", content: "fact one" }),
+			t.invoke({ name: "User", content: "fact two" }),
+		]);
+		expect(disk).toBe("# User\n\nfact one\n\nfact two\n");
 	});
 
 	// A failed write must surface as a tool error so the review notice cannot claim it.
@@ -102,14 +138,15 @@ describe("save_memory tool", () => {
 		await expect(t.invoke({ name: "User", content: "x" })).rejects.toThrow(/read-only vault/);
 	});
 
-	it("falls back to replacing a note created underneath it", async () => {
+	it("falls back to writing into a note created underneath it", async () => {
 		const app = makeApp();
 		const file = new TFile();
 		file.path = "Agents/Memories/User.md";
 		vi.mocked(app.vault.create).mockRejectedValue(new Error("File already exists"));
 		vi.mocked(app.vault.getFileByPath).mockReturnValueOnce(null).mockReturnValue(file);
+		vi.mocked(app.vault.read).mockResolvedValue("existing");
 		const t = createSaveMemoryTool(app, "Agents/Memories");
-		expect(await t.invoke({ name: "User", content: "x" })).toMatch(/Updated memory note/);
-		expect(app.vault.modify).toHaveBeenCalledWith(file, "x");
+		expect(await t.invoke({ name: "User", content: "x" })).toMatch(/Appended to memory note/);
+		expect(app.vault.modify).toHaveBeenCalledWith(file, "existing\n\nx\n");
 	});
 });

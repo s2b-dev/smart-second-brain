@@ -152,7 +152,7 @@ You are reviewing a conversation that just finished between a user and their Obs
 	}
 	if (inputs.canRemember) {
 		tools.push(
-			`- \`save_memory\` to write a memory note into \`${inputs.memoryFolder}/\`. Read the note first if it exists and merge; keep the frontmatter \`description\` current.`,
+			`- \`save_memory\` to write a memory note into \`${inputs.memoryFolder}/\`. A new note needs the full content with a quoted \`description\` in its frontmatter. For an existing note, append the new facts (the default): another review may be writing the same note at the same time, and an append never loses its addition. Replace a whole note (mode "replace") only after reading it in this review, when it needs reorganizing or a new description.`,
 		);
 	}
 	parts.push(`# Tools\n${tools.join("\n")}`);
@@ -203,7 +203,7 @@ export function summarizeReviewActions(messages: readonly BaseMessage[]): string
 				const name = String(args.skillName ?? args.name ?? "");
 				if (/^Created and attached /.test(outcome)) actions.push(`created skill ${name}`);
 				else if (/^(Patched|Updated) the /.test(outcome)) actions.push(`revised skill ${name}`);
-			} else if (call.name === "save_memory" && /^(Created|Updated) memory note /.test(outcome)) {
+			} else if (call.name === "save_memory" && /^(Created|Updated|Appended to) memory note /.test(outcome)) {
 				actions.push(`saved memory ${String(args.name ?? "")}`);
 			}
 		}
