@@ -1147,7 +1147,7 @@ describe("PluginDataStore – skill usage", () => {
 		// Persisted, not just held in memory.
 		expect(plugin.saveData).toHaveBeenCalled();
 		const saved = plugin.saveData.mock.calls.at(-1)![0];
-		expect(saved.skillUsage["weekly-review"].loadCount).toBe(2);
+		expect(saved.skillUsage.find((entry: { name: string }) => entry.name === "weekly-review").loadCount).toBe(2);
 	});
 
 	it("a revision on a never-loaded skill leaves the load side empty", async () => {
@@ -1165,14 +1165,14 @@ describe("PluginDataStore – skill usage", () => {
 		store.recordSkillLoad("weekly-review");
 		store.forgetSkillUsage("weekly-review");
 		expect(store.getSkillUsage("weekly-review")).toBeUndefined();
-		expect(store.skillUsage).toEqual({});
+		expect(store.skillUsage).toEqual([]);
 	});
 
 	// Data written before this field existed has no `skillUsage` key at all.
-	it("tolerates saved data without a skillUsage field", async () => {
+	it("tolerates saved data without a skillUsage field, or with a non-list one", async () => {
 		__resetPluginDataStoreForTests();
 		const data = structuredClone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
-		data.skillUsage = undefined;
+		data.skillUsage = { "weekly-review": { loadCount: 9 } }; // a shape that never shipped
 		const plugin = { ...createMockPlugin(), loadData: vi.fn().mockResolvedValue(data) };
 		const store = await createData(plugin as never);
 		expect(store.getSkillUsage("x")).toBeUndefined();
@@ -1180,9 +1180,10 @@ describe("PluginDataStore – skill usage", () => {
 		expect(store.getSkillUsage("x")?.loadCount).toBe(1);
 	});
 
-	// "constructor" and "toString" are valid skill names; the counters live in a plain
-	// object, so a lookup must not fall through to the inherited property.
-	it("never reads an Object.prototype member as a skill's counters", async () => {
+	// "constructor" and "toString" are valid skill names. With a name-keyed object Svelte's
+	// $state proxy silently dropped the write (the key exists on the prototype chain), which
+	// is why the counters are a list; this pins that such names round-trip.
+	it("stores a skill named like an Object.prototype member", async () => {
 		const { store } = await freshStore();
 		expect(store.getSkillUsage("constructor")).toBeUndefined();
 		expect(store.getSkillUsage("toString")).toBeUndefined();

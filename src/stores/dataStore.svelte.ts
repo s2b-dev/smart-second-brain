@@ -255,7 +255,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	searchShowMatchContext: true,
 	searchShowKeyboardHints: true,
 	recentNotes: [],
-	skillUsage: {},
+	skillUsage: [],
 	embeddingIndexes: [],
 	searchEmbedIndex: null,
 	graphEmbedIndex: null,
@@ -1318,27 +1318,33 @@ export class PluginDataStore {
 
 	// --- Skill usage ---
 
-	/** Usage counters for a skill, or undefined when it has never been loaded or revised. */
-	getSkillUsage(skillName: string): SkillUsageEntry | undefined {
-		// Own keys only: a skill named like an Object.prototype member ("constructor",
-		// "toString" — valid skill names) must not read the inherited property as its counters.
-		const usage = this.#data.skillUsage;
-		return usage && Object.hasOwn(usage, skillName) ? usage[skillName] : undefined;
+	/**
+	 * The usage list, healed to an empty list when the field is absent or not a list (a data
+	 * file from before the field existed, or one written while the shape was still changing).
+	 */
+	private usageList(): SkillUsageEntry[] {
+		if (!Array.isArray(this.#data.skillUsage)) this.#data.skillUsage = [];
+		return this.#data.skillUsage;
 	}
 
-	/** All usage counters, keyed by skill name. */
-	get skillUsage(): Readonly<Record<string, SkillUsageEntry>> {
-		return this.#data.skillUsage ?? {};
+	/** Usage counters for a skill, or undefined when it has never been loaded or revised. */
+	getSkillUsage(skillName: string): SkillUsageEntry | undefined {
+		return this.usageList().find((entry) => entry.name === skillName);
+	}
+
+	/** All usage counters. */
+	get skillUsage(): readonly SkillUsageEntry[] {
+		return this.usageList();
 	}
 
 	private bumpSkillUsage(skillName: string, mutate: (entry: SkillUsageEntry) => void): void {
-		if (!this.#data.skillUsage) this.#data.skillUsage = {};
-		const usage = this.#data.skillUsage;
-		const entry = Object.hasOwn(usage, skillName)
-			? usage[skillName]
-			: { loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
+		const usage = this.usageList();
+		let entry = usage.find((candidate) => candidate.name === skillName);
+		if (!entry) {
+			entry = { name: skillName, loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
+			usage.push(entry);
+		}
 		mutate(entry);
-		usage[skillName] = entry;
 		void this.saveSettings();
 	}
 
@@ -1360,8 +1366,9 @@ export class PluginDataStore {
 
 	/** The skill is gone; a later skill of the same name starts from zero. */
 	forgetSkillUsage(skillName: string): void {
-		if (!this.#data.skillUsage || !Object.hasOwn(this.#data.skillUsage, skillName)) return;
-		delete this.#data.skillUsage[skillName];
+		const usage = this.usageList();
+		if (!usage.some((entry) => entry.name === skillName)) return;
+		this.#data.skillUsage = usage.filter((entry) => entry.name !== skillName);
 		void this.saveSettings();
 	}
 

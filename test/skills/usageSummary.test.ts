@@ -30,14 +30,20 @@ describe("skillUsageSummary", () => {
 	});
 
 	it("reads counts and ages in words", () => {
-		const usage = { loadCount: 3, lastLoadedAt: NOW - 2 * DAY, revisionCount: 1, lastRevisedAt: NOW - 60_000 };
+		const usage = {
+			name: "x",
+			loadCount: 3,
+			lastLoadedAt: NOW - 2 * DAY,
+			revisionCount: 1,
+			lastRevisedAt: NOW - 60_000,
+		};
 		expect(skillUsageSummary("agent", usage, NOW)).toBe(
 			"Created by the agent · used 3 times, last 2 days ago · revised once (last 1 min ago)",
 		);
 	});
 
 	it("omits the revision part when nothing was revised", () => {
-		const usage = { loadCount: 1, lastLoadedAt: NOW, revisionCount: 0, lastRevisedAt: null };
+		const usage = { name: "x", loadCount: 1, lastLoadedAt: NOW, revisionCount: 0, lastRevisedAt: null };
 		expect(skillUsageSummary(undefined, usage, NOW)).toBe("Your skill · used once, last just now");
 	});
 });
