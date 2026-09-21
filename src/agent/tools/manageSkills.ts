@@ -195,12 +195,21 @@ const updateOperationSchema = z.object({
 		.describe("Optional new one-line description of what the skill does and when to use it."),
 });
 
-const manageSkillsSchema = z.discriminatedUnion("type", [
-	createOperationSchema,
-	patchOperationSchema,
-	updateOperationSchema,
-	deleteOperationSchema,
-]);
+// The operations are a discriminated union, but it sits under a key rather than at the root:
+// every provider's function-calling API requires the parameters schema to be a plain object,
+// and a root-level union renders as `anyOf` with no `type`, which OpenAI rejects outright
+// ("schema must be a JSON Schema of 'type: object'") before the model sees a single message.
+// Same shape as manage_notes' `operations`.
+const manageSkillsSchema = z.object({
+	operation: z
+		.discriminatedUnion("type", [
+			createOperationSchema,
+			patchOperationSchema,
+			updateOperationSchema,
+			deleteOperationSchema,
+		])
+		.describe("The one operation to perform, selected by `type`."),
+});
 
 /**
  * The post-turn reviewer's variant: create, patch and update only. Deletion is immediate and
@@ -208,11 +217,11 @@ const manageSkillsSchema = z.discriminatedUnion("type", [
  * conversation justifies it — the reviewer is told to create or revise, so its tool cannot do
  * more than that.
  */
-const reviewerManageSkillsSchema = z.discriminatedUnion("type", [
-	createOperationSchema,
-	patchOperationSchema,
-	updateOperationSchema,
-]);
+const reviewerManageSkillsSchema = z.object({
+	operation: z
+		.discriminatedUnion("type", [createOperationSchema, patchOperationSchema, updateOperationSchema])
+		.describe("The one operation to perform, selected by `type`."),
+});
 
 export interface ManageSkillsToolOptions {
 	/** Omit the delete operation from the schema (the post-turn reviewer). Default: allowed. */
@@ -249,6 +258,7 @@ function rejectInvalidRevision(
 }
 
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
+type ManageSkillsOperation = ManageSkillsInput["operation"];
 
 /**
  * Tool letting an agent create new skills, revise skills attached to it, or delete skills it
@@ -278,7 +288,7 @@ export function createManageSkillsTool(
 	}
 
 	return tool(
-		async (input: ManageSkillsInput, config?: RunnableConfig) => {
+		async ({ operation: input }: ManageSkillsInput, config?: RunnableConfig) => {
 			const threadId: string | undefined = config?.configurable?.thread_id;
 			const attached = getAttachedSkillNames(skillsService, agentId);
 

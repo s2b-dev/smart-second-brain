@@ -131,13 +131,13 @@ describe("summarizeReviewActions", () => {
 					{
 						id: "b",
 						name: "manage_skills",
-						args: { type: "patch", skillName: "weekly-review", oldText: "x", newText: "y" },
+						args: { operation: { type: "patch", skillName: "weekly-review", oldText: "x", newText: "y" } },
 					},
 					{ id: "c", name: "save_memory", args: { name: "User", content: "…" } },
 					{
 						id: "d",
 						name: "manage_skills",
-						args: { type: "patch", skillName: "weekly-review", oldText: "y", newText: "z" },
+						args: { operation: { type: "patch", skillName: "weekly-review", oldText: "y", newText: "z" } },
 					},
 				],
 			}),
@@ -171,7 +171,7 @@ describe("summarizeReviewActions", () => {
 					{
 						id: "b",
 						name: "manage_skills",
-						args: { type: "patch", skillName: "dataview", oldText: "x", newText: "y" },
+						args: { operation: { type: "patch", skillName: "dataview", oldText: "x", newText: "y" } },
 					},
 				],
 			}),
@@ -189,7 +189,10 @@ describe("summarizeReviewActions", () => {
 	it("reports a successful retry after a refusal, matching each call to its own result", () => {
 		const patch = { type: "patch", skillName: "dataview", oldText: "x", newText: "y" };
 		const messages = [
-			new AIMessage({ content: "", tool_calls: [{ id: "b1", name: "manage_skills", args: patch }] }),
+			new AIMessage({
+				content: "",
+				tool_calls: [{ id: "b1", name: "manage_skills", args: { operation: patch } }],
+			}),
 			new ToolMessage({
 				tool_call_id: "b1",
 				name: "manage_skills",
@@ -200,7 +203,10 @@ describe("summarizeReviewActions", () => {
 				tool_calls: [{ id: "l", name: "load_skill", args: { skillName: "dataview" } }],
 			}),
 			new ToolMessage({ tool_call_id: "l", name: "load_skill", content: "# Skill: dataview" }),
-			new AIMessage({ content: "", tool_calls: [{ id: "b2", name: "manage_skills", args: patch }] }),
+			new AIMessage({
+				content: "",
+				tool_calls: [{ id: "b2", name: "manage_skills", args: { operation: patch } }],
+			}),
 			new ToolMessage({ tool_call_id: "b2", name: "manage_skills", content: 'Patched the "dataview" skill.' }),
 		];
 		expect(summarizeReviewActions(messages)).toEqual(["revised skill dataview"]);

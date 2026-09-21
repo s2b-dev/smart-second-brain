@@ -225,7 +225,8 @@ export function summarizeReviewActions(messages: readonly BaseMessage[]): string
 			// Positive matching on the tools' own success phrasings: anything else — a
 			// refusal, a "no changes" no-op, an unexpected reply — is not a save.
 			if (call.name === "manage_skills") {
-				const name = String(args.skillName ?? args.name ?? "");
+				const op = (args.operation ?? {}) as Record<string, unknown>;
+				const name = String(op.skillName ?? op.name ?? "");
 				if (/^Created and attached /.test(outcome)) actions.push(`created skill ${name}`);
 				else if (/^(Patched|Updated) the /.test(outcome)) actions.push(`revised skill ${name}`);
 			} else if (call.name === "save_memory" && /^(Created|Updated|Appended to) memory note /.test(outcome)) {
