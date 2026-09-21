@@ -456,6 +456,12 @@ export interface AgentConfig {
 	 * own `subAgentIds` are ignored.
 	 */
 	subAgentIds?: string[];
+	/**
+	 * The post-turn review: after a turn busy enough to cross the tool-call threshold, a side
+	 * run asks a model whether the conversation taught something worth routing into memory or
+	 * a skill. Off by default; see `agent/postTurnReview.ts`.
+	 */
+	postTurnReview?: import("../agent/postTurnReview").PostTurnReviewConfig;
 	// NOTE: whether an agent uses memory is no longer config either. The memory machinery
 	// (auto-applied writes in `Agents/Memories/`, that folder's `list_directory` visibility) is
 	// always on; participation is decided by the `# Memory` section of the agent's own AGENT.md,

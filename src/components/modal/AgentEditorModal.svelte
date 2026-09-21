@@ -33,6 +33,7 @@ import {
 	toExecToolId,
 } from "../../agent/integrations/pluginIntegrations";
 import { DEFAULT_AGENT_PROMPT } from "../../agent/prompts";
+import { DEFAULT_POST_TURN_REVIEW } from "../../agent/postTurnReview";
 import { normalizeShipped } from "../../utils/shippedDefaults";
 import { agentDefinitionPath, agentDir } from "../../utils/agentPaths";
 import { Logger } from "../../utils/logging";
@@ -232,6 +233,42 @@ function openTitleModelSelectionModal() {
 function resetTitleModel() {
 	pluginData.updateAgent(agentId, { titleModel: null });
 	void applyChanges();
+}
+
+// --- Post-turn review ---
+
+const postTurnReview = $derived(selectedAgent?.postTurnReview ?? DEFAULT_POST_TURN_REVIEW);
+
+const currentReviewModelDisplay = $derived.by(() => {
+	if (!postTurnReview.model) return null;
+	const providerDef = getProviderDefinition(postTurnReview.model.provider, pluginData.getAllProviderMeta());
+	return {
+		model: postTurnReview.model.model,
+		logo: providerDef && "logo" in providerDef && providerDef.logo ? providerDef.logo : GenericAIIcon,
+	};
+});
+
+function setPostTurnReviewEnabled(enabled: boolean) {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, enabled } });
+}
+
+function openReviewModelSelectionModal() {
+	const currentSelection = postTurnReview.model
+		? { provider: postTurnReview.model.provider, model: postTurnReview.model.model }
+		: null;
+	new ModelSelectionModal(plugin, "chat", currentSelection, (selected) => {
+		if (!selected) return;
+		pluginData.updateAgent(agentId, {
+			postTurnReview: {
+				...postTurnReview,
+				model: buildPersistedChatModel(selected.provider, selected.model, postTurnReview.model),
+			},
+		});
+	}).open();
+}
+
+function resetReviewModel() {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, model: null } });
 }
 
 function openAgentNote() {
@@ -1002,6 +1039,40 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             {/key}
           </SettingItem>
         {/each}
+      </SettingGroup>
+
+      <SettingGroup heading="Self-improvement">
+        <div class="setting-item agent-section-intro">
+          <div class="setting-item-info">
+            <div class="setting-item-description">
+              After a busy turn, a short side run reviews the conversation and keeps what it
+              taught: a durable fact about you goes to memory, a lesson about how a task is done
+              goes into the skill that was used. It runs only while Obsidian is open, on desktop,
+              once the turns since the last review add up to {postTurnReview.toolCallThreshold}
+              tool calls. A notice names what was saved; most reviews save nothing.
+            </div>
+          </div>
+        </div>
+        <SettingItem name="Review after busy turns" desc="Off by default. Each review costs one extra model call over the conversation.">
+          <Toggle checked={postTurnReview.enabled} onchange={() => setPostTurnReviewEnabled(!postTurnReview.enabled)} />
+        </SettingItem>
+        {#if postTurnReview.enabled}
+          <SettingItem name="Review model" desc="A cheaper model is fine here; the review reads and writes short notes.">
+            <ModelSettingControl
+              available={models.hasProviders && models.hasModels}
+              loading={models.hasProviders && models.isLoadingModels}
+              configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
+              unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
+              onConfigure={() => models.openSettings(() => modal.close())}
+              placeholder="Auto (same as chat model)"
+              selectedLabel={currentReviewModelDisplay?.model ?? null}
+              selectedLogo={currentReviewModelDisplay?.logo ?? null}
+              onSelect={openReviewModelSelectionModal}
+              secondaryLabel={postTurnReview.model ? "Reset" : undefined}
+              onSecondary={postTurnReview.model ? resetReviewModel : undefined}
+            />
+          </SettingItem>
+        {/if}
       </SettingGroup>
 
       <SettingGroup heading="Subagents">

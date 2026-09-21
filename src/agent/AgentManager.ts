@@ -1,7 +1,10 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
+import { HumanMessage } from "@langchain/core/messages";
+import { createAgent } from "langchain";
+import { Notice, normalizePath, Platform, TFile, type WorkspaceLeaf } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
+import { createAiTransportContext, runWithAiTransportContext } from "../lib/aiTransport";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
 import type { ChatModel } from "../stores/chatTimeline";
@@ -62,6 +65,20 @@ import {
 	substitutePromptPlaceholders,
 } from "./prompts";
 import { collectMemoryIndex, renderMemoryIndex } from "./memoryNotes";
+import {
+	type TurnActivity,
+	buildReviewSystemPrompt,
+	buildReviewUserMessage,
+	noteTurnForReview,
+	renderTranscript,
+	summarizeReviewActions,
+} from "./postTurnReview";
+import { createSaveMemoryTool } from "./tools/saveMemory";
+
+/** The agent's own tools a reviewer may hold: read, load, and revise skills — nothing that writes a vault note. */
+const REVIEWER_TOOL_NAMES = new Set(["read_content", "list_directory", "grep_notes", "load_skill", "manage_skills"]);
+/** A review is a handful of reads and at most a few writes; anything longer is the model looping. */
+const REVIEWER_RECURSION_LIMIT = 40;
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
@@ -1859,6 +1876,108 @@ export class AgentManager {
 			createdAt: snapshot.createdAt,
 			updatedAt: snapshot.updatedAt,
 		});
+	}
+
+	// --- post-turn review -------------------------------------------------------------------
+
+	/** Threads with a review in flight; a second busy turn while one runs is simply skipped. */
+	private reviewsInFlight = new Set<string>();
+
+	/**
+	 * Called by the chat store after every successful turn. Decides whether the turn earned a
+	 * review (see `noteTurnForReview`) and, if so, runs one detached. Never throws.
+	 */
+	async maybeRunPostTurnReview(threadId: string, agentId: string, activity: TurnActivity): Promise<void> {
+		try {
+			const agentCfg = agentId ? getData().getAgent(agentId) : getData().getSelectedAgent();
+			const config = agentCfg?.postTurnReview;
+			if (!agentCfg || !config?.enabled) return;
+			// Desktop only: a side model call on a phone spends battery and data on work the
+			// user is not watching, and the same conversation earns the review again on desktop.
+			if (Platform.isMobile) return;
+			if (!noteTurnForReview(threadId, activity, config.toolCallThreshold)) return;
+			if (this.reviewsInFlight.has(threadId)) return;
+			this.reviewsInFlight.add(threadId);
+			try {
+				await this.runPostTurnReview(threadId, agentCfg);
+			} finally {
+				this.reviewsInFlight.delete(threadId);
+			}
+		} catch (error) {
+			Logger.error("[AgentManager] Post-turn review failed:", error);
+		}
+	}
+
+	/**
+	 * One side run over the finished thread with a reviewer prompt and a read-and-revise tool
+	 * set: the agent's own gated tools filtered to reading, skill loading and `manage_skills`,
+	 * plus `save_memory` as the only memory write path. No checkpointer — the review is not
+	 * part of the conversation and leaves no trace in it; what it changes is in the vault.
+	 */
+	private async runPostTurnReview(threadId: string, agentCfg: AgentConfig): Promise<void> {
+		const agent = await this.ensureAgent();
+		const history = await agent.getThreadHistory(threadId);
+		if (!history || history.messages.length === 0) return;
+
+		const chatModel = agentCfg.postTurnReview?.model ?? agentCfg.chatModel;
+		if (!chatModel) return;
+		ensureProviderRegistered(getData(), chatModel.provider);
+		const params = await toChooseModelParams(chatModel);
+		const model = getRegistry().createChatInstance(params.provider, params.chatModel, params.options);
+
+		const body = this.plugin.promptFilesService?.getAgentPrompt(agentCfg.id) ?? DEFAULT_AGENT_PROMPT;
+		const canRemember = body.includes(MEMORY_FOLDER_PLACEHOLDER);
+		const canRevise = this.isToolBound(agentCfg, "manage_skills");
+		if (!canRemember && !canRevise) return;
+
+		const memoryFolder = normalizePath(memoriesDir());
+		const reviewerTools = this.buildToolsForAgent(agentCfg).filter((tool) =>
+			REVIEWER_TOOL_NAMES.has((tool as { name: string }).name),
+		);
+		if (canRemember) reviewerTools.push(createSaveMemoryTool(this.plugin.app, memoryFolder));
+
+		const skillsService = this.plugin.skillsService;
+		let skillsXml = "";
+		if (canRevise && skillsService?.isDiscovered()) {
+			const enableState: Record<string, boolean> = {};
+			for (const [name, meta] of skillsService.getCachedSkills()) {
+				enableState[name] =
+					(agentCfg.skills[name]?.enabled ?? true) && this.skillHasUsableTools(agentCfg, meta);
+			}
+			skillsXml = skillsService.generateContextXml(
+				enableState,
+				(id) => this.isPluginEnabled(id),
+				(id) => this.isInternalPluginEnabled(id),
+			);
+		}
+		const memoryIndex = canRemember
+			? renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder))
+			: "";
+
+		const systemPrompt = buildReviewSystemPrompt({ memoryIndex, memoryFolder, skillsXml, canRevise, canRemember });
+		const reviewer = createAgent({ model, tools: reviewerTools, systemPrompt });
+		const transcript = renderTranscript(history.messages);
+
+		Logger.log(`[AgentManager] Post-turn review of ${threadId} with ${params.provider}:${params.chatModel}`);
+		// Buffered transport, like title generation: a non-streaming side call that must
+		// never disturb a concurrent chat stream's transport context.
+		const transportContext = createAiTransportContext("buffered", `postTurnReview:${threadId}`);
+		const result = await runWithAiTransportContext(transportContext, () =>
+			reviewer.invoke(
+				{ messages: [new HumanMessage(buildReviewUserMessage(transcript))] },
+				// The thread id is what lets manage_skills accept a skill the conversation
+				// already loaded (the load registry is keyed by it).
+				{ configurable: { thread_id: threadId }, recursionLimit: REVIEWER_RECURSION_LIMIT },
+			),
+		);
+		const messages = (result as { messages?: BaseMessage[] }).messages ?? [];
+		const actions = summarizeReviewActions(messages);
+		if (actions.length === 0) {
+			Logger.log("[AgentManager] Post-turn review: nothing to save");
+			return;
+		}
+		Logger.log(`[AgentManager] Post-turn review: ${actions.join("; ")}`);
+		new Notice(`${agentCfg.name} learned: ${actions.join("; ")}`, 8000);
 	}
 
 	/**

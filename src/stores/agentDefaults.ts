@@ -1,4 +1,5 @@
 import { DEFAULT_TOOLS_CONFIG } from "../agent/tools/builtInToolDefaults";
+import { DEFAULT_POST_TURN_REVIEW } from "../agent/postTurnReview";
 import { type AgentConfig, type AgentsConfig, DEFAULT_AGENT_ICON, type PluginData } from "../types/plugin";
 import { sanitizeAgentFileName } from "../utils/agentPaths";
 import { genUUIDv7 } from "../utils/uuid7Validator";
@@ -26,6 +27,7 @@ export function createDefaultAgentConfig(id?: string, name?: string): AgentConfi
 		toolsConfig: structuredClone(DEFAULT_TOOLS_CONFIG),
 		mcpServers: {},
 		subAgentIds: [],
+		postTurnReview: { ...DEFAULT_POST_TURN_REVIEW },
 	};
 }
 
@@ -44,6 +46,7 @@ export function createDefaultAgent(): AgentConfig {
 		toolsConfig: structuredClone(DEFAULT_TOOLS_CONFIG),
 		mcpServers: {},
 		subAgentIds: [],
+		postTurnReview: { ...DEFAULT_POST_TURN_REVIEW },
 	};
 }
 
@@ -76,6 +79,7 @@ export function normalizeAgent(agent: AgentConfig): void {
 
 	agent.summarizationModel ??= null;
 	agent.titleModel ??= null;
+	agent.postTurnReview = { ...DEFAULT_POST_TURN_REVIEW, ...(agent.postTurnReview ?? {}) };
 }
 
 export function normalizeAgents(mergedData: PluginData): void {
