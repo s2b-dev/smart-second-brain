@@ -980,6 +980,7 @@ export class AgentManager {
 				tools.push(
 					createLoadSkillTool(this.plugin.skillsService, {
 						skillNames: loadableSkills,
+						recordUsage: (name) => getData().recordSkillLoad(name),
 						isToolAvailable: (toolId) => {
 							if (BUILT_IN_TOOL_IDS.includes(toolId as BuiltInToolId)) {
 								return boundBuiltInTools.has(toolId);

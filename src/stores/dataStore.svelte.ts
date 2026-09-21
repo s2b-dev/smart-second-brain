@@ -29,6 +29,7 @@ import type {
 	PrivacyMode,
 	PromptFileReader,
 	RecentNoteEntry,
+	SkillUsageEntry,
 	StaleGuidance,
 	ToolConfig,
 } from "../types/plugin";
@@ -254,6 +255,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	searchShowMatchContext: true,
 	searchShowKeyboardHints: true,
 	recentNotes: [],
+	skillUsage: {},
 	embeddingIndexes: [],
 	searchEmbedIndex: null,
 	graphEmbedIndex: null,
@@ -1311,6 +1313,50 @@ export class PluginDataStore {
 			(entry) => entry.path !== normalizedPath && now - entry.lastOpenedAt < RECENT_NOTE_WINDOW_MS,
 		);
 		this.#data.recentNotes = [{ path: normalizedPath, lastOpenedAt: now }, ...existing].slice(0, MAX_RECENT_NOTES);
+		void this.saveSettings();
+	}
+
+	// --- Skill usage ---
+
+	/** Usage counters for a skill, or undefined when it has never been loaded or revised. */
+	getSkillUsage(skillName: string): SkillUsageEntry | undefined {
+		return this.#data.skillUsage?.[skillName];
+	}
+
+	/** All usage counters, keyed by skill name. */
+	get skillUsage(): Readonly<Record<string, SkillUsageEntry>> {
+		return this.#data.skillUsage ?? {};
+	}
+
+	private bumpSkillUsage(skillName: string, mutate: (entry: SkillUsageEntry) => void): void {
+		if (!this.#data.skillUsage) this.#data.skillUsage = {};
+		const usage = this.#data.skillUsage;
+		const entry = usage[skillName] ?? { loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
+		mutate(entry);
+		usage[skillName] = entry;
+		void this.saveSettings();
+	}
+
+	/** `load_skill` returned this skill's body. */
+	recordSkillLoad(skillName: string): void {
+		this.bumpSkillUsage(skillName, (entry) => {
+			entry.loadCount += 1;
+			entry.lastLoadedAt = Date.now();
+		});
+	}
+
+	/** `manage_skills` patched or rewrote this skill. */
+	recordSkillRevision(skillName: string): void {
+		this.bumpSkillUsage(skillName, (entry) => {
+			entry.revisionCount += 1;
+			entry.lastRevisedAt = Date.now();
+		});
+	}
+
+	/** The skill is gone; a later skill of the same name starts from zero. */
+	forgetSkillUsage(skillName: string): void {
+		if (!this.#data.skillUsage?.[skillName]) return;
+		delete this.#data.skillUsage[skillName];
 		void this.saveSettings();
 	}
 

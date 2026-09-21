@@ -31,6 +31,23 @@ export interface RecentNoteEntry {
 }
 
 /**
+ * How a skill has been used, keyed by skill name in plugin data (never in the SKILL.md:
+ * a counter in frontmatter would turn every load into a vault write, break the bundled
+ * skills' shipped-history fingerprint, and diverge across synced devices). Advisory only —
+ * a missed bump costs nothing — and per device, since plugin data is.
+ */
+export interface SkillUsageEntry {
+	/** Times `load_skill` returned this skill's body. */
+	loadCount: number;
+	/** Epoch ms of the most recent load, or null when never loaded. */
+	lastLoadedAt: number | null;
+	/** Times `manage_skills` patched or rewrote this skill. */
+	revisionCount: number;
+	/** Epoch ms of the most recent revision, or null when never revised. */
+	lastRevisedAt: number | null;
+}
+
+/**
  * How long after being opened a note still counts as "recent".
  *
  * Recency is bounded by age rather than by a count of entries: a fixed-size
@@ -300,6 +317,10 @@ export interface SkillDisplayInfo {
 	linkedPluginId?: string;
 	/** Linked core plugin ID (if any) */
 	corePluginId?: string;
+	/** `metadata.author` from the frontmatter: `S2B` for bundled skills, `agent` for agent-created ones. */
+	author?: string;
+	/** Usage counters from plugin data, when the skill has ever been loaded or revised. */
+	usage?: SkillUsageEntry;
 }
 
 // ============================================================================
@@ -608,6 +629,8 @@ export interface PluginData {
 	searchShowMatchContext: boolean;
 	searchShowKeyboardHints: boolean;
 	recentNotes: RecentNoteEntry[];
+	/** Per-skill load and revision counters (see {@link SkillUsageEntry}). */
+	skillUsage: Record<string, SkillUsageEntry>;
 
 	/**
 	 * Registry of all known embedding indexes.

@@ -3,6 +3,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { SkillsService } from "../../skills/SkillsService";
 import type { CommunityPluginStatus } from "../integrations/pluginIntegrations";
+import { Logger as Log } from "../../utils/logging";
 import { recordSkillLoaded } from "./skillLoadRegistry";
 
 /** Frontmatter key (under `metadata:`) listing community plugin ids a skill can make use of. */
@@ -46,6 +47,12 @@ export interface LoadSkillToolOptions {
 	 * that path exists, instead of letting it find out from a failed result.
 	 */
 	pluginStatus?: (pluginId: string) => { status: CommunityPluginStatus; displayName: string };
+	/**
+	 * Called after a skill's body was returned to the model. The plugin data store counts
+	 * loads per skill (see `SkillUsageEntry`); injected rather than imported so the tool
+	 * stays testable without a live store, and a missed record never fails a load.
+	 */
+	recordUsage?: (skillName: string) => void;
 }
 
 /**
@@ -57,7 +64,7 @@ export interface LoadSkillToolOptions {
  * @returns A LangChain tool for loading skill content
  */
 export function createLoadSkillTool(skillsService: SkillsService, options: LoadSkillToolOptions) {
-	const { skillNames, isToolAvailable, pluginStatus } = options;
+	const { skillNames, isToolAvailable, pluginStatus, recordUsage } = options;
 
 	// If no skills available, return a tool that explains this
 	if (skillNames.length === 0) {
@@ -88,6 +95,11 @@ export function createLoadSkillTool(skillsService: SkillsService, options: LoadS
 			// The model has now seen this skill's current text in this conversation, which is
 			// what `manage_skills` requires before it will patch or rewrite it.
 			recordSkillLoaded(config?.configurable?.thread_id, skillName, skill.content);
+			try {
+				recordUsage?.(skillName);
+			} catch (error) {
+				Log.warn(`load_skill: could not record usage of ${skillName}`, error);
+			}
 
 			// Return the skill content with metadata
 			const lines: string[] = [];

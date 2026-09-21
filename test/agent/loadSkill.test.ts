@@ -115,4 +115,28 @@ describe("load_skill tool", () => {
 		expect(skillLoadState("t-load", "views", "views instructions")).toBe("not-loaded");
 		expect(skillLoadState("t-other", "web", "web instructions")).toBe("not-loaded");
 	});
+
+	it("reports a successful load to the usage recorder, and only then", async () => {
+		const recordUsage = vi.fn();
+		const service = mockSkillsService({ web: {} });
+		const tool = createLoadSkillTool(service, { skillNames: ["web", "gone"], recordUsage });
+
+		await tool.invoke({ skillName: "web" });
+		await tool.invoke({ skillName: "gone" }); // known to the tool, missing from the service
+
+		expect(recordUsage).toHaveBeenCalledTimes(1);
+		expect(recordUsage).toHaveBeenCalledWith("web");
+	});
+
+	// A recorder that throws must never cost the model the skill it asked for.
+	it("still returns the skill when the usage recorder throws", async () => {
+		const service = mockSkillsService({ web: { body: "Use fetch_url." } });
+		const tool = createLoadSkillTool(service, {
+			skillNames: ["web"],
+			recordUsage: () => {
+				throw new Error("store gone");
+			},
+		});
+		expect(String(await tool.invoke({ skillName: "web" }))).toContain("Use fetch_url.");
+	});
 });

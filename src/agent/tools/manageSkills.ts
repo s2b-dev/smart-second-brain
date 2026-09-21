@@ -129,10 +129,20 @@ function splitSkillMd(raw: string): { head: string; body: string } | null {
 	return { head: raw.slice(0, headLength), body: raw.slice(headLength) };
 }
 
+/**
+ * `metadata.author` value stamped on every skill the agent creates. Bundled skills carry
+ * `S2B` in the same key and hand-written ones carry whatever the user put there (or nothing),
+ * so one existing key tells the three apart — which is what lets anything autonomous later
+ * (a curator) confine itself to the agent's own skills. A fixed word rather than the agent's
+ * name: consumers need no list of agent names, and a renamed or deleted agent changes nothing.
+ */
+export const AGENT_SKILL_AUTHOR = "agent";
+
 /** Build a new SKILL.md's raw text: minimal frontmatter plus body. */
 function buildNewSkillMd(name: string, description: string, body: string, allowedTools: string[]): string {
 	const lines = ["---", `name: ${name}`, `description: ${description}`];
 	if (allowedTools.length > 0) lines.push(`allowed-tools: ${allowedTools.join(" ")}`);
+	lines.push("metadata:", `  author: ${AGENT_SKILL_AUTHOR}`);
 	lines.push("---", "", body.trim(), "");
 	return lines.join("\n");
 }
@@ -303,9 +313,11 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 					return `Could not delete the skill folder at "${metadata.path}".`;
 				}
 
-				// Drop the stale enable-state entry so nothing inherits it later.
+				// Drop the stale enable-state entry so nothing inherits it later, and the usage
+				// counters so a later skill of the same name starts from zero.
 				const agent = getData().getAgent(agentId) ?? getData().getSelectedAgent();
 				if (agent?.skills[input.name]) delete agent.skills[input.name];
+				getData().forgetSkillUsage(input.name);
 
 				return `Deleted the "${input.name}" skill.`;
 			}
@@ -382,6 +394,7 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			// history, so a revised core skill is flagged as customized rather than overwritten
 			// by the next upgrade.
 			await skillsService.writeSkillFile(skillName, newContent);
+			getData().recordSkillRevision(skillName);
 			// The model wrote this text too, so a follow-up revision in the same turn needs no reload.
 			recordSkillLoaded(threadId, skillName, parseFrontmatter(newContent).body);
 
