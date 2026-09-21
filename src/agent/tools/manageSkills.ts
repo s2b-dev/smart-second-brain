@@ -2,7 +2,7 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import { tool } from "@langchain/core/tools";
 import type { App } from "obsidian";
 import { z } from "zod";
-import { recordSkillLoaded, wasSkillLoaded } from "./skillLoadRegistry";
+import { recordSkillLoaded, skillLoadState } from "./skillLoadRegistry";
 import type { BuiltInToolId, SkillMetadata } from "../../types/plugin";
 import type { SkillsService } from "../../skills/SkillsService";
 import { parseFrontmatter } from "../../skills/SkillsService";
@@ -93,16 +93,22 @@ function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): 
 }
 
 /**
- * The body of a SKILL.md — everything after the frontmatter block — or null when the file has no
- * well-formed frontmatter. Patches search this, never the frontmatter: the fields there are
- * either locked (name, plugin link) or have their own update path (description).
+ * A SKILL.md split at the byte after its closing `---` line: the frontmatter block (verbatim,
+ * newline included) and the body. Null when the file has no well-formed frontmatter. A patch is
+ * spliced into `body` and the two halves re-joined, so every byte outside the matched passage —
+ * indentation, trailing whitespace, CRLF line endings — survives untouched; only the whole-body
+ * `update` path goes through the normalizing {@link rebuildSkillMd}. Patches never search the
+ * frontmatter: its fields are either locked (name, plugin link) or have their own path
+ * (description via update).
  */
-function skillBody(raw: string): string | null {
+function splitSkillMd(raw: string): { head: string; body: string } | null {
 	const lines = raw.split("\n");
 	if (lines[0]?.trim() !== "---") return null;
 	const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
 	if (endIndex === -1) return null;
-	return lines.slice(endIndex + 1).join("\n");
+	// Length of lines[0..endIndex] plus one "\n" after each of them.
+	const headLength = lines.slice(0, endIndex + 1).reduce((sum, line) => sum + line.length + 1, 0);
+	return { head: raw.slice(0, headLength), body: raw.slice(headLength) };
 }
 
 /** Build a new SKILL.md's raw text: minimal frontmatter plus body. */
@@ -248,9 +254,12 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				}
 
 				if (!(await app.vault.adapter.exists(skillDir))) await app.vault.adapter.mkdir(skillDir);
-				await app.vault.adapter.write(skillPath, content);
+				// Through the service so the discovery cache holds the new skill at once: the
+				// vault watcher's re-discovery is debounced, and a patch later in this same turn
+				// looks the skill up in that cache.
+				await skillsService.writeSkillFile(input.name, content);
 				// The model wrote this text, so it may patch it in this conversation without a load.
-				recordSkillLoaded(threadId, input.name);
+				recordSkillLoaded(threadId, input.name, parseFrontmatter(content).body);
 
 				const droppedNote =
 					dropped.length > 0 ? ` Dropped disallowed tool request(s): ${dropped.join(", ")}.` : "";
@@ -292,12 +301,6 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			if (!attached.includes(skillName)) {
 				return `Skill "${skillName}" is not attached to this agent, so it cannot be edited here.`;
 			}
-			// Read before write: a revision is written against text the model has actually seen
-			// in this conversation, not a remembered or summarized copy (see skillLoadRegistry).
-			if (!wasSkillLoaded(threadId, skillName)) {
-				return `Load the "${skillName}" skill with load_skill first, then revise it: a revision must be written against the skill's current text as you have read it in this conversation.`;
-			}
-
 			const skillPath = `${metadata.path}/${SKILL_FILENAME}`;
 			let originalContent: string;
 			try {
@@ -307,16 +310,28 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return `Could not read the skill file at "${skillPath}".`;
 			}
 
+			// Read before write: a revision is written against text the model has actually seen
+			// in this conversation — not a remembered or summarized copy, and not a version the
+			// file has since moved past (see skillLoadRegistry). Fingerprinted through the same
+			// parse `load_skill` returns, so the two sides always agree on what "the body" is.
+			const loadState = skillLoadState(threadId, skillName, parseFrontmatter(originalContent).body);
+			if (loadState === "not-loaded") {
+				return `Load the "${skillName}" skill with load_skill first, then revise it: a revision must be written against the skill's current text as you have read it in this conversation.`;
+			}
+			if (loadState === "stale") {
+				return `The "${skillName}" skill has changed since you loaded it. Load it again with load_skill and write the revision against its current text.`;
+			}
+
 			let newContent: string | null;
 			let verb: string;
 			if (input.type === "patch") {
-				const body = skillBody(originalContent);
-				if (body === null) {
+				const split = splitSkillMd(originalContent);
+				if (split === null) {
 					return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
 				}
-				const occurrences = body.split(input.oldText).length - 1;
+				const occurrences = split.body.split(input.oldText).length - 1;
 				if (occurrences === 0) {
-					const inFrontmatter = originalContent.includes(input.oldText);
+					const inFrontmatter = split.head.includes(input.oldText);
 					return inFrontmatter
 						? `The passage is in the skill's frontmatter, which a patch cannot change. Use update with newDescription for the description; the other fields are locked.`
 						: `Could not find that passage in the "${skillName}" skill's body. Copy oldText exactly from the loaded skill (including whitespace and line breaks), or load it again if it changed.`;
@@ -324,10 +339,8 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				if (occurrences > 1) {
 					return `That passage appears ${occurrences} times in the "${skillName}" skill. Include more surrounding text so oldText matches exactly once.`;
 				}
-				newContent = rebuildSkillMd(
-					originalContent,
-					body.replace(input.oldText, () => input.newText),
-				);
+				// Callback form so `$&`-style sequences in the replacement are inserted literally.
+				newContent = split.head + split.body.replace(input.oldText, () => input.newText);
 				verb = "Patched";
 			} else {
 				newContent = rebuildSkillMd(originalContent, input.newBody, input.newDescription);
@@ -343,7 +356,13 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			const rejection = rejectInvalidRevision(metadata, newContent);
 			if (rejection) return rejection;
 
-			await app.vault.adapter.write(skillPath, newContent);
+			// Through the service: it refreshes this skill's cache entry (a changed description
+			// is advertised on the next run) and re-evaluates a bundled skill against the shipped
+			// history, so a revised core skill is flagged as customized rather than overwritten
+			// by the next upgrade.
+			await skillsService.writeSkillFile(skillName, newContent);
+			// The model wrote this text too, so a follow-up revision in the same turn needs no reload.
+			recordSkillLoaded(threadId, skillName, parseFrontmatter(newContent).body);
 
 			return `${verb} the "${skillName}" skill.`;
 		},

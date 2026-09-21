@@ -11,6 +11,7 @@ import type { App } from "obsidian";
 import type { SkillsService } from "../../src/skills/SkillsService";
 import { createManageSkillsTool } from "../../src/agent/tools/manageSkills";
 import { recordSkillLoaded, resetSkillLoadRegistry } from "../../src/agent/tools/skillLoadRegistry";
+import { parseFrontmatter } from "../../src/skills/SkillsService";
 
 const RUN_CONFIG = { configurable: { thread_id: "t1" }, runId: "run-1" };
 
@@ -28,9 +29,18 @@ metadata:
 Old body.
 `;
 
+// The service mock writes through whichever app the test built last (tests build the service
+// first, then the app), so the existing `write` spy on the adapter still sees every write and
+// the cache gains the entry the real writeSkillFile would add.
+let lastApp: App | undefined;
+
 function makeSkillsService(cache: Map<string, unknown>) {
 	return {
 		getCachedSkills: () => cache,
+		writeSkillFile: vi.fn(async (name: string, content: string) => {
+			await lastApp?.vault.adapter.write(`Agents/Skills/${name}/SKILL.md`, content);
+			cache.set(name, { path: `Agents/Skills/${name}`, frontmatter: parseFrontmatter(content).frontmatter });
+		}),
 	} as unknown as SkillsService;
 }
 
@@ -59,6 +69,7 @@ function makeApp(files: Record<string, string>) {
 			},
 		},
 	} as unknown as App;
+	lastApp = app;
 	return { app, store, write, mkdir, rmdir };
 }
 
@@ -106,8 +117,8 @@ describe("manage_skills tool", () => {
 		// Revisions require the skill to have been loaded in this thread; most tests below
 		// exercise what happens after that, so satisfy the gate up front.
 		resetSkillLoadRegistry();
-		recordSkillLoaded("t1", "dataview");
-		recordSkillLoaded("t1", "other");
+		recordSkillLoaded("t1", "dataview", parseFrontmatter(DATAVIEW_MD).body);
+		recordSkillLoaded("t1", "other", "");
 	});
 
 	describe("read-before-write gate", () => {
@@ -135,10 +146,8 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			await t.invoke({ type: "create", name: "weekly-review", description: "d", body: "Step one." }, RUN_CONFIG);
-			cache.set("weekly-review", {
-				path: "Agents/Skills/weekly-review",
-				frontmatter: { name: "weekly-review", description: "d" },
-			});
+			// No manual cache insert: create goes through writeSkillFile, which caches the entry.
+			expect(cache.has("weekly-review")).toBe(true);
 
 			const res = await t.invoke(
 				{ type: "patch", skillName: "weekly-review", oldText: "Step one.", newText: "Step one, then two." },
@@ -146,6 +155,43 @@ describe("manage_skills tool", () => {
 			);
 			expect(res).toMatch(/patched/i);
 			expect(store["Agents/Skills/weekly-review/SKILL.md"]).toContain("Step one, then two.");
+		});
+
+		// A load authorizes a revision of the text that was loaded, not of whatever the file
+		// holds later: a whole-body update against a stale copy would discard the newer edit.
+		it("refuses a revision when the skill changed after it was loaded", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const changed = DATAVIEW_MD.replace("Old body.", "Old body.\n\nEdited by hand meanwhile.");
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": changed });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			const patched = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "x" },
+				RUN_CONFIG,
+			);
+			const updated = await t.invoke({ type: "update", skillName: "dataview", newBody: "x" }, RUN_CONFIG);
+
+			expect(patched).toMatch(/changed since you loaded it/);
+			expect(updated).toMatch(/changed since you loaded it/);
+			expect(write).not.toHaveBeenCalled();
+		});
+
+		it("counts a revision as a load, so a second patch in the same turn needs no reload", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, store } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "Step one." },
+				RUN_CONFIG,
+			);
+			const res = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Step one.", newText: "Step one and two." },
+				RUN_CONFIG,
+			);
+
+			expect(res).toMatch(/patched/i);
+			expect(store["Agents/Skills/dataview/SKILL.md"]).toContain("Step one and two.");
 		});
 	});
 
@@ -164,6 +210,26 @@ describe("manage_skills tool", () => {
 			const [path, newContent] = write.mock.calls[0];
 			expect(path).toBe("Agents/Skills/dataview/SKILL.md");
 			expect(newContent).toBe(DATAVIEW_MD.replace("Old body.", "Use api.pages()."));
+		});
+
+		// A patch is a splice, not a rewrite: trailing spaces, blank lines and indentation
+		// outside the passage must come back byte for byte (indentation changes Markdown
+		// meaning). Whole-file CRLF is out of scope: the frontmatter parser splits on "\n"
+		// alone, so such a file is already rejected before any revision.
+		it("leaves every byte outside the passage untouched", async () => {
+			const raw = DATAVIEW_MD.replace("Old body.", "  - indented  \n\n\nOld body.  \n\n");
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": raw });
+			recordSkillLoaded("t1", "dataview", parseFrontmatter(raw).body);
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			const res = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." },
+				RUN_CONFIG,
+			);
+
+			expect(res).toMatch(/patched/i);
+			expect(write.mock.calls[0][1]).toBe(raw.replace("Old body.", "New body."));
 		});
 
 		// `$&` in a replacement is a pattern to String.replace; a skill about regexes would
@@ -210,9 +276,9 @@ describe("manage_skills tool", () => {
 
 		it("refuses an ambiguous passage", async () => {
 			const svc = makeSkillsService(dataviewCache());
-			const { app, write } = makeApp({
-				"Agents/Skills/dataview/SKILL.md": DATAVIEW_MD.replace("Old body.", "Step.\n\nStep."),
-			});
+			const twice = DATAVIEW_MD.replace("Old body.", "Step.\n\nStep.");
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": twice });
+			recordSkillLoaded("t1", "dataview", parseFrontmatter(twice).body);
 			const t = createManageSkillsTool(svc, app, "agent-1");
 			const res = await t.invoke(
 				{ type: "patch", skillName: "dataview", oldText: "Step.", newText: "x" },

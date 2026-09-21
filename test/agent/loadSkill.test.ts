@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createLoadSkillTool } from "../../src/agent/tools/loadSkill";
-import { resetSkillLoadRegistry, wasSkillLoaded } from "../../src/agent/tools/skillLoadRegistry";
+import { resetSkillLoadRegistry, skillLoadState } from "../../src/agent/tools/skillLoadRegistry";
 import type { SkillsService } from "../../src/skills/SkillsService";
 
 function mockSkillsService(
@@ -109,8 +109,10 @@ describe("load_skill tool", () => {
 
 		await tool.invoke({ skillName: "web" }, { configurable: { thread_id: "t-load" } });
 
-		expect(wasSkillLoaded("t-load", "web")).toBe(true);
-		expect(wasSkillLoaded("t-load", "views")).toBe(false);
-		expect(wasSkillLoaded("t-other", "web")).toBe(false);
+		expect(skillLoadState("t-load", "web", "web instructions")).toBe("current");
+		// The recorded text, not just the name: a body that moved on since reads as stale.
+		expect(skillLoadState("t-load", "web", "web instructions, since edited")).toBe("stale");
+		expect(skillLoadState("t-load", "views", "views instructions")).toBe("not-loaded");
+		expect(skillLoadState("t-other", "web", "web instructions")).toBe("not-loaded");
 	});
 });

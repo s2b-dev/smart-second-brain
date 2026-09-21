@@ -87,7 +87,7 @@ export function createLoadSkillTool(skillsService: SkillsService, options: LoadS
 
 			// The model has now seen this skill's current text in this conversation, which is
 			// what `manage_skills` requires before it will patch or rewrite it.
-			recordSkillLoaded(config?.configurable?.thread_id, skillName);
+			recordSkillLoaded(config?.configurable?.thread_id, skillName, skill.content);
 
 			// Return the skill content with metadata
 			const lines: string[] = [];
