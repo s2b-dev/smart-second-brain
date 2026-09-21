@@ -86,16 +86,18 @@ export function createSaveMemoryTool(app: App, memoryFolder: string) {
 			});
 
 			// Append is the default and the safe one: it is computed against the text on disk
-			// at write time, inside the serialization, so two reviews that both read the old
-			// note and finish together both land — a replace computed from a stale read would
-			// drop whichever addition came first.
+			// at write time, so two reviews that both read the old note and finish together
+			// both land — a replace computed from a stale read would drop whichever addition
+			// came first.
 			async function writeExisting(file: TFile): Promise<string> {
 				if (mode === "replace") {
 					await app.vault.modify(file, content);
 					return `Updated memory note ${path} (applied, no review needed).`;
 				}
-				const current = await app.vault.read(file);
-				await app.vault.modify(file, `${current.trimEnd()}\n\n${content.trim()}\n`);
+				// `vault.process` reads and writes under Obsidian's own file lock, so the
+				// append is derived from the latest on-disk text even against a writer this
+				// module's serialization cannot see (sync, another plugin, a hand edit).
+				await app.vault.process(file, (current) => `${current.trimEnd()}\n\n${content.trim()}\n`);
 				return `Appended to memory note ${path} (applied, no review needed).`;
 			}
 		},
