@@ -62,10 +62,25 @@ function isReseededOnStartup(app: App, skillName: string): boolean {
  * (rather than parse → serialize) so unrecognized frontmatter keys, ordering, and formatting are
  * preserved — SkillsService.serializeSkillMd is lossy and would reformat the file.
  */
+/** The line ending a file uses; CRLF if any line does. */
+function lineEndingOf(raw: string): string {
+	return raw.includes("\r\n") ? "\r\n" : "\n";
+}
+
+/**
+ * Convert model-supplied text to a file's line ending. `load_skill` shows the model an LF
+ * body whatever the file uses (see `parseFrontmatter`), so a passage it copies back, or a
+ * body it writes, carries LF; matching or writing that into a CRLF file verbatim would miss
+ * every multi-line passage and leave the file with mixed endings.
+ */
+function toLineEnding(text: string, eol: string): string {
+	return text.replace(/\r\n/g, "\n").replace(/\n/g, eol);
+}
+
 function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): string | null {
 	// Keep the file's own line endings: a CRLF skill rebuilt with LF would read as a whole-file
 	// change to sync and to the shipped-history fingerprint alike.
-	const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+	const eol = lineEndingOf(raw);
 	const lines = raw.split(eol);
 	if (lines[0]?.trim() !== "---") return null;
 
@@ -92,7 +107,7 @@ function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): 
 		}
 	}
 
-	return ["---", ...frontmatterLines, "---", "", newBody.trim(), ""].join(eol);
+	return ["---", ...frontmatterLines, "---", "", toLineEnding(newBody.trim(), eol), ""].join(eol);
 }
 
 /**
@@ -332,9 +347,12 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				if (split === null) {
 					return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
 				}
-				const occurrences = split.body.split(input.oldText).length - 1;
+				const eol = lineEndingOf(originalContent);
+				const oldText = toLineEnding(input.oldText, eol);
+				const newText = toLineEnding(input.newText, eol);
+				const occurrences = split.body.split(oldText).length - 1;
 				if (occurrences === 0) {
-					const inFrontmatter = split.head.includes(input.oldText);
+					const inFrontmatter = split.head.includes(oldText);
 					return inFrontmatter
 						? `The passage is in the skill's frontmatter, which a patch cannot change. Use update with newDescription for the description; the other fields are locked.`
 						: `Could not find that passage in the "${skillName}" skill's body. Copy oldText exactly from the loaded skill (including whitespace and line breaks), or load it again if it changed.`;
@@ -343,7 +361,7 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 					return `That passage appears ${occurrences} times in the "${skillName}" skill. Include more surrounding text so oldText matches exactly once.`;
 				}
 				// Callback form so `$&`-style sequences in the replacement are inserted literally.
-				newContent = split.head + split.body.replace(input.oldText, () => input.newText);
+				newContent = split.head + split.body.replace(oldText, () => newText);
 				verb = "Patched";
 			} else {
 				newContent = rebuildSkillMd(originalContent, input.newBody, input.newDescription);

@@ -231,6 +231,32 @@ describe("manage_skills tool", () => {
 			expect(write.mock.calls[0][1]).toBe(raw.replace("Old body.", "New body."));
 		});
 
+		// load_skill shows the model an LF body whatever the file uses, so a multi-line passage
+		// it copies back carries LF; it must still match a CRLF file, and the replacement must
+		// land in the file's own ending rather than mix the two.
+		it("matches and writes multi-line text in the file's line ending", async () => {
+			const raw = DATAVIEW_MD.replace(/\n/g, "\r\n");
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": raw });
+			recordSkillLoaded("t1", "dataview", parseFrontmatter(raw).body);
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			const res = await t.invoke(
+				{
+					type: "patch",
+					skillName: "dataview",
+					oldText: "# Dataview\n\nOld body.",
+					newText: "# Dataview\n\nOne.\nTwo.",
+				},
+				RUN_CONFIG,
+			);
+
+			expect(res).toMatch(/patched/i);
+			const written = String(write.mock.calls[0][1]);
+			expect(written).toBe(raw.replace("Old body.", "One.\r\nTwo."));
+			expect(written).not.toMatch(/[^\r]\n/);
+		});
+
 		// `$&` in a replacement is a pattern to String.replace; a skill about regexes would
 		// otherwise have its own text spliced back in.
 		it("inserts the replacement literally", async () => {
@@ -337,6 +363,20 @@ describe("manage_skills tool", () => {
 			expect(newContent).toContain("description: New verified description");
 			expect(newContent).not.toContain("description: Old description");
 			expect(newContent).toContain('linkedPlugin: "dataview"');
+		});
+
+		it("writes a multi-line body in the file's line ending", async () => {
+			const raw = DATAVIEW_MD.replace(/\n/g, "\r\n");
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": raw });
+			recordSkillLoaded("t1", "dataview", parseFrontmatter(raw).body);
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke({ type: "update", skillName: "dataview", newBody: "# Dataview\n\nOne.\nTwo." }, RUN_CONFIG);
+
+			const written = String(write.mock.calls[0][1]);
+			expect(written).toContain("One.\r\nTwo.");
+			expect(written).not.toMatch(/[^\r]\n/);
 		});
 
 		it("makes no write when the content is unchanged", async () => {
