@@ -43,14 +43,25 @@ const CANCELLED_OUTPUT = JSON.stringify({ error: "The request was cancelled in t
 const ABORTED_OUTPUT = JSON.stringify({ error: "Voice mode was stopped before the request ran." });
 
 /**
- * What lands in the thread as the user message. The voice chit-chat is context only
- * — the agent should answer the request, not the small talk — hence the labelling.
+ * What lands in the thread as the user message. The speech model phrases the request
+ * self-contained, so most of the voice exchange is redundant with it: the utterance
+ * that triggered the call is the request itself, and the assistant's voice lines
+ * are fillers by design. Only the user's *earlier* words can add something the
+ * request lacks ("I'm prepping for the meeting with Anna" a turn before "what are my
+ * tasks"), so those are all that is kept — and when there are none, the request
+ * stands alone.
  */
 export function buildDelegationMessage(request: string, transcript: readonly TranscriptLine[]): string {
 	const trimmed = request.trim();
-	if (transcript.length === 0) return trimmed;
-	const lines = transcript.map((l) => `${l.role === "user" ? "User" : "Assistant (voice)"}: ${l.text.trim()}`);
-	return `[Voice conversation since the last request, for context only]\n${lines.join("\n")}\n\n[Request]\n${trimmed}`;
+	const userLines = transcript.filter((line) => line.role === "user");
+	// The last user line is the one that produced this request.
+	const earlier = userLines
+		.slice(0, -1)
+		.map((line) => line.text.trim())
+		.filter(Boolean);
+	if (earlier.length === 0) return trimmed;
+	const lines = earlier.map((text) => `User: ${text}`);
+	return `[What the user said earlier in this voice conversation, for context only]\n${lines.join("\n")}\n\n[Request]\n${trimmed}`;
 }
 
 export function formatSettledTurn(turn: SettledTurn): string {

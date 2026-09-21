@@ -34,13 +34,24 @@ describe("buildDelegationMessage", () => {
 		expect(buildDelegationMessage("  what did I write?  ", [])).toBe("what did I write?");
 	});
 
-	it("prefixes the labelled voice transcript", () => {
-		const msg = buildDelegationMessage("summarise it", [
-			{ role: "user", text: "hey" },
-			{ role: "assistant", text: "hi there" },
+	it("drops the triggering utterance and the assistant's voice lines — the usual exchange adds nothing", () => {
+		expect(
+			buildDelegationMessage("Welche Aufgaben habe ich diese Woche?", [
+				{ role: "user", text: "Welche Aufgaben habe ich diese Woche?" },
+				{ role: "assistant", text: "Einen Moment, ich schau mal nach." },
+			]),
+		).toBe("Welche Aufgaben habe ich diese Woche?");
+	});
+
+	it("keeps only what the user said earlier", () => {
+		const msg = buildDelegationMessage("summarise my tasks", [
+			{ role: "user", text: "I'm prepping for the meeting with Anna." },
+			{ role: "assistant", text: "Sure, tell me when you're ready." },
+			{ role: "user", text: "What are my tasks?" },
+			{ role: "assistant", text: "One moment." },
 		]);
 		expect(msg).toBe(
-			"[Voice conversation since the last request, for context only]\nUser: hey\nAssistant (voice): hi there\n\n[Request]\nsummarise it",
+			"[What the user said earlier in this voice conversation, for context only]\nUser: I'm prepping for the meeting with Anna.\n\n[Request]\nsummarise my tasks",
 		);
 	});
 });
@@ -74,8 +85,7 @@ describe("SupervisorBridge", () => {
 		});
 
 		expect(JSON.parse(out)).toEqual({ answer: "42" });
-		expect(seen[0]).toContain("[Request]\nq");
-		expect(seen[0]).toContain("User: yo");
+		expect(seen[0]).toBe("q");
 	});
 
 	it("resolves a thread-path function when the run starts, so a rename while queued is honoured", async () => {
