@@ -271,6 +271,10 @@ function resetReviewModel() {
 	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, model: null } });
 }
 
+function setPostTurnReviewOnMobile(onMobile: boolean) {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, onMobile } });
+}
+
 function openAgentNote() {
 	if (!selectedAgent) return;
 	const path = normalizePath(agentDefinitionPath(agentId));
@@ -1047,9 +1051,10 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             <div class="setting-item-description">
               After a busy turn, a short side run reviews the conversation and keeps what it
               taught: a durable fact about you goes to memory, a lesson about how a task is done
-              goes into the skill that was used. It runs only while Obsidian is open, on desktop,
-              once the turns since the last review add up to {postTurnReview.toolCallThreshold}
-              tool calls. A notice names what was saved; most reviews save nothing.
+              goes into the skill that was used. It runs right after the answer, once the turns
+              since the last review add up to {postTurnReview.toolCallThreshold} tool calls (the
+              count is kept with the chat). A notice names what was saved; most reviews save
+              nothing.
             </div>
           </div>
         </div>
@@ -1070,6 +1075,15 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onSelect={openReviewModelSelectionModal}
               secondaryLabel={postTurnReview.model ? "Reset" : undefined}
               onSecondary={postTurnReview.model ? resetReviewModel : undefined}
+            />
+          </SettingItem>
+          <SettingItem
+            name="Also on mobile"
+            desc="Off by default: a review on a phone spends battery and data on work you are not watching."
+          >
+            <Toggle
+              checked={postTurnReview.onMobile}
+              onchange={() => setPostTurnReviewOnMobile(!postTurnReview.onMobile)}
             />
           </SettingItem>
         {/if}

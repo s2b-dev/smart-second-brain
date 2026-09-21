@@ -70,8 +70,10 @@ import {
 	buildReviewSystemPrompt,
 	buildReviewUserMessage,
 	noteTurnForReview,
+	readCallsSinceReview,
 	renderTranscript,
 	summarizeReviewActions,
+	TOOL_CALLS_SINCE_REVIEW_KEY,
 } from "./postTurnReview";
 import { createSaveMemoryTool } from "./tools/saveMemory";
 
@@ -1892,10 +1894,25 @@ export class AgentManager {
 			const agentCfg = agentId ? getData().getAgent(agentId) : getData().getSelectedAgent();
 			const config = agentCfg?.postTurnReview;
 			if (!agentCfg || !config?.enabled) return;
-			// Desktop only: a side model call on a phone spends battery and data on work the
-			// user is not watching, and the same conversation earns the review again on desktop.
-			if (Platform.isMobile) return;
-			if (!noteTurnForReview(threadId, activity, config.toolCallThreshold)) return;
+			if (Platform.isMobile && !config.onMobile) return;
+			const resolvedThreadId = this.normalizeThreadId(threadId);
+			// The count lives in the thread's own metadata (see TOOL_CALLS_SINCE_REVIEW_KEY):
+			// read it, fold this turn in, write it back — a plain metadata update like
+			// setLastViewedCheckpoint, on a thread the run just persisted.
+			const snapshot = await this.chatManager.read(resolvedThreadId, true);
+			if (!snapshot) return;
+			const { due, callsSinceReview } = noteTurnForReview(
+				readCallsSinceReview(snapshot.metadata),
+				activity,
+				config.toolCallThreshold,
+			);
+			if (callsSinceReview !== readCallsSinceReview(snapshot.metadata)) {
+				await this.chatManager.write({
+					...snapshot,
+					metadata: { ...snapshot.metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: callsSinceReview },
+				});
+			}
+			if (!due) return;
 			if (this.reviewsInFlight.has(threadId)) return;
 			this.reviewsInFlight.add(threadId);
 			try {

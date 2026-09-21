@@ -24,12 +24,19 @@ export interface PostTurnReviewConfig {
 	model: ChatModel | null;
 	/** Tool calls accumulated across turns before a review fires. */
 	toolCallThreshold: number;
+	/**
+	 * Also run on phones and tablets. Off by default because a side model call there spends
+	 * battery and data on work the user is not watching; on by choice for anyone who wants
+	 * the agent to learn from mobile conversations too.
+	 */
+	onMobile: boolean;
 }
 
 export const DEFAULT_POST_TURN_REVIEW: PostTurnReviewConfig = {
 	enabled: false,
 	model: null,
 	toolCallThreshold: 10,
+	onMobile: false,
 };
 
 /** What one finished turn contributes to the trigger. */
@@ -41,31 +48,35 @@ export interface TurnActivity {
 }
 
 /**
- * Cumulative tool calls per thread since the last review. Deliberately not reset per turn:
- * a session of many small turns earns a review just as one long turn does (Hermes's
- * `_iters_since_skill`). Reset when a review fires, and when the agent revised a skill on its
- * own — the work the review exists to prompt has already been done.
+ * Key of the running count in a thread's persisted metadata (see `ThreadSnapshot.metadata`).
+ * It lives with the thread, not in memory: a count that vanished when Obsidian closed meant
+ * anyone working in short sessions never reached the threshold at all. Thread metadata is
+ * written after every run anyway, so this costs nothing extra, survives the auto-title
+ * rename (it is keyed by thread), and goes away with the thread.
  */
-const callsSinceReview = new Map<string, number>();
+export const TOOL_CALLS_SINCE_REVIEW_KEY = "toolCallsSinceReview";
 
-/** Record a finished turn; true when a review is due (and the counter is reset). */
-export function noteTurnForReview(threadId: string, activity: TurnActivity, threshold: number): boolean {
-	if (activity.revisedSkills) {
-		callsSinceReview.delete(threadId);
-		return false;
-	}
-	const total = (callsSinceReview.get(threadId) ?? 0) + activity.toolCalls;
-	if (threshold > 0 && total >= threshold) {
-		callsSinceReview.delete(threadId);
-		return true;
-	}
-	callsSinceReview.set(threadId, total);
-	return false;
+/** Read the running count from a thread's metadata; anything but a finite number reads as 0. */
+export function readCallsSinceReview(metadata: Record<string, unknown> | undefined): number {
+	const value = metadata?.[TOOL_CALLS_SINCE_REVIEW_KEY];
+	return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
-/** Test hook. */
-export function resetReviewCounters(): void {
-	callsSinceReview.clear();
+/**
+ * Fold a finished turn into the running count. Cumulative across turns, deliberately: a
+ * session of many small turns earns a review just as one long turn does (Hermes's
+ * `_iters_since_skill`). The count returns to zero when a review is due, and when the agent
+ * revised a skill on its own — the work the review exists to prompt has already been done.
+ */
+export function noteTurnForReview(
+	callsSoFar: number,
+	activity: TurnActivity,
+	threshold: number,
+): { due: boolean; callsSinceReview: number } {
+	if (activity.revisedSkills) return { due: false, callsSinceReview: 0 };
+	const total = callsSoFar + activity.toolCalls;
+	if (threshold > 0 && total >= threshold) return { due: true, callsSinceReview: 0 };
+	return { due: false, callsSinceReview: total };
 }
 
 // --- transcript --------------------------------------------------------------------------

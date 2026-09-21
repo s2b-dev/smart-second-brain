@@ -4,43 +4,52 @@
  */
 
 import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
 	buildReviewSystemPrompt,
 	noteTurnForReview,
+	readCallsSinceReview,
 	renderTranscript,
-	resetReviewCounters,
 	summarizeReviewActions,
+	TOOL_CALLS_SINCE_REVIEW_KEY,
 } from "../../src/agent/postTurnReview";
 
 describe("noteTurnForReview", () => {
-	beforeEach(() => resetReviewCounters());
+	const turn = (toolCalls: number, revisedSkills = false) => ({ toolCalls, revisedSkills });
 
-	it("accumulates tool calls across turns and fires once the threshold is reached", () => {
-		expect(noteTurnForReview("t", { toolCalls: 4, revisedSkills: false }, 10)).toBe(false);
-		expect(noteTurnForReview("t", { toolCalls: 4, revisedSkills: false }, 10)).toBe(false);
-		expect(noteTurnForReview("t", { toolCalls: 2, revisedSkills: false }, 10)).toBe(true);
-		// Reset after firing.
-		expect(noteTurnForReview("t", { toolCalls: 9, revisedSkills: false }, 10)).toBe(false);
-	});
-
-	it("keeps threads apart", () => {
-		expect(noteTurnForReview("a", { toolCalls: 9, revisedSkills: false }, 10)).toBe(false);
-		expect(noteTurnForReview("b", { toolCalls: 9, revisedSkills: false }, 10)).toBe(false);
-		expect(noteTurnForReview("a", { toolCalls: 1, revisedSkills: false }, 10)).toBe(true);
+	it("accumulates tool calls across turns and is due once the threshold is reached", () => {
+		let calls = 0;
+		let step = noteTurnForReview(calls, turn(4), 10);
+		expect(step).toEqual({ due: false, callsSinceReview: 4 });
+		step = noteTurnForReview(step.callsSinceReview, turn(4), 10);
+		expect(step).toEqual({ due: false, callsSinceReview: 8 });
+		step = noteTurnForReview(step.callsSinceReview, turn(2), 10);
+		expect(step).toEqual({ due: true, callsSinceReview: 0 });
+		// Starts over after firing.
+		calls = step.callsSinceReview;
+		expect(noteTurnForReview(calls, turn(9), 10)).toEqual({ due: false, callsSinceReview: 9 });
 	});
 
 	// The review exists to prompt the revision the agent skipped; a turn that revised a
 	// skill on its own has done that work, so it resets the count rather than adding to it.
 	it("resets without firing when the turn revised a skill itself", () => {
-		expect(noteTurnForReview("t", { toolCalls: 9, revisedSkills: false }, 10)).toBe(false);
-		expect(noteTurnForReview("t", { toolCalls: 5, revisedSkills: true }, 10)).toBe(false);
-		expect(noteTurnForReview("t", { toolCalls: 9, revisedSkills: false }, 10)).toBe(false);
+		expect(noteTurnForReview(9, turn(5, true), 10)).toEqual({ due: false, callsSinceReview: 0 });
 	});
 
-	it("never fires with a non-positive threshold", () => {
-		expect(noteTurnForReview("t", { toolCalls: 100, revisedSkills: false }, 0)).toBe(false);
+	it("is never due with a non-positive threshold", () => {
+		expect(noteTurnForReview(50, turn(100), 0).due).toBe(false);
+	});
+});
+
+describe("readCallsSinceReview", () => {
+	it("reads the persisted count and treats anything else as zero", () => {
+		expect(readCallsSinceReview({ [TOOL_CALLS_SINCE_REVIEW_KEY]: 7 })).toBe(7);
+		expect(readCallsSinceReview({ [TOOL_CALLS_SINCE_REVIEW_KEY]: 7.9 })).toBe(7);
+		expect(readCallsSinceReview({ [TOOL_CALLS_SINCE_REVIEW_KEY]: "7" })).toBe(0);
+		expect(readCallsSinceReview({ [TOOL_CALLS_SINCE_REVIEW_KEY]: -3 })).toBe(0);
+		expect(readCallsSinceReview({})).toBe(0);
+		expect(readCallsSinceReview(undefined)).toBe(0);
 	});
 });
 
