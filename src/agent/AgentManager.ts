@@ -61,6 +61,7 @@ import {
 	localIsoDate,
 	substitutePromptPlaceholders,
 } from "./prompts";
+import { collectMemoryIndex, renderMemoryIndex } from "./memoryNotes";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
@@ -367,6 +368,14 @@ export class AgentManager {
 	 * Uses the currently selected agent's configuration.
 	 * Only includes skills for plugins that are both enabled AND installed.
 	 */
+	/**
+	 * The memory index rendered by the last {@link assembleSystemPrompt}. Memory is global, so
+	 * the same text serves every agent; subagent specs are resolved synchronously right after
+	 * the parent's assembly (see `resolveSubAgentSpecs`) and reuse it rather than collecting
+	 * again.
+	 */
+	private memoryIndexSnapshot = "";
+
 	async assembleSystemPrompt(agent?: AgentConfig): Promise<string> {
 		const pluginData = getData();
 		const selectedAgent = agent ?? pluginData.getSelectedAgent();
@@ -378,11 +387,24 @@ export class AgentManager {
 
 		const memoryFolder = normalizePath(memoriesDir());
 
+		// The memory index is read fresh on every assembly (metadata cache only, no disk) —
+		// unconditionally, not just when this body carries the placeholder: memory is global,
+		// and a referenced subagent whose note still has its `# Memory` section reuses this
+		// snapshot even when the parent opted out. It needs no cache-key term: any change under
+		// the agent folder — memory notes included — invalidates every cached runnable (see the
+		// vault watcher in main.ts), so the next turn re-assembles and the model sees the note
+		// it just wrote.
+		this.memoryIndexSnapshot = renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder));
+
 		// The model has no reliable notion of "now", and the memory folder is user-configurable;
 		// both are written into the note as placeholders and substituted here, so nothing stale
 		// is ever baked into stored text. The runnable cache key carries the same local date (see
 		// buildRunnableCacheKey), so a cached runnable is rebuilt at most once per day.
-		let prompt = substitutePromptPlaceholders(body, { memoryFolder, date: currentDateValue() });
+		let prompt = substitutePromptPlaceholders(body, {
+			memoryFolder,
+			date: currentDateValue(),
+			memoryIndex: this.memoryIndexSnapshot,
+		});
 
 		// Best-effort ensure the memory folder exists so list_directory has somewhere to look
 		// before the first memory is written. Only for agents that actually reference it — the
@@ -445,7 +467,13 @@ export class AgentManager {
 		);
 		if (contextXml) {
 			prompt +=
-				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. When you need detailed instructions for a skill, use the `load_skill` tool with the skill name to retrieve the full instructions. Only load skills when you actually need them for a task.";
+				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. Skills carry the user's conventions and verified procedures for a kind of task, so load a skill with the `load_skill` tool whenever one matches or partly matches what you are doing, even for tasks you already know how to do. Do not load skills that are unrelated to the task.";
+			// Only when the tool is actually bound: teaching the model to revise skills with a
+			// tool it cannot call would just produce failed calls.
+			if (this.isToolBound(selectedAgent, "manage_skills")) {
+				prompt +=
+					" If a skill you loaded was missing a step, wrong, or outdated, revise it with `manage_skills` before you finish, so the next run does not repeat the discovery.";
+			}
 			prompt += `\n\n${contextXml}`;
 		}
 
@@ -1150,7 +1178,11 @@ export class AgentManager {
 				// the parent model reads as the tool's description) ever shows a raw placeholder.
 				const refBasePrompt = substitutePromptPlaceholders(
 					this.plugin.promptFilesService?.getAgentPrompt(ref.id) ?? DEFAULT_AGENT_PROMPT,
-					{ memoryFolder: normalizePath(memoriesDir()), date: currentDateValue() },
+					{
+						memoryFolder: normalizePath(memoriesDir()),
+						date: currentDateValue(),
+						memoryIndex: this.memoryIndexSnapshot,
+					},
 				);
 				const promptHint = refBasePrompt.trim().replace(/\s+/g, " ").slice(0, 160);
 				let description: string;

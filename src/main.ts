@@ -4,6 +4,8 @@ import "./lib/i18n";
 import "./lib/langgraphContext";
 import { Logger as Log, applyVerboseLogging } from "./utils/logging";
 import { isAgentFilePath } from "./utils/fileFiltering";
+import { seedMemoryFolder } from "./agent/memoryNotes";
+import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
 import { getVoiceSession } from "./voice/voiceSession.svelte";
@@ -717,6 +719,7 @@ export default class SecondBrainPlugin extends Plugin {
 					await StartupProfiler.measure("promptFiles:init", async () => {
 						await this.promptFilesService.seedDefaults(this.pluginData.agents);
 						await this.promptFilesService.refresh(this.pluginData.agents);
+						await seedMemoryFolder(this.app, memoriesDir());
 					});
 					await StartupProfiler.measure("agent:init", () => this.agentManager.initialize());
 					// Fold in the fire-and-forget search/vectorstore inits so their sub-phase
@@ -769,6 +772,18 @@ export default class SecondBrainPlugin extends Plugin {
 				}
 			}),
 		);
+		// A rename into, out of, or within the agent folder changes the memory index (and a
+		// skill's path), so either side of the move counts.
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (isAgentFilePath(oldPath)) refreshAgentContext();
+				else refreshAgentContextOnVaultChange(file);
+			}),
+		);
+		// The memory index reads note frontmatter from the metadata cache, which Obsidian
+		// updates after the vault `modify` event — a description edited in the Properties panel
+		// would otherwise be one assembly behind. Same debounced refresh, same path filter.
+		this.registerEvent(this.app.metadataCache.on("changed", refreshAgentContextOnVaultChange));
 
 		this.registerEvent(
 			(
@@ -949,6 +964,7 @@ export default class SecondBrainPlugin extends Plugin {
 		await this.skillsService?.bootstrapDefaultSkills();
 		await this.skillsService?.discoverSkills();
 		await this.promptFilesService?.seedDefaults(this.pluginData.agents);
+		await seedMemoryFolder(this.app, memoriesDir());
 		// Reload the prompt cache from the *new* folder — seedDefaults only writes files,
 		// it doesn't touch the cache, so without this the assembled prompt keeps serving the old
 		// folder's content (or the default) until a later vault event refreshes it.

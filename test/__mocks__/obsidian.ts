@@ -50,9 +50,13 @@ export class Vault {
 		write: vi.fn().mockResolvedValue(undefined),
 	};
 	getAbstractFileByPath = vi.fn();
+	getFileByPath = vi.fn().mockReturnValue(null);
+	getFolderByPath = vi.fn().mockReturnValue(null);
 	getFiles = vi.fn().mockReturnValue([]);
 	getName = vi.fn().mockReturnValue("test-vault");
 	read = vi.fn().mockResolvedValue("");
+	cachedRead = vi.fn().mockResolvedValue("");
+	createFolder = vi.fn().mockImplementation(() => Promise.resolve(new TFolder()));
 	modify = vi.fn().mockResolvedValue(undefined);
 	// Delegates to the mocked read/modify (writes only when the callback changed
 	// the data), mirroring Vault.process's read → transform → write contract.
@@ -290,6 +294,10 @@ export const requestUrl = vi.fn(async (_param: RequestUrlParam) => ({
 export interface CachedMetadata {
 	tags?: { tag: string; position: { start: { line: number } } }[];
 	frontmatter?: Record<string, unknown>;
+	frontmatterPosition?: {
+		start: { line: number; col: number; offset: number };
+		end: { line: number; col: number; offset: number };
+	};
 	links?: { link: string; original: string }[];
 	headings?: { heading: string; level: number }[];
 }

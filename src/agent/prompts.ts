@@ -56,11 +56,21 @@ You are a privacy-aware assistant integrated into Obsidian. You help users searc
  * supplies the `# Memory` heading and names the live folder via a placeholder, so the stored
  * text never carries a path that a reconfigured agent folder could make stale.
  */
-const MEMORY_INSTRUCTIONS = `Your memory folder is your own working memory — an intermediate layer between you and the vault. The vault is the user's long-term memory (the source of truth); your memory folder is short-term memory that you govern: durable facts about the user, their preferences and projects, workflows that worked, and — importantly — pointers to where relevant information already lives in the vault.
+const MEMORY_INSTRUCTIONS = `Your memory folder is your own working memory — an intermediate layer between you and the vault. The vault is the user's long-term memory (the source of truth); your memory folder holds what stays true across conversations and is not tied to one kind of task: who the user is, their preferences and projects, and — importantly — pointers to where relevant information already lives in the vault.
+- Route what you learn to the right place. Facts about the user and pointers into their vault go here. How a kind of task is done, the pitfalls you hit doing it, and the user's corrections about that work belong in the skill you used for it, where they load only when relevant. Nothing that only mattered in this conversation is written anywhere.
 - This folder is yours to read and write freely — you do not need permission to look in it. Never ask the user whether you should check your memory; just check it.
-- Whenever a question could depend on remembered context — anything about the user's identity, preferences, projects, or past decisions ("who am I", "what do I like", "what was I working on", etc.) — check your memory first: call list_directory on your memory folder to see what memory notes exist, then read_content the relevant ones, then answer. Do this silently and automatically before saying you don't know. Memory notes are deliberately excluded from vault search, so search_notes will never return them — list_directory is how you discover what you remember.
+- Your memory notes are listed at the end of this section, each with a one-line description. Whenever a question could depend on remembered context — anything about the user's identity, preferences, projects, or past decisions ("who am I", "what do I like", "what was I working on", etc.) — read the notes whose description fits with read_content before answering, silently and automatically. Notes marked always-loaded are already included in full below. Memory notes are deliberately excluded from vault search, so search_notes will never return them: the list is how you discover what you remember, and list_directory on your memory folder shows everything when the list overflows.
 - Do NOT duplicate information that already exists in the vault. If the answer lives in the user's own notes (e.g. work is tracked under a #work tag or a [[Projects]] note), store a pointer in memory — the tag, wiki link, folder, or search query to run — not a copy of that content. Then, at answer time, re-fetch the live details from the vault via those pointers so your answer reflects the current notes, not a stale snapshot.
 - Reserve full content in memory for facts that have no home in the vault (e.g. a stated preference the user never wrote down). When you learn such a durable, reusable fact, record it with manage_notes in your memory folder. Group related facts into one note when it makes sense rather than creating a note per fact; update, split, or reorganize existing memory notes as they grow. Do not record ephemeral or conversation-only details.
+- Before you finish a task, ask whether you learned something worth keeping. A durable fact about the user, how they work, or a pointer into their vault goes into memory now. How you should do this kind of task next time goes into the skill you used. If neither applies, save nothing.
+- Every memory note starts with frontmatter carrying a one-line \`description\` of what the note holds and when to read it. That line is what you see in the list, so make it specific. Keep the value quoted — an unquoted \`#\` or \`: \` is read as YAML syntax and cuts the description short:
+  \`\`\`
+  ---
+  description: "<what this note holds and when to read it>"
+  ---
+  \`\`\`
+  Write the facts themselves declaratively ("User prefers short answers"), never as instructions to yourself ("Always answer briefly"): an imperative re-read in a later conversation can override what the user is asking for then.
+- \`always: true\` in the frontmatter loads a note in full into every conversation. The User note has it. Do not add it to other notes unless the user asks; the always-loaded budget is small, and a listed description is usually enough.
 - You manage this folder yourself: writes to it are applied automatically without the user's review, so keep it tidy, non-redundant, and well organized.`;
 
 /**
@@ -96,6 +106,13 @@ export const MEMORY_FOLDER_PLACEHOLDER = "{{memoryFolder}}";
 /** Substituted with today's local date, e.g. `Monday, 2026-09-01`. */
 export const DATE_PLACEHOLDER = "{{date}}";
 
+/**
+ * Substituted with the rendered memory index (see `memoryNotes.renderMemoryIndex`): the
+ * always-loaded notes in full, then one line per memory note. Lives inside the `# Memory`
+ * section so deleting that section still opts an agent out of memory entirely.
+ */
+export const MEMORY_INDEX_PLACEHOLDER = "{{memoryIndex}}";
+
 /** The `# Current Date` section of the default body, carrying {@link DATE_PLACEHOLDER}. */
 export function buildDateSection(): string {
 	return `# Current Date
@@ -105,13 +122,23 @@ Today is ${DATE_PLACEHOLDER} (the user's local time). Resolve relative time expr
 /**
  * Wrap memory instructions in the `# Memory` section, naming the folder via
  * {@link MEMORY_FOLDER_PLACEHOLDER} so a reconfigured agent folder never leaves a stale path
- * baked into the note.
+ * baked into the note, and closing with {@link MEMORY_INDEX_PLACEHOLDER} so the live list of
+ * memory notes lands at the end of the section.
  */
 export function buildMemorySection(instructions: string): string {
 	return `# Memory
 Your memory folder is \`${MEMORY_FOLDER_PLACEHOLDER}/\`.
 
-${instructions}`;
+${instructions}
+
+${MEMORY_INDEX_PLACEHOLDER}`;
+}
+
+/** Live values for every placeholder a stored prompt body can carry. */
+export interface PromptPlaceholderValues {
+	memoryFolder: string;
+	date: string;
+	memoryIndex: string;
 }
 
 /**
@@ -119,12 +146,14 @@ ${instructions}`;
  *
  * Replacements go through a callback so `$`-sequences in a value are inserted literally: the
  * memory folder is a user-configurable vault path, and one containing `$&` would otherwise be
- * read as a replacement pattern and put the placeholder straight back into the prompt.
+ * read as a replacement pattern and put the placeholder straight back into the prompt. The
+ * memory index carries user-written note descriptions, so the same applies to it.
  */
-export function substitutePromptPlaceholders(body: string, values: { memoryFolder: string; date: string }): string {
+export function substitutePromptPlaceholders(body: string, values: PromptPlaceholderValues): string {
 	return body
 		.replaceAll(MEMORY_FOLDER_PLACEHOLDER, () => values.memoryFolder)
-		.replaceAll(DATE_PLACEHOLDER, () => values.date);
+		.replaceAll(DATE_PLACEHOLDER, () => values.date)
+		.replaceAll(MEMORY_INDEX_PLACEHOLDER, () => values.memoryIndex);
 }
 
 /** Today's date as rendered into {@link DATE_PLACEHOLDER}: `<Weekday>, <YYYY-MM-DD>`. */
@@ -143,7 +172,7 @@ ${buildDateSection()}
 ${buildMemorySection(MEMORY_INSTRUCTIONS)}`;
 
 /** Increment when DEFAULT_AGENT_PROMPT changes in a way that affects agent behaviour. */
-export const AGENT_PROMPT_VERSION = 1;
+export const AGENT_PROMPT_VERSION = 2;
 
 /**
  * Every agent-definition body we have ever shipped, as version → fingerprint. Lets seeding tell
@@ -151,11 +180,14 @@ export const AGENT_PROMPT_VERSION = 1;
  * notice) — see {@link isShippedDefault}.
  *
  * When DEFAULT_AGENT_PROMPT changes: bump {@link AGENT_PROMPT_VERSION} and record the PREVIOUS
- * text here under its old version number, retained verbatim as its own constant rather than as a
- * hand-transcribed hex literal — a literal has no checkable relationship to the text it claims to
- * fingerprint, while a retained constant can be diffed against git history. Entries are
- * append-only: dropping one makes untouched copies of that version read as customizations.
+ * text's fingerprint here under its old version number, as a hex literal with a comment naming
+ * the release that shipped it. Git holds the text itself; `git show <tag>:src/agent/prompts.ts`
+ * reproduces it, and `test/agent/shippedPromptHistory.test.ts` pins the current literal so a
+ * bump cannot silently drop one. Entries are append-only: dropping one makes untouched copies
+ * of that version read as customizations.
  */
 export const SHIPPED_AGENT_PROMPTS: ShippedHistory = new Map([
+	// 1 (shipped in 2.2.0): before the memory index placeholder and the routing guidance.
+	[1, "182f169c1d5c75fc"],
 	[AGENT_PROMPT_VERSION, fingerprint(DEFAULT_AGENT_PROMPT)],
 ]);
