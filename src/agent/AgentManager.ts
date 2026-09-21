@@ -56,7 +56,6 @@ import type { ThreadSnapshot } from "./memory/ThreadStore";
 import {
 	DEFAULT_AGENT_PROMPT,
 	MEMORY_FOLDER_PLACEHOLDER,
-	MEMORY_INDEX_PLACEHOLDER,
 	NO_WRITE_TOOLS_GUARD,
 	currentDateValue,
 	localIsoDate,
@@ -388,13 +387,14 @@ export class AgentManager {
 
 		const memoryFolder = normalizePath(memoriesDir());
 
-		// The memory index is read fresh on every assembly (metadata cache only, no disk). It
-		// needs no cache-key term: any change under the agent folder — memory notes included —
-		// invalidates every cached runnable (see the vault watcher in main.ts), so the next
-		// turn re-assembles and the model sees the note it just wrote.
-		if (body.includes(MEMORY_INDEX_PLACEHOLDER)) {
-			this.memoryIndexSnapshot = renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder));
-		}
+		// The memory index is read fresh on every assembly (metadata cache only, no disk) —
+		// unconditionally, not just when this body carries the placeholder: memory is global,
+		// and a referenced subagent whose note still has its `# Memory` section reuses this
+		// snapshot even when the parent opted out. It needs no cache-key term: any change under
+		// the agent folder — memory notes included — invalidates every cached runnable (see the
+		// vault watcher in main.ts), so the next turn re-assembles and the model sees the note
+		// it just wrote.
+		this.memoryIndexSnapshot = renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder));
 
 		// The model has no reliable notion of "now", and the memory folder is user-configurable;
 		// both are written into the note as placeholders and substituted here, so nothing stale
