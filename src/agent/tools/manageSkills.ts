@@ -63,7 +63,10 @@ function isReseededOnStartup(app: App, skillName: string): boolean {
  * preserved — SkillsService.serializeSkillMd is lossy and would reformat the file.
  */
 function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): string | null {
-	const lines = raw.split("\n");
+	// Keep the file's own line endings: a CRLF skill rebuilt with LF would read as a whole-file
+	// change to sync and to the shipped-history fingerprint alike.
+	const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+	const lines = raw.split(eol);
 	if (lines[0]?.trim() !== "---") return null;
 
 	let endIndex = -1;
@@ -89,7 +92,7 @@ function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): 
 		}
 	}
 
-	return ["---", ...frontmatterLines, "---", "", newBody.trim(), ""].join("\n");
+	return ["---", ...frontmatterLines, "---", "", newBody.trim(), ""].join(eol);
 }
 
 /**

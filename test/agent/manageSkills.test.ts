@@ -212,12 +212,11 @@ describe("manage_skills tool", () => {
 			expect(newContent).toBe(DATAVIEW_MD.replace("Old body.", "Use api.pages()."));
 		});
 
-		// A patch is a splice, not a rewrite: trailing spaces, blank lines and indentation
-		// outside the passage must come back byte for byte (indentation changes Markdown
-		// meaning). Whole-file CRLF is out of scope: the frontmatter parser splits on "\n"
-		// alone, so such a file is already rejected before any revision.
+		// A patch is a splice, not a rewrite: trailing spaces, blank lines, indentation and CRLF
+		// line endings outside the passage must come back byte for byte (indentation changes
+		// Markdown meaning; a rewritten line ending is a whole-file change to sync).
 		it("leaves every byte outside the passage untouched", async () => {
-			const raw = DATAVIEW_MD.replace("Old body.", "  - indented  \n\n\nOld body.  \n\n");
+			const raw = DATAVIEW_MD.replace("Old body.", "  - indented  \n\n\nOld body.  \n\n").replace(/\n/g, "\r\n");
 			const svc = makeSkillsService(dataviewCache());
 			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": raw });
 			recordSkillLoaded("t1", "dataview", parseFrontmatter(raw).body);

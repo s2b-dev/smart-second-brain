@@ -36,7 +36,10 @@ const LEGACY_VAULT_SKILLS_DIR = "Skills";
  * Frontmatter is delimited by --- at start and end on their own lines.
  */
 function parseFrontmatter(content: string): { frontmatter: Partial<SkillFrontmatter>; body: string } {
-	const lines = content.split("\n");
+	// A SKILL.md saved with CRLF endings (Windows editors, some sync clients) must parse the
+	// same as one with LF: without this every value kept a trailing "\r", the `name` no longer
+	// matched its folder, and the skill was silently dropped from discovery.
+	const lines = content.replace(/\r\n/g, "\n").split("\n");
 
 	// Check for opening ---
 	if (lines[0]?.trim() !== "---") {
