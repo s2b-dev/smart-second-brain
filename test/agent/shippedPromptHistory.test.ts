@@ -31,7 +31,7 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * — if the edit is genuinely cosmetic and no shipped build carries the old text — update the
  * literal below.
  */
-const CURRENT_FINGERPRINT = "db4b462d83615517"; // DEFAULT_AGENT_PROMPT at v2
+const CURRENT_FINGERPRINT = "8db7075e44b97320"; // DEFAULT_AGENT_PROMPT at v2
 
 const history: ShippedHistory = SHIPPED_AGENT_PROMPTS;
 const version = AGENT_PROMPT_VERSION;
