@@ -11,22 +11,36 @@ import {
 	DATE_PLACEHOLDER,
 	DEFAULT_AGENT_PROMPT,
 	MEMORY_FOLDER_PLACEHOLDER,
+	MEMORY_INDEX_PLACEHOLDER,
 	buildDateSection,
 	buildMemorySection,
 	currentDateValue,
 	substitutePromptPlaceholders,
 } from "../../src/agent/prompts";
 
-const VALUES = { memoryFolder: "Agents/Memories", date: "Monday, 2026-09-01" };
+const VALUES = {
+	memoryFolder: "Agents/Memories",
+	date: "Monday, 2026-09-01",
+	memoryIndex: "## Memory notes\n- `Agents/Memories/User.md` — who the user is",
+};
 
 describe("substitutePromptPlaceholders", () => {
-	it("substitutes both placeholders in the shipped default", () => {
+	it("substitutes every placeholder in the shipped default", () => {
 		const result = substitutePromptPlaceholders(DEFAULT_AGENT_PROMPT, VALUES);
 
 		expect(result).not.toContain(MEMORY_FOLDER_PLACEHOLDER);
 		expect(result).not.toContain(DATE_PLACEHOLDER);
+		expect(result).not.toContain(MEMORY_INDEX_PLACEHOLDER);
 		expect(result).toContain("`Agents/Memories/`");
 		expect(result).toContain("Monday, 2026-09-01");
+		expect(result).toContain("- `Agents/Memories/User.md` — who the user is");
+	});
+
+	// The index carries note descriptions the user or the model wrote, so it needs the same
+	// literal treatment as the folder path.
+	it("inserts the memory index literally", () => {
+		const result = substitutePromptPlaceholders(MEMORY_INDEX_PLACEHOLDER, { ...VALUES, memoryIndex: "$& $1" });
+		expect(result).toBe("$& $1");
 	});
 
 	it("replaces every occurrence, not just the first", () => {
@@ -66,6 +80,12 @@ describe("prompt section builders", () => {
 		expect(section.startsWith("# Memory")).toBe(true);
 		expect(section).toContain(MEMORY_FOLDER_PLACEHOLDER);
 		expect(section).toContain("instructions here");
+	});
+
+	// Inside the section, not appended after it: deleting `# Memory` must take the index with it.
+	it("closes the memory section with the index placeholder", () => {
+		const section = buildMemorySection("instructions here");
+		expect(section.endsWith(MEMORY_INDEX_PLACEHOLDER)).toBe(true);
 	});
 
 	it("keeps the date section free of a baked-in date", () => {

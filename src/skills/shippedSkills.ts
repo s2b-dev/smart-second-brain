@@ -19,6 +19,8 @@ import editNotes10 from "./history/edit-notes-1.0.md?raw";
 import editNotes11 from "./history/edit-notes-1.1.md?raw";
 import exploreVault10 from "./history/explore-vault-1.0.md?raw";
 import exploreVault11 from "./history/explore-vault-1.1.md?raw";
+import manageNotes10 from "./history/manage-notes-1.0.md?raw";
+import manageSkills10 from "./history/manage-skills-1.0.md?raw";
 import tasknotes10 from "./history/tasknotes-1.0.md?raw";
 
 /**
@@ -80,6 +82,11 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
+	// 1.0: before the routing guidance — revise the skill you used when it misled you, the
+	//      user's corrections about a kind of task live in its skill rather than in memory.
+	["manage-skills", new Map([["1.0", fingerprint(manageSkills10)]])],
+	// 1.0: before the note that memory-folder writes apply immediately, unlike other writes.
+	["manage-notes", new Map([["1.0", fingerprint(manageNotes10)]])],
 ]);
 
 /**

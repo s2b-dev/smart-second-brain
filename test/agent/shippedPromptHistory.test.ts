@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import agentPrompt1 from "../../src/agent/history/agent-prompt-1.md?raw";
 import { AGENT_PROMPT_VERSION, DEFAULT_AGENT_PROMPT, SHIPPED_AGENT_PROMPTS } from "../../src/agent/prompts";
 import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../src/utils/shippedDefaults";
 
@@ -30,7 +31,7 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * — if the edit is genuinely cosmetic and no shipped build carries the old text — update the
  * literal below.
  */
-const CURRENT_FINGERPRINT = "182f169c1d5c75fc"; // DEFAULT_AGENT_PROMPT at v1
+const CURRENT_FINGERPRINT = "224bcea1cc216fad"; // DEFAULT_AGENT_PROMPT at v2
 
 const history: ShippedHistory = SHIPPED_AGENT_PROMPTS;
 const version = AGENT_PROMPT_VERSION;
@@ -78,9 +79,17 @@ describe("agent prompt shipped history", () => {
  * is the only way a user can turn memory off now that the toggle is gone.
  */
 describe("default agent prompt composition", () => {
-	it("carries both runtime placeholders", () => {
+	it("carries every runtime placeholder", () => {
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryFolder}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{date}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryIndex}}");
+	});
+
+	// The v1 body is retained as a file rather than recomputed, so guard the one thing a stale
+	// copy could get wrong: it must still fingerprint as v1 (see `history/agent-prompt-1.md`).
+	it("retains the v1 body without its later placeholder", () => {
+		expect(agentPrompt1).toContain("{{memoryFolder}}");
+		expect(agentPrompt1).not.toContain("{{memoryIndex}}");
 	});
 
 	it("orders the sections base → date → memory", () => {
