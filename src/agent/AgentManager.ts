@@ -488,7 +488,7 @@ export class AgentManager {
 		);
 		if (contextXml) {
 			prompt +=
-				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. Skills carry the user's conventions and verified procedures for a kind of task, so load a skill with the `load_skill` tool whenever one matches or partly matches what you are doing, even for tasks you already know how to do. Do not load skills that are unrelated to the task.";
+				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. Skills carry the user's conventions and verified procedures for a kind of task, so load a skill with the `load_skill` tool whenever one matches or partly matches what you are doing, even for tasks you already know how to do. Load each skill once per conversation: if its instructions are still in this conversation from an earlier `load_skill` call, they still apply, so do not load it again. Do not load skills that are unrelated to the task.";
 			// Only when the tool is actually bound: teaching the model to revise skills with a
 			// tool it cannot call would just produce failed calls.
 			if (this.isToolBound(selectedAgent, "manage_skills")) {
@@ -822,7 +822,7 @@ export class AgentManager {
 	 *
 	 *  - **Per-tool overrides.** A skill declaring `allowed-tools` needs at least one of its
 	 *    declared built-in tools to survive the `toolsConfig` veto (e.g. the manage-skills
-	 *    core skill while the `manage_skills` tool is disabled — the out-of-the-box default).
+	 *    core skill while the `manage_skills` tool is vetoed in the Tools modal).
 	 *    Unknown (non-built-in) ids don't count as declared tools, matching `attachedToolIds`.
 	 *  - **Plugin exec approval.** A skill linked to a plugin that exposes an `api` is backed
 	 *    by that plugin's `exec_<plugin>` tool, which is gated *separately* by the per-agent

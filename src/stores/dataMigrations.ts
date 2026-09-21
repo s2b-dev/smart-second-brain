@@ -1,7 +1,7 @@
 import type { PluginData } from "../types/plugin";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 
 type Migration = (data: PluginData) => void;
 
@@ -188,6 +188,19 @@ const MIGRATIONS: Migration[] = [
 			for (const [id, server] of Object.entries(servers)) {
 				if (server?.transport === "stdio") delete servers[id];
 			}
+		}
+	},
+	// v13 → v14: `manage_skills` was seeded `enabled: false` by accident, so every agent
+	//            created before this carries a veto nobody chose. That veto hid the "revise the
+	//            skill before you finish" guidance, kept the post-turn reviewer from revising
+	//            anything, and left the memory doctrine promising skill revisions that could
+	//            never happen. The default is now on; stored configs are flipped to match,
+	//            since the stored false is the seed, not a decision (nobody has yet had a
+	//            reason to switch it off on purpose).
+	(data) => {
+		for (const agent of Object.values(data.agents ?? {})) {
+			const manageSkills = agent.toolsConfig?.manage_skills as unknown as Record<string, unknown> | undefined;
+			if (manageSkills) manageSkills.enabled = true;
 		}
 	},
 ];
