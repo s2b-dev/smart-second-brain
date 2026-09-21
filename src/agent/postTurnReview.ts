@@ -22,7 +22,10 @@ export interface PostTurnReviewConfig {
 	enabled: boolean;
 	/** Model for the review; null means the agent's chat model. A cheaper one is the point. */
 	model: ChatModel | null;
-	/** Tool calls accumulated across turns before a review fires. */
+	/**
+	 * Tool calls accumulated across turns before a review fires. Five, not Hermes's ten: this
+	 * agent's turns are two or three calls each, and reading a skill is not counted at all.
+	 */
 	toolCallThreshold: number;
 	/**
 	 * Also run on phones and tablets. Off by default because a side model call there spends
@@ -35,13 +38,17 @@ export interface PostTurnReviewConfig {
 export const DEFAULT_POST_TURN_REVIEW: PostTurnReviewConfig = {
 	enabled: false,
 	model: null,
-	toolCallThreshold: 10,
+	toolCallThreshold: 5,
 	onMobile: false,
 };
 
 /** What one finished turn contributes to the trigger. */
 export interface TurnActivity {
-	/** Tool calls the turn made (any tool, subagents included). */
+	/**
+	 * Tool calls the turn made (any tool, subagents included), except `load_skill`: reading a
+	 * skill is preparation, not work, and counting it let a turn that only loaded guidance
+	 * trip a review of nothing.
+	 */
 	toolCalls: number;
 	/** Whether the turn itself revised or created a skill: the agent already did its review. */
 	revisedSkills: boolean;

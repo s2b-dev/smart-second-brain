@@ -1052,9 +1052,9 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               After a busy turn, a short side run reviews the conversation and keeps what it
               taught: a durable fact about you goes to memory, a lesson about how a task is done
               goes into the skill that was used. It runs right after the answer, once the turns
-              since the last review add up to {postTurnReview.toolCallThreshold} tool calls (the
-              count is kept with the chat). A notice names what was saved; most reviews save
-              nothing.
+              since the last review add up to {postTurnReview.toolCallThreshold} tool calls, not
+              counting skill loads (the count is kept with the chat). A notice names what was
+              saved; most reviews save nothing.
             </div>
           </div>
         </div>

@@ -636,11 +636,12 @@ export class ChatSession {
 			this.liveRun = { pairId, stableKey: pair.stableKey, startedAtMs: runStartedAtMs };
 
 			// Count the turn's tool calls on the way through, for the post-turn review trigger.
+			// Loading a skill is not work (see TurnActivity.toolCalls), so it does not count.
 			const activity: TurnActivity = { toolCalls: 0, revisedSkills: false };
 			const counted = async function* (source: AsyncIterable<AgentStreamChunk>) {
 				for await (const chunk of source) {
 					if (chunk.type === "tool_end") {
-						activity.toolCalls += 1;
+						if (chunk.toolName !== "load_skill") activity.toolCalls += 1;
 						if (chunk.toolName === "manage_skills") activity.revisedSkills = true;
 					}
 					yield chunk;
