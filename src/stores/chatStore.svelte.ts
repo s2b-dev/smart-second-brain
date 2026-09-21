@@ -1147,6 +1147,12 @@ export class ChatSession {
 				const pendingPreamble = (chunk.preamble ?? "").trim();
 				const pendingHasNewPreamble = !!pendingPreamble && !emittedStreamPreambles.has(pendingPreamble);
 				if (pendingHasNewPreamble) emittedStreamPreambles.add(pendingPreamble);
+				// Progress listeners (voice) want the preamble the moment it is first seen,
+				// which is here whenever the provider streams tool-call deltas; the matching
+				// tool_start below then finds it already emitted and stays quiet.
+				if (pendingHasNewPreamble) {
+					this.notifyTurnProgress({ toolName: chunk.toolName, preamble: pendingPreamble });
+				}
 				tokenBuffer = "";
 				assistantMsg.content = "";
 				assistantMsg.contentAiMessageId = undefined;
@@ -1205,11 +1211,15 @@ export class ChatSession {
 				const preambleTrimmed = preamble.trim();
 				const isFirstWithPreamble = !!preambleTrimmed && !emittedStreamPreambles.has(preambleTrimmed);
 				if (isFirstWithPreamble) emittedStreamPreambles.add(preambleTrimmed);
-				this.notifyTurnProgress({
-					toolName: chunk.toolName,
-					preamble: isFirstWithPreamble ? preambleTrimmed : undefined,
-					input: chunk.input,
-				});
+				// Only when no tool_pending announced this preamble first (providers that do
+				// not stream tool-call deltas); otherwise the pending branch already told them.
+				if (isFirstWithPreamble) {
+					this.notifyTurnProgress({
+						toolName: chunk.toolName,
+						preamble: preambleTrimmed,
+						input: chunk.input,
+					});
+				}
 				tokenBuffer = "";
 				assistantMsg.content = "";
 				assistantMsg.contentAiMessageId = undefined;
