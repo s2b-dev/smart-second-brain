@@ -119,7 +119,7 @@ describe("narration responses", () => {
 		expect(ev.response.input).toHaveLength(1);
 		expect(ev.response.input[0].content[0].text).toBe("New step: Searching the notes for graph physics");
 		expect(ev.response.instructions).not.toContain("already said");
-		expect(ev.response.instructions).toContain("terse");
+		expect(ev.response.instructions).toContain("wrote itself");
 		expect(isNarrationResponse(ev.response.metadata)).toBe(true);
 		expect(isNarrationResponse(null)).toBe(false);
 		expect(isNarrationResponse({ other: 1 })).toBe(false);
@@ -129,9 +129,8 @@ describe("narration responses", () => {
 		const { buildNarrationResponse } = await import("../../src/voice/realtimeProtocol");
 		const ev = buildNarrationResponse({
 			text: "Die Datumssuche ist zu unspezifisch; ich ermittle, wie Aufgaben organisiert sind.",
-			isLeadIn: true,
 			request: "Welche Aufgaben hatte ich diese Woche?",
-			stepsSoFar: ["Ich prüfe deine Tagesseiten für diese Woche.", 'Searching the notes for "2026-09-14"'],
+			stepsSoFar: ["Ich prüfe deine Tagesseiten für diese Woche.", "Ich schaue in den Aufgabenordner."],
 			alreadySaid: ["Ich schaue in deine Tagesseiten dieser Woche."],
 			userLastWords: "Welche Aufgaben hatte ich diese Woche?",
 		});
@@ -139,7 +138,7 @@ describe("narration responses", () => {
 		expect(text).toContain("User's last words: Welche Aufgaben hatte ich diese Woche?");
 		expect(text).toContain("The user's request: Welche Aufgaben hatte ich diese Woche?");
 		expect(text).toContain(
-			"Steps so far:\n1. Ich prüfe deine Tagesseiten für diese Woche.\n2. Searching the notes",
+			"Steps so far:\n1. Ich prüfe deine Tagesseiten für diese Woche.\n2. Ich schaue in den Aufgabenordner.",
 		);
 		expect(text).toContain("New step: Die Datumssuche ist zu unspezifisch");
 		expect(ev.response.instructions).toContain("wrote itself");

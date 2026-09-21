@@ -108,8 +108,8 @@ export class VoiceSession {
 	private lastNarrationAt = 0;
 	/** Narration state per in-flight delegation, keyed by call id; dropped when the call settles. */
 	private delegations = new Map<string, Delegation>();
-	/** Which delegation a queued progress line belongs to, and whether it is the agent's own sentence. */
-	private narrationOwners = new Map<string, { callId: string; isLeadIn: boolean }>();
+	/** Which delegation a queued progress line belongs to. */
+	private narrationOwners = new Map<string, string>();
 	private narrationTimer: ReturnType<typeof setTimeout> | null = null;
 	private heldNarrationCallId: string | null = null;
 	/** Bumped on every start/stop so a slow `start()` cannot resurrect a session the user already stopped. */
@@ -422,7 +422,7 @@ export class VoiceSession {
 			const line = describeProgress(progress);
 			if (!line) return;
 			delegation.steps = [...delegation.steps, line.text].slice(-12);
-			this.narrationOwners.set(line.text, { callId, isLeadIn: line.isLeadIn });
+			this.narrationOwners.set(line.text, callId);
 			this.queueNarration(line.text, delegation);
 		};
 		void this.bridge.run({ threadPath, request, transcript: context, onProgress }).then((output) => {
@@ -521,14 +521,13 @@ export class VoiceSession {
 	private speakNarration(text: string): void {
 		const owner = this.narrationOwners.get(text);
 		this.narrationOwners.delete(text);
-		const delegation = owner ? this.delegations.get(owner.callId) : undefined;
+		const delegation = owner ? this.delegations.get(owner) : undefined;
 		// The call this line described has settled or never existed: nothing to say.
 		if (!delegation) return;
 		this.lastNarrationAt = Date.now();
 		this.client?.send(
 			buildNarrationResponse({
 				text,
-				isLeadIn: owner?.isLeadIn ?? false,
 				request: delegation.request,
 				// Everything before the new step, so it can be related to what came earlier.
 				stepsSoFar: delegation.steps.filter((step) => step !== text),

@@ -178,10 +178,8 @@ export function buildResponseCreate() {
 export const NARRATION_METADATA = { s2b: "narration" } as const;
 
 export interface NarrationContext {
-	/** The new step to convey: the assistant's own lead-in sentence, or a terse summary of the tool input. */
+	/** The new step to convey: the assistant's own lead-in sentence for that step. */
 	text: string;
-	/** True when `text` is a sentence the assistant wrote itself (worth speaking close to verbatim). */
-	isLeadIn?: boolean;
 	/** What the user asked the assistant to do, so the narration can relate steps to it. */
 	request?: string | null;
 	/** Every step so far for this request, oldest first, whether or not it was spoken. */
@@ -209,9 +207,7 @@ export function buildNarrationResponse(context: NarrationContext) {
 	const rules = [
 		"You are the voice of an assistant that is working on the user's request in the background; you keep the user company by telling them what it is doing.",
 		"Speak ONE sentence, at most fifteen words, in the language of the user's last words. No filler, no questions, no technical tool names, no markdown.",
-		context.isLeadIn
-			? "The new step is a sentence the assistant wrote itself: say it in your own voice, close to its meaning, shortened if long. It usually explains why this step follows the last one — keep that."
-			: "The new step is terse: turn it into a natural sentence that keeps its specific detail (search terms, note or page name).",
+		"The new step is a sentence the assistant wrote itself: say it in your own voice, close to its meaning, shortened if long. It usually explains why this step follows the last one — keep that.",
 		"Vary how you start and phrase lines; never open two lines the same way. Relate the step to the request or to the previous step when that makes it more natural.",
 		alreadySaid.length > 0
 			? `Lines you already said, do not repeat or rephrase them: ${alreadySaid.map((line) => `"${line}"`).join("; ")}. If the new step adds nothing new, say a very short "still on it" in the user's language.`
