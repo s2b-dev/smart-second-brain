@@ -13,7 +13,6 @@
 
 import { describe, expect, it } from "vitest";
 
-import agentPrompt1 from "../../src/agent/history/agent-prompt-1.md?raw";
 import { AGENT_PROMPT_VERSION, DEFAULT_AGENT_PROMPT, SHIPPED_AGENT_PROMPTS } from "../../src/agent/prompts";
 import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../src/utils/shippedDefaults";
 
@@ -85,11 +84,10 @@ describe("default agent prompt composition", () => {
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryIndex}}");
 	});
 
-	// The v1 body is retained as a file rather than recomputed, so guard the one thing a stale
-	// copy could get wrong: it must still fingerprint as v1 (see `history/agent-prompt-1.md`).
-	it("retains the v1 body without its later placeholder", () => {
-		expect(agentPrompt1).toContain("{{memoryFolder}}");
-		expect(agentPrompt1).not.toContain("{{memoryIndex}}");
+	// v1 is a literal; the value it must equal is the one this test pinned as CURRENT while v1
+	// was current (see git history of this file at tag 2.2.0).
+	it("keeps the v1 fingerprint that shipped in 2.2.0", () => {
+		expect(history.get(1)).toBe("182f169c1d5c75fc");
 	});
 
 	it("orders the sections base → date → memory", () => {

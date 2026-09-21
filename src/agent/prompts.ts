@@ -7,7 +7,6 @@
  */
 
 import { type ShippedHistory, fingerprint } from "../utils/shippedDefaults";
-import agentPrompt1 from "./history/agent-prompt-1.md?raw";
 
 /** Core instructions: the base sections of the default body. */
 const BASE_SECTIONS = `# Role
@@ -181,14 +180,14 @@ export const AGENT_PROMPT_VERSION = 2;
  * notice) — see {@link isShippedDefault}.
  *
  * When DEFAULT_AGENT_PROMPT changes: bump {@link AGENT_PROMPT_VERSION} and record the PREVIOUS
- * text here under its old version number, retained verbatim as `history/agent-prompt-<n>.md`
- * (mirroring `skills/history/`) rather than as a hand-transcribed hex literal — a literal has
- * no checkable relationship to the text it claims to fingerprint, while a retained file can be
- * diffed against git history. Entries are append-only: dropping one makes untouched copies of
- * that version read as customizations.
+ * text's fingerprint here under its old version number, as a hex literal with a comment naming
+ * the release that shipped it. Git holds the text itself; `git show <tag>:src/agent/prompts.ts`
+ * reproduces it, and `test/agent/shippedPromptHistory.test.ts` pins the current literal so a
+ * bump cannot silently drop one. Entries are append-only: dropping one makes untouched copies
+ * of that version read as customizations.
  */
 export const SHIPPED_AGENT_PROMPTS: ShippedHistory = new Map([
-	// 1: before the memory index placeholder and the memory-vs-skill routing guidance.
-	[1, fingerprint(agentPrompt1)],
+	// 1 (shipped in 2.2.0): before the memory index placeholder and the routing guidance.
+	[1, "182f169c1d5c75fc"],
 	[AGENT_PROMPT_VERSION, fingerprint(DEFAULT_AGENT_PROMPT)],
 ]);

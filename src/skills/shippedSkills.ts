@@ -19,8 +19,6 @@ import editNotes10 from "./history/edit-notes-1.0.md?raw";
 import editNotes11 from "./history/edit-notes-1.1.md?raw";
 import exploreVault10 from "./history/explore-vault-1.0.md?raw";
 import exploreVault11 from "./history/explore-vault-1.1.md?raw";
-import manageNotes10 from "./history/manage-notes-1.0.md?raw";
-import manageSkills10 from "./history/manage-skills-1.0.md?raw";
 import tasknotes10 from "./history/tasknotes-1.0.md?raw";
 
 /**
@@ -29,15 +27,16 @@ import tasknotes10 from "./history/tasknotes-1.0.md?raw";
  *
  * ## How to add an entry (do this when you change a bundled SKILL.md)
  *
- * 1. BEFORE your edit, copy the current SKILL.md verbatim to
- *    `src/skills/history/<name>-<version>.md` and `?raw`-import it here.
- * 2. Add `fingerprint(<import>)` under the skill's name and its *current* version.
- * 3. Then make your edit and bump `metadata.version` in the SKILL.md.
+ * 1. BEFORE your edit, record the current body's fingerprint under the skill's name and its
+ *    *current* version: log `fingerprint(<SKILL.md text>)` once and inline the hex string,
+ *    with a comment naming the release that shipped it.
+ * 2. Then make your edit and bump `metadata.version` in the SKILL.md.
  *
- * A retained copy is preferred over a hand-transcribed hex literal because it stays
- * provably exact (`git diff` can compare it to history), at the cost of never-displayed
- * bundle text. If the retained copies ever add up (`bases` alone is ~21KB), collapse old
- * entries to hex literals — log `fingerprint(...)` once and inline the string.
+ * The literal is not taken on trust: the tag-replay test below pulls every released body
+ * out of git and checks it against this table, so a mistyped hash fails the suite. Git is
+ * the archive of old text; this table only needs the index into it. (Earlier entries retain
+ * the old body as a `?raw` import instead — same result, more bundle text; new entries
+ * should be literals.)
  *
  * Skip step 1-2 and existing vaults will read their untouched copy as a user customization:
  * they'll get a notice asking them to reconcile by hand instead of a silent update. Skip step
@@ -82,11 +81,11 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
-	// 1.0: before the routing guidance — revise the skill you used when it misled you, the
-	//      user's corrections about a kind of task live in its skill rather than in memory.
-	["manage-skills", new Map([["1.0", fingerprint(manageSkills10)]])],
-	// 1.0: before the note that memory-folder writes apply immediately, unlike other writes.
-	["manage-notes", new Map([["1.0", fingerprint(manageNotes10)]])],
+	// 1.0 (shipped in 2.2.0): before the routing guidance — revise the skill you used when it
+	//      misled you; the user's corrections about a kind of task live in its skill, not memory.
+	["manage-skills", new Map([["1.0", "4f7b8ff2b47b60e2"]])],
+	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
+	["manage-notes", new Map([["1.0", "eab47f33c57cb977"]])],
 ]);
 
 /**
