@@ -71,8 +71,10 @@ import {
 	buildReviewUserMessage,
 	noteTurnForReview,
 	readCallsSinceReview,
+	readReviewGeneration,
 	renderTranscript,
 	summarizeReviewActions,
+	REVIEW_GENERATION_KEY,
 	TOOL_CALLS_SINCE_REVIEW_KEY,
 } from "./postTurnReview";
 import { createSaveMemoryTool } from "./tools/saveMemory";
@@ -1924,13 +1926,19 @@ export class AgentManager {
 			// a review has actually run, so a skipped or failed review keeps the trigger.
 			let due = false;
 			let consumed = 0;
+			let generation = 0;
 			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
 				const before = readCallsSinceReview(metadata);
+				generation = readReviewGeneration(metadata);
 				const step = noteTurnForReview(before, activity, config.toolCallThreshold);
 				due = step.due;
 				const total = step.due ? before + activity.toolCalls : step.callsSinceReview;
 				consumed = step.due ? total : 0;
-				return total === before ? null : { ...metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: total };
+				// A reset by a skill-revising turn starts a new generation (see
+				// REVIEW_GENERATION_KEY), so a review still running cannot consume from it.
+				const next: Record<string, unknown> = { ...metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: total };
+				if (activity.revisedSkills && before > 0) next[REVIEW_GENERATION_KEY] = generation + 1;
+				return total === before ? null : next;
 			});
 			if (!due) return;
 			// Another review of this thread is running: keep the count and let the next turn
@@ -1946,11 +1954,15 @@ export class AgentManager {
 			}
 			if (!ran) return;
 			// Consume what this review covered. Calls a turn added while it was running stay,
-			// since that turn was not in the transcript it reviewed.
-			await this.patchThreadMetadata(resolvedThreadId, (metadata) => ({
-				...metadata,
-				[TOOL_CALLS_SINCE_REVIEW_KEY]: Math.max(0, readCallsSinceReview(metadata) - consumed),
-			}));
+			// since that turn was not in the transcript it reviewed; and if a skill-revising turn
+			// reset the count meanwhile, this review's share is already gone with it.
+			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
+				if (readReviewGeneration(metadata) !== generation) return null;
+				return {
+					...metadata,
+					[TOOL_CALLS_SINCE_REVIEW_KEY]: Math.max(0, readCallsSinceReview(metadata) - consumed),
+				};
+			});
 		} catch (error) {
 			Logger.error("[AgentManager] Post-turn review failed:", error);
 		}

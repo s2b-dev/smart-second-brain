@@ -10,8 +10,10 @@ import {
 	buildReviewSystemPrompt,
 	noteTurnForReview,
 	readCallsSinceReview,
+	readReviewGeneration,
 	renderTranscript,
 	summarizeReviewActions,
+	REVIEW_GENERATION_KEY,
 	TOOL_CALLS_SINCE_REVIEW_KEY,
 } from "../../src/agent/postTurnReview";
 
@@ -39,6 +41,14 @@ describe("noteTurnForReview", () => {
 
 	it("is never due with a non-positive threshold", () => {
 		expect(noteTurnForReview(50, turn(100), 0).due).toBe(false);
+	});
+});
+
+describe("readReviewGeneration", () => {
+	it("reads the generation and treats anything else as zero", () => {
+		expect(readReviewGeneration({ [REVIEW_GENERATION_KEY]: 3 })).toBe(3);
+		expect(readReviewGeneration({ [REVIEW_GENERATION_KEY]: "3" })).toBe(0);
+		expect(readReviewGeneration(undefined)).toBe(0);
 	});
 });
 

@@ -56,6 +56,20 @@ export interface TurnActivity {
  */
 export const TOOL_CALLS_SINCE_REVIEW_KEY = "toolCallsSinceReview";
 
+/**
+ * Bumped whenever the count is reset by a turn that revised a skill itself. A review that
+ * started before such a reset must not consume its share from calls added after it — those
+ * were never in the transcript it reviewed — so consumption is tied to the generation the
+ * review was triggered in.
+ */
+export const REVIEW_GENERATION_KEY = "toolCallsReviewGeneration";
+
+/** Read the reset generation from a thread's metadata; anything but a finite number reads as 0. */
+export function readReviewGeneration(metadata: Record<string, unknown> | undefined): number {
+	const value = metadata?.[REVIEW_GENERATION_KEY];
+	return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 /** Read the running count from a thread's metadata; anything but a finite number reads as 0. */
 export function readCallsSinceReview(metadata: Record<string, unknown> | undefined): number {
 	const value = metadata?.[TOOL_CALLS_SINCE_REVIEW_KEY];
