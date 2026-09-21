@@ -1,7 +1,9 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { SkillsService } from "../../skills/SkillsService";
 import type { CommunityPluginStatus } from "../integrations/pluginIntegrations";
+import { recordSkillLoaded } from "./skillLoadRegistry";
 
 /** Frontmatter key (under `metadata:`) listing community plugin ids a skill can make use of. */
 export const OPTIONAL_PLUGINS_METADATA_KEY = "optionalPlugins";
@@ -76,12 +78,16 @@ export function createLoadSkillTool(skillsService: SkillsService, options: LoadS
 	const loadable = new Set(skillNames);
 
 	return tool(
-		async ({ skillName }: { skillName: string }) => {
+		async ({ skillName }: { skillName: string }, config?: RunnableConfig) => {
 			const skill = loadable.has(skillName) ? await skillsService.loadSkill(skillName) : null;
 
 			if (!skill) {
 				return `Skill "${skillName}" not found. Available skills: ${skillNames.join(", ")}`;
 			}
+
+			// The model has now seen this skill's current text in this conversation, which is
+			// what `manage_skills` requires before it will patch or rewrite it.
+			recordSkillLoaded(config?.configurable?.thread_id, skillName);
 
 			// Return the skill content with metadata
 			const lines: string[] = [];

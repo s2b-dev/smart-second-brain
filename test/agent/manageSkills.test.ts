@@ -10,6 +10,7 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 import type { App } from "obsidian";
 import type { SkillsService } from "../../src/skills/SkillsService";
 import { createManageSkillsTool } from "../../src/agent/tools/manageSkills";
+import { recordSkillLoaded, resetSkillLoadRegistry } from "../../src/agent/tools/skillLoadRegistry";
 
 const RUN_CONFIG = { configurable: { thread_id: "t1" }, runId: "run-1" };
 
@@ -101,6 +102,133 @@ describe("manage_skills tool", () => {
 		mockGetData.mockReturnValue({
 			getAgent: () => agentWithSkills({ other: { enabled: false } }),
 			getSelectedAgent: () => agentWithSkills({ other: { enabled: false } }),
+		});
+		// Revisions require the skill to have been loaded in this thread; most tests below
+		// exercise what happens after that, so satisfy the gate up front.
+		resetSkillLoadRegistry();
+		recordSkillLoaded("t1", "dataview");
+		recordSkillLoaded("t1", "other");
+	});
+
+	describe("read-before-write gate", () => {
+		it("refuses to patch or update a skill not loaded in this thread", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+			const otherThread = { configurable: { thread_id: "t2" } };
+
+			const patched = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." },
+				otherThread,
+			);
+			const updated = await t.invoke({ type: "update", skillName: "dataview", newBody: "x" }, otherThread);
+
+			expect(patched).toMatch(/load_skill first/);
+			expect(updated).toMatch(/load_skill first/);
+			expect(write).not.toHaveBeenCalled();
+		});
+
+		it("treats a skill created in this thread as loaded", async () => {
+			const cache = dataviewCache();
+			const svc = makeSkillsService(cache);
+			const { app, store } = makeApp({});
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke({ type: "create", name: "weekly-review", description: "d", body: "Step one." }, RUN_CONFIG);
+			cache.set("weekly-review", {
+				path: "Agents/Skills/weekly-review",
+				frontmatter: { name: "weekly-review", description: "d" },
+			});
+
+			const res = await t.invoke(
+				{ type: "patch", skillName: "weekly-review", oldText: "Step one.", newText: "Step one, then two." },
+				RUN_CONFIG,
+			);
+			expect(res).toMatch(/patched/i);
+			expect(store["Agents/Skills/weekly-review/SKILL.md"]).toContain("Step one, then two.");
+		});
+	});
+
+	describe("patch operation", () => {
+		it("replaces exactly one passage in the body and leaves the frontmatter alone", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			const res = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "Use api.pages()." },
+				RUN_CONFIG,
+			);
+
+			expect(res).toMatch(/patched/i);
+			const [path, newContent] = write.mock.calls[0];
+			expect(path).toBe("Agents/Skills/dataview/SKILL.md");
+			expect(newContent).toBe(DATAVIEW_MD.replace("Old body.", "Use api.pages()."));
+		});
+
+		// `$&` in a replacement is a pattern to String.replace; a skill about regexes would
+		// otherwise have its own text spliced back in.
+		it("inserts the replacement literally", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+			await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "$& $1" },
+				RUN_CONFIG,
+			);
+			expect(write.mock.calls[0][1]).toContain("$& $1");
+		});
+
+		it("deletes the passage when the replacement is empty", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+			await t.invoke({ type: "patch", skillName: "dataview", oldText: "\n\nOld body.", newText: "" }, RUN_CONFIG);
+			const [, newContent] = write.mock.calls[0];
+			expect(newContent).not.toContain("Old body.");
+			expect(newContent).toContain("# Dataview");
+		});
+
+		it("refuses a passage that is missing, and says so when it lives in the frontmatter", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			const missing = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "not in there", newText: "x" },
+				RUN_CONFIG,
+			);
+			const frontmatter = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Old description", newText: "x" },
+				RUN_CONFIG,
+			);
+
+			expect(missing).toMatch(/could not find/i);
+			expect(frontmatter).toMatch(/frontmatter/i);
+			expect(write).not.toHaveBeenCalled();
+		});
+
+		it("refuses an ambiguous passage", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({
+				"Agents/Skills/dataview/SKILL.md": DATAVIEW_MD.replace("Old body.", "Step.\n\nStep."),
+			});
+			const t = createManageSkillsTool(svc, app, "agent-1");
+			const res = await t.invoke(
+				{ type: "patch", skillName: "dataview", oldText: "Step.", newText: "x" },
+				RUN_CONFIG,
+			);
+			expect(res).toMatch(/appears 2 times/);
+			expect(write).not.toHaveBeenCalled();
+		});
+
+		it("rejects patching a skill not attached to this agent", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/other/SKILL.md": "" });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+			const res = await t.invoke({ type: "patch", skillName: "other", oldText: "a", newText: "b" }, RUN_CONFIG);
+			expect(res).toMatch(/not attached/i);
+			expect(write).not.toHaveBeenCalled();
 		});
 	});
 

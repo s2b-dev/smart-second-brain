@@ -1,7 +1,9 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { tool } from "@langchain/core/tools";
 import type { App } from "obsidian";
 import { z } from "zod";
-import type { BuiltInToolId } from "../../types/plugin";
+import { recordSkillLoaded, wasSkillLoaded } from "./skillLoadRegistry";
+import type { BuiltInToolId, SkillMetadata } from "../../types/plugin";
 import type { SkillsService } from "../../skills/SkillsService";
 import { parseFrontmatter } from "../../skills/SkillsService";
 import { validateFrontmatter, validateSkillName } from "../../skills/validation";
@@ -90,6 +92,19 @@ function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): 
 	return ["---", ...frontmatterLines, "---", "", newBody.trim(), ""].join("\n");
 }
 
+/**
+ * The body of a SKILL.md — everything after the frontmatter block — or null when the file has no
+ * well-formed frontmatter. Patches search this, never the frontmatter: the fields there are
+ * either locked (name, plugin link) or have their own update path (description).
+ */
+function skillBody(raw: string): string | null {
+	const lines = raw.split("\n");
+	if (lines[0]?.trim() !== "---") return null;
+	const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+	if (endIndex === -1) return null;
+	return lines.slice(endIndex + 1).join("\n");
+}
+
 /** Build a new SKILL.md's raw text: minimal frontmatter plus body. */
 function buildNewSkillMd(name: string, description: string, body: string, allowedTools: string[]): string {
 	const lines = ["---", `name: ${name}`, `description: ${description}`];
@@ -120,13 +135,25 @@ const deleteOperationSchema = z.object({
 	name: z.string().describe("The name of the skill to delete. Built-in core skills cannot be deleted."),
 });
 
+const patchOperationSchema = z.object({
+	type: z.literal("patch"),
+	skillName: z.string().describe("The name of the attached skill to patch. Load it with load_skill first."),
+	oldText: z
+		.string()
+		.min(1)
+		.describe(
+			"The exact passage to replace, copied from the loaded skill body. Must match exactly once — include enough surrounding text to make it unique.",
+		),
+	newText: z.string().describe("The replacement. An empty string deletes the passage."),
+});
+
 const updateOperationSchema = z.object({
 	type: z.literal("update"),
-	skillName: z.string().describe("The name of the attached skill to update"),
+	skillName: z.string().describe("The name of the attached skill to rewrite. Load it with load_skill first."),
 	newBody: z
 		.string()
 		.describe(
-			"The new full instructions (markdown body, without frontmatter) for the skill. Replaces the existing body.",
+			"The new full instructions (markdown body, without frontmatter). Replaces the existing body — prefer patch for a targeted change.",
 		),
 	newDescription: z
 		.string()
@@ -136,9 +163,39 @@ const updateOperationSchema = z.object({
 
 const manageSkillsSchema = z.discriminatedUnion("type", [
 	createOperationSchema,
-	deleteOperationSchema,
+	patchOperationSchema,
 	updateOperationSchema,
+	deleteOperationSchema,
 ]);
+
+/**
+ * Checks shared by every revision path: the result must still be a valid skill, and the fields
+ * the rest of the system wires on (name, plugin link, category) must not have moved. Returns the
+ * rejection to hand back, or null when the revision may be written.
+ */
+function rejectInvalidRevision(
+	metadata: { path: string; frontmatter: SkillMetadata["frontmatter"] },
+	newContent: string,
+) {
+	const dirName = metadata.path.split("/").pop() ?? "";
+	const { frontmatter: newFm } = parseFrontmatter(newContent);
+	const validation = validateFrontmatter(newFm, dirName);
+	if (!validation.valid) {
+		return `Edit rejected — the result would be an invalid skill: ${validation.errors.map((e) => e.message).join(", ")}`;
+	}
+	const oldFm = metadata.frontmatter;
+	if (newFm.name !== oldFm.name) {
+		return "Edit rejected — a skill's name cannot change (would break its folder and wiring).";
+	}
+	if (
+		newFm.metadata?.linkedPlugin !== oldFm.metadata?.linkedPlugin ||
+		newFm.metadata?.corePluginId !== oldFm.metadata?.corePluginId ||
+		newFm.metadata?.category !== oldFm.metadata?.category
+	) {
+		return "Edit rejected — a skill's plugin link and category are locked; only the body and description can change.";
+	}
+	return null;
+}
 
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
 
@@ -150,7 +207,9 @@ type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
  * with no separate manual "enable" step.
  */
 export function createManageSkillsTool(skillsService: SkillsService | undefined, app: App, agentId = "") {
-	const attached = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
+	// For the description only; the checks below re-resolve per call so a skill created
+	// earlier in the same turn is already attached when the model patches it.
+	const attachedAtBuild = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
 
 	if (!skillsService) {
 		return tool(async () => "Skills are not available yet.", {
@@ -161,7 +220,10 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 	}
 
 	return tool(
-		async (input: ManageSkillsInput) => {
+		async (input: ManageSkillsInput, config?: RunnableConfig) => {
+			const threadId: string | undefined = config?.configurable?.thread_id;
+			const attached = getAttachedSkillNames(skillsService, agentId);
+
 			if (input.type === "create") {
 				const nameValidation = validateSkillName(input.name);
 				if (!nameValidation.valid) {
@@ -187,6 +249,8 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 
 				if (!(await app.vault.adapter.exists(skillDir))) await app.vault.adapter.mkdir(skillDir);
 				await app.vault.adapter.write(skillPath, content);
+				// The model wrote this text, so it may patch it in this conversation without a load.
+				recordSkillLoaded(threadId, input.name);
 
 				const droppedNote =
 					dropped.length > 0 ? ` Dropped disallowed tool request(s): ${dropped.join(", ")}.` : "";
@@ -219,14 +283,19 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return `Deleted the "${input.name}" skill.`;
 			}
 
-			// input.type === "update"
-			const { skillName, newBody, newDescription } = input;
+			// input.type === "patch" | "update" — both revise an existing, attached skill.
+			const { skillName } = input;
 			const metadata = skillsService.getCachedSkills().get(skillName);
 			if (!metadata) {
 				return `Skill "${skillName}" not found. Attached skills: ${attached.join(", ")}`;
 			}
 			if (!attached.includes(skillName)) {
 				return `Skill "${skillName}" is not attached to this agent, so it cannot be edited here.`;
+			}
+			// Read before write: a revision is written against text the model has actually seen
+			// in this conversation, not a remembered or summarized copy (see skillLoadRegistry).
+			if (!wasSkillLoaded(threadId, skillName)) {
+				return `Load the "${skillName}" skill with load_skill first, then revise it: a revision must be written against the skill's current text as you have read it in this conversation.`;
 			}
 
 			const skillPath = `${metadata.path}/${SKILL_FILENAME}`;
@@ -238,7 +307,32 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return `Could not read the skill file at "${skillPath}".`;
 			}
 
-			const newContent = rebuildSkillMd(originalContent, newBody, newDescription);
+			let newContent: string | null;
+			let verb: string;
+			if (input.type === "patch") {
+				const body = skillBody(originalContent);
+				if (body === null) {
+					return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
+				}
+				const occurrences = body.split(input.oldText).length - 1;
+				if (occurrences === 0) {
+					const inFrontmatter = originalContent.includes(input.oldText);
+					return inFrontmatter
+						? `The passage is in the skill's frontmatter, which a patch cannot change. Use update with newDescription for the description; the other fields are locked.`
+						: `Could not find that passage in the "${skillName}" skill's body. Copy oldText exactly from the loaded skill (including whitespace and line breaks), or load it again if it changed.`;
+				}
+				if (occurrences > 1) {
+					return `That passage appears ${occurrences} times in the "${skillName}" skill. Include more surrounding text so oldText matches exactly once.`;
+				}
+				newContent = rebuildSkillMd(
+					originalContent,
+					body.replace(input.oldText, () => input.newText),
+				);
+				verb = "Patched";
+			} else {
+				newContent = rebuildSkillMd(originalContent, input.newBody, input.newDescription);
+				verb = "Updated";
+			}
 			if (newContent === null) {
 				return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
 			}
@@ -246,34 +340,16 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return "No changes made — the new content matches the current skill.";
 			}
 
-			// Validate the result and hard-guard the locked frontmatter fields.
-			const dirName = metadata.path.split("/").pop() ?? "";
-			const { frontmatter: newFm } = parseFrontmatter(newContent);
-			const validation = validateFrontmatter(newFm, dirName);
-			if (!validation.valid) {
-				return `Edit rejected — the result would be an invalid skill: ${validation.errors
-					.map((e) => e.message)
-					.join(", ")}`;
-			}
-			const oldFm = metadata.frontmatter;
-			if (newFm.name !== oldFm.name) {
-				return `Edit rejected — a skill's name cannot change (would break its folder and wiring).`;
-			}
-			if (
-				newFm.metadata?.linkedPlugin !== oldFm.metadata?.linkedPlugin ||
-				newFm.metadata?.corePluginId !== oldFm.metadata?.corePluginId ||
-				newFm.metadata?.category !== oldFm.metadata?.category
-			) {
-				return `Edit rejected — a skill's plugin link and category are locked; only the body and description can change.`;
-			}
+			const rejection = rejectInvalidRevision(metadata, newContent);
+			if (rejection) return rejection;
 
 			await app.vault.adapter.write(skillPath, newContent);
 
-			return `Updated the "${skillName}" skill.`;
+			return `${verb} the "${skillName}" skill.`;
 		},
 		{
 			name: "manage_skills",
-			description: `Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately — there is no review step. A skill's name and plugin link are locked once created. Attached skills: ${attached.join(", ")}`,
+			description: `Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
 			schema: manageSkillsSchema,
 		},
 	);
