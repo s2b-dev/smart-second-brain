@@ -1320,7 +1320,10 @@ export class PluginDataStore {
 
 	/** Usage counters for a skill, or undefined when it has never been loaded or revised. */
 	getSkillUsage(skillName: string): SkillUsageEntry | undefined {
-		return this.#data.skillUsage?.[skillName];
+		// Own keys only: a skill named like an Object.prototype member ("constructor",
+		// "toString" — valid skill names) must not read the inherited property as its counters.
+		const usage = this.#data.skillUsage;
+		return usage && Object.hasOwn(usage, skillName) ? usage[skillName] : undefined;
 	}
 
 	/** All usage counters, keyed by skill name. */
@@ -1331,7 +1334,9 @@ export class PluginDataStore {
 	private bumpSkillUsage(skillName: string, mutate: (entry: SkillUsageEntry) => void): void {
 		if (!this.#data.skillUsage) this.#data.skillUsage = {};
 		const usage = this.#data.skillUsage;
-		const entry = usage[skillName] ?? { loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
+		const entry = Object.hasOwn(usage, skillName)
+			? usage[skillName]
+			: { loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
 		mutate(entry);
 		usage[skillName] = entry;
 		void this.saveSettings();
@@ -1355,7 +1360,7 @@ export class PluginDataStore {
 
 	/** The skill is gone; a later skill of the same name starts from zero. */
 	forgetSkillUsage(skillName: string): void {
-		if (!this.#data.skillUsage?.[skillName]) return;
+		if (!this.#data.skillUsage || !Object.hasOwn(this.#data.skillUsage, skillName)) return;
 		delete this.#data.skillUsage[skillName];
 		void this.saveSettings();
 	}

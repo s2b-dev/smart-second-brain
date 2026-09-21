@@ -1179,4 +1179,19 @@ describe("PluginDataStore – skill usage", () => {
 		store.recordSkillLoad("x");
 		expect(store.getSkillUsage("x")?.loadCount).toBe(1);
 	});
+
+	// "constructor" and "toString" are valid skill names; the counters live in a plain
+	// object, so a lookup must not fall through to the inherited property.
+	it("never reads an Object.prototype member as a skill's counters", async () => {
+		const { store } = await freshStore();
+		expect(store.getSkillUsage("constructor")).toBeUndefined();
+		expect(store.getSkillUsage("toString")).toBeUndefined();
+
+		store.recordSkillLoad("constructor");
+		expect(store.getSkillUsage("constructor")).toMatchObject({ loadCount: 1, revisionCount: 0 });
+
+		store.forgetSkillUsage("toString"); // must be a no-op, not a delete of the prototype
+		store.forgetSkillUsage("constructor");
+		expect(store.getSkillUsage("constructor")).toBeUndefined();
+	});
 });
