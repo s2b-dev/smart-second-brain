@@ -1858,26 +1858,48 @@ export class AgentManager {
 	}
 
 	async setLastViewedCheckpoint(threadId: string, checkpointId: string): Promise<void> {
-		const snapshot = await this.chatManager.read(this.normalizeThreadId(threadId), true);
-		if (!snapshot) return;
+		await this.patchThreadMetadata(threadId, (metadata) =>
+			metadata.lastViewedCheckpointId === checkpointId
+				? null
+				: { ...metadata, lastViewedCheckpointId: checkpointId },
+		);
+	}
 
-		const currentLastViewed = snapshot.metadata?.lastViewedCheckpointId;
-		if (currentLastViewed === checkpointId) {
-			return;
-		}
+	/** One metadata patch at a time per thread (see {@link patchThreadMetadata}). */
+	private metadataPatchChains = new Map<string, Promise<unknown>>();
 
-		const metadata = {
-			...snapshot.metadata,
-			lastViewedCheckpointId: checkpointId,
+	/**
+	 * Read-modify-write a thread's metadata, serialized per thread: every writer that patches
+	 * metadata after the run (the last-viewed checkpoint, the review counter) goes through
+	 * here, so two of them landing together cannot each rebuild the object from a stale read
+	 * and discard the other's change. The patch sees the freshest snapshot and returns the new
+	 * metadata, or null to leave the thread untouched.
+	 */
+	private patchThreadMetadata(
+		threadId: string,
+		patch: (metadata: Record<string, unknown>) => Record<string, unknown> | null,
+	): Promise<void> {
+		const resolvedThreadId = this.normalizeThreadId(threadId);
+		const work = async () => {
+			const snapshot = await this.chatManager.read(resolvedThreadId, true);
+			if (!snapshot) return;
+			const metadata = patch({ ...snapshot.metadata });
+			if (!metadata) return;
+			await this.chatManager.write({
+				threadId: snapshot.threadId,
+				title: snapshot.title,
+				metadata,
+				createdAt: snapshot.createdAt,
+				updatedAt: snapshot.updatedAt,
+			});
 		};
-
-		await this.chatManager.write({
-			threadId: snapshot.threadId,
-			title: snapshot.title,
-			metadata,
-			createdAt: snapshot.createdAt,
-			updatedAt: snapshot.updatedAt,
-		});
+		const previous = this.metadataPatchChains.get(resolvedThreadId) ?? Promise.resolve();
+		const next = previous.then(work, work);
+		this.metadataPatchChains.set(
+			resolvedThreadId,
+			next.catch(() => undefined),
+		);
+		return next;
 	}
 
 	// --- post-turn review -------------------------------------------------------------------
@@ -1896,30 +1918,39 @@ export class AgentManager {
 			if (!agentCfg || !config?.enabled) return;
 			if (Platform.isMobile && !config.onMobile) return;
 			const resolvedThreadId = this.normalizeThreadId(threadId);
-			// The count lives in the thread's own metadata (see TOOL_CALLS_SINCE_REVIEW_KEY):
-			// read it, fold this turn in, write it back — a plain metadata update like
-			// setLastViewedCheckpoint, on a thread the run just persisted.
-			const snapshot = await this.chatManager.read(resolvedThreadId, true);
-			if (!snapshot) return;
-			const { due, callsSinceReview } = noteTurnForReview(
-				readCallsSinceReview(snapshot.metadata),
-				activity,
-				config.toolCallThreshold,
-			);
-			if (callsSinceReview !== readCallsSinceReview(snapshot.metadata)) {
-				await this.chatManager.write({
-					...snapshot,
-					metadata: { ...snapshot.metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: callsSinceReview },
-				});
-			}
+
+			// The count lives in the thread's own metadata (see TOOL_CALLS_SINCE_REVIEW_KEY).
+			// Fold this turn in and persist the running total; it is consumed only below, once
+			// a review has actually run, so a skipped or failed review keeps the trigger.
+			let due = false;
+			let consumed = 0;
+			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
+				const before = readCallsSinceReview(metadata);
+				const step = noteTurnForReview(before, activity, config.toolCallThreshold);
+				due = step.due;
+				const total = step.due ? before + activity.toolCalls : step.callsSinceReview;
+				consumed = step.due ? total : 0;
+				return total === before ? null : { ...metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: total };
+			});
 			if (!due) return;
-			if (this.reviewsInFlight.has(threadId)) return;
-			this.reviewsInFlight.add(threadId);
+			// Another review of this thread is running: keep the count and let the next turn
+			// trigger again once it is done.
+			if (this.reviewsInFlight.has(resolvedThreadId)) return;
+
+			this.reviewsInFlight.add(resolvedThreadId);
+			let ran = false;
 			try {
-				await this.runPostTurnReview(threadId, agentCfg);
+				ran = await this.runPostTurnReview(threadId, agentCfg);
 			} finally {
-				this.reviewsInFlight.delete(threadId);
+				this.reviewsInFlight.delete(resolvedThreadId);
 			}
+			if (!ran) return;
+			// Consume what this review covered. Calls a turn added while it was running stay,
+			// since that turn was not in the transcript it reviewed.
+			await this.patchThreadMetadata(resolvedThreadId, (metadata) => ({
+				...metadata,
+				[TOOL_CALLS_SINCE_REVIEW_KEY]: Math.max(0, readCallsSinceReview(metadata) - consumed),
+			}));
 		} catch (error) {
 			Logger.error("[AgentManager] Post-turn review failed:", error);
 		}
@@ -1931,13 +1962,13 @@ export class AgentManager {
 	 * plus `save_memory` as the only memory write path. No checkpointer — the review is not
 	 * part of the conversation and leaves no trace in it; what it changes is in the vault.
 	 */
-	private async runPostTurnReview(threadId: string, agentCfg: AgentConfig): Promise<void> {
+	private async runPostTurnReview(threadId: string, agentCfg: AgentConfig): Promise<boolean> {
 		const agent = await this.ensureAgent();
 		const history = await agent.getThreadHistory(threadId);
-		if (!history || history.messages.length === 0) return;
+		if (!history || history.messages.length === 0) return false;
 
 		const chatModel = agentCfg.postTurnReview?.model ?? agentCfg.chatModel;
-		if (!chatModel) return;
+		if (!chatModel) return false;
 		ensureProviderRegistered(getData(), chatModel.provider);
 		const params = await toChooseModelParams(chatModel);
 		const model = getRegistry().createChatInstance(params.provider, params.chatModel, params.options);
@@ -1945,7 +1976,7 @@ export class AgentManager {
 		const body = this.plugin.promptFilesService?.getAgentPrompt(agentCfg.id) ?? DEFAULT_AGENT_PROMPT;
 		const canRemember = body.includes(MEMORY_FOLDER_PLACEHOLDER);
 		const canRevise = this.isToolBound(agentCfg, "manage_skills");
-		if (!canRemember && !canRevise) return;
+		if (!canRemember && !canRevise) return false;
 
 		const memoryFolder = normalizePath(memoriesDir());
 		const reviewerTools = this.buildToolsForAgent(agentCfg).filter((tool) =>
@@ -1996,10 +2027,11 @@ export class AgentManager {
 		const actions = summarizeReviewActions(messages);
 		if (actions.length === 0) {
 			Logger.log("[AgentManager] Post-turn review: nothing to save");
-			return;
+			return true;
 		}
 		Logger.log(`[AgentManager] Post-turn review: ${actions.join("; ")}`);
 		new Notice(`${agentCfg.name} learned: ${actions.join("; ")}`, 8000);
+		return true;
 	}
 
 	/**
