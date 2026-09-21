@@ -33,11 +33,13 @@ import {
 	toExecToolId,
 } from "../../agent/integrations/pluginIntegrations";
 import { DEFAULT_AGENT_PROMPT } from "../../agent/prompts";
+import { DEFAULT_POST_TURN_REVIEW } from "../../agent/postTurnReview";
 import { normalizeShipped } from "../../utils/shippedDefaults";
 import { agentDefinitionPath, agentDir } from "../../utils/agentPaths";
 import { Logger } from "../../utils/logging";
 import { extractErrorMessage } from "../../utils/errorMessage";
 import { humanizeSkillName } from "../../skills";
+import { skillUsageSummary } from "../../skills/usageSummary";
 import {
 	DEFAULT_AGENT_ICON,
 	type AgentConfig,
@@ -233,6 +235,46 @@ function resetTitleModel() {
 	void applyChanges();
 }
 
+// --- Post-turn review ---
+
+const postTurnReview = $derived(selectedAgent?.postTurnReview ?? DEFAULT_POST_TURN_REVIEW);
+
+const currentReviewModelDisplay = $derived.by(() => {
+	if (!postTurnReview.model) return null;
+	const providerDef = getProviderDefinition(postTurnReview.model.provider, pluginData.getAllProviderMeta());
+	return {
+		model: postTurnReview.model.model,
+		logo: providerDef && "logo" in providerDef && providerDef.logo ? providerDef.logo : GenericAIIcon,
+	};
+});
+
+function setPostTurnReviewEnabled(enabled: boolean) {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, enabled } });
+}
+
+function openReviewModelSelectionModal() {
+	const currentSelection = postTurnReview.model
+		? { provider: postTurnReview.model.provider, model: postTurnReview.model.model }
+		: null;
+	new ModelSelectionModal(plugin, "chat", currentSelection, (selected) => {
+		if (!selected) return;
+		pluginData.updateAgent(agentId, {
+			postTurnReview: {
+				...postTurnReview,
+				model: buildPersistedChatModel(selected.provider, selected.model, postTurnReview.model),
+			},
+		});
+	}).open();
+}
+
+function resetReviewModel() {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, model: null } });
+}
+
+function setPostTurnReviewOnMobile(onMobile: boolean) {
+	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, onMobile } });
+}
+
 function openAgentNote() {
 	if (!selectedAgent) return;
 	const path = normalizePath(agentDefinitionPath(agentId));
@@ -302,6 +344,8 @@ const skills = $derived.by(() => {
 			category: metadata.category ?? "custom",
 			corePluginId: metadata.corePluginId,
 			linkedPluginId: metadata.linkedPluginId,
+			author: metadata.frontmatter.metadata?.author,
+			usage: pluginData.getSkillUsage(skillName),
 		});
 	}
 	return result;
@@ -1001,6 +1045,50 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {/each}
       </SettingGroup>
 
+      <SettingGroup heading="Self-improvement">
+        <div class="setting-item agent-section-intro">
+          <div class="setting-item-info">
+            <div class="setting-item-description">
+              After a busy turn, a short side run reviews the conversation and keeps what it
+              taught: a durable fact about you goes to memory, a lesson about how a task is done
+              goes into the skill that was used. It runs right after the answer, once the turns
+              since the last review add up to {postTurnReview.toolCallThreshold} tool calls, not
+              counting skill loads (the count is kept with the chat). A notice names what was
+              saved; most reviews save nothing.
+            </div>
+          </div>
+        </div>
+        <SettingItem name="Review after busy turns" desc="Off by default. Each review costs one extra model call over the conversation.">
+          <Toggle checked={postTurnReview.enabled} onchange={() => setPostTurnReviewEnabled(!postTurnReview.enabled)} />
+        </SettingItem>
+        {#if postTurnReview.enabled}
+          <SettingItem name="Review model" desc="A cheaper model is fine here; the review reads and writes short notes.">
+            <ModelSettingControl
+              available={models.hasProviders && models.hasModels}
+              loading={models.hasProviders && models.isLoadingModels}
+              configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
+              unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
+              onConfigure={() => models.openSettings(() => modal.close())}
+              placeholder="Auto (same as chat model)"
+              selectedLabel={currentReviewModelDisplay?.model ?? null}
+              selectedLogo={currentReviewModelDisplay?.logo ?? null}
+              onSelect={openReviewModelSelectionModal}
+              secondaryLabel={postTurnReview.model ? "Reset" : undefined}
+              onSecondary={postTurnReview.model ? resetReviewModel : undefined}
+            />
+          </SettingItem>
+          <SettingItem
+            name="Also on mobile"
+            desc="Off by default: a review on a phone spends battery and data on work you are not watching."
+          >
+            <Toggle
+              checked={postTurnReview.onMobile}
+              onchange={() => setPostTurnReviewOnMobile(!postTurnReview.onMobile)}
+            />
+          </SettingItem>
+        {/if}
+      </SettingGroup>
+
       <SettingGroup heading="Subagents">
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
@@ -1053,7 +1141,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             class="skill-entity"
             name={ext.displayName}
             desc={ext.description}
-            meta="Stored as a custom skill in the vault configuration."
+            meta={skillUsageSummary(ext.author, ext.usage)}
           >
             {#snippet actions()}
               <Button

@@ -191,14 +191,23 @@ const MIGRATIONS: Migration[] = [
 			}
 		}
 	},
-	// v13 → v14: the experimental voice mode settings block was added. The top-level
-	//            default spread in `createData` would supply it anyway; seeding it here
-	//            keeps partially-written data (e.g. a sync conflict copy) well-formed.
+	// v13 → v14: `manage_skills` was seeded `enabled: false` by accident, so every agent
+	//            created before this carries a veto nobody chose. That veto hid the "revise the
+	//            skill before you finish" guidance, kept the post-turn reviewer from revising
+	//            anything, and left the memory doctrine promising skill revisions that could
+	//            never happen. The default is now on; stored configs are flipped to match,
+	//            since the stored false is the seed, not a decision (nobody has yet had a
+	//            reason to switch it off on purpose).
 	(data) => {
-		data.voice ??= structuredClone(DEFAULT_VOICE_SETTINGS);
+		for (const agent of Object.values(data.agents ?? {})) {
+			const manageSkills = agent.toolsConfig?.manage_skills as unknown as Record<string, unknown> | undefined;
+			if (manageSkills) manageSkills.enabled = true;
+		}
 	},
-	// v14 → v15: `voice.orbStyle` added. The top-level default spread does not reach
-	//            into nested blocks, so fill any key the stored block lacks.
+	// v14 → v15: the experimental voice mode settings block (`voice`) was added, and
+	//            later gained `orbStyle`. The top-level default spread in `createData`
+	//            supplies a missing block but does not reach into a stored one, so this
+	//            seeds the block when absent and fills any key it lacks when present.
 	(data) => {
 		data.voice = { ...structuredClone(DEFAULT_VOICE_SETTINGS), ...(data.voice ?? {}) };
 	},

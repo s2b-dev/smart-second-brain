@@ -1,7 +1,10 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
+import { HumanMessage } from "@langchain/core/messages";
+import { createAgent } from "langchain";
+import { Notice, normalizePath, Platform, TFile, type WorkspaceLeaf } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
+import { createAiTransportContext, runWithAiTransportContext } from "../lib/aiTransport";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
 import type { ChatModel } from "../stores/chatTimeline";
@@ -62,6 +65,24 @@ import {
 	substitutePromptPlaceholders,
 } from "./prompts";
 import { collectMemoryIndex, renderMemoryIndex } from "./memoryNotes";
+import {
+	type TurnActivity,
+	buildReviewSystemPrompt,
+	buildReviewUserMessage,
+	noteTurnForReview,
+	readCallsSinceReview,
+	readReviewGeneration,
+	renderTranscript,
+	summarizeReviewActions,
+	REVIEW_GENERATION_KEY,
+	TOOL_CALLS_SINCE_REVIEW_KEY,
+} from "./postTurnReview";
+import { createSaveMemoryTool } from "./tools/saveMemory";
+
+/** The agent's own tools a reviewer may hold as they are: reading and skill loading. Skill revision is added separately, without delete. */
+const REVIEWER_TOOL_NAMES = new Set(["read_content", "list_directory", "grep_notes", "load_skill"]);
+/** A review is a handful of reads and at most a few writes; anything longer is the model looping. */
+const REVIEWER_RECURSION_LIMIT = 40;
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
@@ -467,7 +488,7 @@ export class AgentManager {
 		);
 		if (contextXml) {
 			prompt +=
-				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. Skills carry the user's conventions and verified procedures for a kind of task, so load a skill with the `load_skill` tool whenever one matches or partly matches what you are doing, even for tasks you already know how to do. Do not load skills that are unrelated to the task.";
+				"\n\n# Skills\nThe following available_skills section lists skills that can help you with specific tasks. Skills carry the user's conventions and verified procedures for a kind of task, so load a skill with the `load_skill` tool whenever one matches or partly matches what you are doing, even for tasks you already know how to do. Load each skill once per conversation: if its instructions are still in this conversation from an earlier `load_skill` call, they still apply, so do not load it again. Do not load skills that are unrelated to the task.";
 			// Only when the tool is actually bound: teaching the model to revise skills with a
 			// tool it cannot call would just produce failed calls.
 			if (this.isToolBound(selectedAgent, "manage_skills")) {
@@ -801,7 +822,7 @@ export class AgentManager {
 	 *
 	 *  - **Per-tool overrides.** A skill declaring `allowed-tools` needs at least one of its
 	 *    declared built-in tools to survive the `toolsConfig` veto (e.g. the manage-skills
-	 *    core skill while the `manage_skills` tool is disabled — the out-of-the-box default).
+	 *    core skill while the `manage_skills` tool is vetoed in the Tools modal).
 	 *    Unknown (non-built-in) ids don't count as declared tools, matching `attachedToolIds`.
 	 *  - **Plugin exec approval.** A skill linked to a plugin that exposes an `api` is backed
 	 *    by that plugin's `exec_<plugin>` tool, which is gated *separately* by the per-agent
@@ -980,6 +1001,7 @@ export class AgentManager {
 				tools.push(
 					createLoadSkillTool(this.plugin.skillsService, {
 						skillNames: loadableSkills,
+						recordUsage: (name) => getData().recordSkillLoad(name),
 						isToolAvailable: (toolId) => {
 							if (BUILT_IN_TOOL_IDS.includes(toolId as BuiltInToolId)) {
 								return boundBuiltInTools.has(toolId);
@@ -1838,26 +1860,190 @@ export class AgentManager {
 	}
 
 	async setLastViewedCheckpoint(threadId: string, checkpointId: string): Promise<void> {
-		const snapshot = await this.chatManager.read(this.normalizeThreadId(threadId), true);
-		if (!snapshot) return;
+		await this.patchThreadMetadata(threadId, (metadata) =>
+			metadata.lastViewedCheckpointId === checkpointId
+				? null
+				: { ...metadata, lastViewedCheckpointId: checkpointId },
+		);
+	}
 
-		const currentLastViewed = snapshot.metadata?.lastViewedCheckpointId;
-		if (currentLastViewed === checkpointId) {
-			return;
-		}
+	/** One metadata patch at a time per thread (see {@link patchThreadMetadata}). */
+	private metadataPatchChains = new Map<string, Promise<unknown>>();
 
-		const metadata = {
-			...snapshot.metadata,
-			lastViewedCheckpointId: checkpointId,
+	/**
+	 * Read-modify-write a thread's metadata, serialized per thread: every writer that patches
+	 * metadata after the run (the last-viewed checkpoint, the review counter) goes through
+	 * here, so two of them landing together cannot each rebuild the object from a stale read
+	 * and discard the other's change. The patch sees the freshest snapshot and returns the new
+	 * metadata, or null to leave the thread untouched.
+	 */
+	private patchThreadMetadata(
+		threadId: string,
+		patch: (metadata: Record<string, unknown>) => Record<string, unknown> | null,
+	): Promise<void> {
+		const resolvedThreadId = this.normalizeThreadId(threadId);
+		const work = async () => {
+			const snapshot = await this.chatManager.read(resolvedThreadId, true);
+			if (!snapshot) return;
+			const metadata = patch({ ...snapshot.metadata });
+			if (!metadata) return;
+			await this.chatManager.write({
+				threadId: snapshot.threadId,
+				title: snapshot.title,
+				metadata,
+				createdAt: snapshot.createdAt,
+				updatedAt: snapshot.updatedAt,
+			});
 		};
+		const previous = this.metadataPatchChains.get(resolvedThreadId) ?? Promise.resolve();
+		const next = previous.then(work, work);
+		this.metadataPatchChains.set(
+			resolvedThreadId,
+			next.catch(() => undefined),
+		);
+		return next;
+	}
 
-		await this.chatManager.write({
-			threadId: snapshot.threadId,
-			title: snapshot.title,
-			metadata,
-			createdAt: snapshot.createdAt,
-			updatedAt: snapshot.updatedAt,
-		});
+	// --- post-turn review -------------------------------------------------------------------
+
+	/** Threads with a review in flight; a second busy turn while one runs is simply skipped. */
+	private reviewsInFlight = new Set<string>();
+
+	/**
+	 * Called by the chat store after every successful turn. Decides whether the turn earned a
+	 * review (see `noteTurnForReview`) and, if so, runs one detached. Never throws.
+	 */
+	async maybeRunPostTurnReview(threadId: string, agentId: string, activity: TurnActivity): Promise<void> {
+		try {
+			const agentCfg = agentId ? getData().getAgent(agentId) : getData().getSelectedAgent();
+			const config = agentCfg?.postTurnReview;
+			if (!agentCfg || !config?.enabled) return;
+			if (Platform.isMobile && !config.onMobile) return;
+			const resolvedThreadId = this.normalizeThreadId(threadId);
+
+			// The count lives in the thread's own metadata (see TOOL_CALLS_SINCE_REVIEW_KEY).
+			// Fold this turn in and persist the running total; it is consumed only below, once
+			// a review has actually run, so a skipped or failed review keeps the trigger.
+			let due = false;
+			let consumed = 0;
+			let generation = 0;
+			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
+				const before = readCallsSinceReview(metadata);
+				generation = readReviewGeneration(metadata);
+				const step = noteTurnForReview(before, activity, config.toolCallThreshold);
+				due = step.due;
+				const total = step.due ? before + activity.toolCalls : step.callsSinceReview;
+				consumed = step.due ? total : 0;
+				// A reset by a skill-revising turn starts a new generation (see
+				// REVIEW_GENERATION_KEY), so a review still running cannot consume from it.
+				const next: Record<string, unknown> = { ...metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: total };
+				if (activity.revisedSkills && before > 0) next[REVIEW_GENERATION_KEY] = generation + 1;
+				return total === before ? null : next;
+			});
+			if (!due) return;
+			// Another review of this thread is running: keep the count and let the next turn
+			// trigger again once it is done.
+			if (this.reviewsInFlight.has(resolvedThreadId)) return;
+
+			this.reviewsInFlight.add(resolvedThreadId);
+			let ran = false;
+			try {
+				ran = await this.runPostTurnReview(threadId, agentCfg);
+			} finally {
+				this.reviewsInFlight.delete(resolvedThreadId);
+			}
+			if (!ran) return;
+			// Consume what this review covered. Calls a turn added while it was running stay,
+			// since that turn was not in the transcript it reviewed; and if a skill-revising turn
+			// reset the count meanwhile, this review's share is already gone with it.
+			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
+				if (readReviewGeneration(metadata) !== generation) return null;
+				return {
+					...metadata,
+					[TOOL_CALLS_SINCE_REVIEW_KEY]: Math.max(0, readCallsSinceReview(metadata) - consumed),
+				};
+			});
+		} catch (error) {
+			Logger.error("[AgentManager] Post-turn review failed:", error);
+		}
+	}
+
+	/**
+	 * One side run over the finished thread with a reviewer prompt and a read-and-revise tool
+	 * set: the agent's own gated tools filtered to reading, skill loading and `manage_skills`,
+	 * plus `save_memory` as the only memory write path. No checkpointer — the review is not
+	 * part of the conversation and leaves no trace in it; what it changes is in the vault.
+	 */
+	private async runPostTurnReview(threadId: string, agentCfg: AgentConfig): Promise<boolean> {
+		const agent = await this.ensureAgent();
+		const history = await agent.getThreadHistory(threadId);
+		if (!history || history.messages.length === 0) return false;
+
+		const chatModel = agentCfg.postTurnReview?.model ?? agentCfg.chatModel;
+		if (!chatModel) return false;
+		ensureProviderRegistered(getData(), chatModel.provider);
+		const params = await toChooseModelParams(chatModel);
+		const model = getRegistry().createChatInstance(params.provider, params.chatModel, params.options);
+
+		const body = this.plugin.promptFilesService?.getAgentPrompt(agentCfg.id) ?? DEFAULT_AGENT_PROMPT;
+		const canRemember = body.includes(MEMORY_FOLDER_PLACEHOLDER);
+		const canRevise = this.isToolBound(agentCfg, "manage_skills");
+		if (!canRemember && !canRevise) return false;
+
+		const memoryFolder = normalizePath(memoriesDir());
+		const reviewerTools = this.buildToolsForAgent(agentCfg).filter((tool) =>
+			REVIEWER_TOOL_NAMES.has((tool as { name: string }).name),
+		);
+		if (canRevise) {
+			reviewerTools.push(
+				createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id, { allowDelete: false }),
+			);
+		}
+		if (canRemember) reviewerTools.push(createSaveMemoryTool(this.plugin.app, memoryFolder));
+
+		const skillsService = this.plugin.skillsService;
+		let skillsXml = "";
+		if (canRevise && skillsService?.isDiscovered()) {
+			const enableState: Record<string, boolean> = {};
+			for (const [name, meta] of skillsService.getCachedSkills()) {
+				enableState[name] =
+					(agentCfg.skills[name]?.enabled ?? true) && this.skillHasUsableTools(agentCfg, meta);
+			}
+			skillsXml = skillsService.generateContextXml(
+				enableState,
+				(id) => this.isPluginEnabled(id),
+				(id) => this.isInternalPluginEnabled(id),
+			);
+		}
+		const memoryIndex = canRemember
+			? renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder))
+			: "";
+
+		const systemPrompt = buildReviewSystemPrompt({ memoryIndex, memoryFolder, skillsXml, canRevise, canRemember });
+		const reviewer = createAgent({ model, tools: reviewerTools, systemPrompt });
+		const transcript = renderTranscript(history.messages);
+
+		Logger.log(`[AgentManager] Post-turn review of ${threadId} with ${params.provider}:${params.chatModel}`);
+		// Buffered transport, like title generation: a non-streaming side call that must
+		// never disturb a concurrent chat stream's transport context.
+		const transportContext = createAiTransportContext("buffered", `postTurnReview:${threadId}`);
+		const result = await runWithAiTransportContext(transportContext, () =>
+			reviewer.invoke(
+				{ messages: [new HumanMessage(buildReviewUserMessage(transcript))] },
+				// The thread id is what lets manage_skills accept a skill the conversation
+				// already loaded (the load registry is keyed by it).
+				{ configurable: { thread_id: threadId }, recursionLimit: REVIEWER_RECURSION_LIMIT },
+			),
+		);
+		const messages = (result as { messages?: BaseMessage[] }).messages ?? [];
+		const actions = summarizeReviewActions(messages);
+		if (actions.length === 0) {
+			Logger.log("[AgentManager] Post-turn review: nothing to save");
+			return true;
+		}
+		Logger.log(`[AgentManager] Post-turn review: ${actions.join("; ")}`);
+		new Notice(`${agentCfg.name} learned: ${actions.join("; ")}`, 8000);
+		return true;
 	}
 
 	/**

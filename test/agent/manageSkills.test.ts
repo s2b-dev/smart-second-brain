@@ -9,11 +9,14 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 
 import type { App } from "obsidian";
 import type { SkillsService } from "../../src/skills/SkillsService";
+import { z } from "zod";
 import { createManageSkillsTool } from "../../src/agent/tools/manageSkills";
 import { recordSkillLoaded, resetSkillLoadRegistry } from "../../src/agent/tools/skillLoadRegistry";
 import { parseFrontmatter } from "../../src/skills/SkillsService";
 
 const RUN_CONFIG = { configurable: { thread_id: "t1" }, runId: "run-1" };
+const recordSkillRevision = vi.fn();
+const forgetSkillUsage = vi.fn();
 
 const DATAVIEW_MD = `---
 name: dataview
@@ -113,7 +116,11 @@ describe("manage_skills tool", () => {
 		mockGetData.mockReturnValue({
 			getAgent: () => agentWithSkills({ other: { enabled: false } }),
 			getSelectedAgent: () => agentWithSkills({ other: { enabled: false } }),
+			recordSkillRevision,
+			forgetSkillUsage,
 		});
+		recordSkillRevision.mockClear();
+		forgetSkillUsage.mockClear();
 		// Revisions require the skill to have been loaded in this thread; most tests below
 		// exercise what happens after that, so satisfy the gate up front.
 		resetSkillLoadRegistry();
@@ -129,10 +136,13 @@ describe("manage_skills tool", () => {
 			const otherThread = { configurable: { thread_id: "t2" } };
 
 			const patched = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." } },
 				otherThread,
 			);
-			const updated = await t.invoke({ type: "update", skillName: "dataview", newBody: "x" }, otherThread);
+			const updated = await t.invoke(
+				{ operation: { type: "update", skillName: "dataview", newBody: "x" } },
+				otherThread,
+			);
 
 			expect(patched).toMatch(/load_skill first/);
 			expect(updated).toMatch(/load_skill first/);
@@ -145,12 +155,22 @@ describe("manage_skills tool", () => {
 			const { app, store } = makeApp({});
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
-			await t.invoke({ type: "create", name: "weekly-review", description: "d", body: "Step one." }, RUN_CONFIG);
+			await t.invoke(
+				{ operation: { type: "create", name: "weekly-review", description: "d", body: "Step one." } },
+				RUN_CONFIG,
+			);
 			// No manual cache insert: create goes through writeSkillFile, which caches the entry.
 			expect(cache.has("weekly-review")).toBe(true);
 
 			const res = await t.invoke(
-				{ type: "patch", skillName: "weekly-review", oldText: "Step one.", newText: "Step one, then two." },
+				{
+					operation: {
+						type: "patch",
+						skillName: "weekly-review",
+						oldText: "Step one.",
+						newText: "Step one, then two.",
+					},
+				},
 				RUN_CONFIG,
 			);
 			expect(res).toMatch(/patched/i);
@@ -166,10 +186,13 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const patched = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "x" },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "x" } },
 				RUN_CONFIG,
 			);
-			const updated = await t.invoke({ type: "update", skillName: "dataview", newBody: "x" }, RUN_CONFIG);
+			const updated = await t.invoke(
+				{ operation: { type: "update", skillName: "dataview", newBody: "x" } },
+				RUN_CONFIG,
+			);
 
 			expect(patched).toMatch(/changed since you loaded it/);
 			expect(updated).toMatch(/changed since you loaded it/);
@@ -182,11 +205,18 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "Step one." },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "Step one." } },
 				RUN_CONFIG,
 			);
 			const res = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Step one.", newText: "Step one and two." },
+				{
+					operation: {
+						type: "patch",
+						skillName: "dataview",
+						oldText: "Step one.",
+						newText: "Step one and two.",
+					},
+				},
 				RUN_CONFIG,
 			);
 
@@ -202,7 +232,14 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const res = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "Use api.pages()." },
+				{
+					operation: {
+						type: "patch",
+						skillName: "dataview",
+						oldText: "Old body.",
+						newText: "Use api.pages().",
+					},
+				},
 				RUN_CONFIG,
 			);
 
@@ -223,7 +260,7 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const res = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." } },
 				RUN_CONFIG,
 			);
 
@@ -243,10 +280,12 @@ describe("manage_skills tool", () => {
 
 			const res = await t.invoke(
 				{
-					type: "patch",
-					skillName: "dataview",
-					oldText: "# Dataview\n\nOld body.",
-					newText: "# Dataview\n\nOne.\nTwo.",
+					operation: {
+						type: "patch",
+						skillName: "dataview",
+						oldText: "# Dataview\n\nOld body.",
+						newText: "# Dataview\n\nOne.\nTwo.",
+					},
 				},
 				RUN_CONFIG,
 			);
@@ -264,7 +303,7 @@ describe("manage_skills tool", () => {
 			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
 			await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old body.", newText: "$& $1" },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "$& $1" } },
 				RUN_CONFIG,
 			);
 			expect(write.mock.calls[0][1]).toContain("$& $1");
@@ -274,7 +313,10 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			await t.invoke({ type: "patch", skillName: "dataview", oldText: "\n\nOld body.", newText: "" }, RUN_CONFIG);
+			await t.invoke(
+				{ operation: { type: "patch", skillName: "dataview", oldText: "\n\nOld body.", newText: "" } },
+				RUN_CONFIG,
+			);
 			const [, newContent] = write.mock.calls[0];
 			expect(newContent).not.toContain("Old body.");
 			expect(newContent).toContain("# Dataview");
@@ -286,11 +328,11 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const missing = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "not in there", newText: "x" },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "not in there", newText: "x" } },
 				RUN_CONFIG,
 			);
 			const frontmatter = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Old description", newText: "x" },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old description", newText: "x" } },
 				RUN_CONFIG,
 			);
 
@@ -306,7 +348,7 @@ describe("manage_skills tool", () => {
 			recordSkillLoaded("t1", "dataview", parseFrontmatter(twice).body);
 			const t = createManageSkillsTool(svc, app, "agent-1");
 			const res = await t.invoke(
-				{ type: "patch", skillName: "dataview", oldText: "Step.", newText: "x" },
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Step.", newText: "x" } },
 				RUN_CONFIG,
 			);
 			expect(res).toMatch(/appears 2 times/);
@@ -317,9 +359,93 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, write } = makeApp({ "Agents/Skills/other/SKILL.md": "" });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "patch", skillName: "other", oldText: "a", newText: "b" }, RUN_CONFIG);
+			const res = await t.invoke(
+				{ operation: { type: "patch", skillName: "other", oldText: "a", newText: "b" } },
+				RUN_CONFIG,
+			);
 			expect(res).toMatch(/not attached/i);
 			expect(write).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("usage and provenance", () => {
+		it("stamps metadata.author: agent on a created skill", async () => {
+			const cache = dataviewCache();
+			const svc = makeSkillsService(cache);
+			const { app, store } = makeApp({});
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke(
+				{ operation: { type: "create", name: "weekly-review", description: "d", body: "Step one." } },
+				RUN_CONFIG,
+			);
+
+			const written = store["Agents/Skills/weekly-review/SKILL.md"];
+			expect(written).toContain("metadata:\n  author: agent\n---");
+			expect(parseFrontmatter(written).frontmatter.metadata?.author).toBe("agent");
+		});
+
+		it("counts a patch and an update as revisions", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke(
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "A." } },
+				RUN_CONFIG,
+			);
+			await t.invoke(
+				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nB." } },
+				RUN_CONFIG,
+			);
+
+			expect(recordSkillRevision).toHaveBeenCalledTimes(2);
+			expect(recordSkillRevision).toHaveBeenCalledWith("dataview");
+		});
+
+		it("does not count a refused or no-op revision", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke(
+				{ operation: { type: "patch", skillName: "dataview", oldText: "missing", newText: "x" } },
+				RUN_CONFIG,
+			);
+			await t.invoke(
+				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nOld body." } },
+				RUN_CONFIG,
+			);
+
+			expect(recordSkillRevision).not.toHaveBeenCalled();
+		});
+
+		it("forgets a deleted skill's counters", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1");
+
+			await t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG);
+
+			expect(forgetSkillUsage).toHaveBeenCalledWith("dataview");
+		});
+	});
+
+	describe("reviewer variant", () => {
+		it("has no delete operation in its schema but still patches", async () => {
+			const svc = makeSkillsService(dataviewCache());
+			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
+			const t = createManageSkillsTool(svc, app, "agent-1", { allowDelete: false });
+
+			await expect(t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG)).rejects.toThrow();
+			expect(t.description).not.toContain("delete");
+
+			const res = await t.invoke(
+				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." } },
+				RUN_CONFIG,
+			);
+			expect(res).toMatch(/patched/i);
+			expect(write).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -330,7 +456,13 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const res = await t.invoke(
-				{ type: "update", skillName: "dataview", newBody: "# Dataview\n\nVerified: use api.pages()." },
+				{
+					operation: {
+						type: "update",
+						skillName: "dataview",
+						newBody: "# Dataview\n\nVerified: use api.pages().",
+					},
+				},
 				RUN_CONFIG,
 			);
 
@@ -351,10 +483,12 @@ describe("manage_skills tool", () => {
 
 			await t.invoke(
 				{
-					type: "update",
-					skillName: "dataview",
-					newBody: "# Dataview\n\nBody.",
-					newDescription: "New verified description",
+					operation: {
+						type: "update",
+						skillName: "dataview",
+						newBody: "# Dataview\n\nBody.",
+						newDescription: "New verified description",
+					},
 				},
 				RUN_CONFIG,
 			);
@@ -372,7 +506,10 @@ describe("manage_skills tool", () => {
 			recordSkillLoaded("t1", "dataview", parseFrontmatter(raw).body);
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
-			await t.invoke({ type: "update", skillName: "dataview", newBody: "# Dataview\n\nOne.\nTwo." }, RUN_CONFIG);
+			await t.invoke(
+				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nOne.\nTwo." } },
+				RUN_CONFIG,
+			);
 
 			const written = String(write.mock.calls[0][1]);
 			expect(written).toContain("One.\r\nTwo.");
@@ -384,7 +521,7 @@ describe("manage_skills tool", () => {
 			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
 			const res = await t.invoke(
-				{ type: "update", skillName: "dataview", newBody: "# Dataview\n\nOld body." },
+				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nOld body." } },
 				RUN_CONFIG,
 			);
 			expect(write).not.toHaveBeenCalled();
@@ -395,7 +532,7 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, write } = makeApp({ "Agents/Skills/other/SKILL.md": "" });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "update", skillName: "other", newBody: "x" }, RUN_CONFIG);
+			const res = await t.invoke({ operation: { type: "update", skillName: "other", newBody: "x" } }, RUN_CONFIG);
 			expect(res).toMatch(/not attached/i);
 			expect(write).not.toHaveBeenCalled();
 		});
@@ -408,7 +545,14 @@ describe("manage_skills tool", () => {
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
 			const res = await t.invoke(
-				{ type: "create", name: "weekly-review", description: "Reviews the week", body: "Do the review." },
+				{
+					operation: {
+						type: "create",
+						name: "weekly-review",
+						description: "Reviews the week",
+						body: "Do the review.",
+					},
+				},
 				RUN_CONFIG,
 			);
 
@@ -426,7 +570,10 @@ describe("manage_skills tool", () => {
 			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
 
-			const res = await t.invoke({ type: "create", name: "dataview", description: "x", body: "y" }, RUN_CONFIG);
+			const res = await t.invoke(
+				{ operation: { type: "create", name: "dataview", description: "x", body: "y" } },
+				RUN_CONFIG,
+			);
 
 			expect(res).toMatch(/already exists/i);
 			expect(write).not.toHaveBeenCalled();
@@ -436,7 +583,10 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, write } = makeApp({});
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "create", name: "Not Valid!", description: "x", body: "y" }, RUN_CONFIG);
+			const res = await t.invoke(
+				{ operation: { type: "create", name: "Not Valid!", description: "x", body: "y" } },
+				RUN_CONFIG,
+			);
 			expect(res).toMatch(/invalid name/i);
 			expect(write).not.toHaveBeenCalled();
 		});
@@ -448,11 +598,13 @@ describe("manage_skills tool", () => {
 
 			const res = await t.invoke(
 				{
-					type: "create",
-					name: "my-skill",
-					description: "x",
-					body: "y",
-					allowedTools: ["search_notes", "manage_notes", "execute_javascript", "manage_skills"],
+					operation: {
+						type: "create",
+						name: "my-skill",
+						description: "x",
+						body: "y",
+						allowedTools: ["search_notes", "manage_notes", "execute_javascript", "manage_skills"],
+					},
 				},
 				RUN_CONFIG,
 			);
@@ -471,7 +623,7 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, rmdir } = makeApp({});
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "delete", name: "explore-vault" }, RUN_CONFIG);
+			const res = await t.invoke({ operation: { type: "delete", name: "explore-vault" } }, RUN_CONFIG);
 			expect(res).toMatch(/cannot be deleted/i);
 			expect(rmdir).not.toHaveBeenCalled();
 		});
@@ -480,7 +632,7 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, rmdir } = makeApp({ "Agents/Skills/other/SKILL.md": "" });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "delete", name: "other" }, RUN_CONFIG);
+			const res = await t.invoke({ operation: { type: "delete", name: "other" } }, RUN_CONFIG);
 			expect(res).toMatch(/not attached/i);
 			expect(rmdir).not.toHaveBeenCalled();
 		});
@@ -489,7 +641,7 @@ describe("manage_skills tool", () => {
 			const svc = makeSkillsService(dataviewCache());
 			const { app, rmdir, store } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			const res = await t.invoke({ type: "delete", name: "dataview" }, RUN_CONFIG);
+			const res = await t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG);
 
 			expect(rmdir).toHaveBeenCalledWith("Agents/Skills/dataview", true);
 			expect(store["Agents/Skills/dataview/SKILL.md"]).toBeUndefined();
@@ -501,13 +653,38 @@ describe("manage_skills tool", () => {
 			const agent = agentWithSkills({ other: { enabled: false }, dataview: { enabled: true } });
 			mockGetData.mockReturnValue({
 				getAgent: () => agent,
+				recordSkillRevision,
+				forgetSkillUsage,
 				getSelectedAgent: () => agent,
 			});
 			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
 			const t = createManageSkillsTool(svc, app, "agent-1");
-			await t.invoke({ type: "delete", name: "dataview" }, RUN_CONFIG);
+			await t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG);
 
 			expect("dataview" in agent.skills).toBe(false);
 		});
+	});
+});
+
+// Every provider's function-calling API wants a root-level object; the operations union
+// used to sit at the root and rendered as a bare `anyOf`, which OpenAI rejected on every
+// request the moment the tool was bound.
+describe("manage_skills schema", () => {
+	it("is a root-level object for both the agent and the reviewer variant", () => {
+		mockGetData.mockReturnValue({
+			getAgent: () => agentWithSkills({}),
+			getSelectedAgent: () => agentWithSkills({}),
+		});
+		const svc = makeSkillsService(dataviewCache());
+		const { app } = makeApp({});
+		for (const options of [{}, { allowDelete: false }]) {
+			const t = createManageSkillsTool(svc, app, "agent-1", options);
+			const json = z.toJSONSchema(t.schema as z.ZodType) as {
+				type?: string;
+				properties?: Record<string, unknown>;
+			};
+			expect(json.type).toBe("object");
+			expect(Object.keys(json.properties ?? {})).toEqual(["operation"]);
+		}
 	});
 });

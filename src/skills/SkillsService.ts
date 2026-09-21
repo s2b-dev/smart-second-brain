@@ -1018,6 +1018,16 @@ export class SkillsService {
 			}
 
 			this.skillsCache.delete(skillName);
+			// Drop the usage counters with the skill, whichever surface deleted it (the Agent
+			// editor's trash button lands here; manage_skills removes the folder itself and
+			// forgets on its own). A later skill of the same name must start from zero.
+			// Advisory data: a store that is not up yet must not turn a completed delete
+			// into a reported failure.
+			try {
+				getData().forgetSkillUsage(skillName);
+			} catch {
+				Log.debug(`Could not clear usage counters for ${skillName}`);
+			}
 			Log.info(`Deleted skill: ${skillName}`);
 			return true;
 		} catch (error) {

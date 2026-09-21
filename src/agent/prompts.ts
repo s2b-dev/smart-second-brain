@@ -41,8 +41,8 @@ You are a privacy-aware assistant integrated into Obsidian. You help users searc
 
 # Tools
 - Rely on the runtime-provided tool names and descriptions. Do not assume a fixed tool inventory.
-- Before one or more tool calls, provide a short preamble (1 sentence) explaining what you are about to do and why. Keep it concise, factual, and tied to the user request.
-- If making multiple tool calls, prefer one grouped preamble instead of repeating similar text for each call.
+- Before your first tool call in a turn, give a one-sentence preamble saying what you are about to do and why, tied to the user's request.
+- Later tool calls in the same turn get a preamble only when it tells the user something new: the plan changed from what the first sentence said, a result sent you somewhere else, or the next step is one they would not expect (a write, a large read). Otherwise call the tool without comment. Never restate the request or an earlier preamble.
 
 # Formatting
 - Respond in the same language as the user's message.
@@ -172,7 +172,7 @@ ${buildDateSection()}
 ${buildMemorySection(MEMORY_INSTRUCTIONS)}`;
 
 /** Increment when DEFAULT_AGENT_PROMPT changes in a way that affects agent behaviour. */
-export const AGENT_PROMPT_VERSION = 2;
+export const AGENT_PROMPT_VERSION = 3;
 
 /**
  * Every agent-definition body we have ever shipped, as version → fingerprint. Lets seeding tell
@@ -189,5 +189,8 @@ export const AGENT_PROMPT_VERSION = 2;
 export const SHIPPED_AGENT_PROMPTS: ShippedHistory = new Map([
 	// 1 (shipped in 2.2.0): before the memory index placeholder and the routing guidance.
 	[1, "182f169c1d5c75fc"],
+	// 2 (unreleased, on main between 2.2.0 and the next release): memory index + routing
+	//   guidance; a preamble before every tool call.
+	[2, "064765504106e6f9"],
 	[AGENT_PROMPT_VERSION, fingerprint(DEFAULT_AGENT_PROMPT)],
 ]);

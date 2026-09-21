@@ -53,7 +53,7 @@ describe("skillHasUsableTools", () => {
 	});
 
 	it("drops a skill whose every declared tool is vetoed", () => {
-		// The out-of-the-box manage-skills case: skill on, its only tool off.
+		// manage-skills with its only tool vetoed in the Tools modal: skill on, tool off.
 		expect(
 			callSkillHasUsableTools(
 				{ toolsConfig: { manage_skills: { enabled: false } } as AgentConfig["toolsConfig"] },

@@ -2,6 +2,7 @@ import { type BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { Notice, type TFile } from "obsidian";
 import { SvelteMap } from "svelte/reactivity";
 import type { AgentStreamChunk, ThreadHistory } from "../agent/Agent";
+import type { TurnActivity } from "../agent/postTurnReview";
 import type { AgentManager } from "../agent/AgentManager";
 import { DEFAULT_AGENT_PROMPT } from "../agent/prompts";
 import type { ChatModelConfig } from "../providers/index";
@@ -747,7 +748,19 @@ export class ChatSession {
 			pair.assistantMessage.runStartedAtMs = runStartedAtMs;
 			this.liveRun = { pairId, stableKey: pair.stableKey, startedAtMs: runStartedAtMs };
 
-			await this.consumeStream(pair.assistantMessage, getStream(signal));
+			// Count the turn's tool calls on the way through, for the post-turn review trigger.
+			// Loading a skill is not work (see TurnActivity.toolCalls), so it does not count.
+			const activity: TurnActivity = { toolCalls: 0, revisedSkills: false };
+			const counted = async function* (source: AsyncIterable<AgentStreamChunk>) {
+				for await (const chunk of source) {
+					if (chunk.type === "tool_end") {
+						if (chunk.toolName !== "load_skill") activity.toolCalls += 1;
+						if (chunk.toolName === "manage_skills") activity.revisedSkills = true;
+					}
+					yield chunk;
+				}
+			};
+			await this.consumeStream(pair.assistantMessage, counted(getStream(signal)));
 			pair.assistantMessage.state = AssistantState.success;
 			// The turn has succeeded and the checkpointer has persisted the answer.
 			// Everything below is bookkeeping over that already-durable result, so
@@ -822,6 +835,10 @@ export class ChatSession {
 			if (options.reloadAfter && this.onNeedReload) {
 				await this.onNeedReload();
 			}
+
+			// Last, and detached: the answer is on screen and durable; the review is a
+			// side run that must never delay or fail the turn.
+			void getPlugin().agentManager.maybeRunPostTurnReview(String(this.id), this.selectedAgentId, activity);
 		} catch (_err) {
 			if (this.cancelled) {
 				pair.assistantMessage.state = AssistantState.cancelled;
