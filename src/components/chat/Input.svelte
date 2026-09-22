@@ -64,6 +64,7 @@ const isEditing = $derived(editingPairId !== null);
 
 let editorContainer: HTMLDivElement | undefined = $state();
 let attachmentInputEl: HTMLInputElement | undefined = $state();
+let cameraInputEl: HTMLInputElement | undefined = $state();
 /** Send shortcut hint for the send button tooltip (platform-aware). */
 const sendShortcut = Platform.isMacOS ? "⌘↵" : "Ctrl+↵";
 let markdownEditor: EmbeddableMarkdownEditor | undefined = $state();
@@ -1349,9 +1350,23 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         style="display:none;"
         oninput={(event) => onFileAttachment(event)}
       />
+      <!-- `capture` sends the mobile WebView straight to the camera instead of
+           the photo library / file sheet. Desktop ignores the attribute (it
+           would just open a picker filtered to images), so the popover only
+           offers the row on a real mobile device. -->
+      <input
+        bind:this={cameraInputEl}
+        type="file"
+        id="attachment-camera"
+        accept="image/*"
+        capture="environment"
+        style="display:none;"
+        oninput={(event) => onFileAttachment(event)}
+      />
       <AttachPopover
         onFromComputer={() => attachmentInputEl?.click()}
         onFromVault={openVaultPicker}
+        onFromCamera={Platform.isMobile ? () => cameraInputEl?.click() : undefined}
       />
       <AgentPopover {threadPath} />
       <ModelSelectButton {threadPath} />

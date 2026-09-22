@@ -8,9 +8,12 @@ interface Props {
 	onFromComputer: () => void;
 	/** Attach files from the vault (opens the search modal in picker mode). */
 	onFromVault: () => void;
+	/** Take a photo with the device camera. Omitted where there is no camera
+	 * to open (desktop), and the row is hidden with it. */
+	onFromCamera?: () => void;
 }
 
-const { onFromComputer, onFromVault }: Props = $props();
+const { onFromComputer, onFromVault, onFromCamera }: Props = $props();
 
 let isOpen = $state(false);
 let anchor: HTMLButtonElement | undefined = $state();
@@ -45,6 +48,17 @@ function pick(action: () => void) {
     {/snippet}
   </PickerOptionRow>
 
+  {#if onFromCamera}
+    <PickerOptionRow onClick={() => pick(onFromCamera)}>
+      {#snippet leading()}
+        <Icon name="camera" size="xs" />
+      {/snippet}
+      {#snippet content()}
+        Take photo
+      {/snippet}
+    </PickerOptionRow>
+  {/if}
+
   <PickerOptionRow onClick={() => pick(onFromVault)}>
     {#snippet leading()}
       <Icon name="vault" size="xs" />
@@ -56,7 +70,7 @@ function pick(action: () => void) {
 </PickerPopover>
 
 <style>
-  /* The two attach options are short; don't inherit the picker's wide min-width. */
+  /* The attach options are short; don't inherit the picker's wide min-width. */
   :global(.attach-context-popover) {
     min-width: 0;
     width: max-content;
