@@ -22,6 +22,7 @@ import PendingChangesBar from "./PendingChangesBar.svelte";
 import EditingMessageBar from "./EditingMessageBar.svelte";
 import ContextTray from "./ContextTray.svelte";
 import ContextUsageCircle from "./ContextUsageCircle.svelte";
+import { CameraCaptureModal } from "../modal/CameraCaptureModal";
 import AttachPopover from "./AttachPopover.svelte";
 import { SearchModal } from "../modal/SearchModal";
 import { isMobileUI } from "../../utils/platform";
@@ -1041,6 +1042,22 @@ async function onFileAttachment(event: Event) {
 	input.value = "";
 }
 
+/** Photos handed back by the camera modal are attached one at a time as the
+ * user snaps them; chain them so two quick captures never run `processFiles`
+ * concurrently (it reads the running total once at the start). */
+let cameraAttachQueue: Promise<void> = Promise.resolve();
+
+/** Take a photo: the native camera on mobile, a webcam preview modal on desktop. */
+function openCamera() {
+	if (Platform.isMobile) {
+		cameraInputEl?.click();
+		return;
+	}
+	new CameraCaptureModal(getPlugin().app, (file) => {
+		cameraAttachQueue = cameraAttachQueue.then(() => processFiles([file]));
+	}).open();
+}
+
 /** Open the search modal in picker mode to attach vault files as content. */
 function openVaultPicker() {
 	new SearchModal(getPlugin().app, {
@@ -1352,8 +1369,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
       />
       <!-- `capture` sends the mobile WebView straight to the camera instead of
            the photo library / file sheet. Desktop ignores the attribute (it
-           would just open a picker filtered to images), so the popover only
-           offers the row on a real mobile device. -->
+           would just open a picker filtered to images), so there the row opens
+           a live-preview modal instead; see `openCamera`. -->
       <input
         bind:this={cameraInputEl}
         type="file"
@@ -1366,7 +1383,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
       <AttachPopover
         onFromComputer={() => attachmentInputEl?.click()}
         onFromVault={openVaultPicker}
-        onFromCamera={Platform.isMobile ? () => cameraInputEl?.click() : undefined}
+        onFromCamera={openCamera}
       />
       <AgentPopover {threadPath} />
       <ModelSelectButton {threadPath} />
