@@ -1,4 +1,5 @@
 <script lang="ts">
+import { untrack } from "svelte";
 import Button from "../ui/Button.svelte";
 import Dropdown from "../ui/Dropdown.svelte";
 import type { CameraCaptureModal } from "./CameraCaptureModal";
@@ -59,11 +60,13 @@ async function startStream(deviceId: string | undefined) {
 	}
 }
 
-// One stream per selected device; the cleanup stops it on device change and on
-// close, so the camera light goes off with the modal.
+// Start once on mount; the cleanup stops whatever stream is live on close, so
+// the camera light goes off with the modal. Device switches go through the
+// dropdown's `onchange`, not this effect: `startStream` reads and writes
+// `stream` synchronously, so a tracked call here would re-run on its own
+// assignment and stop the camera it just started.
 $effect(() => {
-	const deviceId = selectedDeviceId;
-	void startStream(deviceId);
+	untrack(() => void startStream(undefined));
 	return () => stopStream();
 });
 
@@ -141,7 +144,12 @@ async function attach(andAnother: boolean) {
 	<div class="s2b-camera-bar">
 		<div class="s2b-camera-bar-left">
 			{#if deviceOptions.length > 1 && !snapshot}
-				<Dropdown type="options" dropdown={deviceOptions} bind:selected={selectedDeviceId} />
+				<Dropdown
+					type="options"
+					dropdown={deviceOptions}
+					bind:selected={selectedDeviceId}
+					onchange={(id) => void startStream(id)}
+				/>
 			{/if}
 			{#if attachedCount > 0}
 				<span class="setting-item-description">
