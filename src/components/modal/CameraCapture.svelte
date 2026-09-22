@@ -21,6 +21,10 @@ let selectedDeviceId: string | undefined = $state(undefined);
 /** The frozen frame awaiting Attach/Retake; `null` while the live view shows. */
 let snapshot: { blob: Blob; url: string } | null = $state(null);
 let attachedCount = $state(0);
+/** True once the `<video>` has decoded a frame. `getUserMedia` resolving is
+ * not enough: on macOS, Electron hands back a live track that never delivers
+ * a frame while the OS camera prompt is unanswered or access is denied. */
+let playing = $state(false);
 
 const deviceOptions = $derived(devices.map((d, i) => ({ display: d.label || `Camera ${i + 1}`, value: d.deviceId })));
 
@@ -32,6 +36,7 @@ function stopStream() {
 async function startStream(deviceId: string | undefined) {
 	stopStream();
 	starting = true;
+	playing = false;
 	error = "";
 	try {
 		// Ask for the highest resolution the camera offers: the point is to read
@@ -89,7 +94,7 @@ $effect(() => {
 });
 
 async function takePhoto() {
-	if (!videoEl || !stream || snapshot) return;
+	if (!videoEl || !stream || !playing || snapshot) return;
 	const canvas = document.createElement("canvas");
 	canvas.width = videoEl.videoWidth;
 	canvas.height = videoEl.videoHeight;
@@ -133,9 +138,21 @@ async function attach(andAnother: boolean) {
 				<img src={snapshot.url} alt="Captured frame, awaiting Attach or Retake" />
 			{:else}
 				<!-- svelte-ignore a11y_media_has_caption -->
-				<video bind:this={videoEl} autoplay playsinline muted></video>
+				<video
+					bind:this={videoEl}
+					autoplay
+					playsinline
+					muted
+					onplaying={() => (playing = true)}
+					onemptied={() => (playing = false)}
+				></video>
 				{#if starting}
 					<div class="s2b-camera-status">Starting camera…</div>
+				{:else if !playing}
+					<div class="s2b-camera-status">
+						Waiting for the camera to deliver a picture… If macOS is asking whether Obsidian may use the
+						camera, allow it (System Settings › Privacy & Security › Camera).
+					</div>
 				{/if}
 			{/if}
 		</div>
@@ -167,7 +184,7 @@ async function attach(andAnother: boolean) {
 				<Button buttonText="Close" onClick={() => modal.close()} />
 			{:else}
 				<Button buttonText="Cancel" onClick={() => modal.close()} />
-				<Button buttonText="Take photo" iconId="camera" cta={true} disabled={!stream} onClick={takePhoto} />
+				<Button buttonText="Take photo" iconId="camera" cta={true} disabled={!playing} onClick={takePhoto} />
 			{/if}
 		</div>
 	</div>
@@ -204,6 +221,9 @@ async function attach(andAnother: boolean) {
 
 	.s2b-camera-status {
 		position: absolute;
+		max-width: 32em;
+		padding: 0 var(--size-4-4);
+		text-align: center;
 		color: var(--text-on-accent);
 		opacity: 0.8;
 	}
