@@ -60,8 +60,13 @@ function macCameraAccess(): SystemPreferencesMediaAccess | null {
 	}
 }
 
+/** macOS refuses for one of two reasons and the plugin cannot tell them apart:
+ * the user declined the prompt, or, as of Obsidian 1.x, the app's hardened
+ * runtime signature carries no `com.apple.security.device.camera` entitlement,
+ * so the OS denies without ever asking and never lists Obsidian under the
+ * Camera privacy pane. Name both; the second is the common case today. */
 const DENIED_MESSAGE =
-	"Obsidian is not allowed to use the camera. Enable it under System Settings › Privacy & Security › Camera, then try again.";
+	"macOS refused camera access for Obsidian. If Obsidian is listed under System Settings › Privacy & Security › Camera, enable it there and try again. If it is not listed, this Obsidian build is not entitled to use the camera at all — take the photo with the mobile app's “Take photo” instead, or attach the image from disk.";
 
 function stopStream() {
 	streamGeneration += 1;
