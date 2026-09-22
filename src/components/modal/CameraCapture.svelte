@@ -1,4 +1,5 @@
 <script lang="ts">
+import { Platform } from "obsidian";
 import { untrack } from "svelte";
 import Button from "../ui/Button.svelte";
 import Dropdown from "../ui/Dropdown.svelte";
@@ -25,26 +26,84 @@ let attachedCount = $state(0);
  * not enough: on macOS, Electron hands back a live track that never delivers
  * a frame while the OS camera prompt is unanswered or access is denied. */
 let playing = $state(false);
+/** Bumped on every start and on teardown so a `getUserMedia` that resolves
+ * after the user switched cameras or closed the modal is stopped, not kept. */
+let streamGeneration = 0;
 
 const deviceOptions = $derived(devices.map((d, i) => ({ display: d.label || `Camera ${i + 1}`, value: d.deviceId })));
 
+type MediaAccessStatus = "not-determined" | "granted" | "denied" | "restricted" | "unknown";
+interface SystemPreferencesMediaAccess {
+	getMediaAccessStatus(mediaType: "camera"): MediaAccessStatus;
+	askForMediaAccess(mediaType: "camera"): Promise<boolean>;
+}
+
+/** Electron's macOS camera-permission API, reached through the `require`
+ * Obsidian exposes on desktop; `null` anywhere it does not apply. Needed
+ * because on macOS a renderer `getUserMedia` does not fail while access is
+ * undetermined or denied — it resolves with a track that never delivers a
+ * frame. Asking the OS explicitly turns that silent black view into either a
+ * granted stream or a real error. */
+function macCameraAccess(): SystemPreferencesMediaAccess | null {
+	if (!Platform.isMacOS || !Platform.isDesktopApp) return null;
+	try {
+		const req = (window as { require?: (id: string) => unknown }).require;
+		const electron = req?.("electron") as
+			| {
+					remote?: { systemPreferences?: SystemPreferencesMediaAccess };
+					systemPreferences?: SystemPreferencesMediaAccess;
+			  }
+			| undefined;
+		return electron?.remote?.systemPreferences ?? electron?.systemPreferences ?? null;
+	} catch {
+		return null;
+	}
+}
+
+const DENIED_MESSAGE =
+	"Obsidian is not allowed to use the camera. Enable it under System Settings › Privacy & Security › Camera, then try again.";
+
 function stopStream() {
+	streamGeneration += 1;
 	for (const track of stream?.getTracks() ?? []) track.stop();
 	stream = null;
 }
 
 async function startStream(deviceId: string | undefined) {
 	stopStream();
+	const generation = streamGeneration;
 	starting = true;
 	playing = false;
 	error = "";
 	try {
+		const access = macCameraAccess();
+		if (access) {
+			const status = access.getMediaAccessStatus("camera");
+			if (status === "denied" || status === "restricted") {
+				error = DENIED_MESSAGE;
+				return;
+			}
+			if (status === "not-determined") {
+				const granted = await access.askForMediaAccess("camera");
+				if (generation !== streamGeneration) return;
+				if (!granted) {
+					error = DENIED_MESSAGE;
+					return;
+				}
+			}
+		}
 		// Ask for the highest resolution the camera offers: the point is to read
 		// text off a page, and `ideal` degrades gracefully to whatever exists.
 		const video: MediaTrackConstraints = deviceId
 			? { deviceId: { exact: deviceId }, width: { ideal: 4096 }, height: { ideal: 2160 } }
 			: { facingMode: "environment", width: { ideal: 4096 }, height: { ideal: 2160 } };
 		const next = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+		if (generation !== streamGeneration) {
+			// Superseded while we waited (device switch, or the modal closed):
+			// this stream has no owner, so release the camera right away.
+			for (const track of next.getTracks()) track.stop();
+			return;
+		}
 		stream = next;
 		// Device labels are only populated once a stream has been granted, so
 		// enumerate after, not before. Also learn which device we actually got
@@ -56,12 +115,12 @@ async function startStream(deviceId: string | undefined) {
 		const name = e instanceof Error ? e.name : "";
 		error =
 			name === "NotAllowedError"
-				? "Camera access was denied. Allow Obsidian to use the camera in your system settings, then try again."
+				? DENIED_MESSAGE
 				: name === "NotFoundError"
 					? "No camera found on this device."
 					: `Could not start the camera: ${e instanceof Error ? e.message : String(e)}`;
 	} finally {
-		starting = false;
+		if (generation === streamGeneration) starting = false;
 	}
 }
 
@@ -72,7 +131,11 @@ async function startStream(deviceId: string | undefined) {
 // assignment and stop the camera it just started.
 $effect(() => {
 	untrack(() => void startStream(undefined));
-	return () => stopStream();
+	return () => {
+		stopStream();
+		// Escape / outside click skip `retake`, so drop the frozen frame here too.
+		retake();
+	};
 });
 
 // The live `<video>` is remounted when we return from a snapshot, so bind the
