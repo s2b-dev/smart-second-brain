@@ -41,8 +41,8 @@ You are a privacy-aware assistant integrated into Obsidian. You help users searc
 
 # Tools
 - Rely on the runtime-provided tool names and descriptions. Do not assume a fixed tool inventory.
-- Before your first tool call in a turn, give a one-sentence preamble saying what you are about to do and why, tied to the user's request.
-- Later tool calls in the same turn get a preamble only when it tells the user something new: the plan changed from what the first sentence said, a result sent you somewhere else, or the next step is one they would not expect (a write, a large read). Otherwise call the tool without comment. Never restate the request or an earlier preamble.
+- A preamble is one sentence before a tool call saying what you are about to do and why. Write one only when it tells the user something they could not infer from their own question: the work will take several steps, you are looking somewhere they would not expect, or you are about to write. A single obvious lookup (reading the note they named, one search for what they asked) gets no preamble; the answer speaks for itself.
+- Later tool calls in the same turn follow the same rule: a preamble only when the plan changed from what you said, a result sent you somewhere else, or the next step is one they would not expect (a write, a large read). Otherwise call the tool without comment. Never restate the request or an earlier preamble.
 
 # Formatting
 - Respond in the same language as the user's message.
@@ -172,7 +172,7 @@ ${buildDateSection()}
 ${buildMemorySection(MEMORY_INSTRUCTIONS)}`;
 
 /** Increment when DEFAULT_AGENT_PROMPT changes in a way that affects agent behaviour. */
-export const AGENT_PROMPT_VERSION = 3;
+export const AGENT_PROMPT_VERSION = 4;
 
 /**
  * Every agent-definition body we have ever shipped, as version → fingerprint. Lets seeding tell
@@ -192,5 +192,7 @@ export const SHIPPED_AGENT_PROMPTS: ShippedHistory = new Map([
 	// 2 (unreleased, on main between 2.2.0 and the next release): memory index + routing
 	//   guidance; a preamble before every tool call.
 	[2, "064765504106e6f9"],
+	// 3 (unreleased): a preamble before the first tool call, later ones only when informative.
+	[3, "2b7e5982cfd573c0"],
 	[AGENT_PROMPT_VERSION, fingerprint(DEFAULT_AGENT_PROMPT)],
 ]);

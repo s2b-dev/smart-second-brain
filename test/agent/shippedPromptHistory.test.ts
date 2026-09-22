@@ -34,7 +34,7 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * update the literal below. The tag replay at the bottom of this file checks the recorded old
  * fingerprints against what each release actually shipped.
  */
-const CURRENT_FINGERPRINT = "2b7e5982cfd573c0"; // DEFAULT_AGENT_PROMPT at v3
+const CURRENT_FINGERPRINT = "4129dad19802bdb9"; // DEFAULT_AGENT_PROMPT at v4
 
 const history: ShippedHistory = SHIPPED_AGENT_PROMPTS;
 const version = AGENT_PROMPT_VERSION;
