@@ -65,7 +65,7 @@ function macCameraAccess(): SystemPreferencesMediaAccess | null {
  * runtime signature carries no `com.apple.security.device.camera` entitlement,
  * so the OS denies without ever asking and never lists Obsidian under the
  * Camera privacy pane. Name both; the second is the common case today. */
-const DENIED_MESSAGE =
+const MAC_DENIED_MESSAGE =
 	"macOS refused camera access for Obsidian. If Obsidian is listed under System Settings › Privacy & Security › Camera, enable it there and try again. If it is not listed, this Obsidian build is not entitled to use the camera at all — take the photo with the mobile app's “Take photo” instead, or attach the image from disk.";
 
 function stopStream() {
@@ -85,14 +85,14 @@ async function startStream(deviceId: string | undefined) {
 		if (access) {
 			const status = access.getMediaAccessStatus("camera");
 			if (status === "denied" || status === "restricted") {
-				error = DENIED_MESSAGE;
+				error = MAC_DENIED_MESSAGE;
 				return;
 			}
 			if (status === "not-determined") {
 				const granted = await access.askForMediaAccess("camera");
 				if (generation !== streamGeneration) return;
 				if (!granted) {
-					error = DENIED_MESSAGE;
+					error = MAC_DENIED_MESSAGE;
 					return;
 				}
 			}
@@ -120,7 +120,7 @@ async function startStream(deviceId: string | undefined) {
 		const name = e instanceof Error ? e.name : "";
 		error =
 			name === "NotAllowedError"
-				? DENIED_MESSAGE
+				? "Camera access was denied. Allow Obsidian to use the camera in your system's privacy settings, then try again."
 				: name === "NotFoundError"
 					? "No camera found on this device."
 					: `Could not start the camera: ${e instanceof Error ? e.message : String(e)}`;
