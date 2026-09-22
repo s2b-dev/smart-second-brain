@@ -291,10 +291,13 @@ async function attach(andAnother: boolean) {
 		opacity: 0.8;
 	}
 
+	/* Tinted, not `--background-modifier-error`: that variable is a solid red
+	   in the default theme, which swallows red error text. Same mix the
+	   pending-changes bar uses for its reject state. */
 	.s2b-camera-error {
 		padding: var(--size-4-4);
 		color: var(--text-error);
-		background: var(--background-modifier-error);
+		background: color-mix(in srgb, var(--color-red) 15%, transparent);
 		border-radius: var(--radius-m);
 	}
 
