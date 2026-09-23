@@ -14,9 +14,11 @@
 import { BUNDLED_SKILLS } from "./defaults";
 import { type ShippedHistory, currentShippedVersion, fingerprint } from "../utils/shippedDefaults";
 import dataview10 from "./history/dataview-1.0.md?raw";
+import dataview11 from "./history/dataview-1.1.md?raw";
 import editNotes10 from "./history/edit-notes-1.0.md?raw";
 import editNotes11 from "./history/edit-notes-1.1.md?raw";
 import exploreVault10 from "./history/explore-vault-1.0.md?raw";
+import exploreVault11 from "./history/explore-vault-1.1.md?raw";
 import tasknotes10 from "./history/tasknotes-1.0.md?raw";
 
 /**
@@ -25,15 +27,16 @@ import tasknotes10 from "./history/tasknotes-1.0.md?raw";
  *
  * ## How to add an entry (do this when you change a bundled SKILL.md)
  *
- * 1. BEFORE your edit, copy the current SKILL.md verbatim to
- *    `src/skills/history/<name>-<version>.md` and `?raw`-import it here.
- * 2. Add `fingerprint(<import>)` under the skill's name and its *current* version.
- * 3. Then make your edit and bump `metadata.version` in the SKILL.md.
+ * 1. BEFORE your edit, record the current body's fingerprint under the skill's name and its
+ *    *current* version: log `fingerprint(<SKILL.md text>)` once and inline the hex string,
+ *    with a comment naming the release that shipped it.
+ * 2. Then make your edit and bump `metadata.version` in the SKILL.md.
  *
- * A retained copy is preferred over a hand-transcribed hex literal because it stays
- * provably exact (`git diff` can compare it to history), at the cost of never-displayed
- * bundle text. If the retained copies ever add up (`bases` alone is ~21KB), collapse old
- * entries to hex literals — log `fingerprint(...)` once and inline the string.
+ * The literal is not taken on trust: the tag-replay test below pulls every released body
+ * out of git and checks it against this table, so a mistyped hash fails the suite. Git is
+ * the archive of old text; this table only needs the index into it. (Earlier entries retain
+ * the old body as a `?raw` import instead — same result, more bundle text; new entries
+ * should be literals.)
  *
  * Skip step 1-2 and existing vaults will read their untouched copy as a user customization:
  * they'll get a notice asking them to reconcile by hand instead of a silent update. Skip step
@@ -50,7 +53,16 @@ import tasknotes10 from "./history/tasknotes-1.0.md?raw";
  */
 const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([
 	// 1.0: before the "Compute, don't estimate" execute_javascript guidance was added.
-	["explore-vault", new Map([["1.0", fingerprint(exploreVault10)]])],
+	// 1.1: still told the model to call `list_directory` first, before tags and properties,
+	//      when the vault's organisation was unknown — the root cause of context-filling
+	//      listings in large vaults once the tool itself was bounded.
+	[
+		"explore-vault",
+		new Map([
+			["1.0", fingerprint(exploreVault10)],
+			["1.1", fingerprint(exploreVault11)],
+		]),
+	],
 	// 1.0 as actually released in 2.0.2-beta — i.e. the post-#381 body, which #381 edited
 	// *without* bumping the version. That silent reuse is the same failure as an unretained
 	// body, just quieter: the new text went out still labelled 1.0, so the version could no
@@ -59,8 +71,30 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 	//
 	// Note this is the tagged body, not the pre-#381 one: that earlier text was never
 	// released, so no vault holds it and fingerprinting it would protect nothing.
-	["dataview", new Map([["1.0", fingerprint(dataview10)]])],
+	// 1.1: before the "When to reach for it" section and the description that names the
+	//      category / filter / count questions Dataview answers in one query.
+	[
+		"dataview",
+		new Map([
+			["1.0", fingerprint(dataview10)],
+			["1.1", fingerprint(dataview11)],
+		]),
+	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
+	// 1.0 (shipped in 2.2.0): before the routing guidance — revise the skill you used when it
+	//      misled you; the user's corrections about a kind of task live in its skill, not memory.
+	// 1.1 (main after 2.2.0, unreleased): the routing guidance, before the patch operation
+	//      and the load-before-revise rule. Recorded so dev vaults seeded from main upgrade
+	//      silently rather than reading as customized; costs one literal.
+	[
+		"manage-skills",
+		new Map([
+			["1.0", "4f7b8ff2b47b60e2"],
+			["1.1", "6243bd2c4cf42f9a"],
+		]),
+	],
+	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
+	["manage-notes", new Map([["1.0", "eab47f33c57cb977"]])],
 ]);
 
 /**

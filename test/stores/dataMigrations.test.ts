@@ -29,4 +29,25 @@ describe("dataMigrations", () => {
 		expect(Object.keys(data.agents.a1.mcpServers)).toEqual(["remote"]);
 		expect(data.agents.a2.mcpServers).toBeUndefined();
 	});
+
+	// The stored false was the old seed, not a choice, so it is flipped rather than kept.
+	it("v13 → v14 switches manage_skills on for every agent that has it", () => {
+		const data = {
+			schemaVersion: 13,
+			agents: {
+				a1: { toolsConfig: { manage_skills: { enabled: false, name: "manage_skills" } } },
+				a2: { toolsConfig: { manage_skills: { enabled: true, name: "manage_skills" } } },
+				a3: { toolsConfig: {} },
+				a4: {},
+			},
+		} as unknown as PluginData;
+
+		runMigrations(data);
+
+		expect(data.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+		expect(data.agents.a1.toolsConfig.manage_skills).toEqual({ enabled: true, name: "manage_skills" });
+		expect(data.agents.a2.toolsConfig.manage_skills.enabled).toBe(true);
+		expect(data.agents.a3.toolsConfig.manage_skills).toBeUndefined();
+		expect(data.agents.a4.toolsConfig).toBeUndefined();
+	});
 });

@@ -192,13 +192,6 @@ function formatRawToolOutput(rawText: string): string {
 	return `\`\`\`${language}\n${rawText}\n\`\`\``;
 }
 
-function formatBytes(size?: number): string {
-	if (typeof size !== "number" || Number.isNaN(size)) return "-";
-	if (size < 1024) return `${size} B`;
-	if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-	return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function getVisibleItems<T>(items: T[] | undefined, maxItems = 8): { visible: T[]; hiddenCount: number } {
 	const visible = (items ?? []).slice(0, maxItems);
 	return {
@@ -218,15 +211,17 @@ function formatReadContentSource(sourceType: "file" | "pdf" | "excalidraw"): str
 interface DirectoryTreeFileView {
 	name: string;
 	path: string;
-	extension?: string;
-	size?: number;
 }
 
 interface DirectoryTreeNodeView {
 	name: string;
 	path: string;
+	fileCount?: number;
+	folderCount?: number;
 	folders: DirectoryTreeNodeView[];
+	moreFolders: number;
 	files: DirectoryTreeFileView[];
+	moreFiles: number;
 }
 
 function getDirectoryNodeName(path: string, fallback = "/"): string {
@@ -240,6 +235,15 @@ function shouldShowDirectoryTreePath(name: string, path: string): boolean {
 	return getDirectoryNodeName(path, path) !== name;
 }
 
+function formatFolderMeta(node: DirectoryTreeNodeView): string {
+	const parts: string[] = [];
+	if (node.fileCount !== undefined) parts.push(`${node.fileCount} file${node.fileCount === 1 ? "" : "s"}`);
+	if (node.folderCount !== undefined) {
+		parts.push(`${node.folderCount} subfolder${node.folderCount === 1 ? "" : "s"}`);
+	}
+	return parts.join(" · ");
+}
+
 function buildDirectoryTreeView(
 	payload: Extract<ToolOutputRenderModel, { kind: "list_directory" }>["payload"],
 ): DirectoryTreeNodeView {
@@ -248,25 +252,15 @@ function buildDirectoryTreeView(
 		return `${basePath}/${name}`;
 	};
 
-	const normalizeFile = (
-		file: {
-			name?: string;
-			extension?: string;
-			size?: number;
-		},
-		parentPath: string,
-	): DirectoryTreeFileView => ({
-		name: file.name ?? "Unknown file",
-		path: joinDirectoryPath(parentPath, file.name ?? "Unknown file"),
-		extension: file.extension,
-		size: file.size,
-	});
-
 	const fromPayloadTree = (node: unknown, currentPath: string): DirectoryTreeNodeView | undefined => {
 		if (!node || typeof node !== "object" || Array.isArray(node)) return undefined;
 		const candidate = node as {
+			fileCount?: number;
+			folderCount?: number;
 			folders?: Record<string, unknown>;
-			files?: Array<{ name?: string; extension?: string; size?: number }>;
+			moreFolders?: number;
+			files?: string[];
+			moreFiles?: number;
 		};
 		const folders = Object.entries(candidate.folders ?? {}).map(([folderName, childNode]) => {
 			const childPath = joinDirectoryPath(currentPath, folderName);
@@ -275,7 +269,9 @@ function buildDirectoryTreeView(
 					name: folderName,
 					path: childPath,
 					folders: [],
+					moreFolders: 0,
 					files: [],
+					moreFiles: 0,
 				}
 			);
 		});
@@ -283,8 +279,12 @@ function buildDirectoryTreeView(
 		return {
 			name: getDirectoryNodeName(currentPath),
 			path: currentPath,
+			fileCount: candidate.fileCount,
+			folderCount: candidate.folderCount,
 			folders,
-			files: (candidate.files ?? []).map((file) => normalizeFile(file, currentPath)),
+			moreFolders: candidate.moreFolders ?? 0,
+			files: (candidate.files ?? []).map((name) => ({ name, path: joinDirectoryPath(currentPath, name) })),
+			moreFiles: candidate.moreFiles ?? 0,
 		};
 	};
 
@@ -294,7 +294,9 @@ function buildDirectoryTreeView(
 			name: getDirectoryNodeName(rootPath),
 			path: rootPath,
 			folders: [],
+			moreFolders: 0,
 			files: [],
+			moreFiles: 0,
 		}
 	);
 }
@@ -657,6 +659,7 @@ const PROSE_MARKDOWN_CLASS =
 {/snippet}
 
 {#snippet directoryTreeNode(node: DirectoryTreeNodeView, depth = 0, isRoot = false)}
+  {@const childDepth = depth + (isRoot ? 0 : 1)}
   {#if !isRoot}
     <div class="tool-output-tree-row tool-output-tree-row-folder" style={`--tree-depth: ${depth};`}>
       <span class="tool-output-tree-icon">▾</span>
@@ -664,26 +667,41 @@ const PROSE_MARKDOWN_CLASS =
       {#if shouldShowDirectoryTreePath(node.name, node.path)}
         <span class="tool-output-tree-path">{node.path}</span>
       {/if}
+      {#if formatFolderMeta(node)}
+        <span class="tool-output-tree-meta">{formatFolderMeta(node)}</span>
+      {/if}
     </div>
   {/if}
 
   {#each node.folders as folder (folder.path)}
-    {@render directoryTreeNode(folder, depth + (isRoot ? 0 : 1))}
+    {@render directoryTreeNode(folder, childDepth)}
   {/each}
+  {#if node.moreFolders > 0}
+    <div class="tool-output-tree-row tool-output-tree-row-more" style={`--tree-depth: ${childDepth};`}>
+      <span class="tool-output-tree-icon">…</span>
+      <span class="tool-output-tree-meta">+{node.moreFolders} more folder{node.moreFolders === 1 ? "" : "s"}</span>
+    </div>
+  {/if}
 
   {#each node.files as file (file.path)}
-    <div
-      class="tool-output-tree-row tool-output-tree-row-file"
-      style={`--tree-depth: ${depth + (isRoot ? 0 : 1)};`}
-    >
+    <div class="tool-output-tree-row tool-output-tree-row-file" style={`--tree-depth: ${childDepth};`}>
       <span class="tool-output-tree-icon">•</span>
       <span class="tool-output-tree-name">{file.name}</span>
       {#if shouldShowDirectoryTreePath(file.name, file.path)}
         <span class="tool-output-tree-path">{file.path}</span>
       {/if}
-      <span class="tool-output-tree-meta">{file.extension ?? "-"} · {formatBytes(file.size)}</span>
     </div>
   {/each}
+  {#if node.moreFiles > 0}
+    <div class="tool-output-tree-row tool-output-tree-row-more" style={`--tree-depth: ${childDepth};`}>
+      <span class="tool-output-tree-icon">…</span>
+      <span class="tool-output-tree-meta"
+        >{node.files.length > 0 ? "+" : ""}{node.moreFiles} file{node.moreFiles === 1 ? "" : "s"}{node.files.length > 0
+          ? " more"
+          : " not listed"}</span
+      >
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet outputBody(model: ToolOutputRenderModel, toolCallId: string = "")}
@@ -855,11 +873,14 @@ const PROSE_MARKDOWN_CLASS =
       <span class="tool-output-metric-chip">root: {model.payload.root ?? "/"}</span>
       <span class="tool-output-metric-chip">folders: {model.payload.totalFolders ?? 0}</span>
       <span class="tool-output-metric-chip">files: {model.payload.totalFiles ?? 0}</span>
-      {#if model.payload.recursive}
-        <span class="tool-output-metric-chip">recursive</span>
-      {/if}
       {#if model.payload.maxDepth !== undefined}
-        <span class="tool-output-metric-chip">max depth: {model.payload.maxDepth}</span>
+        <span class="tool-output-metric-chip">depth: {model.payload.maxDepth}</span>
+      {/if}
+      {#if model.payload.includeFiles === false}
+        <span class="tool-output-metric-chip">folders only</span>
+      {/if}
+      {#if model.payload.note}
+        <span class="tool-output-metric-chip tool-output-metric-chip-warning">collapsed</span>
       {/if}
       {#if (model.payload.skippedPrivateFiles ?? 0) > 0}
         <span class="tool-output-metric-chip tool-output-metric-chip-warning"
@@ -1663,9 +1684,15 @@ const PROSE_MARKDOWN_CLASS =
   }
 
   .tool-output-tree-meta {
+    grid-column: 4;
     color: var(--text-faint);
     font-size: 0.74rem;
     white-space: nowrap;
+  }
+
+  .tool-output-tree-row-more .tool-output-tree-meta {
+    grid-column: 2 / -1;
+    font-style: italic;
   }
 
   .tool-output-result-path {

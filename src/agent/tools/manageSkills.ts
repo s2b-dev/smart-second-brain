@@ -1,7 +1,9 @@
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { tool } from "@langchain/core/tools";
 import type { App } from "obsidian";
 import { z } from "zod";
-import type { BuiltInToolId } from "../../types/plugin";
+import { recordSkillLoaded, skillLoadState } from "./skillLoadRegistry";
+import type { BuiltInToolId, SkillMetadata } from "../../types/plugin";
 import type { SkillsService } from "../../skills/SkillsService";
 import { parseFrontmatter } from "../../skills/SkillsService";
 import { validateFrontmatter, validateSkillName } from "../../skills/validation";
@@ -54,6 +56,21 @@ function isReseededOnStartup(app: App, skillName: string): boolean {
 	return !!integrationSkill?.corePluginId && isInternalPluginEnabled(app, integrationSkill.corePluginId);
 }
 
+/** The line ending a file uses; CRLF if any line does. */
+function lineEndingOf(raw: string): string {
+	return raw.includes("\r\n") ? "\r\n" : "\n";
+}
+
+/**
+ * Convert model-supplied text to a file's line ending. `load_skill` shows the model an LF
+ * body whatever the file uses (see `parseFrontmatter`), so a passage it copies back, or a
+ * body it writes, carries LF; matching or writing that into a CRLF file verbatim would miss
+ * every multi-line passage and leave the file with mixed endings.
+ */
+function toLineEnding(text: string, eol: string): string {
+	return text.replace(/\r\n/g, "\n").replace(/\n/g, eol);
+}
+
 /**
  * Rebuild a SKILL.md's raw text, replacing the body and optionally the `description:` frontmatter
  * line while leaving the rest of the frontmatter block byte-for-byte intact. We edit the raw string
@@ -61,7 +78,10 @@ function isReseededOnStartup(app: App, skillName: string): boolean {
  * preserved — SkillsService.serializeSkillMd is lossy and would reformat the file.
  */
 function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): string | null {
-	const lines = raw.split("\n");
+	// Keep the file's own line endings: a CRLF skill rebuilt with LF would read as a whole-file
+	// change to sync and to the shipped-history fingerprint alike.
+	const eol = lineEndingOf(raw);
+	const lines = raw.split(eol);
 	if (lines[0]?.trim() !== "---") return null;
 
 	let endIndex = -1;
@@ -87,13 +107,42 @@ function rebuildSkillMd(raw: string, newBody: string, newDescription?: string): 
 		}
 	}
 
-	return ["---", ...frontmatterLines, "---", "", newBody.trim(), ""].join("\n");
+	return ["---", ...frontmatterLines, "---", "", toLineEnding(newBody.trim(), eol), ""].join(eol);
 }
+
+/**
+ * A SKILL.md split at the byte after its closing `---` line: the frontmatter block (verbatim,
+ * newline included) and the body. Null when the file has no well-formed frontmatter. A patch is
+ * spliced into `body` and the two halves re-joined, so every byte outside the matched passage —
+ * indentation, trailing whitespace, CRLF line endings — survives untouched; only the whole-body
+ * `update` path goes through the normalizing {@link rebuildSkillMd}. Patches never search the
+ * frontmatter: its fields are either locked (name, plugin link) or have their own path
+ * (description via update).
+ */
+function splitSkillMd(raw: string): { head: string; body: string } | null {
+	const lines = raw.split("\n");
+	if (lines[0]?.trim() !== "---") return null;
+	const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+	if (endIndex === -1) return null;
+	// Length of lines[0..endIndex] plus one "\n" after each of them.
+	const headLength = lines.slice(0, endIndex + 1).reduce((sum, line) => sum + line.length + 1, 0);
+	return { head: raw.slice(0, headLength), body: raw.slice(headLength) };
+}
+
+/**
+ * `metadata.author` value stamped on every skill the agent creates. Bundled skills carry
+ * `S2B` in the same key and hand-written ones carry whatever the user put there (or nothing),
+ * so one existing key tells the three apart — which is what lets anything autonomous later
+ * (a curator) confine itself to the agent's own skills. A fixed word rather than the agent's
+ * name: consumers need no list of agent names, and a renamed or deleted agent changes nothing.
+ */
+export const AGENT_SKILL_AUTHOR = "agent";
 
 /** Build a new SKILL.md's raw text: minimal frontmatter plus body. */
 function buildNewSkillMd(name: string, description: string, body: string, allowedTools: string[]): string {
 	const lines = ["---", `name: ${name}`, `description: ${description}`];
 	if (allowedTools.length > 0) lines.push(`allowed-tools: ${allowedTools.join(" ")}`);
+	lines.push("metadata:", `  author: ${AGENT_SKILL_AUTHOR}`);
 	lines.push("---", "", body.trim(), "");
 	return lines.join("\n");
 }
@@ -120,13 +169,25 @@ const deleteOperationSchema = z.object({
 	name: z.string().describe("The name of the skill to delete. Built-in core skills cannot be deleted."),
 });
 
+const patchOperationSchema = z.object({
+	type: z.literal("patch"),
+	skillName: z.string().describe("The name of the attached skill to patch. Load it with load_skill first."),
+	oldText: z
+		.string()
+		.min(1)
+		.describe(
+			"The exact passage to replace, copied from the loaded skill body. Must match exactly once — include enough surrounding text to make it unique.",
+		),
+	newText: z.string().describe("The replacement. An empty string deletes the passage."),
+});
+
 const updateOperationSchema = z.object({
 	type: z.literal("update"),
-	skillName: z.string().describe("The name of the attached skill to update"),
+	skillName: z.string().describe("The name of the attached skill to rewrite. Load it with load_skill first."),
 	newBody: z
 		.string()
 		.describe(
-			"The new full instructions (markdown body, without frontmatter) for the skill. Replaces the existing body.",
+			"The new full instructions (markdown body, without frontmatter). Replaces the existing body — prefer patch for a targeted change.",
 		),
 	newDescription: z
 		.string()
@@ -134,13 +195,70 @@ const updateOperationSchema = z.object({
 		.describe("Optional new one-line description of what the skill does and when to use it."),
 });
 
-const manageSkillsSchema = z.discriminatedUnion("type", [
-	createOperationSchema,
-	deleteOperationSchema,
-	updateOperationSchema,
-]);
+// The operations are a discriminated union, but it sits under a key rather than at the root:
+// every provider's function-calling API requires the parameters schema to be a plain object,
+// and a root-level union renders as `anyOf` with no `type`, which OpenAI rejects outright
+// ("schema must be a JSON Schema of 'type: object'") before the model sees a single message.
+// Same shape as manage_notes' `operations`.
+const manageSkillsSchema = z.object({
+	operation: z
+		.discriminatedUnion("type", [
+			createOperationSchema,
+			patchOperationSchema,
+			updateOperationSchema,
+			deleteOperationSchema,
+		])
+		.describe("The one operation to perform, selected by `type`."),
+});
+
+/**
+ * The post-turn reviewer's variant: create, patch and update only. Deletion is immediate and
+ * recursive, needs no load and checks no authorship, and nothing a reviewer learns from one
+ * conversation justifies it — the reviewer is told to create or revise, so its tool cannot do
+ * more than that.
+ */
+const reviewerManageSkillsSchema = z.object({
+	operation: z
+		.discriminatedUnion("type", [createOperationSchema, patchOperationSchema, updateOperationSchema])
+		.describe("The one operation to perform, selected by `type`."),
+});
+
+export interface ManageSkillsToolOptions {
+	/** Omit the delete operation from the schema (the post-turn reviewer). Default: allowed. */
+	allowDelete?: boolean;
+}
+
+/**
+ * Checks shared by every revision path: the result must still be a valid skill, and the fields
+ * the rest of the system wires on (name, plugin link, category) must not have moved. Returns the
+ * rejection to hand back, or null when the revision may be written.
+ */
+function rejectInvalidRevision(
+	metadata: { path: string; frontmatter: SkillMetadata["frontmatter"] },
+	newContent: string,
+) {
+	const dirName = metadata.path.split("/").pop() ?? "";
+	const { frontmatter: newFm } = parseFrontmatter(newContent);
+	const validation = validateFrontmatter(newFm, dirName);
+	if (!validation.valid) {
+		return `Edit rejected — the result would be an invalid skill: ${validation.errors.map((e) => e.message).join(", ")}`;
+	}
+	const oldFm = metadata.frontmatter;
+	if (newFm.name !== oldFm.name) {
+		return "Edit rejected — a skill's name cannot change (would break its folder and wiring).";
+	}
+	if (
+		newFm.metadata?.linkedPlugin !== oldFm.metadata?.linkedPlugin ||
+		newFm.metadata?.corePluginId !== oldFm.metadata?.corePluginId ||
+		newFm.metadata?.category !== oldFm.metadata?.category
+	) {
+		return "Edit rejected — a skill's plugin link and category are locked; only the body and description can change.";
+	}
+	return null;
+}
 
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
+type ManageSkillsOperation = ManageSkillsInput["operation"];
 
 /**
  * Tool letting an agent create new skills, revise skills attached to it, or delete skills it
@@ -149,19 +267,31 @@ type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
  * attached the moment its file exists (agent.skills[id]?.enabled ?? true): creating IS attaching,
  * with no separate manual "enable" step.
  */
-export function createManageSkillsTool(skillsService: SkillsService | undefined, app: App, agentId = "") {
-	const attached = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
+export function createManageSkillsTool(
+	skillsService: SkillsService | undefined,
+	app: App,
+	agentId = "",
+	options: ManageSkillsToolOptions = {},
+) {
+	const allowDelete = options.allowDelete ?? true;
+	const schema = allowDelete ? manageSkillsSchema : reviewerManageSkillsSchema;
+	// For the description only; the checks below re-resolve per call so a skill created
+	// earlier in the same turn is already attached when the model patches it.
+	const attachedAtBuild = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
 
 	if (!skillsService) {
 		return tool(async () => "Skills are not available yet.", {
 			name: "manage_skills",
 			description: "Create, update, or delete skills. Skills are not available yet.",
-			schema: manageSkillsSchema,
+			schema,
 		});
 	}
 
 	return tool(
-		async (input: ManageSkillsInput) => {
+		async ({ operation: input }: ManageSkillsInput, config?: RunnableConfig) => {
+			const threadId: string | undefined = config?.configurable?.thread_id;
+			const attached = getAttachedSkillNames(skillsService, agentId);
+
 			if (input.type === "create") {
 				const nameValidation = validateSkillName(input.name);
 				if (!nameValidation.valid) {
@@ -186,7 +316,12 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				}
 
 				if (!(await app.vault.adapter.exists(skillDir))) await app.vault.adapter.mkdir(skillDir);
-				await app.vault.adapter.write(skillPath, content);
+				// Through the service so the discovery cache holds the new skill at once: the
+				// vault watcher's re-discovery is debounced, and a patch later in this same turn
+				// looks the skill up in that cache.
+				await skillsService.writeSkillFile(input.name, content);
+				// The model wrote this text, so it may patch it in this conversation without a load.
+				recordSkillLoaded(threadId, input.name, parseFrontmatter(content).body);
 
 				const droppedNote =
 					dropped.length > 0 ? ` Dropped disallowed tool request(s): ${dropped.join(", ")}.` : "";
@@ -194,6 +329,9 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			}
 
 			if (input.type === "delete") {
+				// Unreachable through the reviewer schema; kept as a hard stop should a caller
+				// ever pass a wider input past it.
+				if (!allowDelete) return "Deleting skills is not available in this context.";
 				const metadata = skillsService.getCachedSkills().get(input.name);
 				if (!metadata) {
 					return `Skill "${input.name}" not found.`;
@@ -212,15 +350,17 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 					return `Could not delete the skill folder at "${metadata.path}".`;
 				}
 
-				// Drop the stale enable-state entry so nothing inherits it later.
+				// Drop the stale enable-state entry so nothing inherits it later, and the usage
+				// counters so a later skill of the same name starts from zero.
 				const agent = getData().getAgent(agentId) ?? getData().getSelectedAgent();
 				if (agent?.skills[input.name]) delete agent.skills[input.name];
+				getData().forgetSkillUsage(input.name);
 
 				return `Deleted the "${input.name}" skill.`;
 			}
 
-			// input.type === "update"
-			const { skillName, newBody, newDescription } = input;
+			// input.type === "patch" | "update" — both revise an existing, attached skill.
+			const { skillName } = input;
 			const metadata = skillsService.getCachedSkills().get(skillName);
 			if (!metadata) {
 				return `Skill "${skillName}" not found. Attached skills: ${attached.join(", ")}`;
@@ -228,7 +368,6 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			if (!attached.includes(skillName)) {
 				return `Skill "${skillName}" is not attached to this agent, so it cannot be edited here.`;
 			}
-
 			const skillPath = `${metadata.path}/${SKILL_FILENAME}`;
 			let originalContent: string;
 			try {
@@ -238,7 +377,45 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return `Could not read the skill file at "${skillPath}".`;
 			}
 
-			const newContent = rebuildSkillMd(originalContent, newBody, newDescription);
+			// Read before write: a revision is written against text the model has actually seen
+			// in this conversation — not a remembered or summarized copy, and not a version the
+			// file has since moved past (see skillLoadRegistry). Fingerprinted through the same
+			// parse `load_skill` returns, so the two sides always agree on what "the body" is.
+			const loadState = skillLoadState(threadId, skillName, parseFrontmatter(originalContent).body);
+			if (loadState === "not-loaded") {
+				return `Load the "${skillName}" skill with load_skill first, then revise it: a revision must be written against the skill's current text as you have read it in this conversation.`;
+			}
+			if (loadState === "stale") {
+				return `The "${skillName}" skill has changed since you loaded it. Load it again with load_skill and write the revision against its current text.`;
+			}
+
+			let newContent: string | null;
+			let verb: string;
+			if (input.type === "patch") {
+				const split = splitSkillMd(originalContent);
+				if (split === null) {
+					return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
+				}
+				const eol = lineEndingOf(originalContent);
+				const oldText = toLineEnding(input.oldText, eol);
+				const newText = toLineEnding(input.newText, eol);
+				const occurrences = split.body.split(oldText).length - 1;
+				if (occurrences === 0) {
+					const inFrontmatter = split.head.includes(oldText);
+					return inFrontmatter
+						? `The passage is in the skill's frontmatter, which a patch cannot change. Use update with newDescription for the description; the other fields are locked.`
+						: `Could not find that passage in the "${skillName}" skill's body. Copy oldText exactly from the loaded skill (including whitespace and line breaks), or load it again if it changed.`;
+				}
+				if (occurrences > 1) {
+					return `That passage appears ${occurrences} times in the "${skillName}" skill. Include more surrounding text so oldText matches exactly once.`;
+				}
+				// Callback form so `$&`-style sequences in the replacement are inserted literally.
+				newContent = split.head + split.body.replace(oldText, () => newText);
+				verb = "Patched";
+			} else {
+				newContent = rebuildSkillMd(originalContent, input.newBody, input.newDescription);
+				verb = "Updated";
+			}
 			if (newContent === null) {
 				return `Skill "${skillName}" has malformed frontmatter and cannot be safely edited.`;
 			}
@@ -246,35 +423,24 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 				return "No changes made — the new content matches the current skill.";
 			}
 
-			// Validate the result and hard-guard the locked frontmatter fields.
-			const dirName = metadata.path.split("/").pop() ?? "";
-			const { frontmatter: newFm } = parseFrontmatter(newContent);
-			const validation = validateFrontmatter(newFm, dirName);
-			if (!validation.valid) {
-				return `Edit rejected — the result would be an invalid skill: ${validation.errors
-					.map((e) => e.message)
-					.join(", ")}`;
-			}
-			const oldFm = metadata.frontmatter;
-			if (newFm.name !== oldFm.name) {
-				return `Edit rejected — a skill's name cannot change (would break its folder and wiring).`;
-			}
-			if (
-				newFm.metadata?.linkedPlugin !== oldFm.metadata?.linkedPlugin ||
-				newFm.metadata?.corePluginId !== oldFm.metadata?.corePluginId ||
-				newFm.metadata?.category !== oldFm.metadata?.category
-			) {
-				return `Edit rejected — a skill's plugin link and category are locked; only the body and description can change.`;
-			}
+			const rejection = rejectInvalidRevision(metadata, newContent);
+			if (rejection) return rejection;
 
-			await app.vault.adapter.write(skillPath, newContent);
+			// Through the service: it refreshes this skill's cache entry (a changed description
+			// is advertised on the next run) and re-evaluates a bundled skill against the shipped
+			// history, so a revised core skill is flagged as customized rather than overwritten
+			// by the next upgrade.
+			await skillsService.writeSkillFile(skillName, newContent);
+			getData().recordSkillRevision(skillName);
+			// The model wrote this text too, so a follow-up revision in the same turn needs no reload.
+			recordSkillLoaded(threadId, skillName, parseFrontmatter(newContent).body);
 
-			return `Updated the "${skillName}" skill.`;
+			return `${verb} the "${skillName}" skill.`;
 		},
 		{
 			name: "manage_skills",
-			description: `Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately — there is no review step. A skill's name and plugin link are locked once created. Attached skills: ${attached.join(", ")}`,
-			schema: manageSkillsSchema,
+			description: `Create new skills, revise your own attached skills${allowDelete ? ", or delete skills you created" : ""}. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
+			schema,
 		},
 	);
 }

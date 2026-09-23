@@ -18,6 +18,12 @@ jobs:
 
         steps:
             - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+              with:
+                  # Full history: the shipped-history tests (test/skills/shippedSkillHistory.test.ts,
+                  # test/agent/shippedPromptHistory.test.ts) replay every release tag against the
+                  # fingerprint tables. A shallow checkout has no tags, so they either pass
+                  # vacuously or fail outright. The pack is ~18 MiB.
+                  fetch-depth: 0
 
             - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
               with:

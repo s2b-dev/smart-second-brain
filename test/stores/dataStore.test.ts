@@ -1112,3 +1112,87 @@ describe("PluginDataStore graph index availability", () => {
 		expect(store.getGraphEmbedModel()).toBeNull();
 	});
 });
+
+describe("PluginDataStore – skill usage", () => {
+	beforeEach(() => {
+		__resetPluginDataStoreForTests();
+	});
+
+	async function freshStore() {
+		const plugin = {
+			...createMockPlugin(),
+			loadData: vi.fn().mockResolvedValue(structuredClone(DEFAULT_SETTINGS)),
+		};
+		return { store: await createData(plugin as never), plugin };
+	}
+
+	it("starts with no usage for an unknown skill", async () => {
+		const { store } = await freshStore();
+		expect(store.getSkillUsage("weekly-review")).toBeUndefined();
+	});
+
+	it("counts loads and revisions separately, with timestamps", async () => {
+		const { store, plugin } = await freshStore();
+		const before = Date.now();
+
+		store.recordSkillLoad("weekly-review");
+		store.recordSkillLoad("weekly-review");
+		store.recordSkillRevision("weekly-review");
+
+		const usage = store.getSkillUsage("weekly-review")!;
+		expect(usage.loadCount).toBe(2);
+		expect(usage.revisionCount).toBe(1);
+		expect(usage.lastLoadedAt).toBeGreaterThanOrEqual(before);
+		expect(usage.lastRevisedAt).toBeGreaterThanOrEqual(before);
+		// Persisted, not just held in memory.
+		expect(plugin.saveData).toHaveBeenCalled();
+		const saved = plugin.saveData.mock.calls.at(-1)![0];
+		expect(saved.skillUsage.find((entry: { name: string }) => entry.name === "weekly-review").loadCount).toBe(2);
+	});
+
+	it("a revision on a never-loaded skill leaves the load side empty", async () => {
+		const { store } = await freshStore();
+		store.recordSkillRevision("weekly-review");
+		expect(store.getSkillUsage("weekly-review")).toMatchObject({
+			loadCount: 0,
+			lastLoadedAt: null,
+			revisionCount: 1,
+		});
+	});
+
+	it("forgets a skill so a later one of the same name starts from zero", async () => {
+		const { store } = await freshStore();
+		store.recordSkillLoad("weekly-review");
+		store.forgetSkillUsage("weekly-review");
+		expect(store.getSkillUsage("weekly-review")).toBeUndefined();
+		expect(store.skillUsage).toEqual([]);
+	});
+
+	// Data written before this field existed has no `skillUsage` key at all.
+	it("tolerates saved data without a skillUsage field, or with a non-list one", async () => {
+		__resetPluginDataStoreForTests();
+		const data = structuredClone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+		data.skillUsage = { "weekly-review": { loadCount: 9 } }; // a shape that never shipped
+		const plugin = { ...createMockPlugin(), loadData: vi.fn().mockResolvedValue(data) };
+		const store = await createData(plugin as never);
+		expect(store.getSkillUsage("x")).toBeUndefined();
+		store.recordSkillLoad("x");
+		expect(store.getSkillUsage("x")?.loadCount).toBe(1);
+	});
+
+	// "constructor" and "toString" are valid skill names. With a name-keyed object Svelte's
+	// $state proxy silently dropped the write (the key exists on the prototype chain), which
+	// is why the counters are a list; this pins that such names round-trip.
+	it("stores a skill named like an Object.prototype member", async () => {
+		const { store } = await freshStore();
+		expect(store.getSkillUsage("constructor")).toBeUndefined();
+		expect(store.getSkillUsage("toString")).toBeUndefined();
+
+		store.recordSkillLoad("constructor");
+		expect(store.getSkillUsage("constructor")).toMatchObject({ loadCount: 1, revisionCount: 0 });
+
+		store.forgetSkillUsage("toString"); // must be a no-op, not a delete of the prototype
+		store.forgetSkillUsage("constructor");
+		expect(store.getSkillUsage("constructor")).toBeUndefined();
+	});
+});
