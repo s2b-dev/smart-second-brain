@@ -85,6 +85,12 @@ let dragHasIssue = $state(false);
 // way to submit, so there's nothing to hint.
 const sendShortcutHint = isMobileUI() ? "" : "↵";
 let containerEl: HTMLDivElement | undefined = $state();
+// Floor for the input card when the composer runs out of pane height: its
+// controls plus one editor line. `clientHeight` excludes the card's 1px
+// borders, which its border-box `min-height` must include, hence the `+ 2`.
+let wrapperHeight = $state(0);
+let editorHeight = $state(0);
+const cardMinHeight = $derived(wrapperHeight && editorHeight ? wrapperHeight + 2 - editorHeight + 24 : 0);
 let contextTrayRef = $state<ReturnType<typeof ContextTray> | undefined>(undefined);
 // Read the tray's context outputs reactively through the instance. They're
 // getter functions over `$derived` state in ContextTray, so reading them inside
@@ -1188,7 +1194,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
        pointer-only convenience (focus the editor from the card's padding);
        keyboard users reach the editor by Tab, so no key handler is needed. -->
   <div
-    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate shrink-0 {showDragActive
+    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate {showDragActive
       ? 'border-[--interactive-accent] chat-input-wrapper-drag-active'
       : ''}"
     ondragenter={dropTargetMode === "input" ? handleDragEnter : undefined}
@@ -1197,6 +1203,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     ondrop={dropTargetMode === "input" ? handleDrop : undefined}
     onclick={handleWrapperClick}
     role="region"
+    bind:clientHeight={wrapperHeight}
+    style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}
   >
     <!-- `pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
          6px below the border. The old `pt-2` put it at 12px — a visibly large
@@ -1220,6 +1228,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     <!-- Markdown Editor Container -->
     <div
       bind:this={editorContainer}
+      bind:clientHeight={editorHeight}
       class="markdown-editor-container w-full overflow-y-auto py-1 min-h-[24px]"
       id="chat-view-user-input-element"
       data-testid="message-input"
@@ -1571,18 +1580,23 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
   /* `--s2b-chat-pane-height` is the chat pane's height (published in
      Chat.svelte). The input card grows with its content up to two thirds of
      it, after which the editor — the card's only shrinkable child — scrolls.
-     The card itself never shrinks, so the send row can't be squeezed out.
 
-     The whole composer is capped at the pane. If the card plus a long
-     pending-changes list would exceed that, the list gives way: it is its own
-     scroller with a pinned summary row (see PendingChangesBar.svelte), whereas
-     the banner and editing bar are single rows and keep their size. */
+     The whole composer is capped at the pane. When everything doesn't fit, the
+     pending-changes list gives way first (its far larger shrink factor): it is
+     its own scroller floored at its summary row (see PendingChangesBar.svelte).
+     Only then does the card shrink, down to `cardMinHeight` — its controls plus
+     one editor line — so the send row is never squeezed out. The banner and
+     editing bar are single rows and keep their size. */
   .chat-input-container {
     max-height: var(--s2b-chat-pane-height);
   }
 
   .chat-input-container > :global(:not(.chat-input-wrapper, .pcb-container)) {
     flex-shrink: 0;
+  }
+
+  .chat-input-container > :global(.pcb-container) {
+    flex-shrink: 1000;
   }
 
   .chat-input-wrapper {
