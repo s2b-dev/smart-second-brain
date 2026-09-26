@@ -46,7 +46,6 @@ const acceptedFileTypes =
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB per file
 const MAX_TOTAL_ATTACHMENTS_BYTES = 25 * 1024 * 1024; // 25 MB per message
-const FULLSCREEN_TRANSITION_MS = 220;
 
 const {
 	registry,
@@ -65,8 +64,6 @@ const isEditing = $derived(editingPairId !== null);
 let editorContainer: HTMLDivElement | undefined = $state();
 let attachmentInputEl: HTMLInputElement | undefined = $state();
 let cameraInputEl: HTMLInputElement | undefined = $state();
-/** Send shortcut hint for the send button tooltip (platform-aware). */
-const sendShortcut = Platform.isMacOS ? "⌘↵" : "Ctrl+↵";
 let markdownEditor: EmbeddableMarkdownEditor | undefined = $state();
 let inputValue = $state("");
 
@@ -83,16 +80,10 @@ let isDragging = $state(false);
 let dragCounter = 0;
 let dragMessage = $state("Drop files here");
 let dragHasIssue = $state(false);
-let isFullscreen = $state(false);
 // On mobile there's no keyboard shortcut at all — Enter is always a newline
 // there (see the `onEnter` handler below) and the send button is the only
-// way to submit, so there's nothing to hint. Desktop: Enter sends when
-// collapsed; when expanded, Enter is a newline and Mod+Enter sends.
-const sendShortcutHint = $derived(isMobileUI() ? "" : isFullscreen ? sendShortcut : "↵");
-let isFullscreenVisible = $state(false);
-let fullscreenNoTransition = $state(false);
-let fullscreenTransitioning = false;
-let fullscreenPlaceholderHeight = $state(0);
+// way to submit, so there's nothing to hint.
+const sendShortcutHint = isMobileUI() ? "" : "↵";
 let containerEl: HTMLDivElement | undefined = $state();
 let contextTrayRef = $state<ReturnType<typeof ContextTray> | undefined>(undefined);
 // Read the tray's context outputs reactively through the instance. They're
@@ -530,29 +521,24 @@ function initializeEditor() {
 			inputValue = value;
 		},
 		onEnter: (_editor, _mod, shift) => {
-			// When expanded (fullscreen), Enter always inserts a newline so long,
-			// multi-line drafts flow naturally — sending is Mod+Enter only there.
 			// On mobile, Enter is the on-screen keyboard's only return key — there
 			// is no Shift to hold for a newline and no discoverable "hold to send"
 			// convention, so every mainstream mobile chat app (WhatsApp, iMessage,
 			// Telegram) treats it as a newline and reserves the send button as the
-			// only way to submit. Match that instead of sending on it. Otherwise
-			// (desktop, collapsed) plain Enter sends; Shift+Enter always inserts a
-			// newline. Return false to use the editor's default newline behavior.
-			if (isFullscreen || shift || isMobileUI()) {
+			// only way to submit. Match that instead of sending on it. On desktop
+			// plain Enter sends; Shift+Enter inserts a newline. Return false to use
+			// the editor's default newline behavior.
+			if (shift || isMobileUI()) {
 				return false;
 			}
 			attemptSend();
 			return true;
 		},
 		onSubmit: () => {
-			// Mod+Enter: send message (works in both collapsed and expanded modes)
+			// Mod+Enter: send message
 			attemptSend();
 		},
 		onEscape: () => {
-			// Fullscreen has its own Esc handling (collapse first); don't also
-			// cancel an edit on the same keypress.
-			if (isFullscreen) return;
 			cancelActiveEdit();
 		},
 		onFocus: () => {
@@ -567,64 +553,6 @@ function initializeEditor() {
 	window.requestAnimationFrame(() => {
 		markdownEditor?.focus();
 	});
-}
-
-function expandFullscreen() {
-	if (isMobileUI() || fullscreenTransitioning || isFullscreen) return;
-	fullscreenTransitioning = true;
-	setFullscreenStartInset();
-	fullscreenNoTransition = true;
-	isFullscreen = true;
-	isFullscreenVisible = false;
-	// Double rAF ensures the start geometry is fully painted before transition begins.
-	window.requestAnimationFrame(() => {
-		window.requestAnimationFrame(() => {
-			fullscreenNoTransition = false;
-			window.requestAnimationFrame(() => {
-				isFullscreenVisible = true;
-			});
-			window.setTimeout(() => {
-				fullscreenTransitioning = false;
-			}, FULLSCREEN_TRANSITION_MS);
-			markdownEditor?.focus();
-		});
-	});
-}
-
-function collapseFullscreen() {
-	if (fullscreenTransitioning || !isFullscreen) return;
-	fullscreenTransitioning = true;
-	isFullscreenVisible = false;
-	window.setTimeout(() => {
-		isFullscreen = false;
-		fullscreenNoTransition = false;
-		fullscreenPlaceholderHeight = 0;
-		fullscreenTransitioning = false;
-		window.requestAnimationFrame(() => markdownEditor?.focus());
-	}, FULLSCREEN_TRANSITION_MS);
-}
-
-function setFullscreenStartInset() {
-	if (!containerEl) return;
-	// Use offset geometry from layout engine to avoid subpixel drift during first frame.
-	const top = Math.max(0, containerEl.offsetTop);
-	const left = Math.max(0, containerEl.offsetLeft);
-	const width = Math.max(0, containerEl.offsetWidth);
-	const height = Math.max(0, containerEl.offsetHeight);
-	fullscreenPlaceholderHeight = height;
-
-	containerEl.style.setProperty("--fs-top", `${top}px`);
-	containerEl.style.setProperty("--fs-left", `${left}px`);
-	containerEl.style.setProperty("--fs-width", `${width}px`);
-	containerEl.style.setProperty("--fs-height", `${height}px`);
-}
-
-function toggleFullscreen() {
-	if (isFullscreen) {
-		collapseFullscreen();
-		return;
-	}
-	expandFullscreen();
 }
 
 function attemptSend() {
@@ -742,9 +670,6 @@ function sendMessage() {
 	contextTrayRef?.clear();
 	inputValue = "";
 	markdownEditor?.clear();
-	if (isFullscreen) {
-		collapseFullscreen();
-	}
 	onMessageSent?.();
 }
 
@@ -1236,27 +1161,10 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 }
 </script>
 
-{#if isFullscreen}
-  <div
-    class="chat-input-placeholder w-full"
-    style="height: {fullscreenPlaceholderHeight}px;"
-    aria-hidden="true"
-  ></div>
-{/if}
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={containerEl}
-  class="chat-input-container w-full flex flex-col relative isolate gap-1 {isFullscreen
-    ? `chat-input-fullscreen justify-end ${fullscreenNoTransition ? 'chat-input-fullscreen-no-transition' : ''} ${isFullscreenVisible ? 'chat-input-fullscreen-visible' : ''}`
-    : 'mx-auto max-w-[--file-line-width]'}"
+  class="chat-input-container w-full flex flex-col relative isolate gap-1 mx-auto max-w-[--file-line-width]"
   role="region"
-  onkeydown={(e) => {
-    if (isFullscreen && e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      collapseFullscreen();
-    }
-  }}
 >
   {#if selectedChatModel && models.unavailableProviders.includes(selectedChatModel.provider)}
     <button
@@ -1274,16 +1182,13 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
        Transition is scoped to the two properties that actually change state
        (border-color on focus/drag, background on drag-active) rather than
        `transition-all`, which also animated layout geometry — including the
-       reflow when the mobile keyboard opens. The fullscreen expand/collapse
-       animation is unaffected: it lives on `.chat-input-container`, which has
-       its own explicit transition list. -->
+       reflow when the mobile keyboard opens. -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -- the click is a
        pointer-only convenience (focus the editor from the card's padding);
        keyboard users reach the editor by Tab, so no key handler is needed. -->
   <div
-    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate {isFullscreen
-      ? 'flex-1 min-h-0'
-      : ''} {showDragActive
+    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate min-h-0 {showDragActive
       ? 'border-[--interactive-accent] chat-input-wrapper-drag-active'
       : ''}"
     ondragenter={dropTargetMode === "input" ? handleDragEnter : undefined}
@@ -1293,26 +1198,9 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     onclick={handleWrapperClick}
     role="region"
   >
-    {#if !isMobileUI()}
-      <!-- Fullscreen toggle - top right corner. Desktop only: on mobile the
-           composer already grows with content up to `max-h-[200px]` (see the
-           editor container below), and the fullscreen panel only bought a bit
-           more room at real cost (an extra button, its own transition/keyboard
-           timing to get right) — not worth it on a screen this small. -->
-      <Button
-        styles="chat-input-icon-button fullscreen-toggle-button absolute top-1.5 right-1.5 z-10 opacity-0 transition-opacity duration-150"
-        iconId={isFullscreen ? "minimize-2" : "maximize-2"}
-        iconSize="xs"
-        style="pointer-events: auto;"
-        onClick={toggleFullscreen}
-        tooltip={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen editor"}
-      />
-    {/if}
     <!-- `pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
-         6px below the border, matching the fullscreen toggle's `top-1.5` so
-         the two top-anchored elements sit on one line. The old `pt-2` put it
-         at 12px — a visibly large gap that also read as misaligned against
-         the button. -->
+         6px below the border. The old `pt-2` put it at 12px — a visibly large
+         gap. -->
     <div class="composer-tray-row flex flex-row flex-wrap items-start gap-1.5 pt-0.5 min-w-0">
       <ContextTray
         bind:this={contextTrayRef}
@@ -1332,9 +1220,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     <!-- Markdown Editor Container -->
     <div
       bind:this={editorContainer}
-      class="markdown-editor-container w-full overflow-y-auto py-1 {isFullscreen
-        ? 'flex-1'
-        : 'min-h-[24px] max-h-[200px]'}"
+      class="markdown-editor-container w-full overflow-y-auto py-1 min-h-[24px]"
       id="chat-view-user-input-element"
       data-testid="message-input"
     ></div>
@@ -1609,68 +1495,6 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     padding-right: 6px;
   }
 
-  .chat-input-container.chat-input-fullscreen {
-    /* Breathing room between the expanded panel and the chat pane's edges. */
-    --s2b-fs-gutter: 12px;
-    position: absolute;
-    top: var(--fs-top, 0px);
-    left: var(--fs-left, 0px);
-    width: var(--fs-width, 100%);
-    height: var(--fs-height, 100%);
-    margin: 0 !important;
-    z-index: var(--layer-popover);
-    background: var(--background-primary) !important;
-    padding: 0;
-    max-width: none;
-    opacity: 1;
-    /* Matches `.chat-input-wrapper`'s radius. With `overflow: hidden` here, a
-       tighter radius on the container clips the wrapper's rounder corners and
-       shaves off its bottom edge. */
-    border-radius: 22px;
-    overflow: hidden;
-    transition:
-      top 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      left 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      border-radius 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 220ms ease;
-    will-change: top, left, width, height, border-radius;
-  }
-
-  /* Expanded geometry. The toggle that reaches this state is desktop-only (see
-     the `{#if !isMobileUI()}` guard on the fullscreen button), so this sizes
-     against the chat pane, not the phone viewport.
-
-     `.chat-input-container` is `position: absolute` inside `.chat-root`, which
-     is `position: relative` — so percentages here resolve against the chat pane
-     and the panel stays inside it instead of escaping to the window. An earlier
-     `height: 100vh - <mobile keyboard/navbar bands>` measured the whole viewport
-     while the top offset was relative to the pane, so in any pane shorter than
-     the window the panel overhung its bottom edge and the send row was clipped —
-     the reported "cut off slightly at the bottom". */
-  .chat-input-container.chat-input-fullscreen.chat-input-fullscreen-visible {
-    opacity: 1;
-    top: var(--s2b-fs-gutter);
-    height: calc(100% - (2 * var(--s2b-fs-gutter)));
-    /* Match the collapsed composer's readable measure (`max-w-[--file-line-width]`,
-       centered) rather than stretching edge to edge: a full-width editor gives
-       lines far longer than the messages above it, so text written here does not
-       wrap where it will once sent. Centering is done with `left` + `width`
-       because `margin: 0 !important` above rules out `margin-inline: auto`. */
-    width: min(calc(100% - (2 * var(--s2b-fs-gutter))), var(--file-line-width));
-    left: max(
-      var(--s2b-fs-gutter),
-      calc((100% - min(calc(100% - (2 * var(--s2b-fs-gutter))), var(--file-line-width))) / 2)
-    );
-    /* Keep in step with the wrapper radius, as above. */
-    border-radius: 22px;
-  }
-
-  .chat-input-container.chat-input-fullscreen.chat-input-fullscreen-no-transition {
-    transition: none !important;
-  }
-
   .chat-input-wrapper:focus-within {
     border-color: var(--interactive-accent);
   }
@@ -1744,26 +1568,11 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     aspect-ratio: 1;
   }
 
-  :global(.chat-input-wrapper:hover > .fullscreen-toggle-button.clickable-icon),
-  :global(.chat-input-wrapper:focus-within > .fullscreen-toggle-button.clickable-icon),
-  :global(.chat-input-fullscreen .chat-input-wrapper > .fullscreen-toggle-button.clickable-icon) {
-    opacity: 1;
-  }
-
-  /* The toggle is absolutely positioned over the wrapper's top-right corner,
-     outside the flow — reserve that corner in the tray row so a wrapping chip
-     can't land underneath it, where the toggle would swallow the chip's
-     clicks (its paperclip/close actions live exactly at a chip's right edge).
-     2.5rem = the 6px right offset + 1.75rem button + a 6px gap. Only the
-     row's FIRST line can collide (the toggle band ends where a second chip
-     line begins), so the over-reservation on later lines is the price of
-     doing this in CSS. Mobile never renders the toggle — no reservation. */
-  .composer-tray-row {
-    padding-right: 2.5rem;
-  }
-
-  :global(.is-mobile) .composer-tray-row {
-    padding-right: 0;
+  /* The container is capped at two thirds of the chat pane (see Chat.svelte).
+     Only the input card may give up height under that cap — its editor is the
+     one scroller — so banners and review bars above it keep their full size. */
+  .chat-input-container > :not(.chat-input-wrapper) {
+    flex-shrink: 0;
   }
 
   /* Markdown editor styling */

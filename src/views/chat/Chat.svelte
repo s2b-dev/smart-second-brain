@@ -85,8 +85,7 @@ function messageNavHotkeys(node: HTMLElement) {
 // which no `position`/`inset` can escape) and what it fixes.
 //
 // The composer keeps its own DOM identity — only its parent changes — so Svelte
-// continues to own and update it normally, and the fullscreen transition on
-// `.chat-input-container` is unaffected.
+// continues to own and update it normally.
 function portalComposer(node: HTMLElement) {
 	if (!isMobileUI() || typeof document === "undefined") return {};
 	// `.workspace-split.mod-root` rather than `.app-container`: swiping a sidebar
@@ -193,9 +192,10 @@ function portalComposer(node: HTMLElement) {
 
 	const leafEl = node.closest<HTMLElement>(".workspace-leaf");
 
-	// `<Input>`'s own template drives this element's `class` attribute (it
-	// toggles fullscreen classes reactively on `isFullscreen`), and Svelte
-	// replaces the whole attribute string on each such re-render — silently
+	// `<Input>`'s own template drives this element's `class` attribute, and
+	// if it ever toggles a class reactively again (it used to, for the removed
+	// fullscreen editor), Svelte replaces the whole attribute string on each
+	// such re-render — silently
 	// dropping `s2b-composer-portaled`, which was added imperatively above and
 	// is invisible to Svelte's reactivity. Losing it mid-render (confirmed via
 	// on-device collapse-from-fullscreen: the class vanished right after
@@ -408,6 +408,21 @@ function portalComposer(node: HTMLElement) {
     --chat-bg: var(--background-primary);
   }
 
+  /* The composer grows with its content up to two thirds of the chat pane,
+     then the editor scrolls (Input.svelte lets only the editor shrink). On
+     desktop the composer is an in-flow child of `.chat-root`, so the pane is a
+     size container and `cqh` measures it directly. Mobile portals the composer
+     out of the pane (see `portalComposer`), where `cqh` would fall back to the
+     full viewport and ignore the keyboard — the portaled rule below restates
+     the cap against the pane's own height formula instead. */
+  :global(body:not(.is-mobile)) .chat-root {
+    container-type: size;
+  }
+
+  :global(.chat-root > .chat-input-container) {
+    max-height: calc(100cqh * 2 / 3);
+  }
+
   :global(.mod-left-split .chat-root),
   :global(.mod-right-split .chat-root) {
     --chat-bg: var(--background-secondary);
@@ -516,6 +531,17 @@ function portalComposer(node: HTMLElement) {
     );
     margin-top: 0;
     z-index: auto;
+    /* Two thirds of the visible chat pane — the same height `.chat-root` gets
+       in the mobile rule above. */
+    max-height: calc(
+      (
+          100vh - var(--s2b-view-top, 0px) -
+            max(
+              calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
+              calc(52px + env(safe-area-inset-bottom))
+            )
+        ) * 2 / 3
+    );
   }
 
   /* Anchor the absolute chat-root to the leaf's content area. `:has` is supported
