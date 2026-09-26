@@ -1,7 +1,8 @@
 import type { PluginData } from "../types/plugin";
+import { DEFAULT_VOICE_SETTINGS } from "./voiceDefaults";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 type Migration = (data: PluginData) => void;
 
@@ -202,6 +203,13 @@ const MIGRATIONS: Migration[] = [
 			const manageSkills = agent.toolsConfig?.manage_skills as unknown as Record<string, unknown> | undefined;
 			if (manageSkills) manageSkills.enabled = true;
 		}
+	},
+	// v14 → v15: the experimental voice mode settings block (`voice`) was added, and
+	//            later gained `orbStyle`. The top-level default spread in `createData`
+	//            supplies a missing block but does not reach into a stored one, so this
+	//            seeds the block when absent and fills any key it lacks when present.
+	(data) => {
+		data.voice = { ...structuredClone(DEFAULT_VOICE_SETTINGS), ...(data.voice ?? {}) };
 	},
 ];
 

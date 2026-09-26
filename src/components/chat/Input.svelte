@@ -26,6 +26,7 @@ import AttachPopover from "./AttachPopover.svelte";
 import { SearchModal } from "../modal/SearchModal";
 import { isMobileUI } from "../../utils/platform";
 import Button from "../ui/Button.svelte";
+import { getVoiceSession } from "../../voice/voiceSession.svelte";
 interface Props {
 	registry: SessionRegistry;
 	threadPath: string | null;
@@ -202,6 +203,11 @@ const contextUsage = $derived.by(() => {
 const hasChatModel = $derived(Boolean(selectedChatModel));
 const hasContentToSend = $derived(inputValue.trim().length > 0 || attachments.length > 0);
 const canSendMessage = $derived(hasContentToSend && hasChatModel);
+// The Send slot doubles as the voice-conversation button while there is nothing
+// to send: no text, no attachments, not editing. Desktop-only feature, opt-in.
+const voiceInSendSlot = $derived(
+	!isMobileUI() && getData().voice.enabled && !hasContentToSend && !isEditing && threadPath !== null,
+);
 const canSummarizeNow = $derived.by(() => {
 	return Boolean(session && session.messageState === MessageState.idle && session.messages.length > 0);
 });
@@ -1386,24 +1392,42 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
               iconId="x"
             />
           {/if}
-          <Button
-            disabled={!canSendMessage || savingFiles}
-            ariaLabel={isEditing ? "save edit" : "send message"}
-            tooltip={!hasChatModel
-              ? "Select a chat model first"
-              : isEditing
-                ? sendShortcutHint
-                  ? `Save edit (${sendShortcutHint})`
-                  : "Save edit"
-                : sendShortcutHint
-                  ? `Send message (${sendShortcutHint})`
-                  : "Send message"}
-            onClick={attemptSend}
-            dataTestId="send-message-button"
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
-            style={sendButtonStyle}
-            iconId={isEditing ? "check" : "arrow-up"}
-          />
+          {#if voiceInSendSlot}
+            <!-- Nothing to send yet, so the slot starts a voice conversation instead
+                 (the pattern ChatGPT's composer established). Typing anything, adding
+                 an attachment, or editing turns it back into Send. Only a click gets
+                 here: Enter on an empty box still does nothing. -->
+            <Button
+              ariaLabel="start voice conversation"
+              tooltip="Start voice conversation"
+              onClick={() => {
+                if (threadPath) void getVoiceSession().toggle(threadPath);
+              }}
+              dataTestId="voice-conversation-button"
+              styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200"
+              style={sendButtonStyle}
+              iconId="audio-lines"
+            />
+          {:else}
+            <Button
+              disabled={!canSendMessage || savingFiles}
+              ariaLabel={isEditing ? "save edit" : "send message"}
+              tooltip={!hasChatModel
+                ? "Select a chat model first"
+                : isEditing
+                  ? sendShortcutHint
+                    ? `Save edit (${sendShortcutHint})`
+                    : "Save edit"
+                  : sendShortcutHint
+                    ? `Send message (${sendShortcutHint})`
+                    : "Send message"}
+              onClick={attemptSend}
+              dataTestId="send-message-button"
+              styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
+              style={sendButtonStyle}
+              iconId={isEditing ? "check" : "arrow-up"}
+            />
+          {/if}
         {:else if session.messageState === MessageState.answering}
           <Button
             ariaLabel="stop streaming"

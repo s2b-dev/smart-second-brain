@@ -2,10 +2,12 @@
 import { QueryClientProvider } from "@tanstack/svelte-query";
 import Input from "../../components/chat/Input.svelte";
 import MessageContainer from "../../components/chat/MessageContainer.svelte";
+import VoiceSurface from "../../components/chat/VoiceSurface.svelte";
 import { getSessionRegistry } from "../../stores/chatStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
 import { isMobileUI } from "../../utils/platform";
+import { getVoiceSession } from "../../voice/voiceSession.svelte";
 import type { ThreadPathStore } from "./threadPathStore.svelte";
 
 interface Props {
@@ -19,6 +21,18 @@ const threadPath = $derived(threadPathStore.current);
 const plugin = getPlugin();
 
 const registry = getSessionRegistry();
+
+const voice = getVoiceSession();
+
+// Report which thread this view shows so the global voice session can end when
+// the last view showing its thread closes or navigates away — without a second
+// leaf on the same thread being able to kill it. Cleanup runs on both thread
+// change and unmount; the session decides whether anything else still shows it.
+const voiceViewToken = Symbol("chat-view");
+$effect(() => {
+	voice.attachView(voiceViewToken, threadPath);
+	return () => voice.detachView(voiceViewToken);
+});
 
 let messageContainer = $state<ReturnType<typeof MessageContainer> | undefined>();
 let input = $state<ReturnType<typeof Input> | undefined>();
@@ -313,7 +327,9 @@ function portalComposer(node: HTMLElement) {
     use:messageNavHotkeys
     use:portalComposer
   >
-    {#if registry}
+    {#if registry && voice.isBoundTo(threadPath)}
+      <VoiceSurface {registry} {threadPath} />
+    {:else if registry}
       <MessageContainer bind:this={messageContainer} {registry} {threadPath} />
       <Input
         bind:this={input}
