@@ -925,18 +925,6 @@ export class Agent {
 		const invokeConfig = this.buildRunnableConfig(options, threadId, checkpointId);
 		const transportContext = createAiTransportContext("default", `${label}:${runId}`);
 
-		// Bind the LangChain stream so each pull runs inside this run's transport
-		// context (run()-scoped, concurrency-safe). Without this the fetch issued
-		// deep inside the stream would read whichever context another concurrent
-		// run last set.
-		const stream = bindAsyncIterableToTransportContext(
-			await agent.stream(input, {
-				...invokeConfig,
-				streamMode: ["messages", "tools", "values"] as const,
-			}),
-			transportContext,
-		);
-
 		let rawResult: unknown;
 		// Track tool calls in progress to correlate start/end events
 		const pendingToolCalls = new Map<string, { name: string; input: unknown }>();
@@ -963,6 +951,16 @@ export class Agent {
 		// boundary: ids are globally unique per run, and `tool_start` reconciles by id.
 		const announcedPendingToolCalls = new Set<string>();
 		try {
+			// Scope initialization and each pull to this run; initialization can also require fallback.
+			const stream = bindAsyncIterableToTransportContext(
+				await runWithAiTransportContext(transportContext, () =>
+					agent.stream(input, {
+						...invokeConfig,
+						streamMode: ["messages", "tools", "values"] as const,
+					}),
+				),
+				transportContext,
+			);
 			for await (const chunk of stream) {
 				// Check if aborted before processing
 				if (options.signal?.aborted) {

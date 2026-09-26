@@ -33,7 +33,14 @@ vi.mock("langchain", () => ({
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { AIMessage } from "@langchain/core/messages";
 import { Agent, type AgentStreamChunk, type ResolvedRun } from "../../src/agent/Agent";
+import {
+	AiTransportDowngradeRequiredError,
+	createAiTransportContext,
+	getCurrentAiTransportModeForTest,
+	runWithAiTransportContext,
+} from "../../src/lib/aiTransport";
 
 const THREAD_ID = "Chats/thread.chat";
 
@@ -109,6 +116,34 @@ beforeEach(() => {
 });
 
 describe("stream loop parity across the three entry points", () => {
+	it.each(["streamTokens", "editFromCheckpoint", "regenerateFromCheckpoint"] as const)(
+		"scopes %s initialization and falls back on initialization failure",
+		async (method) => {
+			const agent = makeAgent();
+			const resolved = await makeResolved(agent);
+			const error = new AiTransportDowngradeRequiredError("openai", "https://example.com", new Error("fetch"));
+			const stream = vi.spyOn(resolved.runnable, "stream").mockImplementation(() => {
+				expect(getCurrentAiTransportModeForTest()).toBe("default");
+				return Promise.reject(error);
+			});
+			const invoke = vi.spyOn(resolved.runnable, "invoke").mockImplementation(async () => {
+				expect(getCurrentAiTransportModeForTest()).toBe("buffered");
+				return { messages: [new AIMessage("final")], structuredResponse: {} };
+			});
+			const chunks = await runWithAiTransportContext(createAiTransportContext("buffered", "outer"), () =>
+				collect(agent[method]({ query: "hi", resolved, threadId: THREAD_ID, checkpointId: "cp-1" })),
+			);
+
+			expect(stream).toHaveBeenCalledOnce();
+			expect(invoke).toHaveBeenCalledOnce();
+			expect(invoke.mock.calls[0][0]).toEqual(stream.mock.calls[0][0]);
+			expect(invoke.mock.calls[0][1]?.configurable).toEqual(stream.mock.calls[0][1]?.configurable);
+			expect(chunks).toEqual([
+				expect.objectContaining({ type: "result", result: expect.objectContaining({ response: "final" }) }),
+			]);
+		},
+	);
+
 	it("emits the same token sequence", async () => {
 		STREAM_CHUNKS.push(aiDelta("m1", "Hello "), aiDelta("m1", "world"), FINAL_VALUES);
 

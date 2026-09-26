@@ -141,6 +141,8 @@ export type ToolOutputRenderModel =
 	  };
 
 const JSON_FENCE = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+export const MAX_RENDERED_TOOL_OUTPUT_CHARS = 20_000;
+const UI_TRUNCATION_MARKER = "[UI preview truncated:";
 const MARKDOWN_PATTERNS = [
 	/^#{1,6}\s/m,
 	/^[-*+]\s/m,
@@ -194,15 +196,23 @@ function buildStringOutputRenderModel(
 	output: string,
 	input?: Record<string, unknown> | null,
 ): ToolOutputRenderModel {
-	const trimmed = output.trim();
-	if (!trimmed) return { kind: "empty", rawText: output };
+	const fullTrimmed = output.trim();
+	if (!fullTrimmed) return { kind: "empty", rawText: output };
 
-	const parsed = parseJsonString(trimmed);
+	// Parse before capping: JSON tools (search_notes, list_directory, grep_notes, ...)
+	// routinely exceed the cap, and a cut document no longer parses into its card.
+	// Structured views cap their own display text in stringifyPrettyValue.
+	const parsed = parseJsonString(fullTrimmed);
 	if (parsed !== undefined) {
-		return classifyStructuredValue(toolName, parsed, trimmed, input);
+		return classifyStructuredValue(toolName, parsed, fullTrimmed, input);
 	}
 
+	const trimmed = truncateToolOutputForRendering(output).trim();
+
 	const specialized = buildSpecializedStringModel(toolName, trimmed, input);
+	if (specialized?.kind === "read_content" && output.length > MAX_RENDERED_TOOL_OUTPUT_CHARS) {
+		specialized.payload.truncated = true;
+	}
 	if (specialized) return specialized;
 
 	if (looksLikeMarkdown(trimmed)) {
@@ -210,6 +220,13 @@ function buildStringOutputRenderModel(
 	}
 
 	return { kind: "markdown", markdown: trimmed, rawText: trimmed };
+}
+
+function truncateToolOutputForRendering(output: string): string {
+	if (output.length <= MAX_RENDERED_TOOL_OUTPUT_CHARS) return output;
+
+	const omitted = output.length - MAX_RENDERED_TOOL_OUTPUT_CHARS;
+	return `${output.slice(0, MAX_RENDERED_TOOL_OUTPUT_CHARS)}\n\n${UI_TRUNCATION_MARKER} ${omitted} characters omitted]`;
 }
 
 function buildSpecializedStringModel(
@@ -581,6 +598,10 @@ function stringifyCompactValue(value: unknown): string {
 }
 
 function stringifyPrettyValue(value: unknown): string {
+	return truncateToolOutputForRendering(serializePrettyValue(value));
+}
+
+function serializePrettyValue(value: unknown): string {
 	if (typeof value === "string") return value;
 	try {
 		const serialized = JSON.stringify(value, null, 2);
