@@ -8,8 +8,9 @@ interface Props {
 	onFromComputer: () => void;
 	/** Attach files from the vault (opens the search modal in picker mode). */
 	onFromVault: () => void;
-	/** Take a photo (native camera on mobile, webcam modal on desktop). */
-	onFromCamera: () => void;
+	/** Take a photo with the device camera. Omitted where there is no camera
+	 * to open (desktop), and the row is hidden with it. */
+	onFromCamera?: () => void;
 }
 
 const { onFromComputer, onFromVault, onFromCamera }: Props = $props();
@@ -47,14 +48,16 @@ function pick(action: () => void) {
     {/snippet}
   </PickerOptionRow>
 
-  <PickerOptionRow onClick={() => pick(onFromCamera)}>
-    {#snippet leading()}
-      <Icon name="camera" size="xs" />
-    {/snippet}
-    {#snippet content()}
-      Take photo
-    {/snippet}
-  </PickerOptionRow>
+  {#if onFromCamera}
+    <PickerOptionRow onClick={() => pick(onFromCamera)}>
+      {#snippet leading()}
+        <Icon name="camera" size="xs" />
+      {/snippet}
+      {#snippet content()}
+        Take photo
+      {/snippet}
+    </PickerOptionRow>
+  {/if}
 
   <PickerOptionRow onClick={() => pick(onFromVault)}>
     {#snippet leading()}
