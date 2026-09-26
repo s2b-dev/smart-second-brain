@@ -85,8 +85,7 @@ function messageNavHotkeys(node: HTMLElement) {
 // which no `position`/`inset` can escape) and what it fixes.
 //
 // The composer keeps its own DOM identity — only its parent changes — so Svelte
-// continues to own and update it normally, and the fullscreen transition on
-// `.chat-input-container` is unaffected.
+// continues to own and update it normally.
 function portalComposer(node: HTMLElement) {
 	if (!isMobileUI() || typeof document === "undefined") return {};
 	// `.workspace-split.mod-root` rather than `.app-container`: swiping a sidebar
@@ -163,6 +162,7 @@ function portalComposer(node: HTMLElement) {
 		// would bake the stale value in.
 		if (!Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--keyboard-height"))) {
 			node.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
+			composer.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
 		}
 	};
 
@@ -193,9 +193,10 @@ function portalComposer(node: HTMLElement) {
 
 	const leafEl = node.closest<HTMLElement>(".workspace-leaf");
 
-	// `<Input>`'s own template drives this element's `class` attribute (it
-	// toggles fullscreen classes reactively on `isFullscreen`), and Svelte
-	// replaces the whole attribute string on each such re-render — silently
+	// `<Input>`'s own template drives this element's `class` attribute, and
+	// if it ever toggles a class reactively again (it used to, for the removed
+	// fullscreen editor), Svelte replaces the whole attribute string on each
+	// such re-render — silently
 	// dropping `s2b-composer-portaled`, which was added imperatively above and
 	// is invisible to Svelte's reactivity. Losing it mid-render (confirmed via
 	// on-device collapse-from-fullscreen: the class vanished right after
@@ -289,7 +290,12 @@ function portalComposer(node: HTMLElement) {
 			if (!composer) return;
 			composer.style.display = "";
 			composer.classList.remove("s2b-composer-portaled");
-			for (const prop of ["--s2b-composer-left", "--s2b-composer-width", "--s2b-composer-height"]) {
+			for (const prop of [
+				"--s2b-composer-left",
+				"--s2b-composer-width",
+				"--s2b-composer-height",
+				"--s2b-view-top",
+			]) {
 				composer.style.removeProperty(prop);
 			}
 			node.style.removeProperty("--s2b-composer-height");
@@ -408,6 +414,21 @@ function portalComposer(node: HTMLElement) {
     --chat-bg: var(--background-primary);
   }
 
+  /* The composer sizes itself against the chat pane's height (see
+     `--s2b-chat-pane-height` in Input.svelte). On desktop it is an in-flow
+     child of `.chat-root`, so the pane is a size container and `cqh` measures
+     it directly. Mobile portals the composer out of the pane (see
+     `portalComposer`), where `cqh` would fall back to the full viewport and
+     ignore the keyboard — the portaled rule below restates the height with the
+     pane's own formula instead. */
+  :global(body:not(.is-mobile)) .chat-root {
+    container-type: size;
+  }
+
+  :global(body:not(.is-mobile) .chat-root > .chat-input-container) {
+    --s2b-chat-pane-height: 100cqh;
+  }
+
   :global(.mod-left-split .chat-root),
   :global(.mod-right-split .chat-root) {
     --chat-bg: var(--background-secondary);
@@ -516,6 +537,16 @@ function portalComposer(node: HTMLElement) {
     );
     margin-top: 0;
     z-index: auto;
+    /* The same height `.chat-root` gets in the mobile rule above.
+       `--s2b-view-top` is published on the composer too: it is no longer a
+       descendant of `.chat-root`, so it can't inherit it from there. */
+    --s2b-chat-pane-height: calc(
+      100vh - var(--s2b-view-top, 0px) -
+        max(
+          calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
+          calc(52px + env(safe-area-inset-bottom))
+        )
+    );
   }
 
   /* Anchor the absolute chat-root to the leaf's content area. `:has` is supported

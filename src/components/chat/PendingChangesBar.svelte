@@ -80,6 +80,8 @@ const summaryLabel = $derived.by(() => {
 });
 
 let isExpanded = $state(false);
+/** Rendered height of the summary row; floors the bar's height (see `.pcb-container`). */
+let summaryHeight = $state(0);
 
 /** True while an Accept All / Reject All batch is running — disables both
  * buttons so a double-click can't queue a second batch (the store's guard
@@ -437,12 +439,18 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
 </script>
 
 {#if actionableEntries.length > 0}
-  <div class="pcb-container">
+  <!-- The bar may give up height when the composer runs out of room (see
+       Input.svelte), but never below its summary row: that row holds Accept /
+       Reject All. `overflow: hidden` zeroes the automatic flex minimum, and
+       no CSS-only minimum excludes the list, hence the measured floor (+2px
+       for the border; the box is border-box). -->
+  <div class="pcb-container" style:min-height={summaryHeight ? `${summaryHeight + 2}px` : undefined}>
     <!-- Summary bar. A div with button semantics, not a <button>: it CONTAINS
          the Accept/Reject All buttons, and interactive elements can't nest. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="pcb-summary"
+      bind:clientHeight={summaryHeight}
       role="button"
       tabindex="0"
       aria-expanded={isExpanded}
