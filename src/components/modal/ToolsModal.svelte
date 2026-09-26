@@ -112,7 +112,8 @@ function openToolConfig(toolId: BuiltInToolId) {
         {#each BUILT_IN_TOOL_IDS as toolId (toolId)}
           {@const config = selectedAgent.toolsConfig[toolId]}
           {@const skills = attachingSkills.get(toolId) ?? []}
-          {@const attached = skills.length > 0}
+          {@const isInteractive = toolId === "ask_question"}
+          {@const attached = skills.length > 0 || isInteractive}
           {@const enabled = isToolEnabled(toolId)}
           {@const displayName = getToolDisplayName(toolId, config?.name)}
           <ManagedEntityItem
@@ -121,11 +122,11 @@ function openToolConfig(toolId: BuiltInToolId) {
             disabled={!attached}
           >
             {#snippet badges()}
-              {#if attached}
+              {#if attached && !isInteractive}
                 {#each skills as skillName (skillName)}
                   <Badge label={skillName} tone="accent" />
                 {/each}
-              {:else}
+              {:else if !attached}
                 <Badge label="Not attached by any enabled skill" tone="warning" />
               {/if}
             {/snippet}

@@ -958,7 +958,43 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onchange={() => void toggleSkill(ext.id, !ext.enabled)}
             />
           </SettingItem>
+          {#if ext.id === "canvas"}
+            <SettingItem
+              name="Ask question"
+              desc="Allow the agent to ask multiple-choice questions in chat to clarify requirements or solicit preferences."
+            >
+              {#snippet namePrefix()}
+                <Icon name="help-circle" size="s" />
+              {/snippet}
+              <Toggle
+                checked={selectedAgent.toolsConfig.ask_question?.enabled ?? true}
+                onchange={() => {
+                  const current = selectedAgent.toolsConfig.ask_question?.enabled ?? true;
+                  pluginData.updateAgentToolConfig(agentId, "ask_question", { enabled: !current });
+                  void applyChanges();
+                }}
+              />
+            </SettingItem>
+          {/if}
         {/each}
+        {#if !coreSkills.some((s) => s.id === "canvas")}
+          <SettingItem
+            name="Ask question"
+            desc="Allow the agent to ask multiple-choice questions in chat to clarify requirements or solicit preferences."
+          >
+            {#snippet namePrefix()}
+              <Icon name="help-circle" size="s" />
+            {/snippet}
+            <Toggle
+              checked={selectedAgent.toolsConfig.ask_question?.enabled ?? true}
+              onchange={() => {
+                const current = selectedAgent.toolsConfig.ask_question?.enabled ?? true;
+                pluginData.updateAgentToolConfig(agentId, "ask_question", { enabled: !current });
+                void applyChanges();
+              }}
+            />
+          </SettingItem>
+        {/if}
       </SettingGroup>
 
       <SettingGroup heading="Integrations">
