@@ -196,14 +196,18 @@ function buildStringOutputRenderModel(
 	output: string,
 	input?: Record<string, unknown> | null,
 ): ToolOutputRenderModel {
-	const renderOutput = truncateToolOutputForRendering(output);
-	const trimmed = renderOutput.trim();
-	if (!trimmed) return { kind: "empty", rawText: output };
+	const fullTrimmed = output.trim();
+	if (!fullTrimmed) return { kind: "empty", rawText: output };
 
-	const parsed = parseJsonString(trimmed);
+	// Parse before capping: JSON tools (search_notes, list_directory, grep_notes, ...)
+	// routinely exceed the cap, and a cut document no longer parses into its card.
+	// Structured views cap their own display text in stringifyPrettyValue.
+	const parsed = parseJsonString(fullTrimmed);
 	if (parsed !== undefined) {
-		return classifyStructuredValue(toolName, parsed, trimmed, input);
+		return classifyStructuredValue(toolName, parsed, fullTrimmed, input);
 	}
+
+	const trimmed = truncateToolOutputForRendering(output).trim();
 
 	const specialized = buildSpecializedStringModel(toolName, trimmed, input);
 	if (specialized?.kind === "read_content" && output.length > MAX_RENDERED_TOOL_OUTPUT_CHARS) {
@@ -594,6 +598,10 @@ function stringifyCompactValue(value: unknown): string {
 }
 
 function stringifyPrettyValue(value: unknown): string {
+	return truncateToolOutputForRendering(serializePrettyValue(value));
+}
+
+function serializePrettyValue(value: unknown): string {
 	if (typeof value === "string") return value;
 	try {
 		const serialized = JSON.stringify(value, null, 2);

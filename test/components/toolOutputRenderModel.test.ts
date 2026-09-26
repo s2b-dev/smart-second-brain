@@ -49,6 +49,41 @@ describe("buildToolOutputRenderModel", () => {
 		},
 	);
 
+	it("parses JSON outputs over the preview cap into their specialized cards", () => {
+		const files = Array.from({ length: 900 }, (_, i) => `Note ${i} about an ordinary topic.md`);
+		const listing = JSON.stringify({ root: "/", tree: { folders: { Projects: { files } } } });
+		const results = Array.from({ length: 25 }, (_, i) => ({
+			rank: i + 1,
+			name: `Note ${i}`,
+			path: "x".repeat(1000),
+		}));
+		const search = JSON.stringify({ query: "q", totalResults: 25, returnedResults: 25, results });
+		expect(listing.length).toBeGreaterThan(MAX_RENDERED_TOOL_OUTPUT_CHARS);
+		expect(search.length).toBeGreaterThan(MAX_RENDERED_TOOL_OUTPUT_CHARS);
+
+		const listModel = buildToolOutputRenderModel("list_directory", listing);
+		expect(listModel.kind).toBe("list_directory");
+		if (listModel.kind !== "list_directory") return;
+		expect(listModel.payload.tree?.folders?.Projects?.files).toHaveLength(900);
+
+		const searchModel = buildToolOutputRenderModel("search_notes", search);
+		expect(searchModel.kind).toBe("search_notes");
+		if (searchModel.kind !== "search_notes") return;
+		expect(searchModel.payload.results).toHaveLength(25);
+	});
+
+	it("caps the displayed JSON of large generic structured outputs", () => {
+		const output = JSON.stringify({ status: "ok", items: Array.from({ length: 2000 }, (_, i) => ({ id: i })) });
+		const model = buildToolOutputRenderModel("mcp_tool", output);
+		expect(model.kind).toBe("structured");
+		if (model.kind !== "structured") return;
+		expect(model.summaryEntries).toEqual([{ key: "status", value: "ok" }]);
+		for (const json of [model.json, ...model.sections.map((section) => section.json)]) {
+			expect(json.length).toBeLessThan(MAX_RENDERED_TOOL_OUTPUT_CHARS + 100);
+			expect(json).toContain("[UI preview truncated:");
+		}
+	});
+
 	it("renders search_notes payloads as a specialized model", () => {
 		const model = buildToolOutputRenderModel(
 			"search_notes",
