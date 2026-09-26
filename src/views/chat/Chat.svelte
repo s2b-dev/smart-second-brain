@@ -162,6 +162,7 @@ function portalComposer(node: HTMLElement) {
 		// would bake the stale value in.
 		if (!Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--keyboard-height"))) {
 			node.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
+			composer.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
 		}
 	};
 
@@ -289,7 +290,12 @@ function portalComposer(node: HTMLElement) {
 			if (!composer) return;
 			composer.style.display = "";
 			composer.classList.remove("s2b-composer-portaled");
-			for (const prop of ["--s2b-composer-left", "--s2b-composer-width", "--s2b-composer-height"]) {
+			for (const prop of [
+				"--s2b-composer-left",
+				"--s2b-composer-width",
+				"--s2b-composer-height",
+				"--s2b-view-top",
+			]) {
 				composer.style.removeProperty(prop);
 			}
 			node.style.removeProperty("--s2b-composer-height");
@@ -408,19 +414,19 @@ function portalComposer(node: HTMLElement) {
     --chat-bg: var(--background-primary);
   }
 
-  /* The composer grows with its content up to two thirds of the chat pane,
-     then the editor scrolls (Input.svelte lets only the editor shrink). On
-     desktop the composer is an in-flow child of `.chat-root`, so the pane is a
-     size container and `cqh` measures it directly. Mobile portals the composer
-     out of the pane (see `portalComposer`), where `cqh` would fall back to the
-     full viewport and ignore the keyboard — the portaled rule below restates
-     the cap against the pane's own height formula instead. */
+  /* The composer sizes itself against the chat pane's height (see
+     `--s2b-chat-pane-height` in Input.svelte). On desktop it is an in-flow
+     child of `.chat-root`, so the pane is a size container and `cqh` measures
+     it directly. Mobile portals the composer out of the pane (see
+     `portalComposer`), where `cqh` would fall back to the full viewport and
+     ignore the keyboard — the portaled rule below restates the height with the
+     pane's own formula instead. */
   :global(body:not(.is-mobile)) .chat-root {
     container-type: size;
   }
 
-  :global(.chat-root > .chat-input-container) {
-    max-height: calc(100cqh * 2 / 3);
+  :global(body:not(.is-mobile) .chat-root > .chat-input-container) {
+    --s2b-chat-pane-height: 100cqh;
   }
 
   :global(.mod-left-split .chat-root),
@@ -531,16 +537,15 @@ function portalComposer(node: HTMLElement) {
     );
     margin-top: 0;
     z-index: auto;
-    /* Two thirds of the visible chat pane — the same height `.chat-root` gets
-       in the mobile rule above. */
-    max-height: calc(
-      (
-          100vh - var(--s2b-view-top, 0px) -
-            max(
-              calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
-              calc(52px + env(safe-area-inset-bottom))
-            )
-        ) * 2 / 3
+    /* The same height `.chat-root` gets in the mobile rule above.
+       `--s2b-view-top` is published on the composer too: it is no longer a
+       descendant of `.chat-root`, so it can't inherit it from there. */
+    --s2b-chat-pane-height: calc(
+      100vh - var(--s2b-view-top, 0px) -
+        max(
+          calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
+          calc(52px + env(safe-area-inset-bottom))
+        )
     );
   }
 
