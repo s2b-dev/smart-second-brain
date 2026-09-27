@@ -46,4 +46,10 @@ describe("isMarkdownListLineAt", () => {
 		expect(atEnd("```\ncode\n```\n- item")).toBe(true);
 		expect(atEnd("~~~\n```\n~~~\n- item")).toBe(true);
 	});
+
+	it("ends a fence opened in a blockquote when the blockquote ends", () => {
+		expect(atEnd("> ```\n> - quoted code")).toBe(false);
+		expect(atEnd("> ```\n- item")).toBe(true);
+		expect(atEnd("> ```\nplain\n- item")).toBe(true);
+	});
 });
