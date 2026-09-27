@@ -5,7 +5,7 @@ import { setPlugin } from "../../src/stores/state.svelte";
 import { AssistantState, buildCheckpointGraph, type CheckpointGraphState } from "../../src/stores/chatTimeline";
 import type { CheckpointHistoryItem } from "../../src/agent/Agent";
 import type SecondBrainPlugin from "../../src/main";
-import { FAILED_CHAT_TITLE, isDefaultChatTitle, needsChatTitle } from "../../src/utils/chatTitle";
+import { isDefaultChatTitle, needsChatTitle } from "../../src/utils/chatTitle";
 
 /* --------------------------------------------------------------------------
  * ChatSession — auto-title after the first SUCCESSFUL turn.
@@ -63,7 +63,7 @@ type RunStreamInternals = {
 };
 
 const generateTitle = vi.fn();
-const renameThread = vi.fn();
+const markThreadFailed = vi.fn();
 
 function makeSession(
 	threadId: string,
@@ -100,11 +100,11 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
 		vi.spyOn(console, "warn").mockImplementation(() => {});
 		generateTitle.mockResolvedValue("Chats/Watering Ferns.chat");
-		renameThread.mockImplementation(async (_threadId: string, title: string) => `Chats/${title}.chat`);
+		markThreadFailed.mockResolvedValue("Chats/New Chat (failed).chat");
 		setPlugin({
 			agentManager: {
 				generateThreadTitleFromUserMessage: generateTitle,
-				renameThread,
+				markThreadFailed,
 				regenerateFromCheckpoint: vi.fn(),
 				annotateThinkingDuration: vi.fn().mockResolvedValue(undefined),
 				maybeRunPostTurnReview: vi.fn().mockResolvedValue(undefined),
@@ -178,7 +178,7 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		await run(session, internals);
 
 		expect(generateTitle).not.toHaveBeenCalled();
-		expect(renameThread).toHaveBeenCalledWith("Chats/New Chat.chat", FAILED_CHAT_TITLE);
+		expect(markThreadFailed).toHaveBeenCalledWith("Chats/New Chat.chat");
 		expect(String(session.id)).toBe("Chats/New Chat (failed).chat");
 		expect(onThreadIdChange).toHaveBeenCalledWith("Chats/New Chat.chat", "Chats/New Chat (failed).chat");
 		expect(session.messages.at(-1)?.assistantMessage.state).toBe(AssistantState.error);
@@ -193,7 +193,7 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 
 			expect(String(session.id)).toBe(threadId);
 		}
-		expect(renameThread).not.toHaveBeenCalled();
+		expect(markThreadFailed).not.toHaveBeenCalled();
 	});
 
 	it("does not mark a chat failed when the user stopped the turn", async () => {
@@ -205,11 +205,11 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 
 		await run(session, internals);
 
-		expect(renameThread).not.toHaveBeenCalled();
+		expect(markThreadFailed).not.toHaveBeenCalled();
 	});
 
 	it("keeps the error visible when the failed-marker rename itself throws", async () => {
-		renameThread.mockRejectedValue(new Error("rename failed"));
+		markThreadFailed.mockRejectedValue(new Error("rename failed"));
 		const { session, internals } = makeSession("Chats/New Chat.chat");
 		internals.consumeStream = vi.fn().mockRejectedValue(new Error("model refused"));
 

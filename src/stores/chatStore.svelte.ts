@@ -19,7 +19,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
-import { FAILED_CHAT_TITLE, isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
+import { isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
 	MessageState,
@@ -775,17 +775,18 @@ export class ChatSession {
 	}
 
 	/**
-	 * Move a still-"New Chat" thread whose turn failed to "New Chat (failed)". The
-	 * failed run already checkpointed the user message, so the chat no longer counts
-	 * as empty and can't be reused; left on the placeholder name, it would push every
-	 * later new chat to "New Chat (2)", "(3)", ... A later successful turn still
-	 * titles it (see `needsChatTitle`). Best-effort: a failed rename only costs the
-	 * numbering, so it must never mask the run's own error.
+	 * Move a still-"New Chat" thread whose turn failed to "New Chat (failed)". A run
+	 * that failed after checkpointing the user message leaves a chat that no longer
+	 * counts as empty and can't be reused; left on the placeholder name, it would push
+	 * every later new chat to "New Chat (2)", "(3)", ... (`markThreadFailed` skips a
+	 * chat the run never checkpointed, which stays reusable.) A later successful turn
+	 * still titles it (see `needsChatTitle`). Best-effort: a failed rename only costs
+	 * the numbering, so it must never mask the run's own error.
 	 */
 	private async markPlaceholderFailed(): Promise<void> {
 		if (!isDefaultChatTitle(String(this.id))) return;
 		try {
-			const newPath = await getPlugin().agentManager.renameThread(String(this.id), FAILED_CHAT_TITLE);
+			const newPath = await getPlugin().agentManager.markThreadFailed(String(this.id));
 			this.adoptThreadPath(newPath);
 		} catch (err) {
 			Logger.warn("[ChatSession] Failed to mark chat as failed:", err);
