@@ -1234,7 +1234,8 @@ $effect(() => {
     border-radius: var(--radius-full, 999px);
     background: var(--background-primary);
     border: 1px solid var(--background-modifier-border);
-    box-shadow: var(--shadow-s);
+    /* Flat like the composer: none of our own, and none of core's button shadow. */
+    box-shadow: none;
     color: var(--text-muted);
   }
 
@@ -1253,6 +1254,7 @@ $effect(() => {
 
   .jump-to-bottom-overlay :global(.jump-to-bottom:hover) {
     background: var(--background-modifier-hover);
+    box-shadow: none;
     color: var(--text-normal);
   }
 </style>
