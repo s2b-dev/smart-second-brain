@@ -1,6 +1,7 @@
 <script lang="ts">
 import { Notice, Platform, TFile, normalizePath } from "obsidian";
 import { selectChatModelAction, showActionNotice } from "../../utils/actionNotice";
+import { isMarkdownListLine } from "../../utils/markdownList";
 import { onDestroy, onMount, untrack } from "svelte";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import { EmbeddableMarkdownEditor } from "../../lib/editor";
@@ -82,8 +83,9 @@ let dragMessage = $state("Drop files here");
 let dragHasIssue = $state(false);
 // On mobile there's no keyboard shortcut at all — Enter is always a newline
 // there (see the `onEnter` handler below) and the send button is the only
-// way to submit, so there's nothing to hint.
-const sendShortcutHint = isMobileUI() ? "" : "↵";
+// way to submit, so there's nothing to hint. On desktop Enter sends except on a
+// list line, where it continues the list and Mod+Enter sends.
+const sendShortcutHint = isMobileUI() ? "" : `↵ · ${Platform.isMacOS ? "⌘↵" : "Ctrl+↵"} in a list`;
 let containerEl: HTMLDivElement | undefined = $state();
 // Floor for the input card when the composer runs out of pane height: its
 // controls plus one editor line. `clientHeight` excludes the card's 1px
@@ -526,7 +528,7 @@ function initializeEditor() {
 		onChange: (value) => {
 			inputValue = value;
 		},
-		onEnter: (_editor, _mod, shift) => {
+		onEnter: (editor, _mod, shift) => {
 			// On mobile, Enter is the on-screen keyboard's only return key — there
 			// is no Shift to hold for a newline and no discoverable "hold to send"
 			// convention, so every mainstream mobile chat app (WhatsApp, iMessage,
@@ -535,6 +537,14 @@ function initializeEditor() {
 			// plain Enter sends; Shift+Enter inserts a newline. Return false to use
 			// the editor's default newline behavior.
 			if (shift || isMobileUI()) {
+				return false;
+			}
+			// On a list line, hand Enter to Obsidian, which continues the list (a
+			// new bullet, number or checkbox) and ends it on an empty item — the
+			// next Enter then sends, as in Slack. Mod+Enter still sends from
+			// anywhere.
+			const { state } = editor.cm;
+			if (isMarkdownListLine(state.doc.lineAt(state.selection.main.head).text)) {
 				return false;
 			}
 			attemptSend();
