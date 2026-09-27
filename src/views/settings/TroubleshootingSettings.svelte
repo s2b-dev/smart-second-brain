@@ -70,6 +70,13 @@ async function handleCleanupPluginData() {
 
 <!-- Maintenance -->
 <SettingGroup heading="Maintenance">
+  <SettingItem
+    name="Release notes"
+    desc={`You are on version ${plugin.manifest.version}. See what changed in recent releases.`}
+  >
+    <Button buttonText="Show release notes" onClick={() => plugin.showReleaseNotes()} />
+  </SettingItem>
+
   <!-- Docs first, GitHub as the escalation path: the troubleshooting guide is
        organised by symptom (the agent won't respond, search returns nothing, a note
        is being withheld, …), so it answers most of what would otherwise arrive as

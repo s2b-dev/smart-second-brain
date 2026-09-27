@@ -8,6 +8,7 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -41,6 +42,7 @@ import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
 import RunningIndicator from "./components/chat/RunningIndicator.svelte";
+import { BUNDLED_RELEASE_NOTES, ReleaseNotesModal } from "./components/modal/ReleaseNotesModal";
 // DISABLED FOR INITIAL RELEASE — Note Context view; see the registerView block in onload().
 // import { NoteContextView, VIEW_TYPE_NOTE_CONTEXT } from "./views/note-context/NoteContextView";
 import { OnboardingView, VIEW_TYPE_ONBOARDING } from "./views/onboarding/OnboardingView";
@@ -567,6 +569,13 @@ export default class SecondBrainPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "show-release-notes",
+			name: "Show release notes",
+			icon: "scroll-text",
+			callback: () => this.showReleaseNotes(),
+		});
+
+		this.addCommand({
 			id: "next-pending-change",
 			name: "Next pending change",
 			icon: "chevron-down",
@@ -671,6 +680,8 @@ export default class SecondBrainPlugin extends Plugin {
 			if (!this.pluginData.onboardingComplete && this.pluginData.getConfiguredProviders().length === 0) {
 				void this.activateOnboardingView();
 			}
+
+			this.announceUpdate();
 
 			// Agents whose customized prompt/guidance couldn't be auto-updated after a
 			// default changed are surfaced in the new-chat recommendations view
@@ -990,6 +1001,40 @@ export default class SecondBrainPlugin extends Plugin {
 	//
 	// 	workspace.revealLeaf(leaf);
 	// }
+
+	/** Open the full bundled changelog (command + Troubleshooting settings). */
+	showReleaseNotes() {
+		new ReleaseNotesModal(this.app, "Release notes", BUNDLED_RELEASE_NOTES).open();
+	}
+
+	/**
+	 * After an update, offer the release notes for every version since the one last
+	 * seen. A notice rather than a modal, so a launch is never blocked by it.
+	 */
+	private announceUpdate() {
+		const current = this.manifest.version;
+		const { sections, record } = planUpdateAnnouncement(
+			this.pluginData.lastSeenVersion,
+			current,
+			BUNDLED_RELEASE_NOTES,
+		);
+		if (record !== null) this.pluginData.lastSeenVersion = record;
+		if (sections.length === 0) return;
+		const message = createFragment((frag) => {
+			frag.appendText(`Smart Second Brain updated to ${current}. `);
+			const link = frag.createEl("a", { text: "See what's new", href: "#" });
+			link.addEventListener("click", (event) => {
+				event.preventDefault();
+				new ReleaseNotesModal(
+					this.app,
+					`What's new in Smart Second Brain ${current}`,
+					sections,
+					sections.length,
+				).open();
+			});
+		});
+		new Notice(message, 15_000);
+	}
 
 	async activateOnboardingView() {
 		// Enabling the plugin from Settings → Community plugins fires onLayoutReady

@@ -232,6 +232,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	lastActiveChatId: null,
 	onboardingComplete: false,
 	onboardingSplashSeen: false,
+	lastSeenVersion: null,
 	dismissedRecommendations: [],
 	thinkingProcessExpanded: true,
 	showActiveAgentsInStatusBar: true,
@@ -1232,6 +1233,14 @@ export class PluginDataStore {
 	}
 	set onboardingSplashSeen(val: boolean) {
 		this.#data.onboardingSplashSeen = val;
+		void this.saveSettings();
+	}
+
+	get lastSeenVersion() {
+		return this.#data.lastSeenVersion ?? null;
+	}
+	set lastSeenVersion(val: string | null) {
+		this.#data.lastSeenVersion = val;
 		void this.saveSettings();
 	}
 
@@ -2244,6 +2253,10 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 	};
 
 	runMigrations(mergedData);
+
+	// A fresh install has nothing to catch up on: record the running version so the
+	// first update announces only what changed since.
+	if (!rawData) mergedData.lastSeenVersion = plugin.manifest.version;
 
 	// If the data was written by a newer plugin, skip normalizeAgents() too — it
 	// would rewrite prompt fields using this plugin's older defaults and those
