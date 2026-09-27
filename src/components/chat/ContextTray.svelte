@@ -459,6 +459,8 @@ onDestroy(() => {
     position: relative;
     height: var(--s2b-tile-size);
     width: calc(var(--s2b-tile-size) * 1.75);
+    /* A narrow sidebar composer can be slimmer than a file card. */
+    max-width: 100%;
     flex: none;
   }
 
