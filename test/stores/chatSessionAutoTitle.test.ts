@@ -107,7 +107,6 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 				markThreadFailed,
 				regenerateFromCheckpoint: vi.fn(),
 				annotateThinkingDuration: vi.fn().mockResolvedValue(undefined),
-				maybeRunPostTurnReview: vi.fn().mockResolvedValue(undefined),
 			},
 		} as unknown as SecondBrainPlugin);
 	});

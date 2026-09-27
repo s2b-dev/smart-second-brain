@@ -212,23 +212,6 @@ const manageSkillsSchema = z.object({
 });
 
 /**
- * The post-turn reviewer's variant: create, patch and update only. Deletion is immediate and
- * recursive, needs no load and checks no authorship, and nothing a reviewer learns from one
- * conversation justifies it — the reviewer is told to create or revise, so its tool cannot do
- * more than that.
- */
-const reviewerManageSkillsSchema = z.object({
-	operation: z
-		.discriminatedUnion("type", [createOperationSchema, patchOperationSchema, updateOperationSchema])
-		.describe("The one operation to perform, selected by `type`."),
-});
-
-export interface ManageSkillsToolOptions {
-	/** Omit the delete operation from the schema (the post-turn reviewer). Default: allowed. */
-	allowDelete?: boolean;
-}
-
-/**
  * Checks shared by every revision path: the result must still be a valid skill, and the fields
  * the rest of the system wires on (name, plugin link, category) must not have moved. Returns the
  * rejection to hand back, or null when the revision may be written.
@@ -267,14 +250,8 @@ type ManageSkillsOperation = ManageSkillsInput["operation"];
  * attached the moment its file exists (agent.skills[id]?.enabled ?? true): creating IS attaching,
  * with no separate manual "enable" step.
  */
-export function createManageSkillsTool(
-	skillsService: SkillsService | undefined,
-	app: App,
-	agentId = "",
-	options: ManageSkillsToolOptions = {},
-) {
-	const allowDelete = options.allowDelete ?? true;
-	const schema = allowDelete ? manageSkillsSchema : reviewerManageSkillsSchema;
+export function createManageSkillsTool(skillsService: SkillsService | undefined, app: App, agentId = "") {
+	const schema = manageSkillsSchema;
 	// For the description only; the checks below re-resolve per call so a skill created
 	// earlier in the same turn is already attached when the model patches it.
 	const attachedAtBuild = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
@@ -331,7 +308,6 @@ export function createManageSkillsTool(
 			if (input.type === "delete") {
 				// Unreachable through the reviewer schema; kept as a hard stop should a caller
 				// ever pass a wider input past it.
-				if (!allowDelete) return "Deleting skills is not available in this context.";
 				const metadata = skillsService.getCachedSkills().get(input.name);
 				if (!metadata) {
 					return `Skill "${input.name}" not found.`;
@@ -439,7 +415,7 @@ export function createManageSkillsTool(
 		},
 		{
 			name: "manage_skills",
-			description: `Create new skills, revise your own attached skills${allowDelete ? ", or delete skills you created" : ""}. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
+			description: `Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
 			schema,
 		},
 	);
