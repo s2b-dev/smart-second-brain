@@ -1,3 +1,9 @@
+<script module lang="ts">
+// Chat roots whose composer is composing (see `setComposing`); the body class
+// that hides Obsidian's toolbar is shared by every open chat view.
+const composingViews = new Set<HTMLElement>();
+</script>
+
 <script lang="ts">
 import { QueryClientProvider } from "@tanstack/svelte-query";
 import Input from "../../components/chat/Input.svelte";
@@ -238,16 +244,64 @@ function portalComposer(node: HTMLElement) {
 	// (a note), which needs its toolbar at once.
 	const COMPOSING_CLASS = "s2b-composing";
 	const COMPOSING_BAND = -14;
+	let composing = false;
 	let composingPending = false;
 	let composingCleanup: (() => void) | null = null;
+
+	const KEYBOARD_SLIDE = "transform 300ms cubic-bezier(0.38, 0.7, 0.125, 1)";
+	const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+	const readKeyboardHeight = () =>
+		Number.parseFloat(document.documentElement.style.getPropertyValue("--keyboard-height")) || 0;
+	const rootStyle = getComputedStyle(document.documentElement);
+	const toolbarHeight = Number.parseFloat(rootStyle.getPropertyValue("--mobile-toolbar-height")) || 52;
+	const probe = document.createElement("div");
+	probe.style.cssText = "position:absolute;visibility:hidden;padding-bottom:env(safe-area-inset-bottom)";
+	document.body.appendChild(probe);
+	const safeBottom = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+	probe.remove();
+	// The band below the composer, mirroring the `max()` in its `top` rule, with
+	// the toolbar's share swapped for `COMPOSING_BAND` while composing.
+	const band = (keyboard: number, isComposing: boolean) =>
+		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom);
+
+	// Core's toolbar technique: the composer is already at its end position, so
+	// offset it back by the distance travelled and transition the offset away.
+	const slideComposer = (el: HTMLElement, offset: number) => {
+		if (offset === 0 || reducedMotion.matches || el.style.display === "none") return;
+		el.style.transition = "none";
+		el.style.transform = `translateY(${offset}px)`;
+		// Commit the offset now, in the triggering task, so the slide starts on
+		// the same frame as the keyboard.
+		void getComputedStyle(el).transform;
+		el.style.transition = KEYBOARD_SLIDE;
+		el.style.transform = "";
+		// Children's transitions (the input card's border colour changes on
+		// focus, mid-slide) bubble here too; only the composer's own transform
+		// ends the slide.
+		const finishSlide = (event: TransitionEvent) => {
+			if (event.target !== el || event.propertyName !== "transform") return;
+			el.style.transition = "";
+			el.removeEventListener("transitionend", finishSlide);
+		};
+		el.addEventListener("transitionend", finishSlide);
+	};
+
 	const setComposing = (el: HTMLElement, on: boolean) => {
 		composingPending = false;
-		document.body.classList.toggle("s2b-chat-composing", on);
+		if (on === composing) return;
+		// With the keyboard already up (focus arriving from a note, or leaving
+		// for one) the band changes without any keyboard change, so slide here.
+		const keyboard = readKeyboardHeight();
+		const before = band(keyboard, composing);
+		composing = on;
+		// Several chat views can be open; the toolbar stays hidden while any of
+		// them is composing.
+		if (on) composingViews.add(node);
+		else composingViews.delete(node);
+		document.body.classList.toggle("s2b-chat-composing", composingViews.size > 0);
 		el.classList.toggle(COMPOSING_CLASS, on);
 		node.classList.toggle(COMPOSING_CLASS, on);
-	};
-	const onKeyboardClosed = () => {
-		if (composingPending && composer) setComposing(composer, false);
+		if (keyboard > 0) slideComposer(el, band(keyboard, on) - before);
 	};
 	const watchComposing = (el: HTMLElement) => {
 		const onFocusIn = () => setComposing(el, true);
@@ -267,51 +321,17 @@ function portalComposer(node: HTMLElement) {
 		};
 	};
 
-	const KEYBOARD_SLIDE = "transform 300ms cubic-bezier(0.38, 0.7, 0.125, 1)";
-	const readKeyboardHeight = () =>
-		Number.parseFloat(document.documentElement.style.getPropertyValue("--keyboard-height")) || 0;
 	const watchKeyboard = (el: HTMLElement) => {
-		const rootStyle = getComputedStyle(document.documentElement);
-		const toolbarHeight = Number.parseFloat(rootStyle.getPropertyValue("--mobile-toolbar-height")) || 52;
-		const probe = document.createElement("div");
-		probe.style.cssText = "position:absolute;visibility:hidden;padding-bottom:env(safe-area-inset-bottom)";
-		document.body.appendChild(probe);
-		const safeBottom = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
-		probe.remove();
-		// The band below the composer, mirroring the `max()` in its `top` rule —
-		// including the toolbar band being swapped for `COMPOSING_BAND` while the
-		// composer has focus (see `watchComposing`).
-		const band = (keyboard: number) =>
-			Math.max(
-				keyboard + (el.classList.contains(COMPOSING_CLASS) ? COMPOSING_BAND : toolbarHeight),
-				52 + safeBottom,
-			);
-		const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
 		let lastKeyboard = readKeyboardHeight();
 		keyboardObserver = new MutationObserver(() => {
 			const keyboard = readKeyboardHeight();
 			if (keyboard === lastKeyboard) return;
-			const rise = band(keyboard) - band(lastKeyboard);
+			const offset = band(keyboard, composing) - band(lastKeyboard, composing);
 			lastKeyboard = keyboard;
-			if (keyboard === 0) onKeyboardClosed();
-			if (rise === 0 || reducedMotion.matches || el.style.display === "none") return;
-			el.style.transition = "none";
-			el.style.transform = `translateY(${rise}px)`;
-			// Commit the offset now, in the keyboard's own task, so the slide
-			// starts on the same frame the keyboard does.
-			void getComputedStyle(el).transform;
-			el.style.transition = KEYBOARD_SLIDE;
-			el.style.transform = "";
-			// Children's transitions (the input card's border colour changes on
-			// focus, mid-slide) bubble here too; only the composer's own transform
-			// ends the slide.
-			const finishSlide = (event: TransitionEvent) => {
-				if (event.target !== el || event.propertyName !== "transform") return;
-				el.style.transition = "";
-				el.removeEventListener("transitionend", finishSlide);
-			};
-			el.addEventListener("transitionend", finishSlide);
+			slideComposer(el, offset);
+			// The deferred blur (see above) lands once the keyboard is gone; at
+			// height 0 both bands resolve to the navbar's, so nothing moves.
+			if (keyboard === 0 && composingPending) setComposing(el, false);
 		});
 		keyboardObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
 	};

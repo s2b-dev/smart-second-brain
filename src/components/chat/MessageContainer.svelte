@@ -159,6 +159,7 @@ function animateScrollTo(top: number | "bottom") {
 	if (scrollRafId !== null) {
 		cancelAnimationFrame(scrollRafId);
 		scrollRafId = null;
+		el.style.overflowY = "";
 	}
 
 	const start = el.scrollTop;
@@ -168,6 +169,14 @@ function animateScrollTo(top: number | "bottom") {
 	};
 	const initialDelta = resolveTarget() - start;
 	if (Math.abs(initialDelta) < 1) return;
+
+	// iOS: a flick keeps coasting in the scroller's own momentum, which the
+	// floating jump button doesn't stop (it isn't inside the scroller), and that
+	// momentum overwrote every frame of this animation — the jump stopped
+	// halfway. `overflow: hidden` ends the momentum; programmatic scrolling
+	// still works while it's set. Mobile only: on desktop it would hide the
+	// scrollbar and reflow the content for the duration.
+	if (onMobile) el.style.overflowY = "hidden";
 
 	const duration = Math.min(260, 120 + Math.abs(initialDelta) * 0.15);
 	let startTime: number | null = null;
@@ -182,6 +191,7 @@ function animateScrollTo(top: number | "bottom") {
 			scrollRafId = window.requestAnimationFrame(step);
 		} else {
 			scrollRafId = null;
+			el.style.overflowY = "";
 		}
 	};
 	scrollRafId = window.requestAnimationFrame(step);
