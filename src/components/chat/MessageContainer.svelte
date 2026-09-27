@@ -631,9 +631,11 @@ $effect(() => {
 // into the composer crossed that band on the way and ran the thread to the
 // bottom. While a drag is in progress the scroller is made non-user-scrollable
 // (`overflow: hidden` keeps its position; the stable gutter keeps a classic
-// scrollbar's width so nothing reflows). A `dragover` fires every ~50ms while a
-// drag is over the window, so a gap of DRAG_IDLE_MS means it left or ended
-// (`dragleave` is too noisy to rely on). DOM side effect, not state.
+// scrollbar's width so nothing reflows). Only drags over this chat view lock
+// it — one headed for another pane leaves the thread scrollable. A `dragover`
+// fires every ~50ms while a drag is over the view, so a gap of DRAG_IDLE_MS
+// means it left or ended (`dragleave` is too noisy to rely on). DOM side
+// effect, not state.
 const DRAG_IDLE_MS = 250;
 
 $effect(() => {
@@ -657,13 +659,16 @@ $effect(() => {
 		window.clearTimeout(idleTimer);
 		idleTimer = window.setTimeout(release, DRAG_IDLE_MS);
 	};
+	// The whole chat view (thread + composer), not just the scroller: the
+	// composer is where the drag is headed.
+	const view = el.closest(".chat-root") ?? el;
 	const win = el.win;
-	win.addEventListener("dragover", onDragOver, true);
+	view.addEventListener("dragover", onDragOver, true);
 	win.addEventListener("drop", release, true);
 	win.addEventListener("dragend", release, true);
 	return () => {
 		release();
-		win.removeEventListener("dragover", onDragOver, true);
+		view.removeEventListener("dragover", onDragOver, true);
 		win.removeEventListener("drop", release, true);
 		win.removeEventListener("dragend", release, true);
 	};
