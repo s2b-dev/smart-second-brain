@@ -6,6 +6,7 @@
  * file Obsidian's own update check reads — so the notice fires exactly when
  * Obsidian would offer the update. Nothing about the user or the vault is sent.
  */
+import { Logger } from "./logging";
 import { compareVersions, isPrerelease } from "./version";
 
 export const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/s2b-dev/smart-second-brain/HEAD/manifest.json";
@@ -85,7 +86,8 @@ export async function runUpdateCheck(deps: UpdateCheckDeps): Promise<string | nu
 	let remote: RemoteManifest | null;
 	try {
 		remote = parseRemoteManifest(await deps.fetchManifest());
-	} catch {
+	} catch (error) {
+		Logger.debug("[UpdateCheck] Could not reach GitHub; next attempt in a day:", error);
 		return null;
 	}
 	if (!remote || !deps.isActive() || !deps.isEnabled()) return null;
