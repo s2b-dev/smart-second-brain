@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { ChatSession } from "../../src/stores/chatStore.svelte";
 import { setPlugin } from "../../src/stores/state.svelte";
-import { buildCheckpointGraph, type CheckpointGraphState } from "../../src/stores/chatTimeline";
+import { AssistantState, buildCheckpointGraph, type CheckpointGraphState } from "../../src/stores/chatTimeline";
 import type { CheckpointHistoryItem } from "../../src/agent/Agent";
 import type SecondBrainPlugin from "../../src/main";
 import { isDefaultChatTitle } from "../../src/utils/chatTitle";
@@ -28,13 +28,23 @@ function checkpoint(
 	return { checkpointId, step, messages, parentCheckpointId, ts: new Date(2026, 0, 1, 0, step + 2).toISOString() };
 }
 
-function buildGraph(): CheckpointGraphState {
+/** One turn; `summarized` prepends the hidden summary a compacted history leads with. */
+function buildGraph({ summarized = false } = {}): CheckpointGraphState {
+	const lead = summarized
+		? [
+				new HumanMessage({
+					content: "Summary of the earlier conversation",
+					id: "sum",
+					additional_kwargs: { lc_source: "summarization" },
+				}),
+			]
+		: [];
 	const h1 = new HumanMessage({ content: "how do I water ferns", id: "h1" });
 	const ai1 = new AIMessage({ content: "sparingly", id: "ai1" });
 	const graph = buildCheckpointGraph([
 		checkpoint("r", -1, []),
-		checkpoint("a", 0, [h1], "r"),
-		checkpoint("b", 1, [h1, ai1], "a"),
+		checkpoint("a", 0, [...lead, h1], "r"),
+		checkpoint("b", 1, [...lead, h1, ai1], "a"),
 	]);
 	graph.activeCheckpointId = "b";
 	return graph;
@@ -48,16 +58,21 @@ type RunStreamInternals = {
 	): Promise<void>;
 	consumeStream: (...args: unknown[]) => Promise<void>;
 	syncGraphAfterRun: (...args: unknown[]) => Promise<void>;
+	shouldPredictSummarization: (...args: unknown[]) => Promise<boolean>;
+	withdrawAbandonedPendingChanges: (...args: unknown[]) => void;
 };
 
 const generateTitle = vi.fn();
 
 function makeSession(
 	threadId: string,
-	onThreadIdChange?: (oldPath: string, newPath: string) => void,
+	{
+		onThreadIdChange,
+		summarized,
+	}: { onThreadIdChange?: (oldPath: string, newPath: string) => void; summarized?: boolean } = {},
 ): { session: ChatSession; internals: RunStreamInternals } {
 	const session = new ChatSession(threadId, {
-		graphState: buildGraph(),
+		graphState: buildGraph({ summarized }),
 		errorCount: 0,
 		selectedAgentId: "",
 		onThreadIdChange,
@@ -65,6 +80,9 @@ function makeSession(
 	const internals = session as unknown as RunStreamInternals;
 	internals.consumeStream = vi.fn().mockResolvedValue(undefined);
 	internals.syncGraphAfterRun = vi.fn().mockResolvedValue(undefined);
+	// Only reached on the retry path; neither is under test here.
+	internals.shouldPredictSummarization = vi.fn().mockResolvedValue(false);
+	internals.withdrawAbandonedPendingChanges = vi.fn();
 	return { session, internals };
 }
 
@@ -84,6 +102,7 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		setPlugin({
 			agentManager: {
 				generateThreadTitleFromUserMessage: generateTitle,
+				regenerateFromCheckpoint: vi.fn(),
 				annotateThinkingDuration: vi.fn().mockResolvedValue(undefined),
 				maybeRunPostTurnReview: vi.fn().mockResolvedValue(undefined),
 			},
@@ -94,15 +113,40 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("titles a still-placeholder chat from its opening message (the retry-after-error case)", async () => {
+	it("titles a still-placeholder chat from its opening message", async () => {
 		const onThreadIdChange = vi.fn();
-		const { session, internals } = makeSession("Chats/New Chat.chat", onThreadIdChange);
+		const { session, internals } = makeSession("Chats/New Chat.chat", { onThreadIdChange });
 
 		await run(session, internals);
 
 		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat.chat", "", "how do I water ferns");
 		expect(String(session.id)).toBe("Chats/Watering Ferns.chat");
 		expect(onThreadIdChange).toHaveBeenCalledWith("Chats/New Chat.chat", "Chats/Watering Ferns.chat");
+	});
+
+	it("titles the chat when a retry succeeds after the first turn failed", async () => {
+		const { session, internals } = makeSession("Chats/New Chat.chat");
+		internals.consumeStream = vi.fn().mockRejectedValueOnce(new Error("model refused"));
+
+		await run(session, internals);
+		expect(generateTitle).not.toHaveBeenCalled();
+		const failed = session.messages.at(-1);
+		expect(failed?.assistantMessage.state).toBe(AssistantState.error);
+
+		// The retry goes through the regenerate path, which never passed a title before.
+		await session.retryLastError(failed?.id ?? "");
+
+		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat.chat", "", "how do I water ferns");
+		expect(String(session.id)).toBe("Chats/Watering Ferns.chat");
+	});
+
+	it("titles from the first real message when a summary marker leads the history", async () => {
+		const { session, internals } = makeSession("Chats/New Chat.chat", { summarized: true });
+		expect(session.messages[0]?.userMessage.content).toBe("");
+
+		await run(session, internals);
+
+		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat.chat", "", "how do I water ferns");
 	});
 
 	it("titles an auto-deduped placeholder like 'New Chat (3)'", async () => {

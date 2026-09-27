@@ -668,8 +668,9 @@ export class ChatSession {
 			// regenerate or edit that eventually succeeds must still title it. Otherwise the
 			// file stays "New Chat", no longer counts as empty, and every later new chat is
 			// deduped to "New Chat (2)", "(3)", ... Titled from the conversation's opening
-			// message. Must be sequential because rename changes this.id (the thread path).
-			const titleSource = this.messages[0]?.userMessage.content;
+			// message — the first pair with user text, since a summarized history leads with
+			// an empty marker pair. Must be sequential because rename changes this.id.
+			const titleSource = this.messages.find((p) => p.userMessage.content.trim())?.userMessage.content;
 			if (titleSource && isDefaultChatTitle(String(this.id))) {
 				try {
 					const plugin = getPlugin();
