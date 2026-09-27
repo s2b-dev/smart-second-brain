@@ -20,8 +20,9 @@ OBSIDIAN_JSON="$HOME/Library/Application Support/obsidian/obsidian.json"
 
 mkdir -p "$AGENTS_DIR/.locks"
 
-# New slots start from the latest main; fetch once so origin/main is current.
-git -C "$REPO_ROOT" fetch --quiet origin main
+# New slots start from the latest main. Fetched lazily (once) so re-running
+# over existing slots still works offline.
+fetched_main=false
 
 for slot in "${SLOTS[@]}"; do
   worktree="$AGENTS_DIR/$slot"
@@ -35,6 +36,10 @@ for slot in "${SLOTS[@]}"; do
   #    agents create their own task branches inside). Prune first so a slot
   #    whose directory was deleted by hand can be recreated.
   if [[ ! -d "$worktree" ]]; then
+    if [[ "$fetched_main" == false ]]; then
+      git -C "$REPO_ROOT" fetch --quiet origin main
+      fetched_main=true
+    fi
     git -C "$REPO_ROOT" worktree prune
     git -C "$REPO_ROOT" worktree add --detach "$worktree" origin/main
   else
