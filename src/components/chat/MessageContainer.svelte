@@ -306,24 +306,33 @@ $effect(() => {
 	for (const node of turnNodes) observer.observe(node);
 
 	// A hidden turn can't reflow, so its locked height goes stale when the
-	// column's width changes (rotation, resizing a split). Release every lock and
-	// re-observe: `observe` reports each turn's state afresh, so the still
-	// off-screen ones are re-measured at the new width. Height changes (the
-	// keyboard) are deliberately ignored — they don't reflow turns, and
-	// releasing everything then would bring back the restyle cost this avoids.
-	let lastWidth = scrollContainer.clientWidth;
+	// message column's width changes (rotation, resizing a split). Once resizing
+	// settles, release every lock and re-observe: `observe` reports each turn's
+	// state afresh, so the still off-screen ones are re-measured at the new width.
+	// The column, not the scroller, is watched: it stops changing once it hits
+	// its max width. Settling first keeps a divider drag from laying out the
+	// whole chat on every step. Height changes (the keyboard) never trigger this
+	// — they don't reflow turns, and releasing then would bring back the restyle
+	// cost this avoids.
+	const column = scrollContainer.firstElementChild ?? scrollContainer;
+	let lastWidth = column.clientWidth;
+	let widthSettleTimer: number | undefined;
 	const widthObserver = new ResizeObserver(() => {
-		const width = scrollContainer?.clientWidth ?? lastWidth;
-		if (width === lastWidth) return;
-		lastWidth = width;
-		for (const node of turnNodes) {
-			setTurnOffscreen(node, false);
-			observer.unobserve(node);
-			observer.observe(node);
-		}
+		window.clearTimeout(widthSettleTimer);
+		widthSettleTimer = window.setTimeout(() => {
+			const width = column.clientWidth;
+			if (width === lastWidth) return;
+			lastWidth = width;
+			for (const node of turnNodes) {
+				setTurnOffscreen(node, false);
+				observer.unobserve(node);
+				observer.observe(node);
+			}
+		}, 150);
 	});
-	widthObserver.observe(scrollContainer);
+	widthObserver.observe(column);
 	return () => {
+		window.clearTimeout(widthSettleTimer);
 		widthObserver.disconnect();
 		observer.disconnect();
 		turnObserver = null;
