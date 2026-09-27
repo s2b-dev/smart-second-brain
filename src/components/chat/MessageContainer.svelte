@@ -1307,4 +1307,10 @@ $effect(() => {
     box-shadow: none;
     color: var(--text-normal);
   }
+
+  /* The flat `box-shadow: none` above outranks core's `button:focus-visible`,
+     which draws its focus ring as a box-shadow — so restore that ring here. */
+  .jump-to-bottom-overlay :global(.jump-to-bottom:focus-visible) {
+    box-shadow: 0 0 0 3px var(--background-modifier-border-focus);
+  }
 </style>
