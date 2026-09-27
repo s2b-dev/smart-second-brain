@@ -1,7 +1,7 @@
 <script lang="ts">
 import { Notice, Platform, TFile, normalizePath } from "obsidian";
 import { selectChatModelAction, showActionNotice } from "../../utils/actionNotice";
-import { isMarkdownListLine } from "../../utils/markdownList";
+import { isMarkdownListLineAt } from "../../utils/markdownList";
 import { onDestroy, onMount, untrack } from "svelte";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import { EmbeddableMarkdownEditor } from "../../lib/editor";
@@ -544,7 +544,7 @@ function initializeEditor() {
 			// next Enter then sends, as in Slack. Mod+Enter still sends from
 			// anywhere.
 			const { state } = editor.cm;
-			if (isMarkdownListLine(state.doc.lineAt(state.selection.main.head).text)) {
+			if (isMarkdownListLineAt(state.doc.toString(), state.selection.main.head)) {
 				return false;
 			}
 			attemptSend();
