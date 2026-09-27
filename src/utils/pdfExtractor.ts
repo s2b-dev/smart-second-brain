@@ -102,8 +102,8 @@ export async function extractTextFromPdf(data: Uint8Array): Promise<PdfExtractRe
 }
 
 /**
- * Renders page 1 of a PDF to a PNG `width` pixels wide — the composer's
- * attachment thumbnail, which crops to the top of the page.
+ * Renders the top of page 1 of a PDF to a PNG `width` pixels wide and at most
+ * as tall — the composer's attachment thumbnail.
  *
  * @param data - PDF file content as Uint8Array (pdfjs may transfer it; pass a copy)
  * @param width - Width of the output image, in device pixels
@@ -122,7 +122,10 @@ export async function renderPdfThumbnail(data: Uint8Array, width: number): Promi
 		const viewport = page.getViewport({ scale: width / natural.width });
 		const canvas = document.createElement("canvas");
 		canvas.width = Math.ceil(viewport.width);
-		canvas.height = Math.ceil(viewport.height);
+		// The tile shows only the top of the page, so a very tall page (a long
+		// receipt, a scrolling export) renders into a canvas cut at a square
+		// rather than allocating its full height.
+		canvas.height = Math.min(Math.ceil(viewport.height), canvas.width);
 		const canvasContext = canvas.getContext("2d");
 		if (!canvasContext) throw new Error("Canvas 2D context unavailable");
 		await page.render({ canvasContext, viewport }).promise;

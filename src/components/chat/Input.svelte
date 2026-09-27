@@ -89,11 +89,27 @@ let dragHasIssue = $state(false);
 const sendShortcutHint = isMobileUI() ? "" : `↵ · ${Platform.isMacOS ? "⌘↵" : "Ctrl+↵"} in a list`;
 let containerEl: HTMLDivElement | undefined = $state();
 // Floor for the input card when the composer runs out of pane height: its
-// controls plus one editor line. `clientHeight` excludes the card's 1px
-// borders, which its border-box `min-height` must include, hence the `+ 2`.
-let wrapperHeight = $state(0);
-let editorHeight = $state(0);
-const cardMinHeight = $derived(wrapperHeight && editorHeight ? wrapperHeight + 2 - editorHeight + 24 : 0);
+// controls plus one editor line. Summed from the rows around the editor, never
+// derived from the card's own height — the floor props the card open, so when
+// the tray shrank (say, an attachment removed) a self-derived floor only fell
+// by a few px per resize tick and the card visibly crept back down.
+let wrapperEl: HTMLDivElement | undefined = $state();
+let trayRowHeight = $state(0);
+let actionsRowHeight = $state(0);
+const cardMinHeight = $derived.by(() => {
+	if (!wrapperEl || !actionsRowHeight) return 0;
+	const style = getComputedStyle(wrapperEl);
+	const px = (value: string) => Number.parseFloat(value) || 0;
+	// Border-box `min-height`: the card's padding and borders, plus the two row
+	// gaps between its three in-flow children (tray, editor, actions).
+	const chrome =
+		px(style.paddingTop) +
+		px(style.paddingBottom) +
+		px(style.borderTopWidth) +
+		px(style.borderBottomWidth) +
+		2 * px(style.rowGap);
+	return trayRowHeight + actionsRowHeight + chrome + 24;
+});
 let contextTrayRef = $state<ReturnType<typeof ContextTray> | undefined>(undefined);
 // Read the tray's context outputs reactively through the instance. They're
 // getter functions over `$derived` state in ContextTray, so reading them inside
@@ -300,11 +316,14 @@ async function createPreviewUrl(buffer: ArrayBuffer, mimeType: string): Promise<
 	}
 }
 
-/** Store a preview URL, unless its attachment was removed while the preview was
- * being made (nothing would be left to revoke it). */
+let destroyed = false;
+
+/** Store a preview URL, unless its attachment was removed — or the composer
+ * destroyed — while the preview was being made (nothing would be left to
+ * revoke it). */
 function publishPreview(vaultPath: string, url: string | undefined): void {
 	if (!url) return;
-	if (!attachments.some((a) => a.vaultPath === vaultPath)) {
+	if (destroyed || !attachments.some((a) => a.vaultPath === vaultPath)) {
 		URL.revokeObjectURL(url);
 		return;
 	}
@@ -499,6 +518,7 @@ $effect(() => {
 });
 
 onDestroy(() => {
+	destroyed = true;
 	// Stop any in-flight edit-attachment seeding; its writes would land on a
 	// dead component's state (and mint object URLs nothing revokes).
 	seedEditToken++;
@@ -1240,13 +1260,16 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     ondrop={dropTargetMode === "input" ? handleDrop : undefined}
     onclick={handleWrapperClick}
     role="region"
-    bind:clientHeight={wrapperHeight}
+    bind:this={wrapperEl}
     style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}
   >
     <!-- `pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
          6px below the border. The old `pt-2` put it at 12px — a visibly large
          gap. -->
-    <div class="composer-tray-row flex flex-row flex-wrap items-start gap-1.5 pt-0.5 min-w-0">
+    <div
+      class="composer-tray-row flex flex-row flex-wrap items-start gap-1.5 pt-0.5 min-w-0"
+      bind:clientHeight={trayRowHeight}
+    >
       <ContextTray
         bind:this={contextTrayRef}
         graphPaths={registry.graphSelection}
@@ -1266,14 +1289,13 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     <!-- Markdown Editor Container -->
     <div
       bind:this={editorContainer}
-      bind:clientHeight={editorHeight}
       class="markdown-editor-container w-full overflow-y-auto py-1 min-h-[24px]"
       id="chat-view-user-input-element"
       data-testid="message-input"
     ></div>
 
     <!-- Actions row: attachment, agent+model, send -->
-    <div class="chat-actions-row flex items-center gap-2">
+    <div class="chat-actions-row flex items-center gap-2" bind:clientHeight={actionsRowHeight}>
       <input
         bind:this={attachmentInputEl}
         type="file"
