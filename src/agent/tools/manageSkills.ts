@@ -241,7 +241,6 @@ function rejectInvalidRevision(
 }
 
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
-type ManageSkillsOperation = ManageSkillsInput["operation"];
 
 /**
  * Tool letting an agent create new skills, revise skills attached to it, or delete skills it
@@ -306,8 +305,6 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 			}
 
 			if (input.type === "delete") {
-				// Unreachable through the reviewer schema; kept as a hard stop should a caller
-				// ever pass a wider input past it.
 				const metadata = skillsService.getCachedSkills().get(input.name);
 				if (!metadata) {
 					return `Skill "${input.name}" not found.`;
