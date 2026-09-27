@@ -245,6 +245,31 @@ function attachmentIcon(attachment: ChatAttachment): string {
 	return attachment.mimeType.startsWith("image/") ? "image" : "paperclip";
 }
 
+/** Resource URL for an image attachment's thumbnail, or undefined when the file
+ * isn't in the vault (it then falls back to a plain chip). `getResourcePath`
+ * serves the vault file directly on desktop and mobile — no bytes read. */
+function imageResourceUrl(attachment: ChatAttachment): string | undefined {
+	if (!attachment.mimeType.startsWith("image/")) return undefined;
+	const vault = getPlugin().app.vault;
+	const file = vault.getFileByPath(attachment.vaultPath);
+	return file ? vault.getResourcePath(file) : undefined;
+}
+
+const imageThumbs = $derived(
+	attachments.flatMap((attachment) => {
+		const url = imageResourceUrl(attachment);
+		return url ? [{ attachment, url }] : [];
+	}),
+);
+const imageThumbPaths = $derived(new Set(imageThumbs.map((t) => t.attachment.vaultPath)));
+const chipAttachments = $derived(attachments.filter((a) => !imageThumbPaths.has(a.vaultPath)));
+
+function removeAttachment(evt: MouseEvent, attachment: ChatAttachment): void {
+	evt.preventDefault();
+	evt.stopPropagation();
+	onRemoveAttachment?.(attachment);
+}
+
 function onAttachmentClick(evt: MouseEvent, attachment: ChatAttachment): void {
 	if (Keymap.isModEvent(evt)) {
 		evt.preventDefault();
@@ -275,6 +300,34 @@ onDestroy(() => {
 
 {#if hasAny}
   <div class="context-tray flex flex-row flex-wrap items-start gap-1.5 min-w-0 max-w-full">
+    <!-- Image attachments: thumbnails on their own row, so what's being sent is
+         visible at a glance rather than hidden behind a filename. -->
+    {#if imageThumbs.length > 0}
+      <div class="image-thumbs">
+        {#each imageThumbs as { attachment, url } (attachment.vaultPath)}
+          <div class="image-thumb">
+            <button
+              type="button"
+              class="image-thumb-body"
+              title={`${attachment.vaultPath} (click to open)`}
+              onclick={() => openLink(attachment.vaultPath)}
+            >
+              <img src={url} alt={attachment.name} draggable="false" />
+            </button>
+            <button
+              type="button"
+              class="image-thumb-remove"
+              title="Remove attachment"
+              aria-label={`Remove ${attachment.name}`}
+              onclick={(evt) => removeAttachment(evt, attachment)}
+            >
+              <div class="chip-icon" use:icon={"x"} style="--icon-size: 10px"></div>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     <!-- Visible notes (auto references) -->
     {#each visibleNotes as note (note.file.path)}
       {@const deactivated = deactivatedPaths.has(note.file.path)}
@@ -379,7 +432,7 @@ onDestroy(() => {
     {/if}
 
     <!-- Content attachments -->
-    {#each attachments as attachment (attachment.vaultPath)}
+    {#each chipAttachments as attachment (attachment.vaultPath)}
       <button
         type="button"
         class="s2b-chip s2b-pill s2b-pill--interactive attachment"
@@ -396,6 +449,68 @@ onDestroy(() => {
 {/if}
 
 <style>
+  /* `flex-basis: 100%` puts the thumbnails on a row of their own above the
+     chips; the tray itself is a wrapping row. */
+  .image-thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .image-thumb {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex: none;
+  }
+
+  button.image-thumb-body {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+    background: var(--background-modifier-hover);
+    box-shadow: none;
+    cursor: var(--cursor);
+  }
+
+  .image-thumb-body img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Always visible, not revealed on hover: mobile has no hover, and an
+     opacity-0 reveal there turns every remove into a double tap. */
+  button.image-thumb-remove {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    box-shadow: none;
+    cursor: var(--cursor);
+  }
+
+  button.image-thumb-remove:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
+
   .s2b-chip {
     display: inline-flex;
     align-items: center;
