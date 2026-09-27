@@ -22,6 +22,28 @@ jobs:
         steps:
             - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+            # CHANGELOG.md is the single source of release notes: the plugin bundles
+            # it for its "What's new" tab, and its `## <tag> (date)` section becomes the
+            # release body here. A stable tag without a section fails before the
+            # build, since that version would otherwise ship with nothing to show
+            # after an update. Pre-release tags (`2.3.0-beta.1`) need none.
+            - name: Extract release notes
+              run: |
+                  tag="${GITHUB_REF#refs/tags/}"
+                  if [[ "$tag" == *-* ]]; then
+                    : > release-notes.md
+                  else
+                    # Same heading shape the plugin's parser accepts (utils/releaseNotes.ts), so a
+                    # mistyped date fails here instead of shipping notes the plugin can't find.
+                    # ENVIRON, not -v: awk -v would eat the regex's backslashes.
+                    pattern="^## ${tag//./\\.}( \\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\\))?[[:space:]]*\$" \
+                      awk '$0 ~ ENVIRON["pattern"] { found = 1; next } /^## / && found { exit } found' CHANGELOG.md > release-notes.md
+                    if ! grep -q '[^[:space:]]' release-notes.md; then
+                      echo "::error::CHANGELOG.md has no '## $tag' section; write the release notes there before tagging."
+                      exit 1
+                    fi
+                  fi
+
             - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
               with:
                   bun-version-file: .bun-version
@@ -44,9 +66,11 @@ jobs:
                       build/prod/main.js
                       build/prod/styles.css
 
-            # The release is created as a draft so the maintainer can attach
-            # release notes and publish it by hand. If a DRAFT for the tag
-            # already exists (a re-run, or a tag re-pointed before publishing),
+            # The release is created as a draft, with the notes extracted above, so
+            # the maintainer can review and publish it by hand. Fix wording in
+            # CHANGELOG.md rather than in a stable draft: a re-run rewrites its body
+            # (a pre-release draft's hand-written body is left alone). If a DRAFT
+            # for the tag already exists (a re-run, or a tag re-pointed before publishing),
             # replace its assets in place: `gh release create` would either fail
             # on the existing tag or silently mint a second draft that only shows
             # up via the API. A PUBLISHED release is never touched — users may
@@ -66,7 +90,10 @@ jobs:
                       echo "::error::Release $tag is already published; refusing to replace its assets."
                       exit 1
                     fi
-                    echo "Draft release $tag exists; replacing its assets."
+                    echo "Draft release $tag exists; replacing its assets and notes."
+                    if [ -s release-notes.md ]; then
+                      gh release edit "$tag" --notes-file release-notes.md
+                    fi
                     gh release upload "$tag" "${assets[@]}" --clobber
                     # GitHub has no conditional upload, so a maintainer publishing
                     # the draft during the seconds between the check above and the
@@ -81,6 +108,7 @@ jobs:
                     gh release create "$tag" \
                       --title="$tag" \
                       --draft \
+                      --notes-file release-notes.md \
                       "${assets[@]}"
                   else
                     echo "::error::Could not look up release $tag: $lookup"

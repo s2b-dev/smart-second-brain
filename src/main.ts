@@ -19,6 +19,7 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
@@ -56,6 +57,12 @@ import RunningIndicator from "./components/chat/RunningIndicator.svelte";
 // DISABLED FOR INITIAL RELEASE — Note Context view; see the registerView block in onload().
 // import { NoteContextView, VIEW_TYPE_NOTE_CONTEXT } from "./views/note-context/NoteContextView";
 import { OnboardingView, VIEW_TYPE_ONBOARDING } from "./views/onboarding/OnboardingView";
+import {
+	BUNDLED_RELEASE_NOTES,
+	ReleaseNotesView,
+	type ReleaseNotesViewState,
+	VIEW_TYPE_RELEASE_NOTES,
+} from "./views/releaseNotes/ReleaseNotesView";
 import { SmartGraphView, VIEW_TYPE_SMART_GRAPH } from "./views/smart-graph/SmartGraphView";
 import SettingsTab from "./views/settings/Settings";
 import { VectorStoreService, waitForVectorStore } from "./vectorstore";
@@ -500,6 +507,7 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
+		this.registerView(VIEW_TYPE_RELEASE_NOTES, (leaf) => new ReleaseNotesView(leaf, this));
 		// `.widget` files: a standalone widget as its own leaf, plus `![[x.widget]]` embeds and
 		// hover previews (see views/widget/). Torn down in onunload with the chat's.
 		this.registerView(VIEW_TYPE_WIDGET, (leaf) => new WidgetView(leaf, this));
@@ -578,6 +586,13 @@ export default class SecondBrainPlugin extends Plugin {
 			name: "Show welcome",
 			icon: "zap",
 			callback: () => this.activateOnboardingView(),
+		});
+
+		this.addCommand({
+			id: "show-release-notes",
+			name: "Show release notes",
+			icon: "scroll-text",
+			callback: () => void this.showReleaseNotes(),
 		});
 
 		this.addCommand({
@@ -685,6 +700,8 @@ export default class SecondBrainPlugin extends Plugin {
 			if (!this.pluginData.onboardingComplete && this.pluginData.getConfiguredProviders().length === 0) {
 				void this.activateOnboardingView();
 			}
+
+			this.announceUpdate();
 
 			// Update check: a while after startup so it never competes with init, then
 			// hourly re-evaluation for sessions left open for days. Each run only
@@ -1082,6 +1099,42 @@ export default class SecondBrainPlugin extends Plugin {
 			Log.debug("[UpdateCheck] Could not open Community plugins settings:", error);
 		}
 		window.open(COMMUNITY_PLUGIN_URL);
+	}
+
+	/**
+	 * Open (or focus) the "What's new" tab with the `expanded` newest releases open:
+	 * just the latest from the command and settings, every announced one after an update.
+	 */
+	async showReleaseNotes(expanded = 1) {
+		const { workspace } = this.app;
+		const state: ReleaseNotesViewState = { expanded };
+		const leaf = workspace.getLeavesOfType(VIEW_TYPE_RELEASE_NOTES)[0] ?? workspace.getLeaf("tab");
+		await leaf.setViewState({ type: VIEW_TYPE_RELEASE_NOTES, active: true, state });
+		await workspace.revealLeaf(leaf);
+	}
+
+	/**
+	 * After an update, offer the release notes for every version since the one last
+	 * seen. A notice rather than a modal, so a launch is never blocked by it.
+	 */
+	private announceUpdate() {
+		const current = this.manifest.version;
+		const { sections, record } = planUpdateAnnouncement(
+			this.pluginData.lastSeenVersion,
+			current,
+			BUNDLED_RELEASE_NOTES,
+		);
+		if (record !== null) this.pluginData.lastSeenVersion = record;
+		if (sections.length === 0) return;
+		const message = createFragment((frag) => {
+			frag.appendText(`Smart Second Brain updated to ${current}. `);
+			const link = frag.createEl("a", { text: "See what's new", href: "#" });
+			link.addEventListener("click", (event) => {
+				event.preventDefault();
+				void this.showReleaseNotes(sections.length);
+			});
+		});
+		new Notice(message, 15_000);
 	}
 
 	async activateOnboardingView() {

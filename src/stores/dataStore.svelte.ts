@@ -235,6 +235,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	checkForUpdates: true,
 	lastUpdateCheckAt: null,
 	lastNotifiedUpdateVersion: null,
+	lastSeenVersion: null,
 	dismissedRecommendations: [],
 	thinkingProcessExpanded: true,
 	showActiveAgentsInStatusBar: true,
@@ -1262,6 +1263,14 @@ export class PluginDataStore {
 		void this.saveSettings();
 	}
 
+	get lastSeenVersion() {
+		return this.#data.lastSeenVersion ?? null;
+	}
+	set lastSeenVersion(val: string | null) {
+		this.#data.lastSeenVersion = val;
+		void this.saveSettings();
+	}
+
 	get dismissedRecommendations() {
 		return this.#data.dismissedRecommendations;
 	}
@@ -2271,6 +2280,10 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 	};
 
 	runMigrations(mergedData);
+
+	// A fresh install has nothing to catch up on: record the running version so the
+	// first update announces only what changed since.
+	if (!rawData) mergedData.lastSeenVersion = plugin.manifest.version;
 
 	// If the data was written by a newer plugin, skip normalizeAgents() too — it
 	// would rewrite prompt fields using this plugin's older defaults and those

@@ -20,7 +20,8 @@ export abstract class SvelteItemView extends ItemView {
 	}
 
 	/**
-	 * Reset the content element, tag it for tests, and mount `component` into it.
+	 * Reset the content element, tag it for tests, and mount `component` into it,
+	 * replacing any component mounted earlier (a view re-rendering on `setState`).
 	 * `containerClass` is the view's root CSS class; `testId` lands in `data-testid`.
 	 */
 	protected mountComponent<Props extends Record<string, unknown>>(
@@ -28,6 +29,7 @@ export abstract class SvelteItemView extends ItemView {
 		props: Props,
 		chrome: { containerClass: string; testId: string },
 	): void {
+		if (this.mounted) void unmount(this.mounted);
 		this.contentEl.empty();
 		this.contentEl.addClass(chrome.containerClass);
 		this.contentEl.setAttribute("data-testid", chrome.testId);

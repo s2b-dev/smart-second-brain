@@ -563,6 +563,11 @@ export interface PluginData {
 	lastUpdateCheckAt: number | null;
 	/** Newest version already announced by the update check, so each is announced once. */
 	lastNotifiedUpdateVersion: string | null;
+	/**
+	 * Last stable plugin version whose release notes were announced (or that was
+	 * installed fresh). Null for data written before release notes existed.
+	 */
+	lastSeenVersion: string | null;
 	/** IDs of new-chat recommendations the user has dismissed. Includes the well-known block id to dismiss the whole surface. */
 	dismissedRecommendations: string[];
 	/**
