@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
 import changelog from "../../CHANGELOG.md?raw";
 import manifest from "../../manifest.json";
-import {
-	compareVersions,
-	isPrerelease,
-	linkifyReferences,
-	parseChangelog,
-	planUpdateAnnouncement,
-} from "../../src/utils/releaseNotes";
+import { linkifyReferences, parseChangelog, planUpdateAnnouncement } from "../../src/utils/releaseNotes";
+import { compareVersions, isPrerelease } from "../../src/utils/version";
 
 const SAMPLE = `# Changelog
 
