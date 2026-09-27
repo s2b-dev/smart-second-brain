@@ -431,24 +431,6 @@ describe("manage_skills tool", () => {
 		});
 	});
 
-	describe("reviewer variant", () => {
-		it("has no delete operation in its schema but still patches", async () => {
-			const svc = makeSkillsService(dataviewCache());
-			const { app, write } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
-			const t = createManageSkillsTool(svc, app, "agent-1", { allowDelete: false });
-
-			await expect(t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG)).rejects.toThrow();
-			expect(t.description).not.toContain("delete");
-
-			const res = await t.invoke(
-				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "New body." } },
-				RUN_CONFIG,
-			);
-			expect(res).toMatch(/patched/i);
-			expect(write).toHaveBeenCalledTimes(1);
-		});
-	});
-
 	describe("update operation", () => {
 		it("applies a valid body edit immediately", async () => {
 			const svc = makeSkillsService(dataviewCache());
@@ -670,21 +652,19 @@ describe("manage_skills tool", () => {
 // used to sit at the root and rendered as a bare `anyOf`, which OpenAI rejected on every
 // request the moment the tool was bound.
 describe("manage_skills schema", () => {
-	it("is a root-level object for both the agent and the reviewer variant", () => {
+	it("is a root-level object", () => {
 		mockGetData.mockReturnValue({
 			getAgent: () => agentWithSkills({}),
 			getSelectedAgent: () => agentWithSkills({}),
 		});
 		const svc = makeSkillsService(dataviewCache());
 		const { app } = makeApp({});
-		for (const options of [{}, { allowDelete: false }]) {
-			const t = createManageSkillsTool(svc, app, "agent-1", options);
-			const json = z.toJSONSchema(t.schema as z.ZodType) as {
-				type?: string;
-				properties?: Record<string, unknown>;
-			};
-			expect(json.type).toBe("object");
-			expect(Object.keys(json.properties ?? {})).toEqual(["operation"]);
-		}
+		const t = createManageSkillsTool(svc, app, "agent-1");
+		const json = z.toJSONSchema(t.schema as z.ZodType) as {
+			type?: string;
+			properties?: Record<string, unknown>;
+		};
+		expect(json.type).toBe("object");
+		expect(Object.keys(json.properties ?? {})).toEqual(["operation"]);
 	});
 });
