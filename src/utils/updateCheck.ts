@@ -52,3 +52,46 @@ export function updateToAnnounce(
 	if (lastNotified !== null && compareVersions(remote.version, lastNotified) <= 0) return null;
 	return remote.version;
 }
+
+/** What {@link runUpdateCheck} reads and does, injected so the flow is testable. */
+export interface UpdateCheckDeps {
+	/** The user's "Check for updates" setting, read live (it can flip mid-request). */
+	isEnabled(): boolean;
+	/** Obsidian's own automatic plugin-update check is on, so this one steps aside. */
+	obsidianChecksUpdates(): boolean;
+	/** False once the plugin has unloaded; a late response must not act. */
+	isActive(): boolean;
+	now(): number;
+	currentVersion: string;
+	appVersion: string;
+	getLastCheckAt(): number | null;
+	setLastCheckAt(at: number): void;
+	getLastNotified(): string | null;
+	setLastNotified(version: string): void;
+	/** Parsed JSON of the remote manifest, or null on a non-200; may throw offline. */
+	fetchManifest(): Promise<unknown>;
+	notify(version: string): void;
+}
+
+/**
+ * One run of the update check: gate, fetch (recording the attempt first, so a
+ * failure also waits a day), and announce at most once per version. Returns the
+ * announced version, or null. Never throws: offline is normal.
+ */
+export async function runUpdateCheck(deps: UpdateCheckDeps): Promise<string | null> {
+	if (!deps.isEnabled() || deps.obsidianChecksUpdates()) return null;
+	if (!isUpdateCheckDue(deps.now(), deps.getLastCheckAt())) return null;
+	deps.setLastCheckAt(deps.now());
+	let remote: RemoteManifest | null;
+	try {
+		remote = parseRemoteManifest(await deps.fetchManifest());
+	} catch {
+		return null;
+	}
+	if (!remote || !deps.isActive() || !deps.isEnabled()) return null;
+	const version = updateToAnnounce(deps.currentVersion, deps.appVersion, remote, deps.getLastNotified());
+	if (!version) return null;
+	deps.setLastNotified(version);
+	deps.notify(version);
+	return version;
+}

@@ -19,13 +19,7 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
-import {
-	COMMUNITY_PLUGIN_URL,
-	UPDATE_MANIFEST_URL,
-	isUpdateCheckDue,
-	parseRemoteManifest,
-	updateToAnnounce,
-} from "./utils/updateCheck";
+import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -95,6 +89,8 @@ export default class SecondBrainPlugin extends Plugin {
 	/** `performance.now()` when `onload` finished; -1 until then. Used to attribute the
 	 *  Obsidian pre-layout gap (onload:end → onLayoutReady). */
 	private onloadEndAt = -1;
+	/** Set in onunload, so async work that outlives the plugin (the update check) stays quiet. */
+	private unloaded = false;
 	/** Mounted status-bar running-agent indicator (unmounted on plugin unload). */
 	private runningIndicator: ReturnType<typeof mount> | null = null;
 
@@ -903,6 +899,7 @@ export default class SecondBrainPlugin extends Plugin {
 	}
 
 	onunload() {
+		this.unloaded = true;
 		Log.info("Unloading plugin");
 		// The model store's module state survives a disable/enable cycle. Without this
 		// reset, its QueryObservers keep fetching with the unloaded plugin's credentials
@@ -1027,30 +1024,37 @@ export default class SecondBrainPlugin extends Plugin {
 	 */
 	private async checkForUpdate() {
 		const data = this.pluginData;
-		if (!data.checkForUpdates || this.obsidianChecksPluginUpdates()) return;
-		if (!isUpdateCheckDue(Date.now(), data.lastUpdateCheckAt)) return;
-		data.lastUpdateCheckAt = Date.now();
-		let remote: ReturnType<typeof parseRemoteManifest>;
-		try {
-			const response = await requestUrl({ url: UPDATE_MANIFEST_URL, throw: false });
-			remote = response.status === 200 ? parseRemoteManifest(response.json) : null;
-		} catch (error) {
-			Log.debug("[UpdateCheck] Could not reach GitHub:", error);
-			return;
-		}
-		if (!remote || !data.checkForUpdates) return;
-		const version = updateToAnnounce(this.manifest.version, apiVersion, remote, data.lastNotifiedUpdateVersion);
-		if (!version) return;
-		data.lastNotifiedUpdateVersion = version;
-		const message = createFragment((frag) => {
-			frag.appendText(`Smart Second Brain ${version} is available. `);
-			const link = frag.createEl("a", { text: "Update", href: "#" });
-			link.addEventListener("click", (event) => {
-				event.preventDefault();
-				this.openCommunityPluginSettings();
-			});
+		await runUpdateCheck({
+			isEnabled: () => data.checkForUpdates,
+			obsidianChecksUpdates: () => this.obsidianChecksPluginUpdates(),
+			isActive: () => !this.unloaded,
+			now: () => Date.now(),
+			currentVersion: this.manifest.version,
+			appVersion: apiVersion,
+			getLastCheckAt: () => data.lastUpdateCheckAt,
+			setLastCheckAt: (at) => {
+				data.lastUpdateCheckAt = at;
+			},
+			getLastNotified: () => data.lastNotifiedUpdateVersion,
+			setLastNotified: (version) => {
+				data.lastNotifiedUpdateVersion = version;
+			},
+			fetchManifest: async () => {
+				const response = await requestUrl({ url: UPDATE_MANIFEST_URL, throw: false });
+				return response.status === 200 ? response.json : null;
+			},
+			notify: (version) => {
+				const message = createFragment((frag) => {
+					frag.appendText(`Smart Second Brain ${version} is available. `);
+					const link = frag.createEl("a", { text: "Update", href: "#" });
+					link.addEventListener("click", (event) => {
+						event.preventDefault();
+						this.openCommunityPluginSettings();
+					});
+				});
+				new Notice(message, 15_000);
+			},
 		});
-		new Notice(message, 15_000);
 	}
 
 	/** Obsidian's own periodic plugin-update check (internal API; false if it ever moves). */
@@ -1068,12 +1072,16 @@ export default class SecondBrainPlugin extends Plugin {
 		const setting = (
 			this.app as typeof this.app & { setting?: { open?: () => void; openTabById?: (id: string) => unknown } }
 		).setting;
-		if (setting?.open && setting.openTabById) {
-			setting.open();
-			setting.openTabById("community-plugins");
-		} else {
-			window.open(COMMUNITY_PLUGIN_URL);
+		try {
+			if (setting?.open && setting.openTabById) {
+				setting.open();
+				setting.openTabById("community-plugins");
+				return;
+			}
+		} catch (error) {
+			Log.debug("[UpdateCheck] Could not open Community plugins settings:", error);
 		}
+		window.open(COMMUNITY_PLUGIN_URL);
 	}
 
 	async activateOnboardingView() {
