@@ -1229,6 +1229,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         onRemoveAttachment={removeAttachment}
         onPromoteToAttachment={promoteVisibleNoteToAttachment}
         canPromoteToAttachment={canPromoteVisibleNoteToAttachment}
+        attachmentPreviewUrls={previewUrls}
       />
       {#if savingFiles}
         <div class="text-xs text-text-muted flex items-center">Saving...</div>

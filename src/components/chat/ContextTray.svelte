@@ -35,6 +35,9 @@ interface Props {
 	onPromoteToAttachment?: (note: VisibleNote) => void | Promise<void>;
 	/** Whether the active note can be promoted to a content attachment. */
 	canPromoteToAttachment?: (note: VisibleNote) => boolean;
+	/** Object URLs for image attachments, keyed by vault path. An image with a
+	 * URL renders as a thumbnail; anything else stays a chip. */
+	attachmentPreviewUrls?: ReadonlyMap<string, string>;
 }
 
 let {
@@ -45,6 +48,7 @@ let {
 	onRemoveAttachment,
 	onPromoteToAttachment,
 	canPromoteToAttachment,
+	attachmentPreviewUrls = new Map(),
 }: Props = $props();
 
 const tracker = new VisibleNotesTracker();
@@ -245,19 +249,9 @@ function attachmentIcon(attachment: ChatAttachment): string {
 	return attachment.mimeType.startsWith("image/") ? "image" : "paperclip";
 }
 
-/** Resource URL for an image attachment's thumbnail, or undefined when the file
- * isn't in the vault (it then falls back to a plain chip). `getResourcePath`
- * serves the vault file directly on desktop and mobile — no bytes read. */
-function imageResourceUrl(attachment: ChatAttachment): string | undefined {
-	if (!attachment.mimeType.startsWith("image/")) return undefined;
-	const vault = getPlugin().app.vault;
-	const file = vault.getFileByPath(attachment.vaultPath);
-	return file ? vault.getResourcePath(file) : undefined;
-}
-
 const imageThumbs = $derived(
 	attachments.flatMap((attachment) => {
-		const url = imageResourceUrl(attachment);
+		const url = attachmentPreviewUrls.get(attachment.vaultPath);
 		return url ? [{ attachment, url }] : [];
 	}),
 );
