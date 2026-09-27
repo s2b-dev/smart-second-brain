@@ -130,11 +130,11 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 
 		await run(session, internals);
 		expect(generateTitle).not.toHaveBeenCalled();
-		const failed = session.messages.at(-1);
-		expect(failed?.assistantMessage.state).toBe(AssistantState.error);
+		const failed = session.messages.at(-1)!;
+		expect(failed.assistantMessage.state).toBe(AssistantState.error);
 
 		// The retry goes through the regenerate path, which never passed a title before.
-		await session.retryLastError(failed?.id ?? "");
+		await session.retryLastError(failed.id);
 
 		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat.chat", "", "how do I water ferns");
 		expect(String(session.id)).toBe("Chats/Watering Ferns.chat");
