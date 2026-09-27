@@ -288,12 +288,10 @@ function openAgentNote() {
 }
 
 // Whether this agent's definition note has drifted from the shipped default. Reads the
-// prompt-file cache (kept fresh by the vault-change handler); `promptDriftTick` lets us
-// force a re-check after opening the diff modal. When false, we hide the "Diff with default"
-// button — matching the skill guidance behaviour (diff only shown when drifted).
-let promptDriftTick = $state(0);
+// prompt-file cache, which is reactive (kept fresh by writes and the vault-change handler), so
+// "Use default" in the diff modal hides the button again. When false, we hide the "Diff with
+// default" button — matching the skill guidance behaviour (diff only shown when drifted).
 const promptDrifted = $derived.by(() => {
-	void promptDriftTick;
 	if (!selectedAgent) return false;
 	const content = plugin.promptFilesService?.getAgentPrompt(agentId) ?? DEFAULT_AGENT_PROMPT;
 	// Same normalization the shipped-default check uses, so a file that differs only by
@@ -307,8 +305,6 @@ function openPromptDiff() {
 	// (invalidate caches on success, surface a Notice on failure), and duplicating it was
 	// how this call site ended up silently swallowing write errors.
 	plugin.agentManager?.openSystemPromptDiff(agentId);
-	// The diff modal can reset/realign the file; re-check drift when we return to this modal.
-	promptDriftTick++;
 }
 
 function openRenderedSystemPromptModal() {
