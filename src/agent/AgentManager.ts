@@ -116,6 +116,7 @@ import {
 
 import { getRegistry } from "../providers/registry";
 import { ensureProviderRegistered } from "../providers/registrySync";
+import { DEFAULT_CHAT_TITLE } from "../utils/chatTitle";
 
 import type { StructuredToolInterface } from "@langchain/core/tools";
 
@@ -2169,7 +2170,7 @@ export class AgentManager {
 			await this.plugin.app.vault.createFolder(folder);
 		}
 
-		const { path } = await this.chatManager.getUniqueTitlePath(folder, "New Chat", "");
+		const { path } = await this.chatManager.getUniqueTitlePath(folder, DEFAULT_CHAT_TITLE, "");
 
 		const initialData = {
 			threadId: path,

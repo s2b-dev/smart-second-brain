@@ -19,6 +19,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
+import { isDefaultChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
 	MessageState,
@@ -598,7 +599,6 @@ export class ChatSession {
 		pairId: UUIDv7,
 		getStream: (signal: AbortSignal) => AsyncIterable<AgentStreamChunk>,
 		options: {
-			generateTitle?: string;
 			reloadAfter?: boolean;
 			parentCheckpointId?: string;
 			beforeCheckpointIds: Set<string>;
@@ -663,15 +663,20 @@ export class ChatSession {
 			const thinkingDurationMs = Date.now() - runStartedAtMs;
 			pair.assistantMessage.thinkingDurationMs = thinkingDurationMs;
 
-			// Generate chat title after stream completes for the first user message.
-			// Must be sequential because rename changes this.id (the thread path).
-			if (options.generateTitle && this.messages.length === 1) {
+			// Title the chat after the first turn that succeeds, not just after the first
+			// submit: a first turn that errored leaves the placeholder name, and the retry,
+			// regenerate or edit that eventually succeeds must still title it. Otherwise the
+			// file stays "New Chat", no longer counts as empty, and every later new chat is
+			// deduped to "New Chat (2)", "(3)", ... Titled from the conversation's opening
+			// message. Must be sequential because rename changes this.id (the thread path).
+			const titleSource = this.messages[0]?.userMessage.content;
+			if (titleSource && isDefaultChatTitle(String(this.id))) {
 				try {
 					const plugin = getPlugin();
 					const newPath = await plugin.agentManager.generateThreadTitleFromUserMessage(
 						String(this.id),
 						this.selectedAgentId,
-						options.generateTitle,
+						titleSource,
 					);
 					if (newPath) {
 						const oldPath = String(this.id);
@@ -873,7 +878,6 @@ export class ChatSession {
 					reviewStatus,
 				) as AsyncIterable<AgentStreamChunk>,
 			{
-				generateTitle: userContent,
 				reloadAfter: true,
 				parentCheckpointId,
 				beforeCheckpointIds,

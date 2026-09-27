@@ -16,6 +16,7 @@ import type { ThreadSnapshot, ThreadStore } from "./memory/ThreadStore";
 import { Logger } from "../utils/logging";
 import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { gunzipToString, gzipString, toArrayBuffer } from "../utils/gzip";
+import { isDefaultChatTitle } from "../utils/chatTitle";
 import type { ChatAttachment } from "../types/shared";
 import {
 	type CheckpointEntry,
@@ -466,13 +467,7 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 	async findEmptyNewChatThread(): Promise<string | undefined> {
 		const threads = await this.listThreads();
 		for (const thread of threads) {
-			const basename =
-				thread.threadId
-					.split("/")
-					.pop()
-					?.replace(/\.chat$/, "") ?? "";
-			// Match "New Chat" and any auto-deduped variant like "New Chat (2)".
-			if (!/^New Chat( \(\d+\))?$/.test(basename)) continue;
+			if (!isDefaultChatTitle(thread.threadId)) continue;
 
 			const data = await this.ensureThreadLoaded(thread.threadId);
 			if (data && Object.keys(data.checkpoints).length === 0) {
