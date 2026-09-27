@@ -1526,19 +1526,6 @@ body.is-mobile .model-select-btn.clickable-icon {
 	padding-block: 8px;
 }
 
-/* The message-nav cluster (jump/step through messages) stacks four 22px
-   buttons vertically in a floating overlay. A full 44px box each would make
-   the stack ~176px tall and cover the conversation, so widen to 44px for the
-   horizontal grab area but keep the rows at 36px — still a comfortable target
-   in the dominant (vertical) axis of a stacked list. The code-copy button sits
-   inside `<pre>` and gets the full square. */
-body.is-mobile .message-nav button {
-	min-width: 44px;
-	min-height: 36px;
-	padding: 6px;
-	box-sizing: border-box;
-}
-
 /* Code blocks render in chat messages AND in tool-call output
    (`.tool-output-content`), so key off `pre` rather than a single container. */
 body.is-mobile .message-text pre .clickable-icon,

@@ -67,18 +67,6 @@ async function handleRootDrop(event: DragEvent) {
 	await input?.handleDrop(event);
 }
 
-// Route Alt+↑/↓ message-navigation hotkeys to the container from anywhere in
-// the chat view. A native listener keeps chat-root a plain region (a11y).
-function messageNavHotkeys(node: HTMLElement) {
-	const onKeydown = (event: KeyboardEvent) => messageContainer?.handleNavKeydown(event);
-	node.addEventListener("keydown", onKeydown);
-	return {
-		destroy() {
-			node.removeEventListener("keydown", onKeydown);
-		},
-	};
-}
-
 // Re-parent the composer out of the leaf on mobile so it can be positioned
 // against a box that does not go stale when the keyboard opens. See the style
 // block for why this is necessary (`.workspace-leaf` sets `contain: strict`,
@@ -316,7 +304,6 @@ function portalComposer(node: HTMLElement) {
     ondragover={handleRootDragOver}
     ondragleave={handleRootDragLeave}
     ondrop={handleRootDrop}
-    use:messageNavHotkeys
     use:portalComposer
   >
     {#if registry}

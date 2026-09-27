@@ -141,10 +141,10 @@ const messageRefs = new Map<string, HTMLDivElement>();
 
 // Leave breathing room above the anchored message so its top isn't hidden
 // behind the container's top padding (Chat.svelte adds 44px) and fade mask.
-const NAV_TOP_OFFSET = 48;
+const ANCHOR_TOP_OFFSET = 48;
 
 // Fast custom smooth-scroll — the native `behavior: "smooth"` easing is too
-// slow for message navigation. Duration is short and capped regardless of
+// slow for in-chat jumps. Duration is short and capped regardless of
 // distance so long jumps still feel snappy.
 let scrollRafId: number | null = null;
 
@@ -194,7 +194,7 @@ function scrollUserMessageToTop(id: UUIDv7) {
 
 	// Place the message near the top of the container, minus a small offset so
 	// it isn't clipped by the fade mask.
-	const targetScroll = currentScroll + (messageTop - containerTop) - NAV_TOP_OFFSET;
+	const targetScroll = currentScroll + (messageTop - containerTop) - ANCHOR_TOP_OFFSET;
 
 	animateScrollTo(targetScroll);
 }
@@ -208,8 +208,8 @@ export async function scrollToLatestMessage() {
 
 // Anchor the message near the top of the view as soon as it enters edit
 // mode, so the user can see what they're changing without hunting for it in
-// the thread. Reuses `scrollUserMessageToTop` (the same function message
-// navigation uses) rather than scrolling relative to the composer: on mobile
+// the thread. Uses `scrollUserMessageToTop` rather than scrolling relative
+// to the composer: on mobile
 // the composer is portaled and repositioned live off the on-screen keyboard
 // (see Chat.svelte), which has no "finished opening" event to wait for and
 // made a composer-relative target impossible to land reliably. The
@@ -227,132 +227,24 @@ $effect(() => {
 	void tick().then(() => scrollUserMessageToTop(id));
 });
 
-// --- Message navigation (jump between user messages) ---
+// --- Jump to bottom ---
 
-// Ids of navigable user messages, in document order (skips summary markers).
-const userMessageIds = $derived.by<UUIDv7[]>(() => {
-	if (!messages) return [];
-	return messages.filter((m) => m.transcriptEvent?.type !== "summarization_marker").map((m) => m.id);
-});
+// Past this distance from the end of the thread, the jump-to-bottom button
+// appears. Small enough that it shows as soon as the latest reply is partly out
+// of view, large enough to ignore sub-line scroll jitter.
+const JUMP_TO_BOTTOM_THRESHOLD = 120;
 
-// Index of the user message currently anchored near the top of the viewport.
-// Recomputed on scroll so prev/next move relative to what the user is reading.
-let activeUserIndex = $state(0);
+let showJumpToBottom = $state(false);
 
-// Whether the up/down controls should be shown. Driven by scroll position so
-// they reflect not just the turn index but where we are within a long reply.
-let prevAvailable = $state(false);
-let nextAvailable = $state(false);
-
-// The nav arrows appear while scrolling (and on hover, via CSS). After scrolling
-// stops they linger briefly, then fade out.
-let isScrolling = $state(false);
-let scrollIdleTimer: number | undefined;
-
-function handleScroll() {
-	recomputeActiveUserIndex();
-	isScrolling = true;
-	if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
-	scrollIdleTimer = window.setTimeout(() => {
-		isScrolling = false;
-	}, 900);
+function recomputeJumpToBottom() {
+	if (!scrollContainer) return;
+	const el = scrollContainer;
+	showJumpToBottom = el.scrollHeight - el.clientHeight - el.scrollTop > JUMP_TO_BOTTOM_THRESHOLD;
 }
 
-function recomputeActiveUserIndex() {
-	if (!scrollContainer || userMessageIds.length === 0) return;
-	const containerTop = scrollContainer.getBoundingClientRect().top;
-	// Anchor at the same offset navigation scrolls to, so the message that lands
-	// at the top counts as active rather than the one just above it.
-	const anchor = containerTop + NAV_TOP_OFFSET + 4;
-
-	let candidate = 0;
-	for (let i = 0; i < userMessageIds.length; i++) {
-		const el = messageRefs.get(`${userMessageIds[i]}-user`);
-		if (!el) continue;
-		if (el.getBoundingClientRect().top <= anchor) {
-			candidate = i;
-		} else {
-			break;
-		}
-	}
-	activeUserIndex = candidate;
-
-	// "Up" is available if there's an earlier turn, OR we've scrolled down inside
-	// the current turn's reply (first "up" snaps back to its user message).
-	prevAvailable = candidate > 0 || !isUserMessageAtTop(candidate);
-	nextAvailable = candidate < userMessageIds.length - 1;
-}
-
-const canNavigatePrev = $derived(prevAvailable);
-const canNavigateNext = $derived(nextAvailable);
-
-function navigateToUserMessage(index: number) {
-	if (index < 0 || index >= userMessageIds.length) return;
-	activeUserIndex = index;
-	scrollUserMessageToTop(userMessageIds[index]);
-}
-
-// True when the given user message is already anchored near the top of the
-// viewport (i.e. we're at the very start of its turn, not deep inside its reply).
-function isUserMessageAtTop(index: number): boolean {
-	const el = messageRefs.get(`${userMessageIds[index]}-user`);
-	if (!el || !scrollContainer) return false;
-	const containerTop = scrollContainer.getBoundingClientRect().top;
-	const offset = el.getBoundingClientRect().top - containerTop;
-	// Within a small band around the resting position counts as "at top".
-	return Math.abs(offset - NAV_TOP_OFFSET) <= 24;
-}
-
-function navigatePrevMessage() {
-	// If we've scrolled down into the current turn's (long) reply, the first
-	// "up" press should bring us back to that turn's own user message rather
-	// than skipping to the previous turn.
-	if (!isUserMessageAtTop(activeUserIndex)) {
-		scrollUserMessageToTop(userMessageIds[activeUserIndex]);
-		return;
-	}
-	navigateToUserMessage(activeUserIndex - 1);
-}
-
-function navigateNextMessage() {
-	navigateToUserMessage(activeUserIndex + 1);
-}
-
-// Touch devices have no Alt key, so the keyboard hint in these tooltips
-// describes a shortcut the user can't press. Drop it on mobile.
-const prevMessageTooltip = onMobile ? "Previous message" : "Previous message (Alt+↑)";
-const nextMessageTooltip = onMobile ? "Next message" : "Next message (Alt+↓)";
-
-function scrollToTop() {
-	// "Jump to top" targets the first user message, symmetric with jump-to-bottom.
-	if (userMessageIds.length === 0) {
-		animateScrollTo(0);
-		return;
-	}
-	navigateToUserMessage(0);
-}
-
-function scrollToBottom() {
-	// "Jump to bottom" targets the last user message (consistent with the rest
-	// of the navigation), not the raw end of the last assistant reply.
-	if (userMessageIds.length === 0) return;
-	navigateToUserMessage(userMessageIds.length - 1);
-}
-
-export function handleNavKeydown(event: KeyboardEvent) {
-	// Alt+Up / Alt+Down jump between user messages. Ignore when a modifier
-	// combo we don't own is pressed, or while typing in an editable field.
-	if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-	const target = event.target as HTMLElement | null;
-	if (target?.isContentEditable || target?.closest("input, textarea, .cm-editor")) return;
-
-	if (event.key === "ArrowUp") {
-		event.preventDefault();
-		navigatePrevMessage();
-	} else if (event.key === "ArrowDown") {
-		event.preventDefault();
-		navigateNextMessage();
-	}
+function jumpToBottom() {
+	if (!scrollContainer) return;
+	animateScrollTo(scrollContainer.scrollHeight);
 }
 
 // Svelte action to register message refs
@@ -611,20 +503,20 @@ function toggleCollapsed(pair: MessagePair): void {
 	perTurnOverride[overrideKey(pair)] = !isCollapsed(pair);
 }
 
-// Recompute the active message + nav availability from the DOM after the thread
-// or message list changes (switching chats, new replies). This is a legitimate
-// DOM-measurement side effect, not state synchronization: `recomputeActiveUserIndex`
-// derives everything from live element positions, so a stale `activeUserIndex`
-// self-heals here and on the next scroll rather than needing an imperative clamp.
+// Re-measure when the content grows or shrinks without a scroll event: a
+// streaming reply lengthening below the fold, switching threads, a turn
+// collapsing. DOM-measurement side effect, not state synchronization.
 $effect(() => {
-	void threadPath;
-	void userMessageIds.length;
-	tick().then(() => recomputeActiveUserIndex());
+	const content = scrollContainer?.firstElementChild;
+	if (!scrollContainer || !content) return;
+	const observer = new ResizeObserver(() => recomputeJumpToBottom());
+	observer.observe(scrollContainer);
+	observer.observe(content);
+	return () => observer.disconnect();
 });
 
 $effect(() => {
 	return () => {
-		if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
 		if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
 	};
 });
@@ -636,7 +528,7 @@ $effect(() => {
     bind:this={scrollContainer}
     class="scroll-container h-full overflow-y-auto overflow-x-clip px-2 pt-4 pb-8"
     tabindex="-1"
-    onscroll={handleScroll}
+    onscroll={recomputeJumpToBottom}
   >
     <!-- `min-h-full` when there are messages, NOT `h-full`: a long conversation
          must be allowed to grow past the scroller's content-box height, or the
@@ -985,53 +877,17 @@ $effect(() => {
     </div>
   </div>
 
-  {#if userMessageIds.length > 1 && !onMobile}
-    <!-- Message navigation controls. The overlay mirrors the content column's
-         max-width so the cluster hugs the right edge of the messages when a wide
-         gutter opens up, while staying near the scrollbar at narrower widths.
-         Desktop only: this is a one-message-at-a-time jump/scroll shortcut
-         cluster mirroring Alt+↑/↓, which has no mobile equivalent to shortcut
-         and is redundant with plain touch scrolling — one less floating
-         overlay competing for space on a small screen. -->
-    <div class="message-nav-overlay">
-      <div class="message-nav" class:message-nav-active={isScrolling} data-testid="message-nav">
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigatePrev}>
-          <Button
-            iconId="chevrons-up"
-            iconSize="s"
-            tooltip="Jump to top"
-            dataTestId="message-nav-top"
-            onClick={scrollToTop}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigatePrev}>
-          <Button
-            iconId="chevron-up"
-            iconSize="s"
-            tooltip={prevMessageTooltip}
-            dataTestId="message-nav-prev"
-            onClick={navigatePrevMessage}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigateNext}>
-          <Button
-            iconId="chevron-down"
-            iconSize="s"
-            tooltip={nextMessageTooltip}
-            dataTestId="message-nav-next"
-            onClick={navigateNextMessage}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigateNext}>
-          <Button
-            iconId="chevrons-down"
-            iconSize="s"
-            tooltip="Jump to bottom"
-            dataTestId="message-nav-bottom"
-            onClick={scrollToBottom}
-          />
-        </div>
-      </div>
+  {#if showJumpToBottom}
+    <!-- Mirrors the content column's max-width so the button stays centred on
+         the messages, not the pane, when a wide gutter opens up. -->
+    <div class="jump-to-bottom-overlay">
+      <Button
+        class="jump-to-bottom"
+        iconId="arrow-down"
+        tooltip="Jump to bottom"
+        dataTestId="jump-to-bottom"
+        onClick={jumpToBottom}
+      />
     </div>
   {/if}
 </div>
@@ -1235,90 +1091,40 @@ $effect(() => {
     font-variant-numeric: tabular-nums;
   }
 
-  .message-nav-overlay {
+  .jump-to-bottom-overlay {
     position: absolute;
-    inset: 0;
-    /* Full-area so the gutter math below resolves against the whole width. */
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    display: flex;
+    justify-content: center;
     pointer-events: none;
     z-index: 30;
   }
 
-  .message-nav {
-    position: absolute;
-    bottom: 12px;
-    /* Sit a fixed distance out from the content column's right edge, into the
-       gutter — a constant offset regardless of pane width, so on very wide panes
-       the arrows stay near the content instead of drifting to the middle of a
-       huge gutter. `--gutter` is the space to the right of the column; `--out` is
-       how far past the content edge to sit. Clamped so at narrow widths (small
-       gutter) the arrows rest flush at the content edge, aligned with the input. */
-    --gutter: max(0px, (100% - var(--file-line-width)) / 2);
-    --out: 16px;
-    --cluster: 20px;
-    right: clamp(2px, calc(var(--gutter) - var(--out)), var(--gutter));
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
-    width: var(--cluster);
-    opacity: 0;
-    transition: opacity 160ms ease;
-    /* Container stays hoverable even when the arrows are faded out, so moving
-       into the corner reveals them. Individual buttons gate interaction via
-       their own visibility. */
+  /* On mobile the scroller is shortened by the portaled composer's height
+     (see `.scroll-container` in Chat.svelte), so lift the button above it. */
+  :global(.is-mobile) .jump-to-bottom-overlay {
+    bottom: calc(var(--s2b-composer-height, 0px) + 8px);
+  }
+
+  .jump-to-bottom-overlay :global(.jump-to-bottom) {
     pointer-events: auto;
-  }
-
-  /* Show while scrolling, when hovering the cluster, or when a nav button has
-     focus. Standalone arrows — no container chrome. */
-  .message-nav-active,
-  .message-nav:hover,
-  .message-nav:focus-within {
-    opacity: 1;
-  }
-
-  /* Fixed slots keep the cluster's height stable so a button never shifts into
-     a neighbour's position when the opposite direction is unavailable. */
-  .message-nav-slot {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: opacity 120ms ease;
-  }
-
-  .message-nav-hidden {
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  /* While faded out the cluster is still hoverable (to reveal it), but its
-     buttons shouldn't register clicks. */
-  .message-nav:not(.message-nav-active):not(:hover):not(:focus-within) :global(button) {
-    pointer-events: none;
-  }
-
-  .message-nav :global(button) {
+    /* Explicit box so the arrow has air inside the ring — core's
+       `.clickable-icon` padding is sized for borderless icons. No `iconSize`
+       on the Button: it would pin width/height inline and swallow this. */
+    padding: 6px;
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-full, 999px);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: var(--shadow-s);
     color: var(--text-muted);
-    /* Override Obsidian's .clickable-icon defaults (padding, min-width, hover
-       box-shadow/background) so the arrows are a tight, chrome-free icon box.
-       The scoped `.message-nav` ancestor plus the element (0,2,1) already
-       out-specifies core's `.clickable-icon` / `.is-mobile .clickable-icon`
-       (0,2,0), and leaves the mobile touch-target rule in styles.css
-       (`body.is-mobile .message-nav button`) able to win on specificity. */
-    background: transparent;
-    box-shadow: none;
-    width: var(--icon-s);
-    height: var(--icon-s);
-    min-width: 0;
-    padding: 2px;
-    box-sizing: content-box;
-    border-radius: 4px;
   }
 
-  .message-nav :global(button:hover) {
+  .jump-to-bottom-overlay :global(.jump-to-bottom:hover) {
+    background: var(--background-modifier-hover);
     color: var(--text-normal);
-    background: transparent;
-    box-shadow: none;
   }
 </style>
