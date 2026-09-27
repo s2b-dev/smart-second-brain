@@ -5,6 +5,7 @@ import ProviderItem from "../../components/settings/ProviderItem.svelte";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
+import Toggle from "../../components/ui/Toggle.svelte";
 import DocsLink from "../../components/ui/DocsLink.svelte";
 import { getData } from "../../stores/dataStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
@@ -62,6 +63,16 @@ function handleOpenProviderSetup() {
     {/snippet}
 
     <Button onClick={() => privacyListModal.open()} buttonText="Manage" />
+  </SettingItem>
+
+  <SettingItem
+    name="Check for updates"
+    desc="Once a day, fetch this plugin's version number from GitHub and show a notice when a newer one is available. Nothing about you or your vault is sent. Skipped while Obsidian's own automatic plugin update check is on."
+  >
+    <Toggle
+      checked={pluginData.checkForUpdates}
+      onchange={(checked) => (pluginData.checkForUpdates = checked)}
+    />
   </SettingItem>
 </SettingGroup>
 

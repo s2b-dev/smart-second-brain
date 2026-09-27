@@ -1,4 +1,15 @@
-import { type EventRef, MarkdownView, Menu, Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import {
+	type EventRef,
+	MarkdownView,
+	Menu,
+	Notice,
+	Plugin,
+	TFile,
+	WorkspaceLeaf,
+	apiVersion,
+	debounce,
+	requestUrl,
+} from "obsidian";
 import { mount, unmount } from "svelte";
 import "./lib/i18n";
 import "./lib/langgraphContext";
@@ -8,6 +19,13 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import {
+	COMMUNITY_PLUGIN_URL,
+	UPDATE_MANIFEST_URL,
+	isUpdateCheckDue,
+	parseRemoteManifest,
+	updateToAnnounce,
+} from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -672,6 +690,13 @@ export default class SecondBrainPlugin extends Plugin {
 				void this.activateOnboardingView();
 			}
 
+			// Update check: a while after startup so it never competes with init, then
+			// hourly re-evaluation for sessions left open for days. Each run only
+			// fetches once the daily interval has passed.
+			const startUpdateCheck = window.setTimeout(() => void this.checkForUpdate(), 30_000);
+			this.register(() => window.clearTimeout(startUpdateCheck));
+			this.registerInterval(window.setInterval(() => void this.checkForUpdate(), 60 * 60 * 1000));
+
 			// Agents whose customized prompt/guidance couldn't be auto-updated after a
 			// default changed are surfaced in the new-chat recommendations view
 			// (ChatRecommendations.svelte reads pluginData.staleGuidance), so no startup
@@ -990,6 +1015,66 @@ export default class SecondBrainPlugin extends Plugin {
 	//
 	// 	workspace.revealLeaf(leaf);
 	// }
+
+	/**
+	 * Fetch the plugin's manifest from GitHub (at most daily, unless disabled in
+	 * settings) and show a notice once per newer version Obsidian would install.
+	 * Failures are silent: offline is normal, and the next run retries.
+	 *
+	 * Steps aside entirely while Obsidian's own "Automatically check for plugin
+	 * updates" (Community plugins, off by default) is on: that already announces
+	 * updates, and a second notice would just be noise.
+	 */
+	private async checkForUpdate() {
+		const data = this.pluginData;
+		if (!data.checkForUpdates || this.obsidianChecksPluginUpdates()) return;
+		if (!isUpdateCheckDue(Date.now(), data.lastUpdateCheckAt)) return;
+		data.lastUpdateCheckAt = Date.now();
+		let remote: ReturnType<typeof parseRemoteManifest>;
+		try {
+			const response = await requestUrl({ url: UPDATE_MANIFEST_URL, throw: false });
+			remote = response.status === 200 ? parseRemoteManifest(response.json) : null;
+		} catch (error) {
+			Log.debug("[UpdateCheck] Could not reach GitHub:", error);
+			return;
+		}
+		if (!remote || !data.checkForUpdates) return;
+		const version = updateToAnnounce(this.manifest.version, apiVersion, remote, data.lastNotifiedUpdateVersion);
+		if (!version) return;
+		data.lastNotifiedUpdateVersion = version;
+		const message = createFragment((frag) => {
+			frag.appendText(`Smart Second Brain ${version} is available. `);
+			const link = frag.createEl("a", { text: "Update", href: "#" });
+			link.addEventListener("click", (event) => {
+				event.preventDefault();
+				this.openCommunityPluginSettings();
+			});
+		});
+		new Notice(message, 15_000);
+	}
+
+	/** Obsidian's own periodic plugin-update check (internal API; false if it ever moves). */
+	private obsidianChecksPluginUpdates(): boolean {
+		const plugins = (this.app as typeof this.app & { plugins?: { autoCheckForUpdates?: unknown } }).plugins;
+		return plugins?.autoCheckForUpdates === true;
+	}
+
+	/**
+	 * Settings → Community plugins, where "Check for updates" and the per-plugin
+	 * Update button live. app.setting is undocumented internal API, so every hop is
+	 * optional; if its shape changes, fall back to the `obsidian://show-plugin` URI.
+	 */
+	private openCommunityPluginSettings() {
+		const setting = (
+			this.app as typeof this.app & { setting?: { open?: () => void; openTabById?: (id: string) => unknown } }
+		).setting;
+		if (setting?.open && setting.openTabById) {
+			setting.open();
+			setting.openTabById("community-plugins");
+		} else {
+			window.open(COMMUNITY_PLUGIN_URL);
+		}
+	}
 
 	async activateOnboardingView() {
 		// Enabling the plugin from Settings → Community plugins fires onLayoutReady

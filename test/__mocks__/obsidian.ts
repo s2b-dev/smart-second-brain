@@ -283,6 +283,9 @@ export interface RequestUrlParam {
 	throw?: boolean;
 }
 
+/** Obsidian's API version (the running app's version). */
+export const apiVersion = "1.11.4";
+
 export const requestUrl = vi.fn(async (_param: RequestUrlParam) => ({
 	status: 200,
 	headers: {} as Record<string, string>,
