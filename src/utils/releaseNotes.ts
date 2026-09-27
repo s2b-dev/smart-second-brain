@@ -6,6 +6,8 @@
 
 export interface ReleaseNotesSection {
 	version: string;
+	/** Release day as `YYYY-MM-DD`, from `## X.Y.Z (YYYY-MM-DD)`; absent until it is known. */
+	date?: string;
 	/** Markdown body under the `## X.Y.Z` heading, trimmed. */
 	body: string;
 }
@@ -13,20 +15,23 @@ export interface ReleaseNotesSection {
 const REPO_URL = "https://github.com/s2b-dev/smart-second-brain";
 export const RELEASES_URL = `${REPO_URL}/releases`;
 
-const VERSION_HEADING = /^## (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\s*$/;
+const VERSION_HEADING = /^## (\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)(?: \((\d{4}-\d{2}-\d{2})\))?\s*$/;
 
-/** Split a changelog into its `## X.Y.Z` sections, in file order (newest first). */
+/** Split a changelog into its `## X.Y.Z (YYYY-MM-DD)` sections, in file order (newest first). */
 export function parseChangelog(markdown: string): ReleaseNotesSection[] {
 	const sections: ReleaseNotesSection[] = [];
-	let current: { version: string; lines: string[] } | null = null;
+	let current: { version: string; date?: string; lines: string[] } | null = null;
 	const flush = () => {
-		if (current) sections.push({ version: current.version, body: current.lines.join("\n").trim() });
+		if (!current) return;
+		const section: ReleaseNotesSection = { version: current.version, body: current.lines.join("\n").trim() };
+		if (current.date) section.date = current.date;
+		sections.push(section);
 	};
 	for (const line of markdown.split(/\r?\n/)) {
 		const match = VERSION_HEADING.exec(line);
 		if (match) {
 			flush();
-			current = { version: match[1], lines: [] };
+			current = { version: match[1], date: match[2], lines: [] };
 		} else if (current) {
 			current.lines.push(line);
 		}
@@ -109,9 +114,31 @@ export function planUpdateAnnouncement(
 	return { sections: due, record: current };
 }
 
-/** Turn `#123` references into links; GitHub redirects issue URLs to PRs. */
+/**
+ * Turn `#123` references into links; GitHub redirects issue URLs to PRs. Code is
+ * left verbatim: fenced blocks and inline code spans are skipped.
+ */
 export function linkifyReferences(markdown: string): string {
-	return markdown.replace(/(^|[\s(,])#(\d+)\b/g, (_, before: string, n: string) => {
+	let inFence = false;
+	return markdown
+		.split("\n")
+		.map((line) => {
+			if (/^\s*(```|~~~)/.test(line)) {
+				inFence = !inFence;
+				return line;
+			}
+			if (inFence) return line;
+			// Odd-indexed parts are inline code spans (the capture group keeps them).
+			return line
+				.split(/(`+[^`]*`+)/)
+				.map((part, index) => (index % 2 === 1 ? part : linkifyText(part)))
+				.join("");
+		})
+		.join("\n");
+}
+
+function linkifyText(text: string): string {
+	return text.replace(/(^|[\s(,])#(\d+)\b/g, (_, before: string, n: string) => {
 		return `${before}[#${n}](${REPO_URL}/issues/${n})`;
 	});
 }

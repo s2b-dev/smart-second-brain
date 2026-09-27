@@ -1,16 +1,17 @@
 # Changelog
 
 User-facing release notes, newest first. This file is the single source for
-them: the plugin bundles it and shows the new sections in a "What's new" modal
+them: the plugin bundles it and shows the new sections in a "What's new" tab
 after an update, and the release workflow copies a version's section into the
 GitHub release body. Write the section before tagging a stable release; the
 workflow refuses a stable tag without one. Pre-releases (`2.3.0-beta.1`) need no
 section.
 
-Each version is a `## X.Y.Z` heading; use `###` and below inside it. PR
-references like `(#505)` become links in the modal.
+Each version is a `## X.Y.Z (YYYY-MM-DD)` heading (the date is the release
+day; leave it off until you know it); use `###` and below inside it. PR
+references like `(#505)` become links in the plugin.
 
-## 2.2.0
+## 2.2.0 (2026-09-18)
 
 Adds widgets: ask the agent for a chart, a table or a dashboard and it draws one in the chat, live from your notes.
 
@@ -22,14 +23,14 @@ Adds widgets: ask the agent for a chart, a table or a dashboard and it draws one
 
 Requires the Dataview plugin for query-backed widgets; without it the agent says so and still renders static ones.
 
-## 2.1.2
+## 2.1.2 (2026-09-15)
 
 Fixes the whole-app stutter while a long reply streams (#482).
 
 ### Chat
 - **Streaming replies render incrementally.** The message used to be torn down and re-parsed on every frame, so a long reply pinned the main thread and the entire app stuttered until it finished. Finished blocks now stay in place and only the block being written is re-rendered. On a 6000-word reply, long tasks dropped from 60 to 2 and the stream itself no longer stalls (#503).
 
-## 2.1.1
+## 2.1.1 (2026-09-14)
 
 Stability release for the Obsidian 1.13 installer (Electron 43) and for long chats: no more renderer crash or connection error on the first send, `.chat` files stop growing by megabytes per turn, and the whole app stays responsive while a reply streams.
 
@@ -52,7 +53,7 @@ Stability release for the Obsidian 1.13 installer (Electron 43) and for long cha
 
 **Thanks** to @RoiArthurB, whose crash dump in #481 pinned the renderer crash to Electron 43's Node 24, to @dingsmart (#478) and @samuelueluel for the Windows and Fedora reports that confirmed it was installer-wide, to @Paxassin for the exact `AbortSignal` error in #472, and to @Direct-Launch for diagnosing and fixing #482 in #483 and #484.
 
-## 2.1.0
+## 2.1.0 (2026-09-11)
 
 Tags are now also respected in the smart graph
 
@@ -64,7 +65,7 @@ Tags are now also respected in the smart graph
 - **Inferred links need an index, and the switch says so.** With no graph embedding index selected (or a selection whose index was removed), the Inferred links and Highlight inferred links toggles are disabled with a hint pointing at the Graph settings. The stored preference is kept, so they come alive as soon as an index is picked. (#475)
 - **Changing the graph index rebuilds the graph.** Picking or clearing the index in settings previously left the old inferred edges on screen, still shaping topics, until an unrelated setting forced a rebuild. It now rebuilds on the spot; switching back to a previously used index is served from cache. (#475)
 
-## 2.0.5
+## 2.0.5 (2026-09-05)
 
 One stylesheet cleanup, no user-facing changes intended.
 
@@ -78,7 +79,7 @@ One stylesheet cleanup, no user-facing changes intended.
 
 Vault enumeration (indexing needs it), clipboard access (the copy-message button), and the declarative settings API (`getSettingDefinitions()`), which is planned separately.
 
-## 2.0.4
+## 2.0.4 (2026-09-05)
 
 Dependency updates and the last round of plugin-review follow-ups. No user-facing changes intended.
 
@@ -95,7 +96,7 @@ Dependency updates and the last round of plugin-review follow-ups. No user-facin
 
 Vault enumeration (indexing needs it) and clipboard access (the copy-message button). The remaining `!important` declarations override theme rules that are themselves `!important`, or raise mobile touch-target sizes.
 
-## 2.0.3
+## 2.0.3 (2026-09-05)
 
 The Obsidian plugin-review pass, and MCP goes HTTP-only. Cleanup and a removal, no new features.
 
@@ -119,7 +120,7 @@ Obsidian's automated review had flagged the plugin. Everything in that report th
 
 Vault enumeration (indexing needs it) and clipboard access (the copy-message button).
 
-## 2.0.2
+## 2.0.2 (2026-09-03)
 
 Two rounds of bug fixes since 2.0.1, plus clearer feedback when connecting a provider.
 
@@ -146,7 +147,7 @@ Two rounds of bug fixes since 2.0.1, plus clearer feedback when connecting a pro
 - Assorted correctness fixes across chat, graph, search, and the vector store found during a
   review pass. (#462)
 
-## 2.0.1
+## 2.0.1 (2026-09-03)
 
 A patch release fixing a skill-editor bug that could destroy a customized skill, plus signed build provenance for the release assets.
 
@@ -173,7 +174,7 @@ A patch release fixing a skill-editor bug that could destroy a customized skill,
 
 No action needed. No settings, vault files, or index formats change, and `minAppVersion` stays at 1.11.4.
 
-## 2.0.0
+## 2.0.0 (2026-09-03)
 
 The first stable release since 1.3.0. Smart Second Brain has grown from a chat-with-your-notes plugin into three features that each work on their own: search, a graph that groups your notes into topics, and an agent that can read and edit your vault with your approval.
 

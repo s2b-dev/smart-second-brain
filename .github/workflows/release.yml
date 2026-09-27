@@ -23,7 +23,7 @@ jobs:
             - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
             # CHANGELOG.md is the single source of release notes: the plugin bundles
-            # it for its "What's new" modal, and its `## <tag>` section becomes the
+            # it for its "What's new" tab, and its `## <tag> (date)` section becomes the
             # release body here. A stable tag without a section fails before the
             # build, since that version would otherwise ship with nothing to show
             # after an update. Pre-release tags (`2.3.0-beta.1`) need none.
@@ -33,7 +33,7 @@ jobs:
                   if [[ "$tag" == *-* ]]; then
                     : > release-notes.md
                   else
-                    awk -v heading="## $tag" '$0 == heading { found = 1; next } /^## / && found { exit } found' CHANGELOG.md > release-notes.md
+                    awk -v heading="## $tag" '$0 == heading || index($0, heading " (") == 1 { found = 1; next } /^## / && found { exit } found' CHANGELOG.md > release-notes.md
                     if ! grep -q '[^[:space:]]' release-notes.md; then
                       echo "::error::CHANGELOG.md has no '## $tag' section; write the release notes there before tagging."
                       exit 1

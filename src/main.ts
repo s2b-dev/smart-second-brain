@@ -42,10 +42,15 @@ import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
 import RunningIndicator from "./components/chat/RunningIndicator.svelte";
-import { BUNDLED_RELEASE_NOTES, ReleaseNotesModal } from "./components/modal/ReleaseNotesModal";
 // DISABLED FOR INITIAL RELEASE — Note Context view; see the registerView block in onload().
 // import { NoteContextView, VIEW_TYPE_NOTE_CONTEXT } from "./views/note-context/NoteContextView";
 import { OnboardingView, VIEW_TYPE_ONBOARDING } from "./views/onboarding/OnboardingView";
+import {
+	BUNDLED_RELEASE_NOTES,
+	ReleaseNotesView,
+	type ReleaseNotesViewState,
+	VIEW_TYPE_RELEASE_NOTES,
+} from "./views/releaseNotes/ReleaseNotesView";
 import { SmartGraphView, VIEW_TYPE_SMART_GRAPH } from "./views/smart-graph/SmartGraphView";
 import SettingsTab from "./views/settings/Settings";
 import { VectorStoreService, waitForVectorStore } from "./vectorstore";
@@ -488,6 +493,7 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
+		this.registerView(VIEW_TYPE_RELEASE_NOTES, (leaf) => new ReleaseNotesView(leaf, this));
 		// `.widget` files: a standalone widget as its own leaf, plus `![[x.widget]]` embeds and
 		// hover previews (see views/widget/). Torn down in onunload with the chat's.
 		this.registerView(VIEW_TYPE_WIDGET, (leaf) => new WidgetView(leaf, this));
@@ -572,7 +578,7 @@ export default class SecondBrainPlugin extends Plugin {
 			id: "show-release-notes",
 			name: "Show release notes",
 			icon: "scroll-text",
-			callback: () => this.showReleaseNotes(),
+			callback: () => void this.showReleaseNotes(),
 		});
 
 		this.addCommand({
@@ -1002,9 +1008,16 @@ export default class SecondBrainPlugin extends Plugin {
 	// 	workspace.revealLeaf(leaf);
 	// }
 
-	/** Open the full bundled changelog (command + Troubleshooting settings). */
-	showReleaseNotes() {
-		new ReleaseNotesModal(this.app, "Release notes", BUNDLED_RELEASE_NOTES).open();
+	/**
+	 * Open (or focus) the "What's new" tab with the `expanded` newest releases open:
+	 * just the latest from the command and settings, every announced one after an update.
+	 */
+	async showReleaseNotes(expanded = 1) {
+		const { workspace } = this.app;
+		const state: ReleaseNotesViewState = { expanded };
+		const leaf = workspace.getLeavesOfType(VIEW_TYPE_RELEASE_NOTES)[0] ?? workspace.getLeaf("tab");
+		await leaf.setViewState({ type: VIEW_TYPE_RELEASE_NOTES, active: true, state });
+		await workspace.revealLeaf(leaf);
 	}
 
 	/**
@@ -1025,12 +1038,7 @@ export default class SecondBrainPlugin extends Plugin {
 			const link = frag.createEl("a", { text: "See what's new", href: "#" });
 			link.addEventListener("click", (event) => {
 				event.preventDefault();
-				new ReleaseNotesModal(
-					this.app,
-					`What's new in Smart Second Brain ${current}`,
-					sections,
-					sections.length,
-				).open();
+				void this.showReleaseNotes(sections.length);
 			});
 		});
 		new Notice(message, 15_000);

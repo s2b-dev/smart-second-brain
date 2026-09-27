@@ -13,7 +13,7 @@ const SAMPLE = `# Changelog
 
 Intro text that belongs to no version.
 
-## 2.3.0
+## 2.3.0 (2026-10-01)
 
 Big release.
 
@@ -37,6 +37,8 @@ describe("parseChangelog", () => {
 	it("splits on version headings and ignores the preamble", () => {
 		expect(sections.map((s) => s.version)).toEqual(["2.3.0", "2.2.0", "2.1.2"]);
 		expect(sections[0].body).toBe("Big release.\n\n### Chat\n- Thing (#12).");
+		expect(sections[0].date).toBe("2026-10-01");
+		expect(sections[1].date).toBeUndefined();
 	});
 
 	it("parses the bundled CHANGELOG.md, newest first, with a section for the manifest version", () => {
@@ -95,5 +97,12 @@ describe("linkifyReferences", () => {
 			"Fixed ([#503](https://github.com/s2b-dev/smart-second-brain/issues/503)), fixes [#478](https://github.com/s2b-dev/smart-second-brain/issues/478), [#481](https://github.com/s2b-dev/smart-second-brain/issues/481).",
 		);
 		expect(linkifyReferences("### Chat\nsee url#12")).toBe("### Chat\nsee url#12");
+	});
+
+	it("leaves code spans and fenced blocks untouched", () => {
+		const code = "Run `gh pr view #12` then:\n```\ngh pr checkout #12\n```\nDone (#7).";
+		expect(linkifyReferences(code)).toBe(
+			"Run `gh pr view #12` then:\n```\ngh pr checkout #12\n```\nDone ([#7](https://github.com/s2b-dev/smart-second-brain/issues/7)).",
+		);
 	});
 });

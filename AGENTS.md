@@ -77,10 +77,10 @@ release" and covers the provider list, bundled skills, built-in tools,
 `BUILT_IN_TOOL_IDS`, `src/skills/defaults/`, or `manifest.json` means the site
 needs updating too.
 
-**Release notes live in `CHANGELOG.md`**, one `## X.Y.Z` section per stable
-release, newest first. It is the single source: the plugin bundles it (`?raw`)
+**Release notes live in `CHANGELOG.md`**, one `## X.Y.Z (YYYY-MM-DD)` section per
+stable release, newest first. It is the single source: the plugin bundles it (`?raw`)
 and, after an update, offers the sections since the last-seen version in a
-"What's new" modal (`utils/releaseNotes.ts`, `components/modal/ReleaseNotesModal.ts`);
+"What's new" tab (`utils/releaseNotes.ts`, `views/releaseNotes/`);
 the release workflow copies the tag's section into the GitHub draft and fails a
 stable tag that has none. Write the section in the release commit, before tagging.
 Pre-releases need no section and never trigger the announcement.

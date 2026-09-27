@@ -74,7 +74,7 @@ async function handleCleanupPluginData() {
     name="Release notes"
     desc={`You are on version ${plugin.manifest.version}. See what changed in recent releases.`}
   >
-    <Button buttonText="Show release notes" onClick={() => plugin.showReleaseNotes()} />
+    <Button buttonText="Show release notes" onClick={() => void plugin.showReleaseNotes()} />
   </SettingItem>
 
   <!-- Docs first, GitHub as the escalation path: the troubleshooting guide is
