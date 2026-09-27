@@ -251,13 +251,15 @@ function portalComposer(node: HTMLElement) {
 			void getComputedStyle(el).transform;
 			el.style.transition = KEYBOARD_SLIDE;
 			el.style.transform = "";
-			el.addEventListener(
-				"transitionend",
-				() => {
-					el.style.transition = "";
-				},
-				{ once: true },
-			);
+			// Children's transitions (the input card's border colour changes on
+			// focus, mid-slide) bubble here too; only the composer's own transform
+			// ends the slide.
+			const finishSlide = (event: TransitionEvent) => {
+				if (event.target !== el || event.propertyName !== "transform") return;
+				el.style.transition = "";
+				el.removeEventListener("transitionend", finishSlide);
+			};
+			el.addEventListener("transitionend", finishSlide);
 		});
 		keyboardObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
 	};

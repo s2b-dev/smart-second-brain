@@ -304,7 +304,27 @@ $effect(() => {
 	);
 	turnObserver = observer;
 	for (const node of turnNodes) observer.observe(node);
+
+	// A hidden turn can't reflow, so its locked height goes stale when the
+	// column's width changes (rotation, resizing a split). Release every lock and
+	// re-observe: `observe` reports each turn's state afresh, so the still
+	// off-screen ones are re-measured at the new width. Height changes (the
+	// keyboard) are deliberately ignored — they don't reflow turns, and
+	// releasing everything then would bring back the restyle cost this avoids.
+	let lastWidth = scrollContainer.clientWidth;
+	const widthObserver = new ResizeObserver(() => {
+		const width = scrollContainer?.clientWidth ?? lastWidth;
+		if (width === lastWidth) return;
+		lastWidth = width;
+		for (const node of turnNodes) {
+			setTurnOffscreen(node, false);
+			observer.unobserve(node);
+			observer.observe(node);
+		}
+	});
+	widthObserver.observe(scrollContainer);
 	return () => {
+		widthObserver.disconnect();
 		observer.disconnect();
 		turnObserver = null;
 		for (const node of turnNodes) setTurnOffscreen(node, false);
