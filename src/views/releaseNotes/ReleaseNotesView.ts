@@ -1,4 +1,4 @@
-import { MarkdownRenderer, type ViewStateResult } from "obsidian";
+import { Component, MarkdownRenderer, type ViewStateResult } from "obsidian";
 import changelog from "../../../CHANGELOG.md?raw";
 import { type ReleaseNotesSection, parseChangelog } from "../../utils/releaseNotes";
 import { SvelteItemView } from "../SvelteItemView";
@@ -22,6 +22,8 @@ export class ReleaseNotesView extends SvelteItemView {
 	// Main-area view: lets Escape and back/forward treat it like a note tab.
 	navigation = true;
 	private expanded = 1;
+	/** Owns the current render's markdown children; replaced (and unloaded) on re-render. */
+	private renderOwner: Component | null = null;
 
 	getViewType(): string {
 		return VIEW_TYPE_RELEASE_NOTES;
@@ -52,14 +54,16 @@ export class ReleaseNotesView extends SvelteItemView {
 	}
 
 	private render() {
+		if (this.renderOwner) this.removeChild(this.renderOwner);
+		const owner = this.addChild(new Component());
+		this.renderOwner = owner;
 		this.mountComponent(
 			ReleaseNotes,
 			{
 				sections: BUNDLED_RELEASE_NOTES,
 				expanded: this.expanded,
-				// The view owns every render child, so they are unloaded with the tab.
 				renderMarkdown: (markdown: string, el: HTMLElement) =>
-					void MarkdownRenderer.render(this.app, markdown, el, "", this),
+					void MarkdownRenderer.render(this.app, markdown, el, "", owner),
 			},
 			{ containerClass: "s2b-release-notes-container", testId: "release-notes-view" },
 		);

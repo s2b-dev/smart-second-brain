@@ -33,7 +33,11 @@ jobs:
                   if [[ "$tag" == *-* ]]; then
                     : > release-notes.md
                   else
-                    awk -v heading="## $tag" '$0 == heading || index($0, heading " (") == 1 { found = 1; next } /^## / && found { exit } found' CHANGELOG.md > release-notes.md
+                    # Same heading shape the plugin's parser accepts (utils/releaseNotes.ts), so a
+                    # mistyped date fails here instead of shipping notes the plugin can't find.
+                    # ENVIRON, not -v: awk -v would eat the regex's backslashes.
+                    pattern="^## ${tag//./\\.}( \\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\\))?[[:space:]]*\$" \
+                      awk '$0 ~ ENVIRON["pattern"] { found = 1; next } /^## / && found { exit } found' CHANGELOG.md > release-notes.md
                     if ! grep -q '[^[:space:]]' release-notes.md; then
                       echo "::error::CHANGELOG.md has no '## $tag' section; write the release notes there before tagging."
                       exit 1
