@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Notice, type TFolder } from "obsidian";
+import { Notice, Platform, type TFolder } from "obsidian";
 import { AgentEditorModal } from "../../components/modal/AgentEditorModal";
 import FolderSuggest from "../../components/modal/FolderSuggest.svelte";
 import ManagedEntityItem from "../../components/settings/ManagedEntityItem.svelte";
@@ -11,16 +11,24 @@ import Button from "../../components/ui/Button.svelte";
 import { confirmDelete } from "../../components/modal/ConfirmModal";
 import Dropdown from "../../components/ui/Dropdown.svelte";
 import Icon from "../../components/ui/Icon.svelte";
+import Text from "../../components/ui/Text.svelte";
 import Toggle from "../../components/ui/Toggle.svelte";
 import { getProviderDefinition } from "../../providers/index";
 import { getData } from "../../stores/dataStore.svelte";
+import { VOICE_OPTIONS } from "../../stores/voiceDefaults";
 import { DEFAULT_AGENT_ID } from "../../stores/agentDefaults";
 import { getPlugin } from "../../stores/state.svelte";
-import { DEFAULT_AGENT_ICON, type ChatOpenLocation } from "../../types/plugin";
+import { DEFAULT_AGENT_ICON, type ChatOpenLocation, type VoiceTurnDetection } from "../../types/plugin";
 import { isMobileUI } from "../../utils/platform";
 
 const pluginData = getData();
 const plugin = getPlugin();
+
+const voiceOptions = VOICE_OPTIONS.map((v) => ({ display: v, value: v }));
+const turnDetectionOptions: { display: string; value: VoiceTurnDetection }[] = [
+	{ display: "Semantic (waits for a finished thought)", value: "semantic_vad" },
+	{ display: "Server VAD (cuts in on silence)", value: "server_vad" },
+];
 
 const chatOpenLocationOptions: { display: string; value: ChatOpenLocation }[] = [
 	{ display: "Main area (tab)", value: "tab" },
@@ -285,6 +293,46 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
       />
     </SettingItem>
   </SettingGroup>
+
+  {#if Platform.isDesktopApp}
+    <SettingGroup
+      heading="Voice (experimental)"
+      headingDesc="Talk to your agent through OpenAI's realtime speech model. It handles the conversation itself and hands anything about your notes to the regular agent in the open chat."
+    >
+      <SettingItem
+        name="Enable voice mode"
+        desc="Adds a microphone button to the chat composer. Uses your OpenAI provider's API key; audio is streamed to OpenAI and billed per audio minute. Headphones recommended — without them the model can hear itself."
+      >
+        <Toggle checked={pluginData.voice.enabled} onchange={(checked) => pluginData.setVoice({ enabled: checked })} />
+      </SettingItem>
+      {#if pluginData.voice.enabled}
+        <SettingItem name="Realtime model" desc="OpenAI realtime model id.">
+          <Text
+            inputType="text"
+            placeholder="gpt-realtime"
+            value={pluginData.voice.model}
+            onblur={(value) => pluginData.setVoice({ model: value.trim() || "gpt-realtime" })}
+          />
+        </SettingItem>
+        <SettingItem name="Voice" desc="Voice preset for spoken replies.">
+          <Dropdown
+            type="options"
+            dropdown={voiceOptions}
+            selected={pluginData.voice.voice}
+            onchange={(value) => pluginData.setVoice({ voice: value })}
+          />
+        </SettingItem>
+        <SettingItem name="Turn detection" desc="How the model decides you have finished speaking.">
+          <Dropdown
+            type="options"
+            dropdown={turnDetectionOptions}
+            selected={pluginData.voice.turnDetection}
+            onchange={(value) => pluginData.setVoice({ turnDetection: value })}
+          />
+        </SettingItem>
+      {/if}
+    </SettingGroup>
+  {/if}
 </div>
 
 <style>

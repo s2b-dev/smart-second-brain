@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "../__mocks__/obsidian";
 import { CURRENT_SCHEMA_VERSION, runMigrations } from "../../src/stores/dataMigrations";
+import { DEFAULT_VOICE_SETTINGS } from "../../src/stores/voiceDefaults";
 import type { PluginData } from "../../src/types/plugin";
 
 describe("dataMigrations", () => {
@@ -49,5 +50,27 @@ describe("dataMigrations", () => {
 		expect(data.agents.a2.toolsConfig.manage_skills.enabled).toBe(true);
 		expect(data.agents.a3.toolsConfig.manage_skills).toBeUndefined();
 		expect(data.agents.a4.toolsConfig).toBeUndefined();
+	});
+
+	it("v14 → v15 seeds the voice settings block and fills keys a stored one lacks", () => {
+		const fresh = { schemaVersion: 14, agents: {} } as unknown as PluginData;
+		runMigrations(fresh);
+		expect(fresh.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+		expect(fresh.voice).toEqual(DEFAULT_VOICE_SETTINGS);
+		expect(fresh.voice).not.toBe(DEFAULT_VOICE_SETTINGS);
+
+		const partial = {
+			schemaVersion: 14,
+			agents: {},
+			voice: { enabled: true, model: "gpt-realtime-mini", voice: "cedar", turnDetection: "server_vad" },
+		} as unknown as PluginData;
+		runMigrations(partial);
+		expect(partial.voice).toEqual({
+			enabled: true,
+			model: "gpt-realtime-mini",
+			voice: "cedar",
+			turnDetection: "server_vad",
+			orbStyle: DEFAULT_VOICE_SETTINGS.orbStyle,
+		});
 	});
 });

@@ -68,6 +68,31 @@ interface ChatSessionOptions {
 	onThreadIdChange?: (oldPath: string, newPath: string) => void;
 }
 
+/**
+ * Terminal outcome of one chat turn, as observed by `ChatSession.sendMessageAndAwait`.
+ * `content` is the final assistant text (checkpoint-derived on success, whatever had
+ * streamed on cancel/error).
+ */
+export interface SettledTurn {
+	state: AssistantState;
+	content: string;
+	errorCode?: string;
+}
+
+/**
+ * A tool starting inside a running turn, with the model's own lead-in sentence when
+ * it wrote one. Voice mode narrates these so the user hears what the agent is doing.
+ */
+export interface TurnProgress {
+	toolName: string;
+	preamble?: string;
+	/** The tool's input as the model produced it; summarised for spoken progress. */
+	input?: unknown;
+}
+
+/** How many settled outcomes to keep for pairs nobody awaited before dropping the oldest. */
+const MAX_UNCLAIMED_TURN_RESULTS = 16;
+
 export class ChatSession {
 	id = $state<string>("");
 	messages: MessagePair[] = $state<MessagePair[]>([]);
@@ -78,6 +103,14 @@ export class ChatSession {
 
 	// Streaming / lifecycle
 	private abortController: AbortController | null = null;
+	/**
+	 * Settled outcomes keyed by the pre-run pair id `sendMessage` returned. Recorded in
+	 * `runStream`'s `finally` because the pair object itself is re-minted after a
+	 * successful run (`syncGraphAfterRun`), so a caller holding the original id could
+	 * not read the state off it afterwards.
+	 */
+	private turnResults = new Map<UUIDv7, SettledTurn>();
+	private progressListeners = new Set<(progress: TurnProgress) => void>();
 	private cancelled = false;
 	// Reactive mirror of "a stream is in flight". `abortController` is an
 	// imperative handle (not $state), so UI that reacts to running state — the
@@ -276,18 +309,26 @@ export class ChatSession {
 	}
 
 	/**
-	 * Send a user message:
-	 *  - Create MessagePair with idle assistant
-	 *  - Kick off streaming process
+	 * Push a fresh user/assistant pair and kick off the assistant run. Shared by the
+	 * fire-and-forget `sendMessage` and the awaiting `sendMessageAndAwait`; the run
+	 * promise is handed back so the awaiting variant can observe the same chain.
 	 */
-	async sendMessage(
+	private startTurn(
 		content: string,
 		attachments?: ChatAttachment[],
 		visibleNotes?: VisibleNoteRef[],
 		selection?: SelectionRef,
 		graphNotes?: GraphNoteRef[],
-	): Promise<UUIDv7> {
+	): { pairId: UUIDv7; run: Promise<void> } {
 		const pairId = genUUIDv7();
+
+		// Refuse before the pair exists: `runStream` would reject the overlap anyway, but
+		// by then the idle pair is already in `messages` with nothing to settle it — a
+		// phantom turn that never reaches the checkpoint graph. The composer disables
+		// Send while a reply runs, so this only bites callers like voice mode.
+		if (this.abortController) {
+			return { pairId, run: Promise.reject(new Error("A response is already in progress for this chat.")) };
+		}
 
 		// Capture the current model at send time
 		const selectedAgent = getData().getSelectedAgent();
@@ -310,9 +351,81 @@ export class ChatSession {
 		this.messages.push(pair);
 
 		// Stream assistant reply (pass attachments and visible notes so they reach the agent)
-		void this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
+		const run = this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
+		return { pairId, run };
+	}
 
+	/**
+	 * Send a user message:
+	 *  - Create MessagePair with idle assistant
+	 *  - Kick off streaming process (fire-and-forget)
+	 */
+	async sendMessage(
+		content: string,
+		attachments?: ChatAttachment[],
+		visibleNotes?: VisibleNoteRef[],
+		selection?: SelectionRef,
+		graphNotes?: GraphNoteRef[],
+	): Promise<UUIDv7> {
+		const { pairId, run } = this.startTurn(content, attachments, visibleNotes, selection, graphNotes);
+		void run.catch((err) => Logger.error("[ChatSession] Send failed:", err));
 		return pairId;
+	}
+
+	/**
+	 * `sendMessage`, but resolved only once the turn has settled, with its terminal
+	 * state and final assistant text. Never rejects: a synchronous refusal (e.g. a
+	 * response already in progress) comes back as an `error` outcome so a caller that
+	 * relays the result elsewhere — the voice bridge hands it to the speech model —
+	 * always has something to say.
+	 */
+	async sendMessageAndAwait(
+		content: string,
+		attachments?: ChatAttachment[],
+		visibleNotes?: VisibleNoteRef[],
+		selection?: SelectionRef,
+		graphNotes?: GraphNoteRef[],
+	): Promise<SettledTurn> {
+		const { pairId, run } = this.startTurn(content, attachments, visibleNotes, selection, graphNotes);
+		try {
+			await run;
+		} catch (err) {
+			this.turnResults.delete(pairId);
+			return { state: AssistantState.error, content: "", errorCode: extractErrorMessage(err) };
+		}
+		const result = this.turnResults.get(pairId);
+		this.turnResults.delete(pairId);
+		return result ?? { state: AssistantState.error, content: "", errorCode: "The turn produced no result." };
+	}
+
+	/** Observe tool starts of whatever turn is running on this session. Returns the unsubscribe. */
+	subscribeTurnProgress(listener: (progress: TurnProgress) => void): () => void {
+		this.progressListeners.add(listener);
+		return () => this.progressListeners.delete(listener);
+	}
+
+	private notifyTurnProgress(progress: TurnProgress): void {
+		for (const listener of this.progressListeners) {
+			try {
+				listener(progress);
+			} catch (err) {
+				Logger.warn("[ChatSession] Turn progress listener threw:", err);
+			}
+		}
+	}
+
+	private recordTurnResult(pairId: UUIDv7, source: MessagePair): void {
+		this.turnResults.set(pairId, {
+			state: source.assistantMessage.state,
+			content: source.assistantMessage.content,
+			errorCode: source.assistantMessage.errorCode,
+		});
+		// Fire-and-forget callers never claim their entry; keep the map bounded.
+		while (this.turnResults.size > MAX_UNCLAIMED_TURN_RESULTS) {
+			const oldest = this.turnResults.keys().next().value;
+			if (oldest === undefined) break;
+			this.turnResults.delete(oldest);
+		}
 	}
 
 	/** Abort current streaming (if any) */
@@ -753,6 +866,7 @@ export class ChatSession {
 			if (settledPair) {
 				settledPair.assistantMessage.runStartedAtMs = undefined;
 			}
+			this.recordTurnResult(pairId, settledPair ?? pair);
 			this.abortController = null;
 			this.running = false;
 			this.cancelled = false;
@@ -1033,6 +1147,12 @@ export class ChatSession {
 				const pendingPreamble = (chunk.preamble ?? "").trim();
 				const pendingHasNewPreamble = !!pendingPreamble && !emittedStreamPreambles.has(pendingPreamble);
 				if (pendingHasNewPreamble) emittedStreamPreambles.add(pendingPreamble);
+				// Progress listeners (voice) want the preamble the moment it is first seen,
+				// which is here whenever the provider streams tool-call deltas; the matching
+				// tool_start below then finds it already emitted and stays quiet.
+				if (pendingHasNewPreamble) {
+					this.notifyTurnProgress({ toolName: chunk.toolName, preamble: pendingPreamble });
+				}
 				tokenBuffer = "";
 				assistantMsg.content = "";
 				assistantMsg.contentAiMessageId = undefined;
@@ -1091,6 +1211,15 @@ export class ChatSession {
 				const preambleTrimmed = preamble.trim();
 				const isFirstWithPreamble = !!preambleTrimmed && !emittedStreamPreambles.has(preambleTrimmed);
 				if (isFirstWithPreamble) emittedStreamPreambles.add(preambleTrimmed);
+				// Only when no tool_pending announced this preamble first (providers that do
+				// not stream tool-call deltas); otherwise the pending branch already told them.
+				if (isFirstWithPreamble) {
+					this.notifyTurnProgress({
+						toolName: chunk.toolName,
+						preamble: preambleTrimmed,
+						input: chunk.input,
+					});
+				}
 				tokenBuffer = "";
 				assistantMsg.content = "";
 				assistantMsg.contentAiMessageId = undefined;
@@ -1462,6 +1591,19 @@ export class SessionRegistry {
 				this.rekeySession(oldPath, newPath);
 			},
 		};
+	}
+
+	/**
+	 * A `.chat` file was renamed in the vault — by auto-title, the file menu, or the
+	 * user dragging it. Keep the live session findable under its new path and let the
+	 * session know its id, so anything resolving by path (the view, voice mode) keeps
+	 * working. Idempotent with the auto-title path, which re-keys itself as well.
+	 */
+	handleFileRenamed(oldPath: string, newPath: string): void {
+		const session = this.sessions.get(oldPath);
+		if (!session || oldPath === newPath) return;
+		session.id = newPath;
+		this.rekeySession(oldPath, newPath);
 	}
 
 	/** Rekey a session in the map after its thread path changes (title rename).

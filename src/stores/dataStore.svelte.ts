@@ -12,6 +12,7 @@ import { sanitizeAgentFileName } from "../utils/agentPaths";
 import { installAgentPathSource } from "../utils/agentPathSource";
 import { DEFAULT_AGENT_ID, createDefaultAgent, createDefaultAgentConfig, normalizeAgents } from "./agentDefaults";
 import { CURRENT_SCHEMA_VERSION, runMigrations } from "./dataMigrations";
+import { DEFAULT_VOICE_SETTINGS } from "./voiceDefaults";
 import { computeStaleGuidance } from "./staleGuidance";
 import type SecondBrainPlugin from "../main";
 import type {
@@ -33,7 +34,7 @@ import type {
 	StaleGuidance,
 	ToolConfig,
 } from "../types/plugin";
-import { RECENT_NOTE_WINDOW_MS } from "../types/plugin";
+import { RECENT_NOTE_WINDOW_MS, type VoiceSettings } from "../types/plugin";
 import { getDefaultEmbeddingBatchSize, normalizeEmbeddingBatchSize } from "../vectorstore/batchSize";
 import { type UUIDv7, genUUIDv7 } from "../utils/uuid7Validator";
 
@@ -236,6 +237,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	thinkingProcessExpanded: true,
 	showActiveAgentsInStatusBar: true,
 	overrideMobileNavbarSearch: false,
+	voice: structuredClone(DEFAULT_VOICE_SETTINGS),
 	suppressIntegrationPrivacyWarning: false,
 
 	// Debugging & telemetry
@@ -1208,6 +1210,15 @@ export class PluginDataStore {
 	}
 	set overrideMobileNavbarSearch(val: boolean) {
 		this.#data.overrideMobileNavbarSearch = val;
+		void this.saveSettings();
+	}
+
+	get voice(): VoiceSettings {
+		return this.#data.voice;
+	}
+	/** Patch the voice settings in place (keeps the object reactive) and persist. */
+	setVoice(patch: Partial<VoiceSettings>) {
+		Object.assign(this.#data.voice, patch);
 		void this.saveSettings();
 	}
 
