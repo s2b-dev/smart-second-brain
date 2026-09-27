@@ -20,6 +20,9 @@ OBSIDIAN_JSON="$HOME/Library/Application Support/obsidian/obsidian.json"
 
 mkdir -p "$AGENTS_DIR/.locks"
 
+# New slots start from the latest main; fetch once so origin/main is current.
+git -C "$REPO_ROOT" fetch --quiet origin main
+
 for slot in "${SLOTS[@]}"; do
   worktree="$AGENTS_DIR/$slot"
   vault_name="S2B ${slot/wt/WT}"
@@ -29,9 +32,11 @@ for slot in "${SLOTS[@]}"; do
   echo "=== Slot $slot ==="
 
   # 1. Worktree (detached so slots never fight over branch checkouts;
-  #    agents create their own task branches inside).
+  #    agents create their own task branches inside). Prune first so a slot
+  #    whose directory was deleted by hand can be recreated.
   if [[ ! -d "$worktree" ]]; then
-    git -C "$REPO_ROOT" worktree add --detach "$worktree" dev
+    git -C "$REPO_ROOT" worktree prune
+    git -C "$REPO_ROOT" worktree add --detach "$worktree" origin/main
   else
     echo "worktree exists: $worktree"
   fi

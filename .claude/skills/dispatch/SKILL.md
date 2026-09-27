@@ -76,7 +76,7 @@ For each task Leo gives:
   (`gh pr view <n> --json comments,reviews,statusCheckRollup` +
   `gh api repos/s2b-dev/smart-second-brain/pulls/<n>/comments`). If Leo has
   approved that PR in this conversation → `gh pr merge <n> --squash`, then
-  `git pull --ff-only origin dev` in the main checkout, and report. If not
+  `git pull --ff-only origin main` in the main checkout, and report. If not
   yet approved → tell Leo it's ready for his live test.
 - **"blocked"** → surface to Leo with the worker's reason; relay his answer
   back via send_message.
