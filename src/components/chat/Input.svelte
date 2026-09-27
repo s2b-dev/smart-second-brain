@@ -297,7 +297,7 @@ let seededEditPaths = new Set<string>();
 let seedEditToken = 0;
 
 /** Width of a PDF thumbnail in CSS px: the desktop tile size. */
-const PDF_THUMBNAIL_WIDTH = 80;
+const PDF_THUMBNAIL_WIDTH = 120;
 
 function hasPreview(mimeType: string): boolean {
 	return mimeType.startsWith("image/") || mimeType === "application/pdf";

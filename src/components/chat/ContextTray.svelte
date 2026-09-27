@@ -437,10 +437,10 @@ onDestroy(() => {
 
 <style>
   /* `flex-basis: 100%` puts the tiles on a row of their own above the chips;
-     the tray itself is a wrapping row. Tiles are 80px on desktop, 56px on a
+     the tray itself is a wrapping row. Tiles are 120px on desktop, 56px on a
      phone where the composer is narrow. */
   .attachment-tiles {
-    --s2b-tile-size: 80px;
+    --s2b-tile-size: 120px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
