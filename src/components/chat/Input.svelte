@@ -15,6 +15,7 @@ import type { VisibleNote, VisibleNoteRef } from "../../hooks/useVisibleNotes.sv
 import type { SelectionRef } from "../../hooks/useSelection.svelte";
 import type { GraphNoteRef } from "../../stores/chatTimeline";
 import { mimeFromExtension } from "../../utils/attachments";
+import { renderPdfThumbnail } from "../../utils/pdfExtractor";
 import { extractObsidianDraggedPaths, hasObsidianFileDrag } from "../../utils/obsidianDrag";
 import { getData } from "../../stores/dataStore.svelte";
 import AgentPopover from "./AgentPopover.svelte";
@@ -279,6 +280,38 @@ let seededEditPaths = new Set<string>();
  * idiom as `assembledPromptRequestVersion` above. */
 let seedEditToken = 0;
 
+/** Width of a PDF thumbnail in CSS px: the desktop tile size. */
+const PDF_THUMBNAIL_WIDTH = 80;
+
+function hasPreview(mimeType: string): boolean {
+	return mimeType.startsWith("image/") || mimeType === "application/pdf";
+}
+
+/** Object URL for an attachment's composer tile: the image itself, or page 1 of
+ * a PDF. Undefined when a PDF won't render — the tile falls back to a file card. */
+async function createPreviewUrl(buffer: ArrayBuffer, mimeType: string): Promise<string | undefined> {
+	if (mimeType.startsWith("image/")) return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+	try {
+		// pdfjs transfers the buffer to its worker, so hand it a copy.
+		const width = Math.round(PDF_THUMBNAIL_WIDTH * window.devicePixelRatio);
+		return URL.createObjectURL(await renderPdfThumbnail(new Uint8Array(buffer.slice(0)), width));
+	} catch {
+		return undefined;
+	}
+}
+
+/** Store a preview URL, unless its attachment was removed while the preview was
+ * being made (nothing would be left to revoke it). */
+function publishPreview(vaultPath: string, url: string | undefined): void {
+	if (!url) return;
+	if (!attachments.some((a) => a.vaultPath === vaultPath)) {
+		URL.revokeObjectURL(url);
+		return;
+	}
+	previewUrls.set(vaultPath, url);
+	previewUrls = new Map(previewUrls);
+}
+
 /** Seed the edited message's attachments into the composer tray so they are
  * visible and removable during the edit — previously they rode along
  * invisibly, and anything the user attached during the edit was silently
@@ -301,17 +334,19 @@ async function seedEditAttachments(restored: ChatAttachment[]) {
 		attachmentSizes.set(att.vaultPath, file.stat.size);
 		attachmentSizes = new Map(attachmentSizes);
 		seededEditPaths.add(att.vaultPath);
-		if (att.mimeType.startsWith("image/")) {
+		if (hasPreview(att.mimeType)) {
 			try {
-				const buffer = await plugin.app.vault.readBinary(file);
+				const url = await createPreviewUrl(await plugin.app.vault.readBinary(file), att.mimeType);
 				// Re-check before publishing: the URL would leak (nothing left to
-				// revoke it) and the map write would resurrect a removed chip's
+				// revoke it) and the map write would resurrect a removed tile's
 				// preview if the edit ended during the read.
-				if (token !== seedEditToken) return;
-				previewUrls.set(att.vaultPath, URL.createObjectURL(new Blob([buffer], { type: att.mimeType })));
-				previewUrls = new Map(previewUrls);
+				if (token !== seedEditToken) {
+					if (url) URL.revokeObjectURL(url);
+					return;
+				}
+				publishPreview(att.vaultPath, url);
 			} catch {
-				// preview only — the chip still renders without it
+				// preview only — the tile still renders as a file card without it
 			}
 		}
 	}
@@ -828,12 +863,7 @@ async function processFiles(files: File[]) {
 			managedAttachmentPaths = new Set(managedAttachmentPaths);
 			count++;
 
-			// Create preview URL for images
-			if (mime.startsWith("image/")) {
-				const blob = new Blob([buffer], { type: mime });
-				previewUrls.set(vaultPath, URL.createObjectURL(blob));
-				previewUrls = new Map(previewUrls);
-			}
+			if (hasPreview(mime)) publishPreview(vaultPath, await createPreviewUrl(buffer, mime));
 		}
 	} catch (error) {
 		new Notice(`Failed to attach file: ${error instanceof Error ? error.message : String(error)}`);
@@ -889,11 +919,8 @@ async function attachVaultFile(file: TFile): Promise<boolean> {
 		attachmentSizes.set(file.path, size);
 		attachmentSizes = new Map(attachmentSizes);
 
-		if (mime.startsWith("image/")) {
-			const buffer = await getPlugin().app.vault.readBinary(file);
-			const blob = new Blob([buffer], { type: mime });
-			previewUrls.set(file.path, URL.createObjectURL(blob));
-			previewUrls = new Map(previewUrls);
+		if (hasPreview(mime)) {
+			publishPreview(file.path, await createPreviewUrl(await getPlugin().app.vault.readBinary(file), mime));
 		}
 
 		return true;
