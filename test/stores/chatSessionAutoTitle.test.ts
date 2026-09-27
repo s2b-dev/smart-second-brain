@@ -5,7 +5,7 @@ import { setPlugin } from "../../src/stores/state.svelte";
 import { AssistantState, buildCheckpointGraph, type CheckpointGraphState } from "../../src/stores/chatTimeline";
 import type { CheckpointHistoryItem } from "../../src/agent/Agent";
 import type SecondBrainPlugin from "../../src/main";
-import { isDefaultChatTitle } from "../../src/utils/chatTitle";
+import { FAILED_CHAT_TITLE, isDefaultChatTitle, needsChatTitle } from "../../src/utils/chatTitle";
 
 /* --------------------------------------------------------------------------
  * ChatSession — auto-title after the first SUCCESSFUL turn.
@@ -63,6 +63,7 @@ type RunStreamInternals = {
 };
 
 const generateTitle = vi.fn();
+const renameThread = vi.fn();
 
 function makeSession(
 	threadId: string,
@@ -99,9 +100,11 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		vi.spyOn(console, "error").mockImplementation(() => {});
 		vi.spyOn(console, "warn").mockImplementation(() => {});
 		generateTitle.mockResolvedValue("Chats/Watering Ferns.chat");
+		renameThread.mockImplementation(async (_threadId: string, title: string) => `Chats/${title}.chat`);
 		setPlugin({
 			agentManager: {
 				generateThreadTitleFromUserMessage: generateTitle,
+				renameThread,
 				regenerateFromCheckpoint: vi.fn(),
 				annotateThinkingDuration: vi.fn().mockResolvedValue(undefined),
 				maybeRunPostTurnReview: vi.fn().mockResolvedValue(undefined),
@@ -133,10 +136,12 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		const failed = session.messages.at(-1)!;
 		expect(failed.assistantMessage.state).toBe(AssistantState.error);
 
+		expect(String(session.id)).toBe("Chats/New Chat (failed).chat");
+
 		// The retry goes through the regenerate path, which never passed a title before.
 		await session.retryLastError(failed.id);
 
-		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat.chat", "", "how do I water ferns");
+		expect(generateTitle).toHaveBeenCalledWith("Chats/New Chat (failed).chat", "", "how do I water ferns");
 		expect(String(session.id)).toBe("Chats/Watering Ferns.chat");
 	});
 
@@ -165,26 +170,70 @@ describe("ChatSession — auto-title after the first successful turn", () => {
 		expect(generateTitle).not.toHaveBeenCalled();
 	});
 
-	it("does not title when the turn itself fails", async () => {
-		const { session, internals } = makeSession("Chats/New Chat.chat");
+	it("moves a placeholder chat to 'New Chat (failed)' when its turn fails, freeing the name", async () => {
+		const onThreadIdChange = vi.fn();
+		const { session, internals } = makeSession("Chats/New Chat.chat", { onThreadIdChange });
 		internals.consumeStream = vi.fn().mockRejectedValue(new Error("model refused"));
 
 		await run(session, internals);
 
 		expect(generateTitle).not.toHaveBeenCalled();
+		expect(renameThread).toHaveBeenCalledWith("Chats/New Chat.chat", FAILED_CHAT_TITLE);
+		expect(String(session.id)).toBe("Chats/New Chat (failed).chat");
+		expect(onThreadIdChange).toHaveBeenCalledWith("Chats/New Chat.chat", "Chats/New Chat (failed).chat");
+		expect(session.messages.at(-1)?.assistantMessage.state).toBe(AssistantState.error);
+	});
+
+	it("does not re-mark an already failed chat, nor mark a titled one", async () => {
+		for (const threadId of ["Chats/New Chat (failed).chat", "Chats/Watering Ferns.chat"]) {
+			const { session, internals } = makeSession(threadId);
+			internals.consumeStream = vi.fn().mockRejectedValue(new Error("model refused"));
+
+			await run(session, internals);
+
+			expect(String(session.id)).toBe(threadId);
+		}
+		expect(renameThread).not.toHaveBeenCalled();
+	});
+
+	it("does not mark a chat failed when the user stopped the turn", async () => {
+		const { session, internals } = makeSession("Chats/New Chat.chat");
+		internals.consumeStream = vi.fn().mockImplementation(async () => {
+			(session as unknown as { cancelled: boolean }).cancelled = true;
+			throw new Error("aborted");
+		});
+
+		await run(session, internals);
+
+		expect(renameThread).not.toHaveBeenCalled();
+	});
+
+	it("keeps the error visible when the failed-marker rename itself throws", async () => {
+		renameThread.mockRejectedValue(new Error("rename failed"));
+		const { session, internals } = makeSession("Chats/New Chat.chat");
+		internals.consumeStream = vi.fn().mockRejectedValue(new Error("model refused"));
+
+		await run(session, internals);
+
 		expect(String(session.id)).toBe("Chats/New Chat.chat");
+		expect(session.messages.at(-1)?.assistantMessage.errorCode).toContain("model refused");
+		expect(session.isRunning).toBe(false);
 	});
 });
 
-describe("isDefaultChatTitle", () => {
+describe("placeholder title matchers", () => {
 	it.each([
-		["Chats/New Chat.chat", true],
-		["Chats/New Chat (2).chat", true],
-		["New Chat", true],
-		["Chats/New Chat about ferns.chat", false],
-		["Chats/New Chat (x).chat", false],
-		["Chats/Watering Ferns.chat", false],
-	])("%s → %s", (path, expected) => {
-		expect(isDefaultChatTitle(path)).toBe(expected);
+		// path, isDefaultChatTitle (reusable placeholder), needsChatTitle
+		["Chats/New Chat.chat", true, true],
+		["Chats/New Chat (2).chat", true, true],
+		["New Chat", true, true],
+		["Chats/New Chat (failed).chat", false, true],
+		["Chats/New Chat (failed) (2).chat", false, true],
+		["Chats/New Chat about ferns.chat", false, false],
+		["Chats/New Chat (x).chat", false, false],
+		["Chats/Watering Ferns.chat", false, false],
+	])("%s → default %s, needs title %s", (path, isDefault, needsTitle) => {
+		expect(isDefaultChatTitle(path)).toBe(isDefault);
+		expect(needsChatTitle(path)).toBe(needsTitle);
 	});
 });

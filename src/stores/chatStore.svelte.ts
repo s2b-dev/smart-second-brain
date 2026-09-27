@@ -19,7 +19,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
-import { isDefaultChatTitle } from "../utils/chatTitle";
+import { FAILED_CHAT_TITLE, isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
 	MessageState,
@@ -667,11 +667,12 @@ export class ChatSession {
 			// submit: a first turn that errored leaves the placeholder name, and the retry,
 			// regenerate or edit that eventually succeeds must still title it. Otherwise the
 			// file stays "New Chat", no longer counts as empty, and every later new chat is
-			// deduped to "New Chat (2)", "(3)", ... Titled from the conversation's opening
-			// message — the first pair with user text, since a summarized history leads with
-			// an empty marker pair. Must be sequential because rename changes this.id.
+			// deduped to "New Chat (2)", "(3)", ... This includes a chat a failed turn moved
+			// to "New Chat (failed)". Titled from the conversation's opening message — the
+			// first pair with user text, since a summarized history leads with an empty
+			// marker pair. Must be sequential because rename changes this.id.
 			const titleSource = this.messages.find((p) => p.userMessage.content.trim())?.userMessage.content;
-			if (titleSource && isDefaultChatTitle(String(this.id))) {
+			if (titleSource && needsChatTitle(String(this.id))) {
 				try {
 					const plugin = getPlugin();
 					const newPath = await plugin.agentManager.generateThreadTitleFromUserMessage(
@@ -679,11 +680,7 @@ export class ChatSession {
 						this.selectedAgentId,
 						titleSource,
 					);
-					if (newPath) {
-						const oldPath = String(this.id);
-						this.id = newPath;
-						this.onThreadIdChange?.(oldPath, newPath);
-					}
+					this.adoptThreadPath(newPath);
 				} catch (err) {
 					Logger.warn("[ChatSession] Failed to generate chat title:", err);
 				}
@@ -749,6 +746,7 @@ export class ChatSession {
 				pair.assistantMessage.state = AssistantState.error;
 				pair.assistantMessage.errorCode = extractErrorMessage(_err);
 				Logger.error("[ChatSession] Run failed:", _err);
+				await this.markPlaceholderFailed();
 			}
 		} finally {
 			// Drop the live anchor on every exit path — success, cancel and error
@@ -765,6 +763,32 @@ export class ChatSession {
 			this.summarizingHistory = false;
 			this.messageState = MessageState.idle;
 			this.touch();
+		}
+	}
+
+	/** Follow a rename of this thread's file (auto-title or failed-marker). */
+	private adoptThreadPath(newPath: string | undefined): void {
+		if (!newPath || newPath === String(this.id)) return;
+		const oldPath = String(this.id);
+		this.id = newPath;
+		this.onThreadIdChange?.(oldPath, newPath);
+	}
+
+	/**
+	 * Move a still-"New Chat" thread whose turn failed to "New Chat (failed)". The
+	 * failed run already checkpointed the user message, so the chat no longer counts
+	 * as empty and can't be reused; left on the placeholder name, it would push every
+	 * later new chat to "New Chat (2)", "(3)", ... A later successful turn still
+	 * titles it (see `needsChatTitle`). Best-effort: a failed rename only costs the
+	 * numbering, so it must never mask the run's own error.
+	 */
+	private async markPlaceholderFailed(): Promise<void> {
+		if (!isDefaultChatTitle(String(this.id))) return;
+		try {
+			const newPath = await getPlugin().agentManager.renameThread(String(this.id), FAILED_CHAT_TITLE);
+			this.adoptThreadPath(newPath);
+		} catch (err) {
+			Logger.warn("[ChatSession] Failed to mark chat as failed:", err);
 		}
 	}
 
