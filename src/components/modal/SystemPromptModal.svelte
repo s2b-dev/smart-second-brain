@@ -1,7 +1,6 @@
 <script lang="ts">
-import { onDestroy, onMount } from "svelte";
+import { onMount } from "svelte";
 import { diffWords } from "diff";
-import { EmbeddableMarkdownEditor } from "../../lib/editor";
 import type SecondBrainPlugin from "../../main";
 import Button from "../ui/Button.svelte";
 import type { SystemPromptAccessors, SystemPromptModal } from "./SystemPromptModal";
@@ -12,33 +11,19 @@ interface Props {
 	accessors: SystemPromptAccessors;
 	description: string;
 	readOnly: boolean;
-	showDiff?: boolean;
 }
 
-const { modal, plugin, accessors, description, readOnly, showDiff = false }: Props = $props();
+const { modal, plugin, accessors, description, readOnly }: Props = $props();
 
-type ViewMode = "edit" | "diff";
-
-let editorContainer: HTMLDivElement | undefined = $state();
-let editor: EmbeddableMarkdownEditor | undefined = $state();
-let initialPromptValue = $state("");
 let promptValue = $state("");
 let isLoading = $state(true);
-let viewMode: ViewMode = $state<ViewMode>("edit");
 
-// Initialise to diff when the modal was opened with showDiff=true.
-$effect(() => {
-	if (showDiff) viewMode = "diff";
-});
-
-// No `?? DEFAULT_AGENT_PROMPT` fallback: editable callers are now required to name their
-// own baseline, and silently substituting the agent base prompt is exactly the bug this
-// had (a skill diffed against — and resettable to — an unrelated document). Read-only
-// previews never reach the diff or reset paths, so "" is inert for them.
+// No `?? DEFAULT_AGENT_PROMPT` fallback: diff callers are required to name their own
+// baseline, and silently substituting the agent base prompt is exactly the bug this had
+// (a skill diffed against — and resettable to — an unrelated document). Read-only previews
+// never reach the diff, so "" is inert for them.
 const defaultPrompt = $derived(accessors.defaultPrompt ?? "");
-const isDirty = $derived(promptValue !== initialPromptValue);
 const isAtDefault = $derived(promptValue === defaultPrompt);
-const canShowDiff = $derived(!readOnly && !isAtDefault);
 
 function renderDiffSide(oldText: string, newText: string, side: "old" | "new"): string {
 	const parts = diffWords(oldText, newText);
@@ -54,60 +39,40 @@ function renderDiffSide(oldText: string, newText: string, side: "old" | "new"): 
 }
 
 onMount(() => {
-	if (readOnly) {
-		void loadPrompt();
-		return;
-	}
-	void initializeEditor();
-});
-
-onDestroy(() => {
-	editor?.destroy();
+	void loadPrompt();
 });
 
 async function loadPrompt() {
 	promptValue = await accessors.getPrompt();
-	initialPromptValue = promptValue;
 	isLoading = false;
 }
 
-async function initializeEditor() {
-	if (!editorContainer) return;
-	await loadPrompt();
-	editor = new EmbeddableMarkdownEditor(plugin.app, editorContainer, {
-		value: promptValue,
-		placeholder: "Define the system prompt for the assistant...",
-		cls: "system-prompt-editor",
-		editable: true,
-		onChange: (value) => {
-			promptValue = value;
-		},
-	});
-}
-
-async function handleSave() {
-	accessors.setPrompt?.(promptValue);
-	plugin.agentManager?.invalidateSystemPromptCaches();
+// "Use default" is a commit, not a preview step — apply and close immediately.
+function handleUseDefault() {
+	accessors.setPrompt?.(defaultPrompt);
 	modal.close();
 }
 
-function handleResetToDefault() {
-	promptValue = defaultPrompt;
-	editor?.setValue(defaultPrompt);
-}
-
-// "Use default" in the diff view is a commit, not a preview step — apply and close
-// immediately rather than dropping the user back in the editor with an extra Save to find.
-async function handleUseDefault() {
-	promptValue = defaultPrompt;
-	await handleSave();
+// Merging by hand happens in the note itself, not in a second editor inside this modal.
+function handleOpenNote() {
+	if (!accessors.notePath) return;
+	void plugin.app.workspace.openLinkText(accessors.notePath, "", true);
+	modal.close();
 }
 </script>
 
 <div class="system-prompt-modal-content">
   <p class="system-prompt-description">{description}</p>
 
-  {#if viewMode === "diff" && canShowDiff}
+  {#if isLoading}
+    <div class="system-prompt-loading">Loading prompt…</div>
+  {:else if readOnly}
+    <div class="system-prompt-preview-container">
+      <pre class="system-prompt-preview">{promptValue}</pre>
+    </div>
+  {:else if isAtDefault}
+    <div class="system-prompt-loading">This note matches the current default.</div>
+  {:else}
     <div class="prompt-diff-container">
       <div class="prompt-diff-pane">
         <div class="prompt-diff-pane-label">Yours</div>
@@ -118,47 +83,17 @@ async function handleUseDefault() {
         <pre class="prompt-diff-text">{@html renderDiffSide(promptValue, defaultPrompt, "new")}</pre>
       </div>
     </div>
-  {:else if readOnly}
-    <div class="system-prompt-preview-container">
-      {#if isLoading}
-        <div class="system-prompt-loading">Loading prompt…</div>
-      {:else}
-        <pre class="system-prompt-preview">{promptValue}</pre>
-      {/if}
-    </div>
-  {/if}
-  {#if !readOnly}
-    <div
-      bind:this={editorContainer}
-      class="system-prompt-editor-container"
-      class:hidden={viewMode === "diff"}
-    >
-      {#if isLoading}
-        <div class="system-prompt-loading">Loading prompt…</div>
-      {/if}
-    </div>
   {/if}
 
   {#if !readOnly}
     <div class="system-prompt-actions">
       <Button buttonText="Cancel" onClick={() => modal.close()} />
       <div class="flex-1"></div>
-      {#if viewMode === "diff" && canShowDiff}
-        <Button buttonText="Back to editor" onClick={() => (viewMode = "edit")} />
-        <Button buttonText="Use default" cta={true} onClick={() => void handleUseDefault()} />
-      {:else}
-        {#if accessors.viewFinalPrompt}
-          <Button buttonText="View final" onClick={accessors.viewFinalPrompt} />
-        {/if}
-        {#if !isAtDefault}
-          <Button buttonText="Reset to default" onClick={handleResetToDefault} />
-        {/if}
-        {#if canShowDiff}
-          <Button buttonText="Diff with default" onClick={() => (viewMode = "diff")} />
-        {/if}
-        {#if isDirty}
-          <Button buttonText="Save" cta={true} onClick={handleSave} />
-        {/if}
+      {#if accessors.notePath}
+        <Button buttonText="Open note" onClick={handleOpenNote} />
+      {/if}
+      {#if !isLoading && !isAtDefault}
+        <Button buttonText="Use default" cta={true} onClick={handleUseDefault} />
       {/if}
     </div>
   {/if}
@@ -240,18 +175,7 @@ async function handleUseDefault() {
     color: inherit;
   }
 
-  /* ── Editor / preview ── */
-  .hidden {
-    display: none;
-  }
-
-  .system-prompt-editor-container {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    border-radius: 12px;
-  }
-
+  /* ── Preview ── */
   .system-prompt-preview-container {
     flex: 1 1 auto;
     min-height: 0;
@@ -280,38 +204,6 @@ async function handleUseDefault() {
     min-height: 200px;
     color: var(--text-muted);
     font-size: var(--font-ui-small);
-  }
-
-  .system-prompt-editor-container :global(.cm-editor) {
-    height: 100%;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 12px;
-    font-family: var(--font-text);
-    font-size: 0.95rem;
-  }
-
-  .system-prompt-editor-container :global(.cm-editor.cm-focused) {
-    outline: none;
-    border-color: var(--interactive-accent);
-    box-shadow: 0 0 0 1px var(--interactive-accent);
-  }
-
-  .system-prompt-editor-container :global(.cm-scroller) {
-    padding: 12px 14px;
-  }
-
-  .system-prompt-editor-container :global(.cm-content) {
-    min-height: 200px;
-    caret-color: var(--text-normal);
-  }
-
-  .system-prompt-editor-container :global(.cm-line) {
-    line-height: 1.6;
-  }
-
-  .system-prompt-editor-container :global(.cm-placeholder) {
-    color: var(--text-muted);
   }
 
   .system-prompt-actions {

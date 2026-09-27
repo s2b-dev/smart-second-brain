@@ -515,7 +515,8 @@ export class AgentManager {
 	}
 
 	/**
-	 * Two-way diff (yours vs the current default) over the agent's AGENT.md body, with reset.
+	 * Two-way diff (yours vs the current default) over the agent's AGENT.md body, with reset
+	 * and a link to the note for merging by hand.
 	 * Lives here rather than only in AgentEditorModal so the stale-guidance notice can open it
 	 * directly from the chat recommendations surface.
 	 */
@@ -530,10 +531,10 @@ export class AgentManager {
 				getPrompt: () => promptFiles?.getAgentPrompt(agentId) ?? DEFAULT_AGENT_PROMPT,
 				// The factory default this agent's AGENT.md body was written from.
 				defaultPrompt: DEFAULT_AGENT_PROMPT,
-				// The modal closes synchronously after this, so a rejected write would read as
-				// a successful save (and leave an unhandled rejection). The edit only exists
-				// in the closed editor at that point — say so rather than letting the user
-				// believe it landed. Same contract as `openSkillDiff`.
+				notePath: agentDefinitionPath(agentId),
+				// The modal closes synchronously after "Use default", so a rejected write would
+				// read as a success (and leave an unhandled rejection) — say so rather than
+				// letting the user believe it landed. Same contract as `openSkillDiff`.
 				setPrompt: (prompt: string) => {
 					void promptFiles
 						?.writeAgentPrompt(agentId, prompt)
@@ -542,8 +543,7 @@ export class AgentManager {
 						})
 						.catch((error) => {
 							Logger.error(`Failed to save the system prompt for ${agent.name}:`, error);
-							// The edit is gone with the closed editor; the link shows what is
-							// actually on disk so the user can redo it against the real content.
+							// The link shows what is actually on disk.
 							showActionNotice(
 								`Could not save the system prompt: ${extractErrorMessage(error)}`,
 								openNoteAction(agentDefinitionPath(agentId), "Open the agent note"),
@@ -551,18 +551,19 @@ export class AgentManager {
 						});
 				},
 			},
-			{ title: `System Prompt — ${agent.name}`, showDiff: true },
+			{ title: `System Prompt — ${agent.name}` },
 		).open();
 	}
 
 	/**
 	 * Diff a bundled skill's on-disk body against the version we currently ship, so a user
-	 * whose customization blocked the auto-update can see what moved and merge it by hand.
+	 * whose customization blocked the auto-update can see what moved and merge it by hand in
+	 * the note (or replace it with the default).
 	 *
 	 * The prompt surfaces get this from their factory constants; a skill's "default" is the
 	 * bundled `SKILL.md` content, which is available at runtime for exactly this reason.
-	 * Saving writes the file back and re-discovers, so the edited body reaches the next
-	 * agent run without a reload. Returns false when the skill isn't bundled (user-created
+	 * "Use default" writes the file back and re-discovers, so the body reaches the next agent
+	 * run without a reload. Returns false when the skill isn't bundled (user-created
 	 * skills have no shipped default to diff against) so the caller can fall back to just
 	 * opening the note.
 	 */
@@ -588,10 +589,10 @@ export class AgentManager {
 				// — two unrelated documents, so the whole pane highlights and "Use default"
 				// would overwrite the skill with the base prompt.
 				defaultPrompt: bundled.content,
-				// The modal closes synchronously after calling this, so a rejected write would
-				// otherwise read as a successful save (and leave an unhandled rejection). The
-				// edit only exists in the closed editor at that point, so say so explicitly
-				// rather than letting the user believe it landed.
+				notePath: `${skills.getSkillsDir()}/${skillName}/SKILL.md`,
+				// The modal closes synchronously after "Use default", so a rejected write would
+				// otherwise read as a success (and leave an unhandled rejection) — say so
+				// explicitly rather than letting the user believe it landed.
 				setPrompt: (text: string) => {
 					void skills
 						.writeSkillFile(skillName, text)
@@ -607,7 +608,7 @@ export class AgentManager {
 						});
 				},
 			},
-			{ title: `Skill — ${skillName}`, showDiff: true },
+			{ title: `Skill — ${skillName}` },
 		).open();
 		return true;
 	}
