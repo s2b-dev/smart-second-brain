@@ -148,7 +148,9 @@ const ANCHOR_TOP_OFFSET = 48;
 // distance so long jumps still feel snappy.
 let scrollRafId: number | null = null;
 
-function animateScrollTo(top: number) {
+// `"bottom"` re-reads the end of the thread every frame, so a reply that keeps
+// streaming in during the animation can't leave the jump stopping short.
+function animateScrollTo(top: number | "bottom") {
 	if (!scrollContainer) return;
 	const el = scrollContainer;
 
@@ -160,12 +162,14 @@ function animateScrollTo(top: number) {
 	}
 
 	const start = el.scrollTop;
-	const max = el.scrollHeight - el.clientHeight;
-	const target = Math.max(0, Math.min(top, max));
-	const delta = target - start;
-	if (Math.abs(delta) < 1) return;
+	const resolveTarget = () => {
+		const max = el.scrollHeight - el.clientHeight;
+		return Math.max(0, Math.min(top === "bottom" ? max : top, max));
+	};
+	const initialDelta = resolveTarget() - start;
+	if (Math.abs(initialDelta) < 1) return;
 
-	const duration = Math.min(260, 120 + Math.abs(delta) * 0.15);
+	const duration = Math.min(260, 120 + Math.abs(initialDelta) * 0.15);
 	let startTime: number | null = null;
 
 	const step = (now: number) => {
@@ -173,7 +177,7 @@ function animateScrollTo(top: number) {
 		const t = Math.min(1, (now - startTime) / duration);
 		// easeOutCubic
 		const eased = 1 - (1 - t) ** 3;
-		el.scrollTop = start + delta * eased;
+		el.scrollTop = start + (resolveTarget() - start) * eased;
 		if (t < 1) {
 			scrollRafId = window.requestAnimationFrame(step);
 		} else {
@@ -244,7 +248,7 @@ function recomputeJumpToBottom() {
 
 function jumpToBottom() {
 	if (!scrollContainer) return;
-	animateScrollTo(scrollContainer.scrollHeight);
+	animateScrollTo("bottom");
 }
 
 // Svelte action to register message refs
@@ -1121,6 +1125,19 @@ $effect(() => {
     border: 1px solid var(--background-modifier-border);
     box-shadow: var(--shadow-s);
     color: var(--text-muted);
+  }
+
+  /* 30px is too small a touch target; widen the hit area to 44px with an
+     invisible ring rather than growing the visible circle. */
+  :global(.is-mobile) .jump-to-bottom-overlay :global(.jump-to-bottom) {
+    position: relative;
+  }
+
+  :global(.is-mobile) .jump-to-bottom-overlay :global(.jump-to-bottom)::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    border-radius: inherit;
   }
 
   .jump-to-bottom-overlay :global(.jump-to-bottom:hover) {
