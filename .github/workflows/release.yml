@@ -13,6 +13,12 @@ jobs:
         # (2.1.1). Those pushes are never a release; skip them outright.
         if: ${{ !startsWith(github.ref_name, 'untagged-') }}
         runs-on: ubuntu-latest
+        # One run per tag at a time: two pushes of the same tag could otherwise both
+        # find no release and each create a draft. Queued, never cancelled, so the
+        # last push's build is the one that ends up on the draft.
+        concurrency:
+            group: release-${{ github.ref }}
+            cancel-in-progress: false
         permissions:
             contents: write
             # Required by attest-build-provenance to mint the signing certificate.
@@ -88,7 +94,8 @@ jobs:
                   assets=(build/prod/main.js manifest.json build/prod/styles.css)
                   api="repos/${GITHUB_REPOSITORY}/releases"
 
-                  matches=$(gh api --paginate "$api" --jq ".[] | select(.tag_name == \"$tag\") | {id, draft}")
+                  # The tag goes to jq as data (--arg), never into the filter text.
+                  matches=$(gh api --paginate "$api" | jq -c --arg tag "$tag" '.[] | select(.tag_name == $tag) | {id, draft}')
                   count=$(jq -s length <<<"$matches")
 
                   if [ "$count" -eq 0 ]; then
@@ -108,13 +115,15 @@ jobs:
                     fi
                     echo "Draft release $tag ($id) exists; replacing its assets and notes."
                     if [ -s release-notes.md ]; then
-                      gh api -X PATCH "$api/$id" -F body=@release-notes.md >/dev/null
+                      # tag_name must be restated: a PATCH without it silently renames
+                      # a draft's tag to `untagged-<hash>`, detaching it from the tag.
+                      gh api -X PATCH "$api/$id" -f tag_name="$tag" -F body=@release-notes.md >/dev/null
                     fi
                     # By id, not `gh release upload <tag>`: gh's tag lookup misses
                     # drafts too. Delete a same-named asset, then upload its build.
                     for file in "${assets[@]}"; do
                       name=$(basename "$file")
-                      old=$(gh api "$api/$id/assets" --jq ".[] | select(.name == \"$name\") | .id")
+                      old=$(gh api --paginate "$api/$id/assets" | jq --arg name "$name" '.[] | select(.name == $name) | .id')
                       if [ -n "$old" ]; then gh api -X DELETE "$api/assets/$old"; fi
                       gh api -X POST "https://uploads.github.com/$api/$id/assets?name=$name" \
                         -H "Content-Type: application/octet-stream" --input "$file" >/dev/null
