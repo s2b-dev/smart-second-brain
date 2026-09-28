@@ -168,6 +168,7 @@ export const BUILT_IN_TOOL_IDS = [
 	"fetch_url",
 	"web_search",
 	"manage_skills",
+	"ask_question",
 ] as const;
 
 export type BuiltInToolId = (typeof BUILT_IN_TOOL_IDS)[number];

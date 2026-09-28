@@ -388,7 +388,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
         </div>
       </SettingContainer>
     </SettingGroup>
-  {:else if capturedToolId === "fetch_url"}
+  {:else if capturedToolId === "fetch_url" || capturedToolId === "ask_question"}
     <!-- no tool-specific settings -->
   {:else if capturedToolId === "web_search"}
     <SettingGroup heading="Web search">
