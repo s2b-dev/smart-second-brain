@@ -14,8 +14,9 @@ jobs:
         if: ${{ !startsWith(github.ref_name, 'untagged-') }}
         runs-on: ubuntu-latest
         # One run per tag at a time: two pushes of the same tag could otherwise both
-        # find no release and each create a draft. Queued, never cancelled, so the
-        # last push's build is the one that ends up on the draft.
+        # find no release and each create a draft. GitHub keeps only the newest
+        # pending run per group and doesn't promise push order, so the upload step
+        # also checks that the tag still points at the commit this run built.
         concurrency:
             group: release-${{ github.ref }}
             cancel-in-progress: false
@@ -90,9 +91,21 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
+                  # Default run steps are `bash -e` without pipefail; a failed listing
+                  # piped into jq must fail the step, not read as "no release".
+                  set -o pipefail
                   tag="${GITHUB_REF#refs/tags/}"
                   assets=(build/prod/main.js manifest.json build/prod/styles.css)
                   api="repos/${GITHUB_REPOSITORY}/releases"
+
+                  # The tag was re-pointed after this run started: a newer run owns the
+                  # draft, so don't overwrite it with this (older) build. The peeled
+                  # `^{}` line, when present, is an annotated tag's commit.
+                  current=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | tail -n 1 | cut -f 1)
+                  if [ "$current" != "$GITHUB_SHA" ]; then
+                    echo "::notice::Tag $tag now points at ${current:-nothing}, not $GITHUB_SHA; skipping the upload."
+                    exit 0
+                  fi
 
                   # The tag goes to jq as data (--arg), never into the filter text.
                   matches=$(gh api --paginate "$api" | jq -c --arg tag "$tag" '.[] | select(.tag_name == $tag) | {id, draft}')
