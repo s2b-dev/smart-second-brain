@@ -166,7 +166,11 @@ const createOperationSchema = z.object({
 
 const deleteOperationSchema = z.object({
 	type: z.literal("delete"),
-	name: z.string().describe("The name of the skill to delete. Built-in core skills cannot be deleted."),
+	name: z
+		.string()
+		.describe(
+			"The name of the skill to delete. Only when the user asked for this skill to be deleted. Built-in core skills cannot be deleted.",
+		),
 });
 
 const patchOperationSchema = z.object({
@@ -243,8 +247,8 @@ function rejectInvalidRevision(
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
 
 /**
- * Tool letting an agent create new skills, revise skills attached to it, or delete skills it
- * created. All three operations apply immediately — there is no staging/review step, unlike
+ * Tool letting an agent create new skills, revise skills attached to it, or delete an attached
+ * skill the user asked it to delete. All three operations apply immediately — there is no staging/review step, unlike
  * manage_notes. A created skill is given no explicit `agent.skills` entry, so it reads as
  * attached the moment its file exists (agent.skills[id]?.enabled ?? true): creating IS attaching,
  * with no separate manual "enable" step.
@@ -412,7 +416,7 @@ export function createManageSkillsTool(skillsService: SkillsService | undefined,
 		},
 		{
 			name: "manage_skills",
-			description: `Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
+			description: `Create new skills, revise your own attached skills, or delete a skill when the user asks you to. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
 			schema,
 		},
 	);

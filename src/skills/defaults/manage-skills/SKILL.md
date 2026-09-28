@@ -1,10 +1,10 @@
 ---
 name: manage-skills
-description: Create, revise, or delete skills with manage_skills — author new skills, fold verified knowledge into an existing skill's instructions, or remove a skill you created. Changes apply immediately. Load this before editing or creating a skill.
+description: Create, revise, or delete skills with manage_skills — author new skills, fold verified knowledge into an existing skill's instructions, or remove a skill the user asked to delete. Changes apply immediately. Load this before editing or creating a skill.
 allowed-tools: manage_skills
 metadata:
   author: "S2B"
-  version: "1.2"
+  version: "1.3"
   category: "core"
 ---
 
@@ -48,5 +48,6 @@ an allowed subset are granted, others are silently dropped.
 - Keep new skills narrow and instructions concrete — write down only what you'd actually want to
   remember doing again.
 
-**Delete** — remove a skill you created, immediately and without confirmation. Built-in core
-skills cannot be deleted.
+**Delete** — remove a skill only when the user asks for that skill to be deleted, whoever
+wrote it. Never delete one on your own initiative, to tidy up or because it looks unused. It
+applies immediately, with no confirmation step. Built-in core skills cannot be deleted.

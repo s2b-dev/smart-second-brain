@@ -185,7 +185,7 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 	manage_skills: {
 		displayName: "Manage Skills",
 		summary:
-			"Create new skills, revise the agent's own attached skills, or delete skills it created. Changes apply immediately. A skill's name and plugin link are locked once created.",
+			"Create new skills, revise the agent's own attached skills, or delete a skill when you ask it to. Changes apply immediately. A skill's name and plugin link are locked once created.",
 		config: {
 			// On by default: the routing doctrine in the memory section and the `# Skills`
 			// header both send task lessons into the skill that was used, and the post-turn
@@ -194,7 +194,7 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 			enabled: true,
 			name: "manage_skills",
 			description:
-				"Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
+				"Create new skills, revise your own attached skills, or delete a skill when the user asks you to. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
 		},
 	},
 };

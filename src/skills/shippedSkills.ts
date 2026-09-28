@@ -91,6 +91,8 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", "4f7b8ff2b47b60e2"],
 			["1.1", "6243bd2c4cf42f9a"],
+			// 1.2 (2.3.0 betas): before the rule that a skill is deleted only when the user asks.
+			["1.2", "7b0e742eaeffaa0a"],
 		]),
 	],
 	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
