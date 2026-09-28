@@ -1,15 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", () => import("../__mocks__/obsidian"));
 
-// deleteSkill clears the skill's usage counters through the data store; the Agent editor's
-// trash button is the path that reaches it (manage_skills removes the folder itself).
-const forgetSkillUsage = vi.fn();
 vi.mock("../../src/stores/dataStore.svelte", () => ({
-	getData: () => ({
-		agentFolder: "Agents",
-		forgetSkillUsage,
-	}),
+	getData: () => ({ agentFolder: "Agents" }),
 }));
 
 import { SkillsService } from "../../src/skills/SkillsService";
@@ -55,11 +49,7 @@ function makeAdapter(initial: Record<string, string>) {
 }
 
 describe("SkillsService.deleteSkill", () => {
-	beforeEach(() => {
-		forgetSkillUsage.mockClear();
-	});
-
-	it("removes the file and forgets the skill's usage counters", async () => {
+	it("removes the skill's folder and its cache entry", async () => {
 		const adapter = makeAdapter({ "Agents/Skills/weekly-review/SKILL.md": SKILL_MD });
 		const plugin = { app: { vault: { adapter, configDir: ".obsidian" } } } as never;
 		const svc = new SkillsService(plugin);
@@ -70,14 +60,12 @@ describe("SkillsService.deleteSkill", () => {
 
 		expect(adapter.files.has("Agents/Skills/weekly-review/SKILL.md")).toBe(false);
 		expect(svc.getCachedSkills().has("weekly-review")).toBe(false);
-		expect(forgetSkillUsage).toHaveBeenCalledWith("weekly-review");
 	});
 
-	it("does not touch counters for a skill it does not know", async () => {
+	it("reports false for a skill it does not know", async () => {
 		const adapter = makeAdapter({});
 		const plugin = { app: { vault: { adapter, configDir: ".obsidian" } } } as never;
 		const svc = new SkillsService(plugin);
 		expect(await svc.deleteSkill("ghost")).toBe(false);
-		expect(forgetSkillUsage).not.toHaveBeenCalled();
 	});
 });

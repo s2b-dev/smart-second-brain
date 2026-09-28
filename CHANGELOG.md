@@ -28,7 +28,6 @@ A reworked chat composer, especially on mobile, agents that keep their memory an
 - **Chat: attachments as preview tiles.** Images show a thumbnail and PDFs their first page; other files show a card. Click a tile to open the file, or use its corner × to remove it (#526).
 - **Chat: Take photo on mobile.** The attach menu has a Take photo row that goes straight to the camera (#520).
 - **Chat: one jump-to-bottom button** replaces the message-navigation arrows. It appears once you scroll away from the end, including while a reply streams below the fold (#522, #523, #527, #528).
-- **Agents: where a skill came from and how it's used.** Skills the agent writes are marked as its own, and the Agent editor shows how often each custom skill has been used and revised (#516).
 - **What's new, in the plugin.** After an update, a notice opens a What's new tab with the notes for every release since the one you last saw. The Show release notes command and a row in Settings → Troubleshooting open it any time (#533).
 - **Update notices.** Once a day the plugin asks GitHub whether a newer version exists and says so, with a link to Community plugins. It sends nothing about you or your vault, stays quiet while Obsidian's own automatic update check is on, and can be turned off under Settings → General → Privacy (#534).
 

@@ -15,8 +15,6 @@ import { recordSkillLoaded, resetSkillLoadRegistry } from "../../src/agent/tools
 import { parseFrontmatter } from "../../src/skills/SkillsService";
 
 const RUN_CONFIG = { configurable: { thread_id: "t1" }, runId: "run-1" };
-const recordSkillRevision = vi.fn();
-const forgetSkillUsage = vi.fn();
 
 const DATAVIEW_MD = `---
 name: dataview
@@ -116,11 +114,7 @@ describe("manage_skills tool", () => {
 		mockGetData.mockReturnValue({
 			getAgent: () => agentWithSkills({ other: { enabled: false } }),
 			getSelectedAgent: () => agentWithSkills({ other: { enabled: false } }),
-			recordSkillRevision,
-			forgetSkillUsage,
 		});
-		recordSkillRevision.mockClear();
-		forgetSkillUsage.mockClear();
 		// Revisions require the skill to have been loaded in this thread; most tests below
 		// exercise what happens after that, so satisfy the gate up front.
 		resetSkillLoadRegistry();
@@ -368,7 +362,7 @@ describe("manage_skills tool", () => {
 		});
 	});
 
-	describe("usage and provenance", () => {
+	describe("provenance", () => {
 		it("stamps metadata.author: agent on a created skill", async () => {
 			const cache = dataviewCache();
 			const svc = makeSkillsService(cache);
@@ -383,51 +377,6 @@ describe("manage_skills tool", () => {
 			const written = store["Agents/Skills/weekly-review/SKILL.md"];
 			expect(written).toContain("metadata:\n  author: agent\n---");
 			expect(parseFrontmatter(written).frontmatter.metadata?.author).toBe("agent");
-		});
-
-		it("counts a patch and an update as revisions", async () => {
-			const svc = makeSkillsService(dataviewCache());
-			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
-			const t = createManageSkillsTool(svc, app, "agent-1");
-
-			await t.invoke(
-				{ operation: { type: "patch", skillName: "dataview", oldText: "Old body.", newText: "A." } },
-				RUN_CONFIG,
-			);
-			await t.invoke(
-				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nB." } },
-				RUN_CONFIG,
-			);
-
-			expect(recordSkillRevision).toHaveBeenCalledTimes(2);
-			expect(recordSkillRevision).toHaveBeenCalledWith("dataview");
-		});
-
-		it("does not count a refused or no-op revision", async () => {
-			const svc = makeSkillsService(dataviewCache());
-			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
-			const t = createManageSkillsTool(svc, app, "agent-1");
-
-			await t.invoke(
-				{ operation: { type: "patch", skillName: "dataview", oldText: "missing", newText: "x" } },
-				RUN_CONFIG,
-			);
-			await t.invoke(
-				{ operation: { type: "update", skillName: "dataview", newBody: "# Dataview\n\nOld body." } },
-				RUN_CONFIG,
-			);
-
-			expect(recordSkillRevision).not.toHaveBeenCalled();
-		});
-
-		it("forgets a deleted skill's counters", async () => {
-			const svc = makeSkillsService(dataviewCache());
-			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });
-			const t = createManageSkillsTool(svc, app, "agent-1");
-
-			await t.invoke({ operation: { type: "delete", name: "dataview" } }, RUN_CONFIG);
-
-			expect(forgetSkillUsage).toHaveBeenCalledWith("dataview");
 		});
 	});
 
@@ -635,8 +584,6 @@ describe("manage_skills tool", () => {
 			const agent = agentWithSkills({ other: { enabled: false }, dataview: { enabled: true } });
 			mockGetData.mockReturnValue({
 				getAgent: () => agent,
-				recordSkillRevision,
-				forgetSkillUsage,
 				getSelectedAgent: () => agent,
 			});
 			const { app } = makeApp({ "Agents/Skills/dataview/SKILL.md": DATAVIEW_MD });

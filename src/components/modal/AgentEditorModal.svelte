@@ -38,7 +38,6 @@ import { agentDefinitionPath, agentDir } from "../../utils/agentPaths";
 import { Logger } from "../../utils/logging";
 import { extractErrorMessage } from "../../utils/errorMessage";
 import { humanizeSkillName } from "../../skills";
-import { skillUsageSummary } from "../../skills/usageSummary";
 import {
 	DEFAULT_AGENT_ICON,
 	type AgentConfig,
@@ -299,8 +298,6 @@ const skills = $derived.by(() => {
 			category: metadata.category ?? "custom",
 			corePluginId: metadata.corePluginId,
 			linkedPluginId: metadata.linkedPluginId,
-			author: metadata.frontmatter.metadata?.author,
-			usage: pluginData.getSkillUsage(skillName),
 		});
 	}
 	return result;
@@ -1052,7 +1049,6 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             class="skill-entity"
             name={ext.displayName}
             desc={ext.description}
-            meta={skillUsageSummary(ext.author, ext.usage)}
           >
             {#snippet actions()}
               <Button
