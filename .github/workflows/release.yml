@@ -76,41 +76,56 @@ jobs:
             # up via the API. A PUBLISHED release is never touched — users may
             # already have installed its bundle — so that case fails loudly, and
             # a draft that gets published mid-upload is detected afterwards.
-            # Only a 404 from the lookup means "no release yet"; any other lookup
-            # failure (auth, rate limit, outage) also fails rather than creating.
+            # GitHub's `releases/tags/<tag>` endpoint never returns DRAFTS, so the
+            # release is found by listing and then addressed by id (2.3.0: a
+            # re-pointed tag minted a second draft because the tag lookup 404'd). A failed
+            # listing (auth, rate limit, outage) fails the run rather than creating.
             - name: Create or update draft release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   tag="${GITHUB_REF#refs/tags/}"
                   assets=(build/prod/main.js manifest.json build/prod/styles.css)
+                  api="repos/${GITHUB_REPOSITORY}/releases"
 
-                  if lookup=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" 2>&1); then
-                    if [ "$(jq -r .draft <<<"$lookup")" != "true" ]; then
-                      echo "::error::Release $tag is already published; refusing to replace its assets."
-                      exit 1
-                    fi
-                    echo "Draft release $tag exists; replacing its assets and notes."
-                    if [ -s release-notes.md ]; then
-                      gh release edit "$tag" --notes-file release-notes.md
-                    fi
-                    gh release upload "$tag" "${assets[@]}" --clobber
-                    # GitHub has no conditional upload, so a maintainer publishing
-                    # the draft during the seconds between the check above and the
-                    # upload cannot be prevented — only detected. Re-check and fail
-                    # loudly so a published release with swapped assets is never a
-                    # silent green run.
-                    if [ "$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .draft)" != "true" ]; then
-                      echo "::error::Release $tag was published while its assets were being replaced; verify the published bundle."
-                      exit 1
-                    fi
-                  elif grep -q "HTTP 404" <<<"$lookup"; then
+                  matches=$(gh api --paginate "$api" --jq ".[] | select(.tag_name == \"$tag\") | {id, draft}")
+                  count=$(jq -s length <<<"$matches")
+
+                  if [ "$count" -eq 0 ]; then
                     gh release create "$tag" \
                       --title="$tag" \
                       --draft \
                       --notes-file release-notes.md \
                       "${assets[@]}"
-                  else
-                    echo "::error::Could not look up release $tag: $lookup"
+                  elif [ "$count" -gt 1 ]; then
+                    echo "::error::$count releases exist for $tag; delete the stray ones and re-run."
                     exit 1
+                  else
+                    id=$(jq -r .id <<<"$matches")
+                    if [ "$(jq -r .draft <<<"$matches")" != "true" ]; then
+                      echo "::error::Release $tag is already published; refusing to replace its assets."
+                      exit 1
+                    fi
+                    echo "Draft release $tag ($id) exists; replacing its assets and notes."
+                    if [ -s release-notes.md ]; then
+                      gh api -X PATCH "$api/$id" -F body=@release-notes.md >/dev/null
+                    fi
+                    # By id, not `gh release upload <tag>`: gh's tag lookup misses
+                    # drafts too. Delete a same-named asset, then upload its build.
+                    for file in "${assets[@]}"; do
+                      name=$(basename "$file")
+                      old=$(gh api "$api/$id/assets" --jq ".[] | select(.name == \"$name\") | .id")
+                      if [ -n "$old" ]; then gh api -X DELETE "$api/assets/$old"; fi
+                      gh api -X POST "https://uploads.github.com/$api/$id/assets?name=$name" \
+                        -H "Content-Type: application/octet-stream" --input "$file" >/dev/null
+                    done
+                    # GitHub has no conditional upload, so a maintainer publishing
+                    # the draft during the seconds between the check above and the
+                    # upload cannot be prevented — only detected. Re-check and fail
+                    # loudly so a published release with swapped assets is never a
+                    # silent green run.
+                    if [ "$(gh api "$api/$id" --jq .draft)" != "true" ]; then
+                      echo "::error::Release $tag was published while its assets were being replaced; verify the published bundle."
+                      exit 1
+                    fi
                   fi
