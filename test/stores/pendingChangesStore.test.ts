@@ -1326,4 +1326,96 @@ describe("PendingChangesStore", () => {
 			expect(store.revision).toBe(before);
 		});
 	});
+
+	/* --------------------------------------------------------------------------
+	 * Payload retention
+	 * ------------------------------------------------------------------------*/
+
+	describe("payload pruning of settled entries", () => {
+		const mkEntry = (
+			id: string,
+			status: "pending" | "accepted" | "rejected",
+			opts: { reported?: boolean; initial?: string } = {},
+		) => ({
+			id,
+			change: {
+				type: "update" as const,
+				path: "note.md",
+				originalContent: "x".repeat(64),
+				newContent: "y".repeat(64),
+				...(opts.initial !== undefined ? { initialOriginalContent: opts.initial } : {}),
+			},
+			status,
+			toolCallId: "tc",
+			threadId: "thread-1",
+			createdAt: 1,
+			shortId: "s",
+			...(opts.reported !== undefined ? { reportedToModel: opts.reported } : {}),
+		});
+
+		async function loadWith(entries: unknown[]) {
+			vi.mocked(plugin.app.vault.adapter.exists).mockResolvedValue(true);
+			vi.mocked(plugin.app.vault.adapter.read).mockResolvedValue(JSON.stringify(entries));
+			await store.load();
+		}
+
+		it("drops the note text of a settled entry, keeping the row and its status", async () => {
+			await loadWith([
+				mkEntry("01a00000-0000-7000-8000-000000000001", "pending"),
+				mkEntry("01a00000-0000-7000-8000-000000000002", "accepted", { reported: true }),
+				mkEntry("01a00000-0000-7000-8000-000000000003", "rejected", { reported: true }),
+			]);
+
+			// Rows survive — the chat card reads them for its review chips.
+			expect(store.getEntriesForThread("thread-1").map((e) => e.id)).toEqual([
+				"01a00000-0000-7000-8000-000000000001",
+				"01a00000-0000-7000-8000-000000000002",
+				"01a00000-0000-7000-8000-000000000003",
+			]);
+
+			const pending = store.getEntry("01a00000-0000-7000-8000-000000000001");
+			expect(pending?.change.type === "update" && pending.change.originalContent).toBe("x".repeat(64));
+
+			const accepted = store.getEntry("01a00000-0000-7000-8000-000000000002");
+			expect(accepted?.status).toBe("accepted");
+			expect(accepted?.change.type === "update" && accepted.change.originalContent).toBe("");
+			expect(accepted?.change.type === "update" && accepted.change.newContent).toBe("");
+		});
+
+		it("keeps a settled entry's text until the outcome has reached the model", async () => {
+			// The next turn still has to be told this proposal was resolved, and
+			// `takeReviewOutcomesForThread` only skips entries already reported.
+			await loadWith([mkEntry("01a00000-0000-7000-8000-000000000004", "accepted")]);
+
+			const entry = store.getEntry("01a00000-0000-7000-8000-000000000004");
+			expect(entry?.change.type === "update" && entry.change.originalContent).toBe("x".repeat(64));
+			expect(plugin.app.vault.adapter.write).not.toHaveBeenCalled();
+		});
+
+		it("keeps a settled entry holding an unreverted partial application", async () => {
+			// `initialOriginalContent` means applied text the user has not signed
+			// off on — the payload is the only undo record, so it must survive.
+			await loadWith([
+				mkEntry("01a00000-0000-7000-8000-000000000005", "accepted", {
+					reported: true,
+					initial: "x".repeat(64),
+				}),
+			]);
+
+			const entry = store.getEntry("01a00000-0000-7000-8000-000000000005");
+			expect(entry?.change.type === "update" && entry.change.originalContent).toBe("x".repeat(64));
+			expect(plugin.app.vault.adapter.write).not.toHaveBeenCalled();
+		});
+
+		it("persists the load-time prune so idle restarts stop re-reading the old file", async () => {
+			await loadWith([mkEntry("01a00000-0000-7000-8000-000000000006", "accepted", { reported: true })]);
+
+			// Nothing else in `load()` writes for this fixture (short ids already
+			// present, no `.chat` thread to sweep), so a write here is the prune
+			// persisting itself — without it every restart pays the full cost again.
+			expect(plugin.app.vault.adapter.write).toHaveBeenCalled();
+			const last = vi.mocked(plugin.app.vault.adapter.write).mock.calls.at(-1)!;
+			expect(last[1]).not.toContain("x".repeat(64));
+		});
+	});
 });

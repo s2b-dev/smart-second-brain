@@ -166,6 +166,10 @@ export class PendingChangesStore {
 		}
 		this.#backfillShortIds();
 		await this.#pruneOrphanedThreads();
+		// Persist the prune when it changed anything: without a save, every idle
+		// restart would re-read, re-parse and re-validate the full historical file,
+		// which is the cost this exists to remove.
+		if (this.#pruneSettledPayloads()) this.flushSave();
 		this.#renameHandler = this.#plugin.app.vault.on("rename", (file, oldPath) => {
 			this.#handleFileRename(oldPath, file.path);
 		});
@@ -263,8 +267,61 @@ export class PendingChangesStore {
 		if (!(await this.#plugin.app.vault.adapter.exists(dir))) {
 			await this.#plugin.app.vault.adapter.mkdir(dir);
 		}
+		this.#pruneSettledPayloads();
 		const snapshot = $state.snapshot(this.#entries);
 		await this.#plugin.app.vault.adapter.write(path, JSON.stringify(snapshot, null, 2));
+	}
+
+	/**
+	 * Drop the note text of entries that can never be needed again.
+	 *
+	 * A resolved entry keeps the full `originalContent` / `newContent` text of the
+	 * note it touched, and nothing ever dropped it — so the store grew with every
+	 * proposal ever made and was re-parsed and re-written whole on load and after
+	 * each change. An entry is only settled once the outcome has reached the model
+	 * (an unreported outcome still has to reach the next turn, and
+	 * `takeReviewOutcomesForThread` skips `reportedToModel` ones) *and* it holds no
+	 * unreverted partial application.
+	 *
+	 * `hasUnrevertedApplication` is the safety gate rather than `status`: a
+	 * partially-accepted entry keeps `originalContent`/`newContent` live so
+	 * `revertAppliedGroups` can restore the note. Both places that settle that
+	 * snapshot clear it — the full accept and the revert — so this cannot race a
+	 * revert in flight.
+	 *
+	 * The row itself is KEPT and only its text blanked: the `manage_notes` card
+	 * reads `getEntriesByToolCallId` to show "accepted"/"rejected" chips, so
+	 * dropping the entry would silently turn a completed review back into the
+	 * static "will be reviewed" summary. Nothing renders a resolved entry's diff —
+	 * `PendingChangesBar` lists only actionable entries — so the text costs
+	 * nothing to drop and the metadata stays honest.
+	 */
+	#pruneSettledPayloads(): boolean {
+		let changed = false;
+		for (const entry of this.#entries) {
+			if (entry.status === "pending") continue;
+			if (!entry.reportedToModel) continue;
+			if (this.hasUnrevertedApplication(entry)) continue;
+			const change = entry.change;
+			if (change.type === "update") {
+				if (change.originalContent === "" && change.newContent === "") continue;
+				change.originalContent = "";
+				change.newContent = "";
+			} else if (change.type === "delete") {
+				if (change.originalContent === "") continue;
+				change.originalContent = "";
+			} else if (change.type === "create") {
+				if (change.content === "") continue;
+				change.content = "";
+			} else {
+				continue;
+			}
+			changed = true;
+		}
+		if (changed) {
+			Logger.log("[PendingChanges] Dropped the stored text of settled entries.");
+		}
+		return changed;
 	}
 
 	/** Reactive revision counter – read this inside `$derived` to track store mutations. */
