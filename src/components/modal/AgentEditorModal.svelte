@@ -190,12 +190,17 @@ function openModelSelectionModal() {
 // The window is filled from provider metadata when a model is picked; this lets the user
 // override it (e.g. to match an Ollama num_ctx their hardware can hold). Re-picking the same
 // model keeps the override — see buildPersistedChatModel (#542).
+// Bumped on a rejected edit to remount the field, which otherwise keeps showing the invalid
+// value it bound locally.
+let contextWindowFieldKey = $state(0);
+
 function updateChatContextWindow(value: number) {
 	const chatModel = selectedAgent?.chatModel;
 	if (!chatModel) return;
 	const contextWindow = Math.round(value);
 	if (!Number.isFinite(contextWindow) || contextWindow < 1) {
 		new Notice("Context window must be a positive number of tokens.");
+		contextWindowFieldKey++;
 		return;
 	}
 	if (contextWindow === chatModel.modelConfig?.contextWindow) return;
@@ -807,11 +812,13 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             name="Context window"
             desc="Tokens the chat model can take in. Decides when older history is summarized, and for Ollama it is also the num_ctx sent with each request. Filled in from the provider when you pick a model."
           >
-            <Text
-              inputType="number"
-              value={selectedAgent.chatModel.modelConfig?.contextWindow ?? 128000}
-              onchange={updateChatContextWindow}
-            />
+            {#key contextWindowFieldKey}
+              <Text
+                inputType="number"
+                value={selectedAgent.chatModel.modelConfig?.contextWindow ?? 128000}
+                onchange={updateChatContextWindow}
+              />
+            {/key}
           </SettingItem>
         {/if}
 
