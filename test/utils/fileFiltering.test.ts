@@ -10,9 +10,11 @@ import { installAgentPathSource } from "../../src/utils/agentPathSource";
 installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined });
 
 import {
+	extractExcalidrawContent,
 	isAgentFilePath,
 	isAgentPath,
 	isEmbeddableFile,
+	isExcalidrawPath,
 	isIndexableFile,
 	readIndexableContent,
 } from "../../src/utils/fileFiltering";
@@ -456,5 +458,73 @@ describe("rename into a non-embeddable extension", () => {
 		// It stays lexically searchable by name, so the rename must not evict it from
 		// the MiniSearch index — only re-key it.
 		expect(isIndexableFile(after)).toBe(true);
+	});
+});
+
+/** An `.excalidraw.md` file as the Excalidraw plugin writes it, with `back` as the back of the note. */
+function drawing(back = ""): string {
+	return [
+		"---",
+		"",
+		"excalidraw-plugin: parsed",
+		"tags: [excalidraw]",
+		"",
+		"---",
+		"==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'",
+		"",
+		back,
+		"",
+		"# Excalidraw Data",
+		"",
+		"## Text Elements",
+		"Label on a box ^aBcD1234",
+		"",
+		"%%",
+		"## Drawing",
+		"```compressed-json",
+		"N4KAkARALgngDgUwgLgAQQQDwMYEMA2AlgCYBOuA7hADTgQBuCpAzoQPYB2KqATLZMzYBXUtiRoIACyhQ4zZAHoFAc0JRJQgEYA6bGwC2",
+		"```",
+		"%%",
+	].join("\n");
+}
+
+describe("Excalidraw drawings (#541)", () => {
+	const f = (path: string, extension: string) => ({ path, extension }) as never;
+
+	it("recognises both drawing forms by path", () => {
+		expect(isExcalidrawPath("Drawings/Sketch.excalidraw.md")).toBe(true);
+		expect(isExcalidrawPath("Drawings/Sketch.Excalidraw.MD")).toBe(true);
+		expect(isExcalidrawPath("Drawings/Sketch.excalidraw")).toBe(true);
+		expect(isExcalidrawPath("Notes/excalidraw.md")).toBe(false);
+		expect(isExcalidrawPath("Notes/On Excalidraw.md")).toBe(false);
+	});
+
+	it("never embeds a bare .excalidraw scene, but keeps it findable by name", () => {
+		installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined });
+		expect(isEmbeddableFile(f("Drawings/Sketch.excalidraw", "excalidraw"))).toBe(false);
+		expect(isIndexableFile(f("Drawings/Sketch.excalidraw", "excalidraw"))).toBe(true);
+	});
+
+	it("reduces a blank drawing to nothing — no frontmatter, banner, text elements or scene", () => {
+		// The frontmatter and banner used to survive, so a blank drawing was embedded
+		// as boilerplate plus its title on every autosave.
+		expect(extractExcalidrawContent(drawing())).toBe("");
+	});
+
+	it("keeps only what the user wrote on the back of the note", () => {
+		const out = extractExcalidrawContent(drawing("Architecture sketch for the [[Sync engine]] rewrite."));
+		expect(out).toBe("Architecture sketch for the [[Sync engine]] rewrite.");
+	});
+
+	it("handles the older format whose data section starts at # Text Elements, behind a %% fence", () => {
+		const raw =
+			"---\nexcalidraw-plugin: parsed\n---\nMy notes\n%%\n# Text Elements\nfoo ^x\n# Drawing\n```json\n{}\n```\n%%";
+		expect(extractExcalidrawContent(raw)).toBe("My notes");
+	});
+
+	it("is what readIndexableContent returns for an .excalidraw.md file", async () => {
+		const vault = { cachedRead: vi.fn(async () => drawing()) } as never;
+		const file = { path: "Drawings/Sketch.excalidraw.md", extension: "md", stat: { size: 10 } } as never;
+		expect(await readIndexableContent(vault, file)).toBe("");
 	});
 });

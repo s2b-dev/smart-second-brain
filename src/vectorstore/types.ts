@@ -202,7 +202,7 @@ export interface IndexingProgress {
 }
 
 /** Reasons a file can be skipped during indexing */
-export type SkipReason = "excluded" | "privacy" | "not-indexed" | "read-error" | "embed-error";
+export type SkipReason = "excluded" | "privacy" | "not-indexed" | "read-error" | "embed-error" | "empty";
 
 /** A file that was skipped during indexing, with its reason */
 export interface SkippedFile {

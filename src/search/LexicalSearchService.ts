@@ -20,7 +20,13 @@ import {
 } from "../search/lexicalScoring";
 import { Logger } from "../utils/logging";
 import { StartupProfiler } from "../utils/startupProfiler";
-import { getIndexableVaultFiles, isIndexableFile, readIndexableContent } from "../utils/fileFiltering";
+import {
+	DRAWING_MODIFY_DEBOUNCE_MS,
+	getIndexableVaultFiles,
+	isExcalidrawPath,
+	isIndexableFile,
+	readIndexableContent,
+} from "../utils/fileFiltering";
 import {
 	MiniSearchService,
 	type AutocompleteCacheSnapshot,
@@ -36,7 +42,8 @@ const MAX_SNIPPET_LENGTH = 180;
  * user types, and every save re-read, re-tokenized and re-added the note;
  * the embedding path already waits (5 s, a provider round trip per save). The
  * lexical index is cheap to update, so it waits less — an edit is searchable
- * a couple of seconds after the last keystroke.
+ * a couple of seconds after the last keystroke. Drawings wait longer
+ * (`DRAWING_MODIFY_DEBOUNCE_MS`).
  */
 const MODIFY_DEBOUNCE_MS = 2_000;
 
@@ -429,10 +436,13 @@ export class LexicalSearchService {
 		this.cancelPendingModify(file.path);
 		this.modifyTimers.set(
 			file.path,
-			window.setTimeout(() => {
-				this.modifyTimers.delete(file.path);
-				void this.reindexModifiedFile(file);
-			}, MODIFY_DEBOUNCE_MS),
+			window.setTimeout(
+				() => {
+					this.modifyTimers.delete(file.path);
+					void this.reindexModifiedFile(file);
+				},
+				isExcalidrawPath(file.path) ? DRAWING_MODIFY_DEBOUNCE_MS : MODIFY_DEBOUNCE_MS,
+			),
 		);
 	}
 
