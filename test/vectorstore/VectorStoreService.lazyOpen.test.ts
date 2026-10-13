@@ -216,6 +216,7 @@ vi.mock("../../src/utils/fileFiltering", () => ({
 	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
 	isExcalidrawPath: (path: string) => path.endsWith(".excalidraw.md"),
 	getEmbeddableVaultFiles: () => vaultFiles,
+	hasNoEmbeddableText: (_f: FakeFile, content: string) => content.trim() === "",
 	isEmbeddableFile: () => true,
 	isBinaryTextFile: (f: FakeFile) => f.extension === "pdf",
 	readIndexableContent: async (_vault: unknown, f: FakeFile) => {

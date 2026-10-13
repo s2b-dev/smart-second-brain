@@ -267,9 +267,8 @@ export function getEmbeddableVaultFiles(vault: Vault): TFile[] {
  *   - `.chat` files: extracts only human/AI message content (not LangChain metadata)
  *   - `.pdf` files: extracts the document text via pdfjs, so a PDF is chunked and
  *     embedded like any other long document rather than reduced to its filename
- *   - `.excalidraw.md` files: extracts only the user-written "back of the note",
- *     stripping the frontmatter, Excalidraw's banner and the huge drawing data.
- *     A drawing nobody wrote anything beside comes back empty.
+ *   - `.excalidraw.md` files: extracts the frontmatter and the user-written "back
+ *     of the note", stripping Excalidraw's banner and the huge drawing data.
  *
  * The caller is responsible for filtering via `isIndexableFile`
  * before calling this helper.
@@ -344,6 +343,26 @@ async function readIndexableContentRaw(vault: Vault, file: TFile): Promise<strin
 	}
 
 	return raw;
+}
+
+/**
+ * Whether `content`, as {@link readIndexableContent} returned it for `file`, means
+ * the file has nothing worth embedding — so it is left out rather than stored as a
+ * title-only vector at the similarity noise floor.
+ *
+ * Only a successful plain-text read can say so. An empty extraction from a
+ * container (a PDF, a `.chat` thread) or a file over the mobile size gate may be a
+ * failed or skipped read, and is not a verdict on the file. A drawing's
+ * frontmatter is plugin bookkeeping (`excalidraw-plugin: parsed`) and does not
+ * count as text — every drawing has it, so with it a blank drawing never read as
+ * empty (#541). A plain note's frontmatter does: a TaskNotes task keeps
+ * everything in it.
+ */
+export function hasNoEmbeddableText(file: TFile, content: string): boolean {
+	if (!isTextIndexableFile(file) || file.extension === "chat") return false;
+	if (Platform.isMobile && file.stat.size > MOBILE_MAX_READ_BYTES) return false;
+	const text = isExcalidrawPath(file.path) ? content.replace(RE_LEADING_FRONTMATTER, "") : content;
+	return text.trim() === "";
 }
 
 /**
@@ -685,7 +704,7 @@ function extractMessageContent(msg: unknown): string {
  */
 const RE_EXCALIDRAW_DATA_START = /^#+ (?:Excalidraw Data|Text Elements|Drawing)\s*$/m;
 
-/** The drawing's frontmatter (`excalidraw-plugin: parsed`, tags): plugin bookkeeping. */
+/** A leading frontmatter block. */
 const RE_LEADING_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
@@ -695,19 +714,15 @@ const RE_LEADING_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 const RE_EXCALIDRAW_BANNER = /^==⚠.*$/gm;
 
 /**
- * Extract the user-authored "back of the note" from an `.excalidraw.md` file.
- *
- * Strips the frontmatter, the banner and everything from the drawing data on.
- * Both of the former used to survive, so a blank drawing looked like a note with
- * text and was embedded as boilerplate plus its title — one more vector at the
- * similarity noise floor per drawing, re-embedded on every autosave (#541).
- * Exported for tests.
+ * Extract the frontmatter and the user-authored "back of the note" from an
+ * `.excalidraw.md` file, stripping the banner and everything from the drawing
+ * data on. The frontmatter stays for lexical search, which reads `aliases` from
+ * it; {@link hasNoEmbeddableText} looks past it. Exported for tests.
  */
 export function extractExcalidrawContent(raw: string): string {
 	const match = RE_EXCALIDRAW_DATA_START.exec(raw);
 	// Without the data section it is not a drawing in the format we know; keep it all.
-	let content = match ? raw.substring(0, match.index) : raw;
-	content = content.replace(RE_LEADING_FRONTMATTER, "").replace(RE_EXCALIDRAW_BANNER, "");
+	const content = (match ? raw.substring(0, match.index) : raw).replace(RE_EXCALIDRAW_BANNER, "");
 	// Strip Obsidian comment markers that Excalidraw uses as section fences
 	return content.replace(/%%\s*$/g, "").trim();
 }

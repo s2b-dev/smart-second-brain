@@ -30,6 +30,7 @@ import { chunkText } from "../utils/chunkText";
 import {
 	DRAWING_MODIFY_DEBOUNCE_MS,
 	getEmbeddableVaultFiles,
+	hasNoEmbeddableText,
 	isEmbeddableFile,
 	isExcalidrawPath,
 	readIndexableContent,
@@ -1887,11 +1888,20 @@ export class VectorStoreService {
 			}
 		};
 
+		// Empty-note verdicts found by this run, not yet in the plugin settings.
+		let emptiesUnsaved = false;
+		const saveEmpties = () => {
+			if (!emptiesUnsaved) return;
+			emptiesUnsaved = false;
+			this.persistFailedNotes(inst);
+		};
+
 		/** Pacing after a batch: a checkpoint every interval of notes, a GC pause otherwise. */
 		const afterBatch = async (): Promise<void> => {
 			refreshNotice();
 			if (notesSinceCheckpoint >= BULK_CHECKPOINT_INTERVAL) {
 				notesSinceCheckpoint = 0;
+				saveEmpties();
 				await inst.store.flush();
 				// The notes just flushed are searchable now, so the count the
 				// settings row shows must say so — not only once the run ends,
@@ -1922,9 +1932,12 @@ export class VectorStoreService {
 			try {
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
-				if (!content.trim()) {
+				if (hasNoEmbeddableText(file, content)) {
 					noteSkipped(file.path, "empty");
-					await this.markNoteEmpty(inst, file.path, mtime);
+					// Saved at the next checkpoint: a vault of blank drawings would
+					// otherwise rewrite the plugin settings once per drawing.
+					await this.markNoteEmpty(inst, file.path, mtime, false);
+					emptiesUnsaved = true;
 					continue;
 				}
 				const chunks = chunkText(content, file.basename, maxContentLength);
@@ -1965,6 +1978,7 @@ export class VectorStoreService {
 		// Notes whose chunks were not all embedded (a stopped run) were never
 		// written; the next validation finds them missing.
 		pendingNotes.clear();
+		saveEmpties();
 
 		const cancelled = aborted();
 		if (stopped && !cancelled) {
@@ -2069,7 +2083,7 @@ export class VectorStoreService {
 		let chunks: ReturnType<typeof chunkText>;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
-			if (!content.trim()) {
+			if (hasNoEmbeddableText(file, content)) {
 				await this.markNoteEmpty(inst, file.path, mtime);
 				return;
 			}
@@ -2150,11 +2164,11 @@ export class VectorStoreService {
 	 * store holds for the path — an earlier version that did have text must not
 	 * keep the note searchable by content it no longer has.
 	 */
-	private async markNoteEmpty(inst: IndexInstance, path: string, mtime: number): Promise<void> {
-		inst.failedNotes.delete(path);
-		if (inst.emptyNotes.get(path) !== mtime) {
+	private async markNoteEmpty(inst: IndexInstance, path: string, mtime: number, persist = true): Promise<void> {
+		const hadFailure = inst.failedNotes.delete(path);
+		if (inst.emptyNotes.get(path) !== mtime || hadFailure) {
 			inst.emptyNotes.set(path, mtime);
-			this.persistFailedNotes(inst);
+			if (persist) this.persistFailedNotes(inst);
 		}
 		try {
 			await inst.store.remove(path);

@@ -11,6 +11,7 @@ installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined
 
 import {
 	extractExcalidrawContent,
+	hasNoEmbeddableText,
 	isAgentFilePath,
 	isAgentPath,
 	isEmbeddableFile,
@@ -505,26 +506,49 @@ describe("Excalidraw drawings (#541)", () => {
 		expect(isIndexableFile(f("Drawings/Sketch.excalidraw", "excalidraw"))).toBe(true);
 	});
 
-	it("reduces a blank drawing to nothing — no frontmatter, banner, text elements or scene", () => {
-		// The frontmatter and banner used to survive, so a blank drawing was embedded
-		// as boilerplate plus its title on every autosave.
-		expect(extractExcalidrawContent(drawing())).toBe("");
+	const sketch = { path: "Drawings/Sketch.excalidraw.md", extension: "md", stat: { size: 10 } } as never;
+
+	it("drops the banner, text elements and scene, keeping frontmatter and the back of the note", () => {
+		const out = extractExcalidrawContent(drawing("Architecture sketch for the [[Sync engine]] rewrite."));
+		expect(out).not.toContain("Switch to EXCALIDRAW VIEW");
+		expect(out).not.toContain("Label on a box");
+		expect(out).not.toContain("N4KAk");
+		// Lexical search reads `aliases` from the frontmatter.
+		expect(out).toContain("excalidraw-plugin: parsed");
+		expect(out.endsWith("Architecture sketch for the [[Sync engine]] rewrite.")).toBe(true);
 	});
 
-	it("keeps only what the user wrote on the back of the note", () => {
-		const out = extractExcalidrawContent(drawing("Architecture sketch for the [[Sync engine]] rewrite."));
-		expect(out).toBe("Architecture sketch for the [[Sync engine]] rewrite.");
+	it("reads a blank drawing as having no text to embed — its frontmatter is bookkeeping", async () => {
+		// The frontmatter and banner used to count as text, so a blank drawing was
+		// embedded as boilerplate plus its title on every autosave.
+		const vault = { cachedRead: vi.fn(async () => drawing()) } as never;
+		expect(hasNoEmbeddableText(sketch, await readIndexableContent(vault, sketch))).toBe(true);
+		expect(hasNoEmbeddableText(sketch, extractExcalidrawContent(drawing("A note")))).toBe(false);
 	});
 
 	it("handles the older format whose data section starts at # Text Elements, behind a %% fence", () => {
 		const raw =
 			"---\nexcalidraw-plugin: parsed\n---\nMy notes\n%%\n# Text Elements\nfoo ^x\n# Drawing\n```json\n{}\n```\n%%";
-		expect(extractExcalidrawContent(raw)).toBe("My notes");
+		expect(extractExcalidrawContent(raw)).toBe("---\nexcalidraw-plugin: parsed\n---\nMy notes");
+	});
+});
+
+describe("hasNoEmbeddableText", () => {
+	const f = (path: string, extension: string) => ({ path, extension, stat: { size: 10 } }) as never;
+
+	it("is true for a blank note", () => {
+		expect(hasNoEmbeddableText(f("Notes/Untitled.md", "md"), "  \n")).toBe(true);
+		expect(hasNoEmbeddableText(f("Notes/Idea.md", "md"), "an idea")).toBe(false);
 	});
 
-	it("is what readIndexableContent returns for an .excalidraw.md file", async () => {
-		const vault = { cachedRead: vi.fn(async () => drawing()) } as never;
-		const file = { path: "Drawings/Sketch.excalidraw.md", extension: "md", stat: { size: 10 } } as never;
-		expect(await readIndexableContent(vault, file)).toBe("");
+	it("counts a plain note's frontmatter as text: a task note keeps everything there", () => {
+		expect(hasNoEmbeddableText(f("Tasks/Pay rent.md", "md"), "---\nstatus: open\ndue: 2026-11-01\n---\n")).toBe(
+			false,
+		);
+	});
+
+	it("never takes an empty extraction from a container as a verdict: it may be a failed read", () => {
+		expect(hasNoEmbeddableText(f("Papers/scan.pdf", "pdf"), "")).toBe(false);
+		expect(hasNoEmbeddableText(f("Chats/Thread.chat", "chat"), "")).toBe(false);
 	});
 });
