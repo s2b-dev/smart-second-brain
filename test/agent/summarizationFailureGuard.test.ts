@@ -255,6 +255,36 @@ describe("guardSummarizationFailure — repeated failures and dropped history", 
 		expect(onRepeatedFailure).toHaveBeenCalledTimes(2);
 	});
 
+	it("counts failure streaks per thread, not across chats sharing the runnable", async () => {
+		const onRepeatedFailure = vi.fn();
+		const failingThreads = new Set(["a", "b"]);
+		const middleware = guardSummarizationFailure(
+			makeMiddleware({
+				invoke: async (_prompt: unknown, config: unknown) => {
+					const threadId = (config as { configurable?: { thread_id?: string } }).configurable?.thread_id;
+					if (threadId && failingThreads.has(threadId)) throw new Error("boom");
+					return new AIMessage({ content: "A proper summary." });
+				},
+			}),
+			{ onRepeatedFailure },
+		);
+		const run = (threadId: string) =>
+			(middleware.beforeModel as BeforeModel)(
+				{ messages: longConversation() },
+				{ context: {}, configurable: { thread_id: threadId } },
+			);
+
+		// Two failures in "a", then one in "b": neither thread reached the threshold.
+		for (let i = 1; i < SUMMARY_FAILURE_NOTICE_THRESHOLD; i++) await run("a");
+		await run("b");
+		expect(onRepeatedFailure).not.toHaveBeenCalled();
+
+		// A success in "c" must not reset "a"'s streak.
+		await run("c");
+		await run("a");
+		expect(onRepeatedFailure).toHaveBeenCalledTimes(1);
+	});
+
 	it("does not report a failure streak for failures interrupted by no-ops", async () => {
 		const onRepeatedFailure = vi.fn();
 		const middleware = guardSummarizationFailure(makeMiddleware(failingModel()), { onRepeatedFailure });

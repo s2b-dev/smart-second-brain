@@ -144,9 +144,11 @@ export interface SummarizationGuardOptions {
  * summarization simply retries on the next turn. Success and no-op updates
  * pass through untouched.
  *
- * Failures are counted across turns; after
- * `SUMMARY_FAILURE_NOTICE_THRESHOLD` in a row `onRepeatedFailure` fires once,
- * since by then the history keeps growing toward the provider's limit. A
+ * Failures are counted across turns, per thread (the runnable is cached per
+ * agent config and shared by every chat, so a single counter would mix
+ * chats); after `SUMMARY_FAILURE_NOTICE_THRESHOLD` in a row in one thread
+ * `onRepeatedFailure` fires once, since by then that thread's history keeps
+ * growing toward the provider's limit. A
  * successful summary is measured against the trim budget and reports any
  * history that was dropped unsummarized.
  */
@@ -157,11 +159,13 @@ export function guardSummarizationFailure<T extends { beforeModel?: unknown }>(
 	const inner = middleware.beforeModel;
 	if (typeof inner !== "function") return middleware;
 
-	let consecutiveFailures = 0;
+	const failuresByThread = new Map<string, number>();
 	middleware.beforeModel = async (...args: unknown[]) => {
 		const update = await inner.apply(middleware, args);
+		const threadId = getThreadId(args[1]);
 		if (isFailedSummaryUpdate(update)) {
-			consecutiveFailures++;
+			const consecutiveFailures = (failuresByThread.get(threadId) ?? 0) + 1;
+			failuresByThread.set(threadId, consecutiveFailures);
 			const summary = getUpdateMessages(update)?.find(isSummaryMessage)?.content;
 			Logger.warn(
 				`[Agent] Summary generation failed (${consecutiveFailures} in a row) — keeping the full history this turn; summarization retries next turn.`,
@@ -175,12 +179,18 @@ export function guardSummarizationFailure<T extends { beforeModel?: unknown }>(
 
 		const updateMessages = getUpdateMessages(update);
 		if (updateMessages?.some(isSummaryMessage)) {
-			consecutiveFailures = 0;
+			failuresByThread.delete(threadId);
 			await reportDroppedHistory(args[0], updateMessages, options);
 		}
 		return update;
 	};
 	return middleware;
+}
+
+/** The run's thread id from the middleware runtime (`configurable.thread_id`). */
+function getThreadId(runtime: unknown): string {
+	const threadId = (runtime as { configurable?: { thread_id?: unknown } } | null)?.configurable?.thread_id;
+	return typeof threadId === "string" ? threadId : "";
 }
 
 async function reportDroppedHistory(
