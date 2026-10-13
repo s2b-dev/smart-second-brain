@@ -63,6 +63,8 @@ vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 }));
 vi.mock("../../src/stores/dataStore.svelte", () => ({ getData: () => ({ vaultSlug: "vault-1" }) }));
 vi.mock("../../src/utils/fileFiltering", () => ({
+	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
+	isExcalidrawPath: (path: string) => path.endsWith(".excalidraw.md"),
 	getIndexableVaultFiles: () => vaultFiles,
 	isIndexableFile: () => true,
 	isBinaryTextFile: () => false,
@@ -217,6 +219,25 @@ describe("LexicalSearchService.validateIndex", () => {
 		await vi.advanceTimersByTimeAsync(2_000);
 		expect(removeDocument).toHaveBeenCalledWith("a.md");
 		expect(addDocument.mock.calls.map(([path]) => path)).toEqual(["b.md"]);
+	});
+
+	it("waits for a drawing to be left alone before re-reading it, not for each autosave (#541)", async () => {
+		loaded = new Map([["Sketch.excalidraw.md", 1_000]]);
+		vaultFiles = [file("Sketch.excalidraw.md", 1_000)];
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+		addDocument.mockClear();
+		const hooks = service as unknown as { handleFileModify(file: FakeFile): void };
+
+		for (let mtime = 2_000; mtime <= 6_000; mtime += 1_000) {
+			vaultFiles[0].stat.mtime = mtime;
+			hooks.handleFileModify(vaultFiles[0]);
+			await vi.advanceTimersByTimeAsync(5_000);
+		}
+		expect(addDocument).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(25_000);
+		expect(addDocument).toHaveBeenCalledTimes(1);
 	});
 
 	it("leaves an index that matches the vault alone", async () => {

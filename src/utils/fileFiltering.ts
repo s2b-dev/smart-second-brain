@@ -130,9 +130,13 @@ const BINARY_TEXT_EXTENSIONS = new Set(["pdf"]);
  *   - images: no text to extract. Embedding them would require a multimodal
  *     embedding model and a separate image pipeline; until that exists they are
  *     pure noise rather than a missing feature.
+ *   - `excalidraw`: a bare Excalidraw scene — JSON shapes, no prose. (The
+ *     `.excalidraw.md` form is a markdown note and is decided by its content:
+ *     see {@link readIndexableContent}.)
  */
 const NON_EMBEDDABLE_EXTENSIONS = new Set([
 	"base",
+	"excalidraw",
 	"png",
 	"jpg",
 	"jpeg",
@@ -225,6 +229,24 @@ export function isEmbeddableFile(file: TFile): boolean {
 	return !NON_EMBEDDABLE_EXTENSIONS.has(extension);
 }
 
+/** Returns `true` for an Excalidraw drawing, in either its `.excalidraw.md` or bare `.excalidraw` form. */
+export function isExcalidrawPath(path: string): boolean {
+	const lower = path.toLowerCase();
+	return lower.endsWith(".excalidraw.md") || lower.endsWith(".excalidraw");
+}
+
+/**
+ * Debounce before re-indexing a modified Excalidraw drawing.
+ *
+ * Excalidraw autosaves every few seconds while the user draws, and each save
+ * rewrites the whole file — the scene JSON included. The indexers' normal
+ * debounce (a couple of seconds) fell between those saves, so every one of them
+ * re-read the full file on the main thread mid-stroke (#541). What a drawing
+ * contributes to search — its title and the text on the back of the note — rarely
+ * changes while drawing, so it is picked up once the drawing has been left alone.
+ */
+export const DRAWING_MODIFY_DEBOUNCE_MS = 30_000;
+
 /**
  * Enumerate all vault files eligible for indexing (replaces
  * `vault.getMarkdownFiles()` in search / vectorstore callers).
@@ -245,8 +267,8 @@ export function getEmbeddableVaultFiles(vault: Vault): TFile[] {
  *   - `.chat` files: extracts only human/AI message content (not LangChain metadata)
  *   - `.pdf` files: extracts the document text via pdfjs, so a PDF is chunked and
  *     embedded like any other long document rather than reduced to its filename
- *   - `.excalidraw.md` files: extracts the "back of the note" and text elements,
- *     stripping the huge embedded JSON drawing data
+ *   - `.excalidraw.md` files: extracts the frontmatter and the user-written "back
+ *     of the note", stripping Excalidraw's banner and the huge drawing data.
  *
  * The caller is responsible for filtering via `isIndexableFile`
  * before calling this helper.
@@ -321,6 +343,26 @@ async function readIndexableContentRaw(vault: Vault, file: TFile): Promise<strin
 	}
 
 	return raw;
+}
+
+/**
+ * Whether `content`, as {@link readIndexableContent} returned it for `file`, means
+ * the file has nothing worth embedding — so it is left out rather than stored as a
+ * title-only vector at the similarity noise floor.
+ *
+ * Only a successful plain-text read can say so. An empty extraction from a
+ * container (a PDF, a `.chat` thread) or a file over the mobile size gate may be a
+ * failed or skipped read, and is not a verdict on the file. A drawing's
+ * frontmatter is plugin bookkeeping (`excalidraw-plugin: parsed`) and does not
+ * count as text — every drawing has it, so with it a blank drawing never read as
+ * empty (#541). A plain note's frontmatter does: a TaskNotes task keeps
+ * everything in it.
+ */
+export function hasNoEmbeddableText(file: TFile, content: string): boolean {
+	if (!isTextIndexableFile(file) || file.extension === "chat") return false;
+	if (Platform.isMobile && file.stat.size > MOBILE_MAX_READ_BYTES) return false;
+	const text = isExcalidrawPath(file.path) ? content.replace(RE_LEADING_FRONTMATTER, "") : content;
+	return text.trim() === "";
 }
 
 /**
@@ -662,22 +704,25 @@ function extractMessageContent(msg: unknown): string {
  */
 const RE_EXCALIDRAW_DATA_START = /^#+ (?:Excalidraw Data|Text Elements|Drawing)\s*$/m;
 
+/** A leading frontmatter block. */
+const RE_LEADING_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+
 /**
- * Extract the user-authored "back of the note" from an `.excalidraw.md` file.
- * Strips the frontmatter-tagged Excalidraw sections and the huge JSON drawing.
+ * The "==⚠ Switch to EXCALIDRAW VIEW … ⚠==" warning Excalidraw writes into every
+ * drawing for readers who open it as markdown — the same boilerplate in each file.
  */
-function extractExcalidrawContent(raw: string): string {
+const RE_EXCALIDRAW_BANNER = /^==⚠.*$/gm;
+
+/**
+ * Extract the frontmatter and the user-authored "back of the note" from an
+ * `.excalidraw.md` file, stripping the banner and everything from the drawing
+ * data on. The frontmatter stays for lexical search, which reads `aliases` from
+ * it; {@link hasNoEmbeddableText} looks past it. Exported for tests.
+ */
+export function extractExcalidrawContent(raw: string): string {
 	const match = RE_EXCALIDRAW_DATA_START.exec(raw);
-	if (!match) {
-		// No Excalidraw markers found — treat the whole file as content
-		return raw;
-	}
-
-	// Everything before the first Excalidraw section header
-	let content = raw.substring(0, match.index);
-
+	// Without the data section it is not a drawing in the format we know; keep it all.
+	const content = (match ? raw.substring(0, match.index) : raw).replace(RE_EXCALIDRAW_BANNER, "");
 	// Strip Obsidian comment markers that Excalidraw uses as section fences
-	content = content.replace(/%%\s*$/g, "").trim();
-
-	return content;
+	return content.replace(/%%\s*$/g, "").trim();
 }

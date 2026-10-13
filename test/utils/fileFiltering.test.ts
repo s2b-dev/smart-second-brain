@@ -10,9 +10,12 @@ import { installAgentPathSource } from "../../src/utils/agentPathSource";
 installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined });
 
 import {
+	extractExcalidrawContent,
+	hasNoEmbeddableText,
 	isAgentFilePath,
 	isAgentPath,
 	isEmbeddableFile,
+	isExcalidrawPath,
 	isIndexableFile,
 	readIndexableContent,
 } from "../../src/utils/fileFiltering";
@@ -456,5 +459,96 @@ describe("rename into a non-embeddable extension", () => {
 		// It stays lexically searchable by name, so the rename must not evict it from
 		// the MiniSearch index — only re-key it.
 		expect(isIndexableFile(after)).toBe(true);
+	});
+});
+
+/** An `.excalidraw.md` file as the Excalidraw plugin writes it, with `back` as the back of the note. */
+function drawing(back = ""): string {
+	return [
+		"---",
+		"",
+		"excalidraw-plugin: parsed",
+		"tags: [excalidraw]",
+		"",
+		"---",
+		"==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'",
+		"",
+		back,
+		"",
+		"# Excalidraw Data",
+		"",
+		"## Text Elements",
+		"Label on a box ^aBcD1234",
+		"",
+		"%%",
+		"## Drawing",
+		"```compressed-json",
+		"N4KAkARALgngDgUwgLgAQQQDwMYEMA2AlgCYBOuA7hADTgQBuCpAzoQPYB2KqATLZMzYBXUtiRoIACyhQ4zZAHoFAc0JRJQgEYA6bGwC2",
+		"```",
+		"%%",
+	].join("\n");
+}
+
+describe("Excalidraw drawings (#541)", () => {
+	const f = (path: string, extension: string) => ({ path, extension }) as never;
+
+	it("recognises both drawing forms by path", () => {
+		expect(isExcalidrawPath("Drawings/Sketch.excalidraw.md")).toBe(true);
+		expect(isExcalidrawPath("Drawings/Sketch.Excalidraw.MD")).toBe(true);
+		expect(isExcalidrawPath("Drawings/Sketch.excalidraw")).toBe(true);
+		expect(isExcalidrawPath("Notes/excalidraw.md")).toBe(false);
+		expect(isExcalidrawPath("Notes/On Excalidraw.md")).toBe(false);
+	});
+
+	it("never embeds a bare .excalidraw scene, but keeps it findable by name", () => {
+		installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined });
+		expect(isEmbeddableFile(f("Drawings/Sketch.excalidraw", "excalidraw"))).toBe(false);
+		expect(isIndexableFile(f("Drawings/Sketch.excalidraw", "excalidraw"))).toBe(true);
+	});
+
+	const sketch = { path: "Drawings/Sketch.excalidraw.md", extension: "md", stat: { size: 10 } } as never;
+
+	it("drops the banner, text elements and scene, keeping frontmatter and the back of the note", () => {
+		const out = extractExcalidrawContent(drawing("Architecture sketch for the [[Sync engine]] rewrite."));
+		expect(out).not.toContain("Switch to EXCALIDRAW VIEW");
+		expect(out).not.toContain("Label on a box");
+		expect(out).not.toContain("N4KAk");
+		// Lexical search reads `aliases` from the frontmatter.
+		expect(out).toContain("excalidraw-plugin: parsed");
+		expect(out.endsWith("Architecture sketch for the [[Sync engine]] rewrite.")).toBe(true);
+	});
+
+	it("reads a blank drawing as having no text to embed — its frontmatter is bookkeeping", async () => {
+		// The frontmatter and banner used to count as text, so a blank drawing was
+		// embedded as boilerplate plus its title on every autosave.
+		const vault = { cachedRead: vi.fn(async () => drawing()) } as never;
+		expect(hasNoEmbeddableText(sketch, await readIndexableContent(vault, sketch))).toBe(true);
+		expect(hasNoEmbeddableText(sketch, extractExcalidrawContent(drawing("A note")))).toBe(false);
+	});
+
+	it("handles the older format whose data section starts at # Text Elements, behind a %% fence", () => {
+		const raw =
+			"---\nexcalidraw-plugin: parsed\n---\nMy notes\n%%\n# Text Elements\nfoo ^x\n# Drawing\n```json\n{}\n```\n%%";
+		expect(extractExcalidrawContent(raw)).toBe("---\nexcalidraw-plugin: parsed\n---\nMy notes");
+	});
+});
+
+describe("hasNoEmbeddableText", () => {
+	const f = (path: string, extension: string) => ({ path, extension, stat: { size: 10 } }) as never;
+
+	it("is true for a blank note", () => {
+		expect(hasNoEmbeddableText(f("Notes/Untitled.md", "md"), "  \n")).toBe(true);
+		expect(hasNoEmbeddableText(f("Notes/Idea.md", "md"), "an idea")).toBe(false);
+	});
+
+	it("counts a plain note's frontmatter as text: a task note keeps everything there", () => {
+		expect(hasNoEmbeddableText(f("Tasks/Pay rent.md", "md"), "---\nstatus: open\ndue: 2026-11-01\n---\n")).toBe(
+			false,
+		);
+	});
+
+	it("never takes an empty extraction from a container as a verdict: it may be a failed read", () => {
+		expect(hasNoEmbeddableText(f("Papers/scan.pdf", "pdf"), "")).toBe(false);
+		expect(hasNoEmbeddableText(f("Chats/Thread.chat", "chat"), "")).toBe(false);
 	});
 });

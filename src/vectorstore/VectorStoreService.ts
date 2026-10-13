@@ -27,7 +27,14 @@ import {
 import { ensureProviderRegistered } from "../providers/registrySync";
 import { getData } from "../stores/dataStore.svelte";
 import { chunkText } from "../utils/chunkText";
-import { getEmbeddableVaultFiles, isEmbeddableFile, readIndexableContent } from "../utils/fileFiltering";
+import {
+	DRAWING_MODIFY_DEBOUNCE_MS,
+	getEmbeddableVaultFiles,
+	hasNoEmbeddableText,
+	isEmbeddableFile,
+	isExcalidrawPath,
+	readIndexableContent,
+} from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 import { matchesPathPrefix } from "../utils/pathUtils";
 import { isConnectionRefusedError, isDocumentRejectionError, isProviderUnreachableError } from "../lib/transportErrors";
@@ -263,6 +270,16 @@ interface IndexInstance {
 	 * `clearStore` drops it, so a rebuild tries everything again.
 	 */
 	failedNotes: Map<string, number>;
+	/**
+	 * Notes with no text to embed, keyed by path with the mtime they were read
+	 * at. Embedding one would store a title-only vector — noise-floor similarity
+	 * against any query — so it is left out, and remembered like `failedNotes`
+	 * so validation does not re-read it on every launch. That matters for
+	 * Excalidraw drawings: most never get text beside the drawing, and reading
+	 * one means reading its whole scene (#541). Mirrored in
+	 * `EmbeddingIndexConfig.emptyNotes`.
+	 */
+	emptyNotes: Map<string, number>;
 	progress: IndexingProgress;
 	/** Timestamp (ms) when the current indexing run started, for ETA estimation */
 	indexingStartedAt: number | null;
@@ -509,6 +526,7 @@ export class VectorStoreService {
 			buildPromise: null,
 			activeBulkRun: null,
 			failedNotes: new Map(Object.entries(getData().getEmbeddingIndex(indexId)?.failedNotes ?? {})),
+			emptyNotes: new Map(Object.entries(getData().getEmbeddingIndex(indexId)?.emptyNotes ?? {})),
 			progress: {
 				isIndexing: false,
 				total: 0,
@@ -962,9 +980,9 @@ export class VectorStoreService {
 			vaultPaths.add(file.path);
 			const indexed = indexedMap.get(file.path);
 			if (!indexed) {
-				// A note the provider rejected at this very mtime is not retried;
-				// an edit (any mtime change) puts it back in play.
-				if (inst.failedNotes.get(file.path) === file.stat.mtime) {
+				// A note the provider rejected, or found empty, at this very mtime
+				// is not retried; an edit (any mtime change) puts it back in play.
+				if (this.rememberedSkip(inst, file)) {
 					failedSkipped++;
 					continue;
 				}
@@ -986,9 +1004,7 @@ export class VectorStoreService {
 		// dead weight; drop them here rather than carrying them for good.
 		this.pruneFailedNotes(inst, vaultFiles);
 		if (failedSkipped > 0) {
-			Logger.log(
-				`[VectorStore] ${inst.indexId}: leaving ${failedSkipped} note(s) the provider rejected unchanged`,
-			);
+			Logger.log(`[VectorStore] ${inst.indexId}: leaving ${failedSkipped} rejected or empty note(s) unchanged`);
 		}
 
 		const totalUpdates = missingFiles.length + staleFiles.length + orphanedPaths.length;
@@ -1102,10 +1118,15 @@ export class VectorStoreService {
 	private registerEvents(): void {
 		const { vault } = this.plugin.app;
 
+		// A new file is debounced like an edit. It is usually created empty and
+		// written to right away — a new note while the user types its first
+		// line, a new drawing as Excalidraw saves its first strokes — and
+		// embedding it on the spot cost a provider round trip for content that
+		// was stale within seconds (#541).
 		this.plugin.registerEvent(
-			vault.on("create", async (file) => {
+			vault.on("create", (file) => {
 				if (file instanceof TFile && isEmbeddableFile(file)) {
-					await this.handleFileCreate(file);
+					this.handleFileModify(file);
 				}
 			}),
 		);
@@ -1178,20 +1199,9 @@ export class VectorStoreService {
 	}
 
 	/**
-	 * Handle new file creation — forward to active instances only.
-	 * Inactive instances are marked for re-validation on next use.
-	 */
-	private async handleFileCreate(file: TFile): Promise<void> {
-		for (const inst of this.instances.values()) {
-			if (!this.canApplyEvent(inst)) continue;
-			await this.indexDocumentForInstance(inst, file);
-			void this.notifyStatsChanged(inst);
-		}
-	}
-
-	/**
-	 * Handle file modification — debounce re-embedding until 10s of inactivity.
-	 * Inactive instances are marked for re-validation on next use.
+	 * Handle file creation or modification — debounce re-embedding until
+	 * `MODIFY_DEBOUNCE_MS` of inactivity (`DRAWING_MODIFY_DEBOUNCE_MS` for a
+	 * drawing). Inactive instances are marked for re-validation on next use.
 	 */
 	private handleFileModify(file: TFile): void {
 		const existing = this.modifyTimers.get(file.path);
@@ -1199,10 +1209,13 @@ export class VectorStoreService {
 
 		this.modifyTimers.set(
 			file.path,
-			window.setTimeout(() => {
-				this.modifyTimers.delete(file.path);
-				void this.reindexModifiedFile(file);
-			}, MODIFY_DEBOUNCE_MS),
+			window.setTimeout(
+				() => {
+					this.modifyTimers.delete(file.path);
+					void this.reindexModifiedFile(file);
+				},
+				isExcalidrawPath(file.path) ? DRAWING_MODIFY_DEBOUNCE_MS : MODIFY_DEBOUNCE_MS,
+			),
 		);
 	}
 
@@ -1538,17 +1551,15 @@ export class VectorStoreService {
 		const { vault } = this.plugin.app;
 		const allFiles = getEmbeddableVaultFiles(vault);
 
-		// Categorize files by skip reason. A note the provider rejected at this
-		// very mtime is skipped here as it is by validation: a store emptied by
-		// such rejections takes this path on every launch, and would retry them.
+		// Categorize files by skip reason. A note the provider rejected, or found
+		// empty, at this very mtime is skipped here as it is by validation: a store
+		// emptied by such notes takes this path on every launch, and would retry them.
 		const files: TFile[] = [];
 		const skippedFiles: SkippedFile[] = [];
 		for (const file of allFiles) {
-			const reason = this.getFileSkipReason(file, model.provider);
+			const reason = this.getFileSkipReason(file, model.provider) ?? this.rememberedSkip(inst, file);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
-			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
-				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				files.push(file);
 			}
@@ -1877,11 +1888,20 @@ export class VectorStoreService {
 			}
 		};
 
+		// Empty-note verdicts found by this run, not yet in the plugin settings.
+		let emptiesUnsaved = false;
+		const saveEmpties = () => {
+			if (!emptiesUnsaved) return;
+			emptiesUnsaved = false;
+			this.persistFailedNotes(inst);
+		};
+
 		/** Pacing after a batch: a checkpoint every interval of notes, a GC pause otherwise. */
 		const afterBatch = async (): Promise<void> => {
 			refreshNotice();
 			if (notesSinceCheckpoint >= BULK_CHECKPOINT_INTERVAL) {
 				notesSinceCheckpoint = 0;
+				saveEmpties();
 				await inst.store.flush();
 				// The notes just flushed are searchable now, so the count the
 				// settings row shows must say so — not only once the run ends,
@@ -1912,6 +1932,14 @@ export class VectorStoreService {
 			try {
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
+				if (hasNoEmbeddableText(file, content)) {
+					noteSkipped(file.path, "empty");
+					// Saved at the next checkpoint: a vault of blank drawings would
+					// otherwise rewrite the plugin settings once per drawing.
+					await this.markNoteEmpty(inst, file.path, mtime, false);
+					emptiesUnsaved = true;
+					continue;
+				}
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				pendingNotes.set(file.path, { mtime, expected: chunks.length, vectors: new Map() });
 				for (const chunk of chunks) {
@@ -1950,6 +1978,7 @@ export class VectorStoreService {
 		// Notes whose chunks were not all embedded (a stopped run) were never
 		// written; the next validation finds them missing.
 		pendingNotes.clear();
+		saveEmpties();
 
 		const cancelled = aborted();
 		if (stopped && !cancelled) {
@@ -2054,6 +2083,10 @@ export class VectorStoreService {
 		let chunks: ReturnType<typeof chunkText>;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
+			if (hasNoEmbeddableText(file, content)) {
+				await this.markNoteEmpty(inst, file.path, mtime);
+				return;
+			}
 			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
 			chunks = chunkText(content, file.basename, maxContentLength);
 		} catch (error) {
@@ -2126,32 +2159,64 @@ export class VectorStoreService {
 		}
 	}
 
+	/**
+	 * The note has no text to embed at this mtime. Record it, and drop what the
+	 * store holds for the path — an earlier version that did have text must not
+	 * keep the note searchable by content it no longer has.
+	 */
+	private async markNoteEmpty(inst: IndexInstance, path: string, mtime: number, persist = true): Promise<void> {
+		const hadFailure = inst.failedNotes.delete(path);
+		if (inst.emptyNotes.get(path) !== mtime || hadFailure) {
+			inst.emptyNotes.set(path, mtime);
+			if (persist) this.persistFailedNotes(inst);
+		}
+		try {
+			await inst.store.remove(path);
+		} catch (error) {
+			Logger.warn(`[VectorStore] Could not drop the stored rows of empty note ${path}:`, error);
+		}
+	}
+
+	/** Why a not-yet-indexed note is left out at its current mtime, if it was rejected or found empty. */
+	private rememberedSkip(inst: IndexInstance, file: TFile): SkipReason | null {
+		if (inst.failedNotes.get(file.path) === file.stat.mtime) return "embed-error";
+		if (inst.emptyNotes.get(file.path) === file.stat.mtime) return "empty";
+		return null;
+	}
+
 	private recordNoteFailure(inst: IndexInstance, path: string, mtime: number): void {
 		if (inst.failedNotes.get(path) === mtime) return;
 		inst.failedNotes.set(path, mtime);
+		inst.emptyNotes.delete(path);
 		this.persistFailedNotes(inst);
 	}
 
 	private clearNoteFailure(inst: IndexInstance, path: string): void {
-		if (!inst.failedNotes.delete(path)) return;
-		this.persistFailedNotes(inst);
+		const hadFailure = inst.failedNotes.delete(path);
+		const wasEmpty = inst.emptyNotes.delete(path);
+		if (hadFailure || wasEmpty) this.persistFailedNotes(inst);
 	}
 
-	/** Forget failures of notes that are gone from the vault or have changed since. */
+	/** Forget failed and empty verdicts of notes that are gone from the vault or have changed since. */
 	private pruneFailedNotes(inst: IndexInstance, vaultFiles: TFile[]): void {
-		if (inst.failedNotes.size === 0) return;
+		if (inst.failedNotes.size === 0 && inst.emptyNotes.size === 0) return;
 		const current = new Map(vaultFiles.map((file) => [file.path, file.stat.mtime]));
 		let changed = false;
-		for (const [path, mtime] of inst.failedNotes) {
-			if (current.get(path) === mtime) continue;
-			inst.failedNotes.delete(path);
-			changed = true;
+		for (const verdicts of [inst.failedNotes, inst.emptyNotes]) {
+			for (const [path, mtime] of verdicts) {
+				if (current.get(path) === mtime) continue;
+				verdicts.delete(path);
+				changed = true;
+			}
 		}
 		if (changed) this.persistFailedNotes(inst);
 	}
 
 	private persistFailedNotes(inst: IndexInstance): void {
-		getData().updateEmbeddingIndexStats(inst.indexId, { failedNotes: Object.fromEntries(inst.failedNotes) });
+		getData().updateEmbeddingIndexStats(inst.indexId, {
+			failedNotes: Object.fromEntries(inst.failedNotes),
+			emptyNotes: Object.fromEntries(inst.emptyNotes),
+		});
 	}
 
 	/**
@@ -2429,11 +2494,9 @@ export class VectorStoreService {
 		for (const file of allFiles) {
 			if (indexedPaths.has(file.path)) continue;
 
-			const reason = this.getFileSkipReason(file, provider);
+			const reason = this.getFileSkipReason(file, provider) ?? this.rememberedSkip(inst, file);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
-			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
-				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				// File passed filters but isn't indexed yet
 				skippedFiles.push({ path: file.path, reason: "not-indexed" });
@@ -2577,7 +2640,13 @@ export class VectorStoreService {
 	private async clearStore(inst: IndexInstance): Promise<void> {
 		await inst.store.clear();
 		inst.failedNotes.clear();
-		getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: null, documentCount: 0, failedNotes: {} });
+		inst.emptyNotes.clear();
+		getData().updateEmbeddingIndexStats(inst.indexId, {
+			lastBuiltAt: null,
+			documentCount: 0,
+			failedNotes: {},
+			emptyNotes: {},
+		});
 	}
 
 	/**
