@@ -7,7 +7,7 @@ import type { BaseCheckpointSaver, CheckpointTuple } from "@langchain/langgraph"
 import { MemorySaver } from "@langchain/langgraph";
 import { type ReactAgent, createAgent, summarizationMiddleware } from "langchain";
 import { createSubAgentMiddleware } from "deepagents/browser";
-import { TFile } from "obsidian";
+import { Notice, TFile } from "obsidian";
 
 import { ProviderEndpointError } from "../providers/errors";
 import type { ChatModelConfig } from "../providers/index";
@@ -27,6 +27,7 @@ import {
 import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { extractTextFromPdf } from "../utils/pdfExtractor";
 import { Logger } from "../utils/logging";
+import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
 import { normalizeMessages } from "./messageNormalization";
 import { type ThreadSnapshot, type ThreadStore, createSnapshot } from "./memory/ThreadStore";
 import {
@@ -613,7 +614,7 @@ export class Agent {
 				systemPrompt,
 				checkpointer: this.checkpointer,
 				middleware: [
-					...this.buildSummarizationMiddleware(selectedModel, resolvedSummarization),
+					...this.buildSummarizationMiddleware(selectedModel, systemPrompt, resolvedSummarization),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
 				] as never,
 			});
@@ -632,7 +633,11 @@ export class Agent {
 		};
 	}
 
-	private buildSummarizationMiddleware(selectedModel: SelectedModel, summarizationModel?: SelectedModel) {
+	private buildSummarizationMiddleware(
+		selectedModel: SelectedModel,
+		systemPrompt: string,
+		summarizationModel?: SelectedModel,
+	) {
 		const model = summarizationModel?.instance ?? selectedModel.instance;
 		const contextWindow = selectedModel.options?.contextWindow;
 		const triggerTokens = getSummarizationTriggerTokens(contextWindow);
@@ -643,7 +648,14 @@ export class Agent {
 			return [];
 		}
 
-		const trimTokensToSummarize = getTrimTokensToSummarize(triggerTokens);
+		// The summarizer reads what it replaces, bounded by its OWN window: the
+		// dedicated summary model's when one is set, else the chat model's.
+		const summarizerContextWindow = summarizationModel ? summarizationModel.options?.contextWindow : contextWindow;
+		const trimTokensToSummarize = getTrimTokensToSummarize(summarizerContextWindow, triggerTokens);
+		// The middleware only counts messages; the system prompt rides along on
+		// every request outside them. Lowering the trigger by its size makes it
+		// fire at the same total the context meter shows (#545).
+		const messageTriggerTokens = Math.max(triggerTokens - estimateSystemPromptTokens(systemPrompt), 1);
 
 		return [
 			// Guarded so a failed summary aborts the trim instead of replacing the
@@ -651,12 +663,27 @@ export class Agent {
 			guardSummarizationFailure(
 				summarizationMiddleware({
 					model,
-					trigger: { tokens: triggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
+					trigger: { tokens: messageTriggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
 					keep: { messages: SUMMARY_KEEP_MESSAGE_COUNT },
 					summaryPrefix: SUMMARY_PREFIX,
 					summaryPrompt: SUMMARY_PROMPT,
+					tokenCounter: countMessageTokens,
 					trimTokensToSummarize,
 				}),
+				{
+					tokenCounter: countMessageTokens,
+					trimTokensToSummarize,
+					onHistoryDropped: ({ droppedTokens }) => {
+						new Notice(
+							`Smart Second Brain: about ${formatThousands(droppedTokens)} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.`,
+						);
+					},
+					onRepeatedFailure: (failures) => {
+						new Notice(
+							`Smart Second Brain: summarizing this chat's history failed ${failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error.`,
+						);
+					},
+				},
 			),
 		] as const;
 	}
@@ -1948,4 +1975,8 @@ ${userMessage}`;
 
 		return undefined;
 	}
+}
+
+function formatThousands(tokens: number): string {
+	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens);
 }
