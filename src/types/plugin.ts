@@ -576,7 +576,7 @@ export interface PluginData {
 	// Web Search
 	// ============================================================================
 
-	/** Selected web search provider ("firecrawl" | "brave" | "tavily" | "") */
+	/** Selected web search provider ("firecrawl" | "brave" | "tavily" | "keenable" | "") */
 	webSearchProvider: string;
 	/**
 	 * Secret IDs for web search API keys, keyed by provider id. Per-provider so a key
