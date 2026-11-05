@@ -215,6 +215,60 @@ async function searchFirecrawl(
 }
 
 // ============================================================================
+// Keenable Search
+// ============================================================================
+
+const KEENABLE_SNIPPET_MAX_CHARS = 1000;
+
+interface KeenableSearchResponse {
+	results?: Array<{ title?: string; url?: string; description?: string; snippet?: string }>;
+}
+
+/**
+ * Keenable search. Works keyless via the public endpoint; an optional API key
+ * switches to the keyed endpoint (sent as X-API-Key) for higher limits.
+ */
+async function searchKeenable(
+	query: string,
+	apiKey: string,
+	count: number,
+	fetchImpl: ReturnType<typeof createObsidianFetch>,
+): Promise<WebSearchResult[]> {
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		"X-Keenable-Title": "Smart Second Brain",
+	};
+	if (apiKey) headers["X-API-Key"] = apiKey;
+	const endpoint = apiKey ? "https://api.keenable.ai/v1/search" : "https://api.keenable.ai/v1/search/public";
+
+	const controller = new AbortController();
+	const response = await fetchImpl(endpoint, {
+		method: "POST",
+		headers,
+		body: JSON.stringify({ query, max_results: count }),
+		signal: controller.signal,
+	});
+
+	if (!response.ok) {
+		if (response.status === 401 || response.status === 403) throw new Error("Invalid Keenable API key");
+		if (response.status === 429)
+			throw new Error("Keenable rate limit exceeded — try again shortly, or add an API key for higher limits");
+		throw new Error(`Keenable returned HTTP ${response.status}`);
+	}
+
+	const data = (await response.json()) as KeenableSearchResponse;
+	return (data.results ?? [])
+		.filter((r) => !!r.url)
+		.map((r, i) => ({
+			rank: i + 1,
+			title: r.title ?? "",
+			url: r.url ?? "",
+			// Prefer the short description; the snippet can be a long page excerpt.
+			snippet: r.description || (r.snippet ?? "").slice(0, KEENABLE_SNIPPET_MAX_CHARS),
+		}));
+}
+
+// ============================================================================
 // Tool factory
 // ============================================================================
 
@@ -239,8 +293,8 @@ export function createWebSearchTool(agentId = "") {
 		}
 
 		const apiKey = pluginData.webSearchApiKey;
-		// Firecrawl works keyless; Brave and Tavily require a key.
-		if (!apiKey && provider !== "firecrawl") {
+		// Firecrawl and Keenable work keyless; Brave and Tavily require a key.
+		if (!apiKey && provider !== "firecrawl" && provider !== "keenable") {
 			return `Error: No API key configured for web search provider "${provider}". Go to Settings → General → Web Search and add an API key.`;
 		}
 
@@ -257,6 +311,8 @@ export function createWebSearchTool(agentId = "") {
 				results = await withTimeout(searchTavily(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
 			} else if (provider === "firecrawl") {
 				results = await withTimeout(searchFirecrawl(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
+			} else if (provider === "keenable") {
+				results = await withTimeout(searchKeenable(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
 			} else {
 				return `Error: Unknown web search provider "${provider}".`;
 			}

@@ -73,6 +73,7 @@ const webSearchProviderOptions = [
 	{ display: "Firecrawl (keyless)", value: "firecrawl" },
 	{ display: "Brave Search", value: "brave" },
 	{ display: "Tavily", value: "tavily" },
+	{ display: "Keenable (keyless)", value: "keenable" },
 ];
 type ProcessorMode = "auto" | "custom" | "disabled";
 
@@ -405,12 +406,14 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
       </SettingContainer>
       {#if pluginData.webSearchProvider}
         <SettingContainer
-          name={pluginData.webSearchProvider === "firecrawl" ? "API Key (optional)" : "API Key"}
+          name={pluginData.webSearchProvider === "firecrawl" || pluginData.webSearchProvider === "keenable" ? "API Key (optional)" : "API Key"}
           desc={pluginData.webSearchProvider === "brave"
             ? "Brave Search API key from api.search.brave.com."
             : pluginData.webSearchProvider === "tavily"
               ? "Tavily API key from app.tavily.com."
-              : "Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier."}
+              : pluginData.webSearchProvider === "keenable"
+                ? "Optional — add a Keenable API key for higher rate limits. Leave empty to use the free public endpoint."
+                : "Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier."}
         >
           <SecretSelect
             value={pluginData.webSearchApiKeyId}
