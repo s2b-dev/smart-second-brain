@@ -113,6 +113,12 @@ export interface MCPHTTPServerConfig extends MCPServerBaseConfig {
 	url: string;
 	/** Optional headers for authentication */
 	headers?: Record<string, string>;
+	/**
+	 * Sign in with OAuth (MCP authorization spec) instead of, or in addition to,
+	 * static headers. Tokens live in SecretStorage keyed by `url`, never here —
+	 * see `lib/mcpOAuth.ts`.
+	 */
+	oauth?: boolean;
 }
 
 /**
