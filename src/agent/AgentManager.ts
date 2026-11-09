@@ -2,6 +2,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
+import { createBackgroundMcpOAuthProvider } from "../lib/mcpOAuth";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
 import type { ChatModel } from "../stores/chatTimeline";
@@ -742,6 +743,15 @@ export class AgentManager {
 
 		const data = getData();
 		const mcpServers = data.getAgentMCPServersForClient(agentId);
+		// OAuth servers get a background auth provider: it attaches and refreshes the
+		// stored token, and fails with a "sign in" error rather than opening a browser
+		// in the middle of a run. Built per load, never stored in plugin data.
+		for (const [id, config] of Object.entries(data.getAgentMCPServers(agentId))) {
+			const entry = mcpServers[id] as Record<string, unknown> | undefined;
+			if (entry && config.oauth) {
+				entry.authProvider = createBackgroundMcpOAuthProvider(this.plugin.app, config.url);
+			}
+		}
 		const promise = (async () => {
 			const tools: StructuredToolInterface[] = [];
 			// Only cache a SUCCESSFUL load. A transient handshake failure (server
@@ -1219,6 +1229,20 @@ export class AgentManager {
 		return specs;
 	}
 
+	/** Server URLs we already told the user to sign in to this session (one notice each, not one per run). */
+	private readonly mcpSignInNoticed = new Set<string>();
+
+	private noticeMcpSignInRequired(error: unknown): void {
+		const message = extractErrorMessage(error);
+		const match = /Sign-in required for MCP server (\S+?)\./.exec(message);
+		if (!match || this.mcpSignInNoticed.has(match[1])) return;
+		this.mcpSignInNoticed.add(match[1]);
+		new Notice(
+			`MCP server ${match[1]} needs you to sign in. Open the agent's MCP server settings and click "Sign in".`,
+			10_000,
+		);
+	}
+
 	private async loadMCPTools(
 		tools: StructuredToolInterface[],
 		mcpServers: Record<string, unknown> | undefined,
@@ -1233,7 +1257,13 @@ export class AgentManager {
 			// so this works the same on desktop and mobile.
 			const { MultiServerMCPClient } = await import("@langchain/mcp-adapters");
 			const mcpConfig = { mcpServers } as ConstructorParameters<typeof MultiServerMCPClient>[0];
-			Logger.log("Initializing MCP client...", mcpConfig);
+			// Log ids and URLs only: entries can carry header credentials and auth providers.
+			Logger.log(
+				"Initializing MCP client...",
+				Object.fromEntries(
+					Object.entries(mcpServers).map(([id, entry]) => [id, (entry as { url?: unknown }).url]),
+				),
+			);
 
 			// Patch global fetch once for the manager's lifetime — MCP tools read
 			// `globalThis.fetch` both here (getTools) and later at invocation time,
@@ -1252,6 +1282,7 @@ export class AgentManager {
 				return true;
 			} catch (e) {
 				Logger.error("Failed to get MCP tools", e);
+				this.noticeMcpSignInRequired(e);
 				return false;
 			}
 		} catch (error) {
