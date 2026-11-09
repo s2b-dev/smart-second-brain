@@ -128,6 +128,15 @@ export function isDocumentRejectionError(error: unknown): boolean {
 }
 
 /**
+ * True when the provider is rate limiting us (HTTP 429). Like a transport
+ * failure it hits every remaining request the same way, so a bulk run should
+ * stop rather than retry entry by entry — one notice instead of one per note.
+ */
+export function isRateLimitError(error: unknown): boolean {
+	return errorStatus(error) === 429;
+}
+
+/**
  * True when the host refused the connection or could not be resolved — the
  * failures where retrying without the user's intervention is pointless.
  */

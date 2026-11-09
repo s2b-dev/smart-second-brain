@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hydrateEmbeddingModel } from "../../src/lib/modelMetadataNormalizer";
+import { hydrateEmbeddingModel, knownEmbeddingMaxInputTokens } from "../../src/lib/modelMetadataNormalizer";
 import { OLLAMA_EMBED_NUM_CTX, type OllamaModelInfo } from "../../src/providers/ollamaModels";
 
 function ollamaData(name: string, contextLength: number | undefined): Map<string, OllamaModelInfo> {
@@ -36,5 +36,21 @@ describe("hydrateEmbeddingModel — Ollama input budget", () => {
 			]),
 		});
 		expect(model.maxInputTokens).toBe(32768);
+	});
+});
+
+describe("hydrateEmbeddingModel — known families behind metadata-less endpoints", () => {
+	it("uses e5-mistral's 4096-token window instead of the 8191 fallback", () => {
+		expect(hydrateEmbeddingModel("chat-ai", "e5-mistral-7b-instruct").maxInputTokens).toBe(4096);
+	});
+
+	it("matches case-insensitively and with vendor prefixes", () => {
+		expect(knownEmbeddingMaxInputTokens("intfloat/E5-Mistral-7B-Instruct")).toBe(4096);
+		expect(knownEmbeddingMaxInputTokens("multilingual-e5-large-instruct")).toBe(512);
+	});
+
+	it("leaves unknown models on the fallback", () => {
+		expect(knownEmbeddingMaxInputTokens("text-embedding-3-small")).toBeUndefined();
+		expect(hydrateEmbeddingModel("chat-ai", "some-embedder").maxInputTokens).toBe(8191);
 	});
 });
