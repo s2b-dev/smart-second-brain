@@ -363,8 +363,31 @@ function randomState(): string {
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Never `window.open` for http(s) on mobile (see AGENTS.md); sign-in is desktop-only, where it works. */
-function openInBrowser(url: string): void {
+/**
+ * Open the authorization page in the **system** browser.
+ *
+ * `window.open` is not enough on desktop: with Obsidian's core "Web viewer"
+ * plugin enabled, external links open in an in-app window instead. That window
+ * has none of the user's identity-provider session and its own cookie jar, and
+ * a real-world login (SAP LeanIX via corporate SSO) ended in "FORBIDDEN" there
+ * while the identical URL completed in the system browser. Electron's
+ * `shell.openExternal` always hands the URL to the OS default browser.
+ * (`window.open` stays as the fallback; never use it on mobile, see AGENTS.md —
+ * sign-in is desktop-only.)
+ */
+async function openInBrowser(url: string): Promise<void> {
+	const electron = (window as unknown as { require?: (id: string) => unknown }).require?.("electron") as
+		| { shell?: { openExternal?: (url: string) => Promise<void> } }
+		| undefined;
+	const openExternal = electron?.shell?.openExternal;
+	if (openExternal) {
+		try {
+			await openExternal(url);
+			return;
+		} catch (error) {
+			Logger.warn("[MCP OAuth] shell.openExternal failed, falling back to window.open", error);
+		}
+	}
 	const opened = window.open(url, "_blank", "noopener,noreferrer");
 	if (!opened) Logger.warn("[MCP OAuth] window.open returned a falsy value while opening the sign-in page");
 }
