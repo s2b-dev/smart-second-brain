@@ -30,7 +30,12 @@ import { chunkText } from "../utils/chunkText";
 import { getEmbeddableVaultFiles, isEmbeddableFile, readIndexableContent } from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 import { matchesPathPrefix } from "../utils/pathUtils";
-import { isConnectionRefusedError, isDocumentRejectionError, isProviderUnreachableError } from "../lib/transportErrors";
+import {
+	isConnectionRefusedError,
+	isDocumentRejectionError,
+	isProviderUnreachableError,
+	isRateLimitError,
+} from "../lib/transportErrors";
 import {
 	configureEmbedIndexAction,
 	settingsAction,
@@ -38,7 +43,12 @@ import {
 	showSettingsLinkNotice,
 } from "../utils/actionNotice";
 import { StartupProfiler } from "../utils/startupProfiler";
-import { getDefaultEmbeddingBatchSize, normalizeEmbeddingBatchSize } from "./batchSize";
+import {
+	getDefaultEmbeddingBatchSize,
+	hasFullEmbeddingBatch,
+	normalizeEmbeddingBatchSize,
+	takeEmbeddingBatch,
+} from "./batchSize";
 import { aggregateChunksToNotes } from "./chunkAggregation";
 import { formatRetrievalQuery } from "./queryInstruction";
 import { createVectorStore } from "./storeFactory";
@@ -1494,6 +1504,23 @@ export class VectorStoreService {
 	}
 
 	/**
+	 * Stop a bulk run on HTTP 429. Returns false for any other error. The notes
+	 * stay unindexed (not failed), so the next validation picks them up again.
+	 */
+	private abortForRateLimit(inst: IndexInstance, error: unknown): boolean {
+		if (!isRateLimitError(error)) return false;
+		const reason = error instanceof Error ? error.message : String(error);
+		Logger.error(`[VectorStore] Stopping indexing for ${inst.indexId}: rate limited by the provider — ${reason}`);
+		showActionNotice(
+			"Indexing paused — the embedding provider's rate limit was reached. It resumes on the next start, or resume it from the search settings later.",
+			settingsAction("search", "Open search settings"),
+			10_000,
+		);
+		inst.abortController?.abort();
+		return true;
+	}
+
+	/**
 	 * Get the configured batch size for an index, falling back to provider defaults.
 	 */
 	private getBatchSize(indexId: string, providerId: string): number {
@@ -1827,6 +1854,10 @@ export class VectorStoreService {
 				// below: that would re-issue every request in the batch against a
 				// provider the user just asked us to stop talking to.
 				if (this.isUserCancellation(error)) return false;
+				// Rate limiting applies to every remaining request alike; retrying
+				// entry by entry would only spend more of the quota and raise one
+				// "failed to embed" notice per note. Stop and let the next run resume.
+				if (this.abortForRateLimit(inst, error)) return false;
 				Logger.warn(`[VectorStore] Batch ${batchNumber} failed, falling back to sequential:`, error);
 				// A transport failure will hit every remaining chunk the same way,
 				// so retrying this batch entry-by-entry is pure waste. Give the
@@ -1858,6 +1889,7 @@ export class VectorStoreService {
 						// aborting mid-batch fires one error Notice per remaining
 						// file and buries the "cancelled" message under them.
 						if (this.isUserCancellation(entryError)) return false;
+						if (this.abortForRateLimit(inst, entryError)) return false;
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
@@ -1901,6 +1933,7 @@ export class VectorStoreService {
 		// Mark the attempt before the first read; cleared below only when the run
 		// survives. See BulkAttemptMarker for why this drives the start backoff.
 		this.bulkAttempts.markAttempt();
+		const embedTextOf = (entry: ChunkEntry) => entry.embedText;
 		let pending: ChunkEntry[] = [];
 		let stopped = false;
 
@@ -1928,12 +1961,12 @@ export class VectorStoreService {
 				continue;
 			}
 
-			while (pending.length >= batchSize) {
+			while (hasFullEmbeddingBatch(pending, batchSize, embedTextOf)) {
 				if (aborted()) {
 					stopped = true;
 					break;
 				}
-				const batch = pending.splice(0, batchSize);
+				const batch = takeEmbeddingBatch(pending, batchSize, embedTextOf);
 				if (!(await embedBatch(batch))) {
 					stopped = true;
 					break;
@@ -1943,8 +1976,13 @@ export class VectorStoreService {
 			if (stopped) break;
 		}
 
-		if (!stopped && pending.length > 0) {
-			if (await embedBatch(pending)) await afterBatch();
+		// The tail can still exceed the character budget, so drain it batch by batch.
+		while (!stopped && pending.length > 0) {
+			if (aborted() || !(await embedBatch(takeEmbeddingBatch(pending, batchSize, embedTextOf)))) {
+				stopped = true;
+				break;
+			}
+			await afterBatch();
 		}
 		pending = [];
 		// Notes whose chunks were not all embedded (a stopped run) were never
