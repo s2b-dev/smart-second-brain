@@ -20,6 +20,28 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.4.0 (2026-11-16)
+
+You choose which files have their contents indexed, web search gains a second keyless provider, and long chats keep their older history when they are summarized.
+
+### New
+- **Search: choose what gets indexed.** A new Indexed content group under Settings → Search switches PDFs, chats, and data files (CSV, JSON, YAML) on or off. All three now start off: such files are still found by title and path, and the agent can still open them, but their contents stay out of search and embeddings until you switch the group on. Notes, canvases, and widgets are always indexed (#557).
+- **Web search: Keenable.** Keenable joins Firecrawl, Brave and Tavily as a web search provider and, like Firecrawl, works without an API key. A key is optional (#551, by @KGKallasmaa).
+- **Agents: set the context window.** The Agent editor has a Context window field under Chat model, so you can match it to your model (for example an Ollama `num_ctx`) without editing `data.json` (#547).
+
+### Improvements
+- **Search: PDF indexing shows its own progress.** PDFs are indexed after your notes, and the progress notice now counts them separately (*then 20 PDFs*, then *PDFs 3/20*) with a time estimate of their own. A long PDF is indexed up to roughly its first 80 pages (#557).
+- **Chat: the context meter matches when summarization starts.** The meter and the summarization trigger now count tokens the same way, tool results included, so "Auto-compacts at …" is accurate. Small context windows are summarized before they overflow (#547, #548).
+
+### Fixes
+- **Chat: summarizing a long chat no longer drops older history.** The summary now covers everything it replaces. A failed or empty summary is rejected, and repeated failures show a notice (#548).
+- **Agents: re-picking the same model keeps your context window** instead of resetting it to the provider's value (#547).
+- **Settings: changes from another device are picked up.** When Obsidian Sync or a hand edit changes the plugin's settings file while Obsidian runs, the plugin reloads it instead of overwriting it on the next save (#556).
+- **Search: Excalidraw drawings are no longer re-embedded on every autosave.** Drawings are re-indexed once you stop drawing, and blank drawings are skipped (#549).
+- **Search: embedding no longer times out on shared endpoints.** Embedding requests are capped in size, and a rate limit pauses indexing with a single notice instead of one per note (#553, by @lxsm).
+
+**Thanks** to @KGKallasmaa for the Keenable provider and @lxsm for the embedding fix.
+
 ## 2.3.0 (2026-09-28)
 
 A reworked chat composer, especially on mobile, agents that keep their memory and skills up to date, and release notes inside the plugin.
