@@ -38,7 +38,7 @@ import { promptText } from "./components/modal/PromptModal";
 import { getQueryClient } from "./lib/query";
 import { SkillsService } from "./skills";
 import { createSessionRegistry, getSessionRegistry, type SessionRegistry } from "./stores/chatStore.svelte";
-import { type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
+import { type ExternalSettingsChange, type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
 import { PendingChangesStore, initPendingChangesStore } from "./stores/pendingChangesStore.svelte";
 import { setPlugin } from "./stores/state.svelte";
 import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
@@ -948,6 +948,46 @@ export default class SecondBrainPlugin extends Plugin {
 		).viewRegistry?.unregisterExtensions?.(["chat", WIDGET_FILE_EXTENSION]);
 		unregisterChatEmbed(this);
 		unregisterWidgetEmbed(this);
+	}
+
+	/** Serializes external-change reloads; Sync can deliver several in quick succession. */
+	private externalSettingsReload: Promise<void> = Promise.resolve();
+
+	/**
+	 * Obsidian calls this when `data.json` changed on disk from outside the plugin (Obsidian
+	 * Sync from another device, a hand edit). Without it the change is ignored and then
+	 * overwritten by the stale in-memory copy on the next save of any setting (#542).
+	 */
+	async onExternalSettingsChange(): Promise<void> {
+		const run = this.externalSettingsReload.then(() => this.reloadExternalSettings());
+		this.externalSettingsReload = run.catch(() => {});
+		await run;
+	}
+
+	private async reloadExternalSettings(): Promise<void> {
+		if (this.unloaded || !this.pluginData) return;
+		let change: ExternalSettingsChange | null;
+		try {
+			change = await this.pluginData.reloadFromDisk();
+		} catch (error) {
+			Log.error("Failed to reload settings changed on disk:", error);
+			return;
+		}
+		if (!change || this.unloaded) return;
+		Log.info("Reloaded settings changed on disk");
+
+		for (const providerId of change.changedProviderIds) {
+			invalidateAuthState(providerId);
+			invalidateProviderState(providerId);
+		}
+		if (change.agentFolderChanged) {
+			await this.reinitAgentFolder();
+		} else if (change.agentsChanged) {
+			await this.promptFilesService?.refresh(this.pluginData.agents);
+		}
+		// Runnables are cached per config signature, so most edits would rebuild anyway; drop
+		// them all so nothing built from the replaced settings survives.
+		this.agentManager?.invalidateSystemPromptCaches();
 	}
 
 	async createNewChat() {

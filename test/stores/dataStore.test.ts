@@ -1112,3 +1112,186 @@ describe("PluginDataStore graph index availability", () => {
 		expect(store.getGraphEmbedModel()).toBeNull();
 	});
 });
+
+describe("reloadFromDisk (onExternalSettingsChange)", () => {
+	beforeEach(() => {
+		__resetPluginDataStoreForTests();
+	});
+
+	/** A plugin whose `loadData` returns whatever `saveData` last wrote, like a real data.json. */
+	function createDiskBackedPlugin(initial: Record<string, unknown>) {
+		let disk: unknown = structuredClone(initial);
+		const plugin = {
+			...createMockPlugin(),
+			loadData: vi.fn(async () => structuredClone(disk)),
+			saveData: vi.fn(async (data: unknown) => {
+				disk = structuredClone(data);
+			}),
+		};
+		return {
+			plugin,
+			/** Simulate Sync / a hand edit replacing the file. */
+			writeExternally(data: unknown) {
+				disk = structuredClone(data);
+			},
+			readDisk: () => structuredClone(disk) as Record<string, unknown>,
+		};
+	}
+
+	function agentWithContextWindow(contextWindow: number) {
+		return {
+			...createDefaultAgentConfig(DEFAULT_AGENT_ID, "S2B Agent"),
+			chatModel: { provider: "openai", model: "gpt-test", modelConfig: { contextWindow } },
+		};
+	}
+
+	function initialSettings() {
+		return {
+			...structuredClone(DEFAULT_SETTINGS),
+			vaultSlug: "test-vault",
+			agents: { [DEFAULT_AGENT_ID]: agentWithContextWindow(128000) },
+		};
+	}
+
+	it("skips a file identical to what was loaded", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		expect(await store.reloadFromDisk()).toBeNull();
+	});
+
+	it("skips the echo of the store's own save", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		store.isVerbose = true;
+		const change = await store.reloadFromDisk();
+
+		expect(change).toBeNull();
+		expect(store.isVerbose).toBe(true);
+	});
+
+	it("applies a changed agent config in place, and the next save keeps it", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		const agentsBefore = store.agents;
+
+		const edited = disk.readDisk();
+		edited.agents = { [DEFAULT_AGENT_ID]: agentWithContextWindow(32000) };
+		disk.writeExternally(edited);
+
+		const change = await store.reloadFromDisk();
+
+		expect(change?.agentsChanged).toBe(true);
+		expect(change?.agentFolderChanged).toBe(false);
+		expect(change?.changedProviderIds).toEqual([]);
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(32000);
+		expect(store.agents).not.toBe(agentsBefore);
+
+		// The bug this guards against: an unrelated setter used to write the stale copy back.
+		store.isVerbose = true;
+		await vi.waitFor(() => expect(disk.plugin.saveData).toHaveBeenCalled());
+		const saved = disk.readDisk() as { agents: Record<string, { chatModel: { modelConfig: object } }> };
+		expect(saved.agents[DEFAULT_AGENT_ID]?.chatModel.modelConfig).toEqual({ contextWindow: 32000 });
+	});
+
+	it("runs migrations on a file from an older schema", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		disk.writeExternally({
+			...structuredClone(DEFAULT_SETTINGS),
+			vaultSlug: "test-vault",
+			schemaVersion: 4,
+			agents: {
+				[DEFAULT_AGENT_ID]: {
+					id: DEFAULT_AGENT_ID,
+					name: "S2B Agent",
+					chatModel: null,
+					systemPrompt: "MY CUSTOM PROMPT",
+					skills: {},
+					toolsConfig: structuredClone(DEFAULT_TOOLS_CONFIG),
+					mcpServers: {},
+				},
+			},
+		});
+
+		const change = await store.reloadFromDisk();
+
+		expect(change).not.toBeNull();
+		const agent = store.getAgent(DEFAULT_AGENT_ID) as unknown as { systemPrompt?: unknown };
+		expect(agent.systemPrompt).toBeUndefined();
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.summarizationModel).toBeNull();
+	});
+
+	it("waits for an in-flight save and treats the resulting file as its own echo", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		let releaseSave!: () => void;
+		const realSave = disk.plugin.saveData.getMockImplementation()!;
+		disk.plugin.saveData.mockImplementationOnce(async (data: unknown) => {
+			await new Promise<void>((resolve) => {
+				releaseSave = resolve;
+			});
+			await realSave(data);
+		});
+
+		disk.plugin.loadData.mockClear();
+		store.isVerbose = true;
+		const reload = store.reloadFromDisk();
+		await Promise.resolve();
+		expect(disk.plugin.loadData).not.toHaveBeenCalled();
+
+		releaseSave();
+		expect(await reload).toBeNull();
+		expect(store.isVerbose).toBe(true);
+	});
+
+	it("re-reads when the store saves while the file is being read", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.agents = { [DEFAULT_AGENT_ID]: agentWithContextWindow(32000) };
+		disk.writeExternally(edited);
+
+		// A setter fires mid-read: its save overwrites the external edit with the in-memory
+		// state, so the edit is gone and applying the stale read would be wrong.
+		const realLoad = disk.plugin.loadData.getMockImplementation()!;
+		disk.plugin.loadData.mockImplementationOnce(async () => {
+			const raw = await realLoad();
+			store.isVerbose = true;
+			return raw;
+		});
+
+		expect(await store.reloadFromDisk()).toBeNull();
+		expect(store.isVerbose).toBe(true);
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(128000);
+	});
+
+	it("keeps the current settings when the file is missing", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		disk.writeExternally(null);
+
+		expect(await store.reloadFromDisk()).toBeNull();
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(128000);
+	});
+
+	it("reports changed providers", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.providerConfig = {
+			...(edited.providerConfig as object),
+			ollama: createProviderState({ isConfigured: false }),
+		};
+		disk.writeExternally(edited);
+
+		const change = await store.reloadFromDisk();
+		expect(change?.changedProviderIds).toEqual(["ollama"]);
+		expect(store.getAllProviderIds()).toContain("ollama");
+	});
+});
