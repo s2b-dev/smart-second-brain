@@ -339,9 +339,10 @@ describe("LexicalSearchService.validateIndex", () => {
 				release = resolve;
 			}),
 		);
-		const handlerRead = (
-			service as unknown as { handleFileModify(file: FakeFile): Promise<void> }
-		).handleFileModify(pdf);
+		(service as unknown as { handleFileModify(file: FakeFile): void }).handleFileModify(pdf);
+		// Past the modify debounce, so the handler's read is actually under way.
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(release).not.toBeNull();
 
 		// PDFs are switched off; the validation it schedules writes the title-only document.
 		readGates.delete("paper.pdf");
@@ -352,8 +353,39 @@ describe("LexicalSearchService.validateIndex", () => {
 
 		// The old extraction lands with the same mtime and must be discarded.
 		(release as unknown as () => void)();
-		await handlerRead;
+		await vi.advanceTimersByTimeAsync(0);
 		expect(addDocument).toHaveBeenCalledTimes(1);
+		expect(addDocument).toHaveBeenLastCalledWith("paper.pdf", "paper.pdf", "", [], 1_000);
+	});
+
+	it("a switch to another group does not discard an extraction in flight", async () => {
+		const pdf: FakeFile = { ...file("paper.pdf", 1_000), extension: "pdf" };
+		contentIndexing = { pdfs: true, chats: false, data: false };
+		localStore.set("s2b-lexical-content-groups", JSON.stringify(contentIndexing));
+		loaded = new Map([["paper.pdf", 1_000]]);
+		vaultFiles = [pdf];
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		let release: (() => void) | null = null;
+		readGates.set(
+			"paper.pdf",
+			new Promise<void>((resolve) => {
+				release = resolve;
+			}),
+		);
+		(service as unknown as { handleFileModify(file: FakeFile): void }).handleFileModify(pdf);
+		await vi.advanceTimersByTimeAsync(2_000);
+
+		// Chats switched on mid-extraction.
+		contentIndexing = { ...contentIndexing, chats: true };
+		for (const listener of contentIndexingListeners) listener();
+		(release as unknown as () => void)();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		expect(addDocument).toHaveBeenCalledWith("paper.pdf", "paper.pdf", "content of paper.pdf@1000", [], 1_000);
+		expect(loaded.get("paper.pdf")).toBe(1_000);
 	});
 
 	it("a changed group's file whose re-read fails is retried by a later validation", async () => {

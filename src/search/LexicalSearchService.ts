@@ -192,7 +192,7 @@ export class LexicalSearchService {
 			// should hold; validation re-reads exactly those (`changedContentGroups`).
 			this.plugin.register(
 				getData().onContentIndexingChange(() => {
-					this.contentSettingsGeneration++;
+					this.noteContentIndexingChange();
 					scheduleBulkRun("LexicalSearch", this.bulkAttempts, () => this.validateIndex());
 				}),
 			);
@@ -341,14 +341,21 @@ export class LexicalSearchService {
 	 */
 	private async indexFile(file: TFile): Promise<boolean> {
 		const mtime = file.stat.mtime;
-		const generation = this.contentSettingsGeneration;
+		const group = contentGroupOf(file);
+		const generation = group === null ? 0 : this.groupGenerations[group];
 		const storedBefore = this.miniSearch.getDocumentMtime(file.path);
 		const content = await readIndexableContent(this.plugin.app.vault, file);
-		// A content switch landed during the read: the content was chosen under the
-		// old setting (a PDF extracted just as PDFs were turned off). Writing it
-		// would carry the file's unchanged mtime, so nothing would ever repair it;
-		// the validation the switch scheduled re-reads the file instead.
-		if (generation !== this.contentSettingsGeneration) return false;
+		// The file's group was switched during the read: the content was chosen
+		// under the old setting (a PDF extracted just as PDFs were turned off).
+		// Written, it would carry the file's unchanged mtime and nothing would ever
+		// repair it. Dropped and marked stale instead, so the next validation
+		// re-reads it whatever the applied-groups record says by then — even if
+		// the group was switched back, or the run that discarded it saved the
+		// record anyway.
+		if (group !== null && generation !== this.groupGenerations[group]) {
+			this.miniSearch.markStale(file.path);
+			return false;
+		}
 		const storedAfter = this.miniSearch.getDocumentMtime(file.path);
 		if (storedAfter !== storedBefore && storedAfter !== undefined && storedAfter > mtime) return false;
 		this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
@@ -451,8 +458,23 @@ export class LexicalSearchService {
 	 */
 	private static readonly APPLIED_CONTENT_GROUPS_KEY = "s2b-lexical-content-groups";
 
-	/** Bumped on every content-indexing change; reads begun under an older value are discarded (`indexFile`). */
-	private contentSettingsGeneration = 0;
+	/**
+	 * Per-group switch counters; a read begun before its own group was switched
+	 * is discarded (`indexFile`). Per group, so toggling Chats never throws away
+	 * a PDF extraction.
+	 */
+	private readonly groupGenerations: Record<ContentGroup, number> = { pdfs: 0, chats: 0, data: 0 };
+
+	/** The switches as last seen, to tell which groups a change notification touched. */
+	private lastSeenContentIndexing: ContentIndexingSettings = { ...getContentIndexing() };
+
+	private noteContentIndexingChange(): void {
+		const current = getContentIndexing();
+		for (const group of CONTENT_GROUPS) {
+			if (current[group] !== this.lastSeenContentIndexing[group]) this.groupGenerations[group]++;
+		}
+		this.lastSeenContentIndexing = { ...current };
+	}
 
 	/**
 	 * Groups whose switch differs from what the stored index was built with.
