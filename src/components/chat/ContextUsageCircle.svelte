@@ -75,11 +75,10 @@ const usageRows = $derived.by(() => {
 });
 
 // Where automatic compaction kicks in, as a position on the bar. Omitted when the
-// trigger is not inside the bar (unknown limit, or a window so small that the 12k
-// floor exceeds it).
+// limit is unknown.
 const compactionTickPercent = $derived.by(() => {
 	const trigger = getSummarizationTriggerTokens(limit);
-	if (trigger === null || limit === undefined || trigger >= limit) return null;
+	if (trigger === null || limit === undefined) return null;
 	return (trigger / limit) * 100;
 });
 
@@ -112,8 +111,7 @@ const usageLine = $derived.by(() => {
 	return `${formatNumber(breakdown.totalTokens)} of ${formatNumber(limit)} tokens`;
 });
 
-// The real trigger, not a rounded "about 80%": it is max(80% of the window, 12k),
-// so on a small window the number is the only honest thing to show. The footer
+// The trigger as a token count beside its share of the window. The footer
 // carries the short form beside the Summarize button (the note and the button are
 // the same concern: automatic vs manual); the full sentence is its tooltip.
 const compaction = $derived.by(() => {
@@ -124,8 +122,7 @@ const compaction = $derived.by(() => {
 			long: "Automatic summarization needs a model with a known context limit.",
 		};
 	}
-	const percent = Math.round((trigger / limit) * 100);
-	const withPercent = percent <= 100 ? ` (${percent}%)` : "";
+	const withPercent = ` (${Math.round((trigger / limit) * 100)}%)`;
 	return {
 		short: `Auto-compacts at ${formatCompact(trigger)}${withPercent}`,
 		long: `Older messages are summarized automatically at ${formatNumber(trigger)} tokens${withPercent}.`,

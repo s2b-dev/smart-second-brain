@@ -3,7 +3,6 @@ import { Logger } from "../utils/logging";
 
 const SUMMARY_TRIGGER_RATIO = 0.8;
 export const SUMMARY_KEEP_MESSAGE_COUNT = 12;
-const SUMMARY_MIN_TRIGGER_TOKENS = 12_000;
 const SUMMARY_MIN_TRIM_TOKENS = 6_000;
 const SUMMARY_MAX_TRIM_TOKENS = 24_000;
 // Share of the summarization model's own window the history may fill; the rest
@@ -25,12 +24,17 @@ Be concise but specific. Do not invent information.
 Conversation:
 {messages}`;
 
+/**
+ * Token count at which history is summarized: a fixed share of the window. There used to be a
+ * 12k floor, but on windows under 15k it put the trigger at or past the window itself, so a
+ * small local model (e.g. Ollama at 8k) overflowed before summarization could fire.
+ */
 export function getSummarizationTriggerTokens(contextWindow: number | undefined): number | null {
 	if (!contextWindow || contextWindow <= 0) {
 		return null;
 	}
 
-	return Math.max(Math.floor(contextWindow * SUMMARY_TRIGGER_RATIO), SUMMARY_MIN_TRIGGER_TOKENS);
+	return Math.floor(contextWindow * SUMMARY_TRIGGER_RATIO);
 }
 
 /**
