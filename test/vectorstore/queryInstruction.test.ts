@@ -20,6 +20,16 @@ describe("formatRetrievalQuery", () => {
 		expect(formatRetrievalQuery("Alibaba-NLP/gte-Qwen2-1.5B-instruct", "history")).toBe(`${qwenPrefix}history`);
 	});
 
+	it("treats the instruct-tuned e5 models as the Qwen3 instruct family", () => {
+		for (const id of [
+			"e5-mistral-7b-instruct",
+			"intfloat/e5-mistral-7b-instruct",
+			"multilingual-e5-large-instruct",
+		]) {
+			expect(formatRetrievalQuery(id, "history")).toBe(`${qwenPrefix}history`);
+		}
+	});
+
 	it("uses the BAAI sentence prefix for English BGE retrievers and mxbai", () => {
 		const expected = "Represent this sentence for searching relevant passages: history";
 		expect(formatRetrievalQuery("bge-large-en-v1.5", "history")).toBe(expected);
