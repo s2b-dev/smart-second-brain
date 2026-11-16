@@ -192,6 +192,7 @@ export class LexicalSearchService {
 			// should hold; validation re-reads exactly those (`changedContentGroups`).
 			this.plugin.register(
 				getData().onContentIndexingChange(() => {
+					this.contentSettingsGeneration++;
 					scheduleBulkRun("LexicalSearch", this.bulkAttempts, () => this.validateIndex());
 				}),
 			);
@@ -263,7 +264,7 @@ export class LexicalSearchService {
 	private static readonly PROGRESS_NOTICE_MIN_EXTRACTIONS = 5;
 
 	/** Index `files`, paced in batches and checkpointing every {@link BULK_CHECKPOINT_INTERVAL} additions. */
-	private async bulkIndexFiles(files: TFile[]): Promise<number> {
+	private async bulkIndexFiles(files: TFile[], onReadFailed?: (file: TFile) => void): Promise<number> {
 		let added = 0;
 		let processed = 0;
 		// Mark the attempt before the first read; cleared below only when the whole
@@ -290,6 +291,7 @@ export class LexicalSearchService {
 					if (await this.indexFile(file)) added++;
 				} catch (error) {
 					Logger.error(`[LexicalSearch] Failed to read ${file.path}:`, error);
+					onReadFailed?.(file);
 				}
 				processed++;
 				if (extracting) extraction.done++;
@@ -339,8 +341,14 @@ export class LexicalSearchService {
 	 */
 	private async indexFile(file: TFile): Promise<boolean> {
 		const mtime = file.stat.mtime;
+		const generation = this.contentSettingsGeneration;
 		const storedBefore = this.miniSearch.getDocumentMtime(file.path);
 		const content = await readIndexableContent(this.plugin.app.vault, file);
+		// A content switch landed during the read: the content was chosen under the
+		// old setting (a PDF extracted just as PDFs were turned off). Writing it
+		// would carry the file's unchanged mtime, so nothing would ever repair it;
+		// the validation the switch scheduled re-reads the file instead.
+		if (generation !== this.contentSettingsGeneration) return false;
 		const storedAfter = this.miniSearch.getDocumentMtime(file.path);
 		if (storedAfter !== storedBefore && storedAfter !== undefined && storedAfter > mtime) return false;
 		this.miniSearch.addDocument(file.path, file.basename, content, this.getSearchableTags(file), mtime);
@@ -417,7 +425,14 @@ export class LexicalSearchService {
 				return (group !== null && changedGroups.has(group)) || this.needsIndexing(file);
 			}),
 		);
-		const added = await this.bulkIndexFiles(pending);
+		const added = await this.bulkIndexFiles(pending, (file) => {
+			// A changed group's file whose re-read failed still holds the old
+			// setting's content at an unchanged mtime, and the record saved below
+			// stops this run from re-reading it again. Marked stale, the ordinary
+			// mtime check retries it next time.
+			const group = contentGroupOf(file);
+			if (group !== null && changedGroups.has(group)) this.miniSearch.markStale(file.path);
+		});
 		if (changedGroups.size > 0) {
 			this.saveAppliedContentGroups(applied);
 			Logger.log(`[LexicalSearch] Content indexing changed for: ${[...changedGroups].join(", ")}`);
@@ -435,6 +450,9 @@ export class LexicalSearchService {
 	 * `data.json`, which sync can change while the app is closed.
 	 */
 	private static readonly APPLIED_CONTENT_GROUPS_KEY = "s2b-lexical-content-groups";
+
+	/** Bumped on every content-indexing change; reads begun under an older value are discarded (`indexFile`). */
+	private contentSettingsGeneration = 0;
 
 	/**
 	 * Groups whose switch differs from what the stored index was built with.

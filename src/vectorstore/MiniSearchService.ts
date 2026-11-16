@@ -627,6 +627,16 @@ export class MiniSearchService {
 	}
 
 	/**
+	 * Forget a document's indexed-at mtime, keeping its content: the next
+	 * validation sees it as stale and re-reads it. For a re-read that failed,
+	 * where the stored content is known to be out of date but nothing better
+	 * is available yet.
+	 */
+	markStale(path: string): void {
+		if (this.documentMtimes.delete(path)) this.scheduleSave();
+	}
+
+	/**
 	 * Check if a document exists in the index.
 	 */
 	hasDocument(path: string): boolean {

@@ -32,6 +32,10 @@ let contentIndexing: { pdfs: boolean; chats: boolean; data: boolean };
 /** Vault-local storage (`App.loadLocalStorage`), where the index records the groups it applied. */
 let localStore: Map<string, string>;
 const contentIndexingListeners = new Set<() => void>();
+/** Paths whose read throws. */
+let readFailures: Set<string>;
+/** Per-path content group, over the mock's PDF-only default. */
+const contentGroupOverride = new Map<string, string>();
 
 vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 	MiniSearchService: class {
@@ -60,6 +64,9 @@ vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 			removeDocument(path);
 			loaded.delete(path);
 		}
+		markStale(path: string) {
+			if (loaded.has(path)) loaded.set(path, undefined);
+		}
 		suspendScheduledSaves() {}
 		resumeScheduledSaves() {}
 		flush = flush;
@@ -77,7 +84,7 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 }));
 vi.mock("../../src/utils/fileFiltering", () => ({
 	CONTENT_GROUPS: ["pdfs", "chats", "data"],
-	contentGroupOf: (f: FakeFile) => (f.extension === "pdf" ? "pdfs" : null),
+	contentGroupOf: (f: FakeFile) => contentGroupOverride.get(f.path) ?? (f.extension === "pdf" ? "pdfs" : null),
 	getContentIndexing: () => contentIndexing,
 	needsExtraction: (f: FakeFile) => f.extension === "pdf" && contentIndexing.pdfs,
 	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
@@ -86,8 +93,13 @@ vi.mock("../../src/utils/fileFiltering", () => ({
 	isIndexableFile: () => true,
 	isBinaryTextFile: () => false,
 	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
+		// Decided at the start of the read, like the real reader: a PDF extraction
+		// already under way finishes even if PDFs are switched off meanwhile.
+		const text = f.extension === "pdf" && !contentIndexing.pdfs ? "" : `content of ${f.path}@${f.stat.mtime}`;
+		const failing = readFailures.has(f.path);
 		await readGates.get(f.path);
-		return `content of ${f.path}@${f.stat.mtime}`;
+		if (failing) throw new Error(`cannot read ${f.path}`);
+		return text;
 	},
 }));
 
@@ -128,6 +140,8 @@ beforeEach(() => {
 	readGates = new Map();
 	contentIndexing = { pdfs: false, chats: false, data: false };
 	localStore = new Map();
+	readFailures = new Set();
+	contentGroupOverride.clear();
 	contentIndexingListeners.clear();
 	layoutReady = null;
 	addDocument.mockClear();
@@ -304,5 +318,71 @@ describe("LexicalSearchService.validateIndex", () => {
 		for (const listener of contentIndexingListeners) listener();
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(addDocument).not.toHaveBeenCalled();
+	});
+
+	it("an extraction still in flight when its group is switched off does not put the contents back", async () => {
+		const pdf: FakeFile = { ...file("paper.pdf", 1_000), extension: "pdf" };
+		contentIndexing = { pdfs: true, chats: false, data: false };
+		localStore.set("s2b-lexical-content-groups", JSON.stringify(contentIndexing));
+		loaded = new Map([["paper.pdf", 1_000]]);
+		vaultFiles = [pdf];
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument).not.toHaveBeenCalled();
+
+		// A modify handler starts extracting the PDF, slowly.
+		let release: (() => void) | null = null;
+		readGates.set(
+			"paper.pdf",
+			new Promise<void>((resolve) => {
+				release = resolve;
+			}),
+		);
+		const handlerRead = (
+			service as unknown as { handleFileModify(file: FakeFile): Promise<void> }
+		).handleFileModify(pdf);
+
+		// PDFs are switched off; the validation it schedules writes the title-only document.
+		readGates.delete("paper.pdf");
+		contentIndexing = { ...contentIndexing, pdfs: false };
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument).toHaveBeenLastCalledWith("paper.pdf", "paper.pdf", "", [], 1_000);
+
+		// The old extraction lands with the same mtime and must be discarded.
+		(release as unknown as () => void)();
+		await handlerRead;
+		expect(addDocument).toHaveBeenCalledTimes(1);
+	});
+
+	it("a changed group's file whose re-read fails is retried by a later validation", async () => {
+		const json: FakeFile = { ...file("export.json", 1_000), extension: "json" };
+		localStore.set("s2b-lexical-content-groups", JSON.stringify(contentIndexing));
+		loaded = new Map([["export.json", 1_000]]);
+		vaultFiles = [json];
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// Data files switched on (the mock groups only PDFs, so give JSON a group too).
+		contentGroupOverride.set("export.json", "data");
+		contentIndexing = { ...contentIndexing, data: true };
+		readFailures.add("export.json");
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument).not.toHaveBeenCalled();
+		expect(loaded.get("export.json")).toBeUndefined();
+
+		// Readable again: the record matches, but the stale stamp gets it re-read.
+		readFailures.clear();
+		await (service as unknown as { validateIndex(): Promise<void> }).validateIndex();
+		expect(addDocument).toHaveBeenCalledWith(
+			"export.json",
+			"export.json",
+			"content of export.json@1000",
+			[],
+			1_000,
+		);
 	});
 });
