@@ -55,8 +55,13 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 		// built on it, and gte-Qwen2, which uses the identical `Instruct:`/`Query:`
 		// template. Model ids vary by host: `qwen/qwen3-embedding-4b` (OpenRouter),
 		// `Qwen3-Embedding-4B-4bit-DWQ` (oMLX), `qwen3-embedding:0.6b` (Ollama).
+		// The instruct-tuned e5 models (e5-mistral-7b-instruct,
+		// multilingual-e5-large-instruct) share the template and, unlike the
+		// plain e5 models, take documents raw; their cards state the query
+		// instruction is required "otherwise you will see a performance
+		// degradation". Plain e5 stays excluded (see above).
 		name: "qwen3-instruct",
-		pattern: /qwen3-embedding|harrier|gte-qwen/,
+		pattern: /qwen3-embedding|harrier|gte-qwen|e5-mistral|multilingual-e5-large-instruct/,
 		format: (query) => `Instruct: ${RETRIEVAL_TASK_INSTRUCTION}\nQuery: ${query}`,
 	},
 	{

@@ -14,6 +14,8 @@ vi.mock("langchain", () => ({
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { Agent, sanitizeRunnableName } from "../../src/agent/Agent";
+import { getTrimTokensToSummarize } from "../../src/agent/summarization";
+import { countMessageTokens, estimateSystemPromptTokens } from "../../src/utils/tokenEstimator";
 
 function makeRegistry() {
 	return {
@@ -31,6 +33,10 @@ const BASE_RESOLVE_PARAMS = {
 	tools: [] as const,
 	subAgents: [] as const,
 } as const;
+
+// The middleware counts messages only, so its trigger is the meter's trigger
+// minus the system prompt the meter adds on top.
+const SYSTEM_PROMPT_TOKENS = estimateSystemPromptTokens(BASE_RESOLVE_PARAMS.systemPrompt);
 
 describe("Agent summarization middleware", () => {
 	beforeEach(() => {
@@ -56,8 +62,10 @@ describe("Agent summarization middleware", () => {
 
 		expect(summarizationMiddlewareMock).toHaveBeenCalledTimes(1);
 		expect((summarizationMiddlewareMock.mock.calls[0] ?? [])[0]).toMatchObject({
-			trigger: { tokens: 80_000, messages: 14 },
+			trigger: { tokens: 80_000 - SYSTEM_PROMPT_TOKENS, messages: 14 },
 			keep: { messages: 12 },
+			tokenCounter: countMessageTokens,
+			trimTokensToSummarize: getTrimTokensToSummarize(100_000, 80_000),
 		});
 		expect(registry.createChatInstance).toHaveBeenCalledWith("openai", "gpt-4o-mini", { contextWindow: 100_000 });
 		expect(createAgentMock).toHaveBeenCalledWith(
@@ -82,9 +90,30 @@ describe("Agent summarization middleware", () => {
 		expect(summarizationMiddlewareMock).toHaveBeenCalledTimes(1);
 		expect(registry.createChatInstance).toHaveBeenCalledTimes(1);
 		expect((summarizationMiddlewareMock.mock.calls[0] ?? [])[0]).toMatchObject({
-			trigger: { tokens: 40_000, messages: 14 },
+			trigger: { tokens: 40_000 - SYSTEM_PROMPT_TOKENS, messages: 14 },
 			keep: { messages: 12 },
+			tokenCounter: countMessageTokens,
+			// The chat model summarizes, so its own window bounds what it reads.
+			trimTokensToSummarize: getTrimTokensToSummarize(50_000, 40_000),
 		});
+	});
+
+	it("bounds the summarizer's input by the dedicated summary model's own window", async () => {
+		const registry = makeRegistry();
+		const agent = new Agent({ registry: registry as never });
+
+		await agent.resolveRun({
+			...BASE_RESOLVE_PARAMS,
+			cacheKey: "test-key-4",
+			provider: "openai",
+			chatModel: "gpt-4o",
+			options: { contextWindow: 200_000 },
+			summarizationModel: { provider: "openai", chatModel: "small", options: { contextWindow: 32_000 } },
+		});
+
+		const config = (summarizationMiddlewareMock.mock.calls[0] ?? [])[0] as { trimTokensToSummarize: number };
+		expect(config.trimTokensToSummarize).toBe(getTrimTokensToSummarize(32_000, 160_000));
+		expect(config.trimTokensToSummarize).toBeLessThan(32_000);
 	});
 
 	it("skips summarization middleware when the context window is unknown", async () => {
