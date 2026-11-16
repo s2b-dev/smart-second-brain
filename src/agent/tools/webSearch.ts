@@ -17,6 +17,7 @@ const FETCH_TIMEOUT_MS = 15_000;
  * fall back to Obsidian's requestUrl, which ignores AbortSignal.
  */
 function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
+	const controller = new AbortController();
 	return new Promise<T>((resolve, reject) => {
 		const timer = window.setTimeout(() => {
 			const err = new Error(`Web search timed out after ${timeoutMs}ms.`);
