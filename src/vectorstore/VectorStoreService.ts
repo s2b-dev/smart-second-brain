@@ -24,6 +24,7 @@ import {
 	orderForBulkIndexing,
 	scheduleBulkRun,
 } from "../search/bulkPacing";
+import { describeBulkProgress } from "../search/bulkProgress";
 import { ensureProviderRegistered } from "../providers/registrySync";
 import { getData } from "../stores/dataStore.svelte";
 import { chunkText } from "../utils/chunkText";
@@ -32,6 +33,7 @@ import {
 	getEmbeddableVaultFiles,
 	hasNoEmbeddableText,
 	isEmbeddableFile,
+	needsExtraction,
 	isExcalidrawPath,
 	readIndexableContent,
 } from "../utils/fileFiltering";
@@ -295,6 +297,8 @@ interface IndexInstance {
 	indexingStartedAt: number | null;
 	/** `indexed` count when the current run started, so ETA measures only this run's rate */
 	indexingStartCount: number;
+	/** Timestamp (ms) the run entered its extraction tail; the ETA then measures that phase alone. */
+	extractionStartedAt: number | null;
 	abortController: AbortController | null;
 	maxInputTokensCache: {
 		provider: string;
@@ -314,23 +318,6 @@ interface IndexInstance {
 export function formatIndexBuildStatus(lastBuiltAt: number | null | undefined, documentCount: number): string {
 	if (lastBuiltAt) return new Date(lastBuiltAt).toLocaleDateString();
 	return documentCount > 0 ? "Build incomplete" : "Never built";
-}
-
-/**
- * Format an estimated-time-remaining duration (in ms) as a short human string,
- * e.g. "45s", "3m", "1h 12m". Rounds up so the estimate never reads as "0s"
- * while work is still in flight.
- */
-export function formatEta(ms: number): string {
-	const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
-	if (totalSeconds < 60) return `${totalSeconds}s`;
-
-	const totalMinutes = Math.ceil(totalSeconds / 60);
-	if (totalMinutes < 60) return `${totalMinutes}m`;
-
-	const hours = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
-	return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 /**
@@ -462,6 +449,7 @@ export class VectorStoreService {
 	/** Promise tracking initialization, awaited by cleanup to avoid closing mid-init. */
 	private initPromise: Promise<void> | null = null;
 	private unsubscribePrivacy: (() => void) | null = null;
+	private unsubscribeContentIndexing: (() => void) | null = null;
 	private unsubscribeRename: (() => void) | null = null;
 
 	/**
@@ -548,6 +536,7 @@ export class VectorStoreService {
 			},
 			indexingStartedAt: null,
 			indexingStartCount: 0,
+			extractionStartedAt: null,
 			abortController: null,
 			maxInputTokensCache: null,
 			report: null,
@@ -665,6 +654,8 @@ export class VectorStoreService {
 			// provider's trust; when either changes, every open index is out of
 			// date in both directions (notes to drop, notes now allowed in).
 			this.unsubscribePrivacy = data.onPrivacyRulesChange(() => this.revalidateAll());
+			// The same holds for which file groups have their contents indexed.
+			this.unsubscribeContentIndexing = data.onContentIndexingChange(() => this.revalidateAll());
 			this.unsubscribeRename = data.onProviderRenamed((oldId, newId) => this.adoptRenamedIndexes(oldId, newId));
 
 			this.isInitialized = true;
@@ -1735,6 +1726,24 @@ export class VectorStoreService {
 		const batchSize = this.getBatchSize(inst.indexId, model.provider);
 		const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
 		const ordered = orderForBulkIndexing(files);
+		// The extraction tail (PDFs, last in `ordered`) gets its own progress phase.
+		const extractionPaths = new Set(ordered.filter(needsExtraction).map((file) => file.path));
+		const extractionTotal = extractionPaths.size;
+		const extractionDone = new Set<string>();
+		const extractionSettled = (path: string) => {
+			if (!extractionPaths.has(path) || extractionDone.has(path)) return;
+			extractionDone.add(path);
+			this.updateInstanceProgress(inst, {
+				extraction: {
+					done: extractionDone.size,
+					total: extractionTotal,
+					active: inst.extractionStartedAt !== null,
+				},
+			});
+		};
+		if (extractionTotal > 0) {
+			this.updateInstanceProgress(inst, { extraction: { done: 0, total: extractionTotal, active: false } });
+		}
 
 		// Progress is tracked in files (matching `total`), not chunks: a note is
 		// counted once its final chunk is written, so a multi-chunk note advances
@@ -1751,6 +1760,7 @@ export class VectorStoreService {
 			report?.indexedFiles.push(path);
 			notesSinceCheckpoint++;
 			this.updateInstanceProgress(inst, { indexed: options.startingIndexedCount + indexedPaths.size });
+			extractionSettled(path);
 		};
 		const noteSkipped = (path: string, reason: SkipReason) => {
 			report?.skippedFiles.push({ path, reason });
@@ -1762,6 +1772,7 @@ export class VectorStoreService {
 				skipped: options.preFilterSkipped + skippedPaths.size,
 				total: Math.max(0, inst.progress.total - 1),
 			});
+			extractionSettled(path);
 		};
 		const refreshNotice = () => {
 			if (notice) this.updateNotice(notice, inst.progress);
@@ -1831,9 +1842,12 @@ export class VectorStoreService {
 			const batch = queued.filter((entry) => !failedPaths.has(entry.file.path));
 			if (batch.length === 0) return true;
 			batchNumber++;
-			this.updateInstanceProgress(inst, {
-				currentFile: batch.length === 1 ? batch[0].file.path : `Embedding batch ${batchNumber}...`,
-			});
+			// In the extraction tail the notice names the PDF being read instead.
+			if (!inst.progress.extraction?.active) {
+				this.updateInstanceProgress(inst, {
+					currentFile: batch.length === 1 ? batch[0].file.path : `Embedding batch ${batchNumber}...`,
+				});
+			}
 			refreshNotice();
 
 			try {
@@ -1963,6 +1977,18 @@ export class VectorStoreService {
 				break;
 			}
 			try {
+				if (extractionPaths.has(file.path)) {
+					// Extraction is the slow part and happens here, at read time, so
+					// name the file now rather than when its batch is sent.
+					if (inst.extractionStartedAt === null) {
+						inst.extractionStartedAt = Date.now();
+						this.updateInstanceProgress(inst, {
+							extraction: { done: extractionDone.size, total: extractionTotal, active: true },
+						});
+					}
+					this.updateInstanceProgress(inst, { currentFile: file.path });
+					refreshNotice();
+				}
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
 				if (hasNoEmbeddableText(file, content)) {
@@ -2049,9 +2075,14 @@ export class VectorStoreService {
 	 * Update the indexing notice with current progress.
 	 */
 	private updateNotice(notice: Notice, progress: IndexingProgress): void {
-		const { indexed, skipped, total, percentage, etaMs } = progress;
-		const skippedText = skipped > 0 ? ` (${skipped} skipped)` : "";
-		const etaText = etaMs !== null ? ` (~${formatEta(etaMs)} left)` : "";
+		const { status, percentage } = describeBulkProgress({
+			processed: progress.indexed,
+			total: progress.total,
+			skipped: progress.skipped,
+			etaMs: progress.etaMs,
+			extraction: progress.extraction,
+			currentFile: progress.currentFile,
+		});
 
 		const el = notice.messageEl;
 		el.empty();
@@ -2060,7 +2091,7 @@ export class VectorStoreService {
 
 		container.createDiv({
 			cls: "s2b-indexing-status",
-			text: `Indexing: ${indexed}/${total}${skippedText}${etaText}`,
+			text: `Indexing: ${status}`,
 		});
 
 		const progressContainer = container.createDiv({ cls: "s2b-indexing-progress" });
@@ -2624,6 +2655,8 @@ export class VectorStoreService {
 		} else if (!inst.progress.isIndexing) {
 			inst.indexingStartedAt = null;
 			inst.indexingStartCount = 0;
+			inst.extractionStartedAt = null;
+			inst.progress.extraction = null;
 		}
 
 		if (inst.progress.total > 0) {
@@ -2645,11 +2678,21 @@ export class VectorStoreService {
 	 * made to produce a stable estimate.
 	 */
 	private estimateEtaMs(inst: IndexInstance): number | null {
-		const { isIndexing, indexed, total } = inst.progress;
+		const { isIndexing, indexed, total, extraction } = inst.progress;
 		if (!isIndexing || inst.indexingStartedAt === null || total <= 0) return null;
 
+		// One PDF costs what hundreds of notes do, so a rate measured on one phase
+		// says nothing about the other. In the extraction tail, measure that phase
+		// alone; before it, estimate the notes left (the notice says PDFs follow).
+		if (extraction?.active && inst.extractionStartedAt !== null) {
+			const remainingExtraction = extraction.total - extraction.done;
+			if (extraction.done <= 0 || remainingExtraction <= 0) return null;
+			const phaseElapsed = Date.now() - inst.extractionStartedAt;
+			return phaseElapsed > 0 ? Math.round((phaseElapsed / extraction.done) * remainingExtraction) : null;
+		}
+
 		const doneThisRun = indexed - inst.indexingStartCount;
-		const remaining = total - indexed;
+		const remaining = total - indexed - (extraction ? extraction.total - extraction.done : 0);
 		if (doneThisRun <= 0 || remaining <= 0) return null;
 
 		const elapsed = Date.now() - inst.indexingStartedAt;
@@ -2922,6 +2965,8 @@ export class VectorStoreService {
 			this.modifyTimers.clear();
 			this.unsubscribePrivacy?.();
 			this.unsubscribePrivacy = null;
+			this.unsubscribeContentIndexing?.();
+			this.unsubscribeContentIndexing = null;
 			this.unsubscribeRename?.();
 			this.unsubscribeRename = null;
 			// Wait for any in-progress initialization before cleaning up

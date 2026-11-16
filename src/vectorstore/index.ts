@@ -12,7 +12,6 @@ export {
 	isVectorStoreInitialized,
 	waitForVectorStore,
 	waitForVectorStoreIndex,
-	formatEta,
 	formatIndexBuildStatus,
 } from "./VectorStoreService";
 

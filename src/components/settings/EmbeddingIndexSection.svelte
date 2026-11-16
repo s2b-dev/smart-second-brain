@@ -18,10 +18,10 @@ import { getPlugin } from "../../stores/state.svelte";
 import {
 	isVectorStoreInitialized,
 	getVectorStoreService,
-	formatEta,
 	formatIndexBuildStatus,
 	type IndexingProgress,
 } from "../../vectorstore";
+import { describeBulkProgress } from "../../search/bulkProgress";
 import { largeDimensionHint } from "../../vectorstore/embeddingMemoryHint";
 
 interface Props {
@@ -46,6 +46,17 @@ let indexProgress = $state<IndexingProgress>({
 	percentage: 0,
 	etaMs: null,
 });
+
+// Same wording as the indexing notice, minus the file name (no room in the row).
+const progressText = $derived(
+	describeBulkProgress({
+		processed: indexProgress.indexed,
+		total: indexProgress.total,
+		skipped: indexProgress.skipped,
+		etaMs: indexProgress.etaMs,
+		extraction: indexProgress.extraction,
+	}),
+);
 
 // Document count derived from reactive pluginData
 const documentCount = $derived(indexConfig?.documentCount ?? 0);
@@ -235,16 +246,8 @@ function getSelectionGroupLabel(): string {
            full-width action. -->
       {#if !Platform.isPhone}
         <div class="index-progress-summary">
-          <ProgressBar progress={indexProgress.percentage} />
-          <span>
-            {indexProgress.indexed}/{indexProgress.total}
-            {#if indexProgress.skipped > 0}
-              ({indexProgress.skipped} skipped)
-            {/if}
-            {#if indexProgress.etaMs !== null}
-              (~{formatEta(indexProgress.etaMs)} left)
-            {/if}
-          </span>
+          <ProgressBar progress={progressText.percentage} />
+          <span>{progressText.status}</span>
         </div>
       {/if}
       <Button buttonText="Cancel" onClick={cancelIndexing} />

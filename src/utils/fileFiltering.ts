@@ -1,4 +1,5 @@
 import { Platform, type TFile, type Vault } from "obsidian";
+import type { ContentGroup, ContentIndexingSettings } from "../types/plugin";
 import { stripWidgetFences } from "../widget/widgetFences";
 import { widgetIndexText } from "../widget/widgetSpec";
 import { getAgentPathSource } from "./agentPathSource";
@@ -56,17 +57,22 @@ const MOBILE_CHAT_MAX_EXTRACT_BYTES = 2 * 1024 * 1024;
  * completely), while extracted/structured text (PDFs, chat logs, canvas/CSV/
  * JSON) gets 10K — about four PDF pages — enough to find a document by its
  * opening content, with title/path/tag search unaffected. Desktop has no
- * memory ceiling and indexes up to 1M everywhere.
+ * memory ceiling, but embedding time does scale with length: a 400-page PDF
+ * at the old uniform 1M cap became hundreds of chunks and minutes of provider
+ * calls for a document mostly irrelevant to any query. So desktop also caps by
+ * provenance, just higher: 1M for notes, 200K (~80 PDF pages) for the rest.
  */
-const MAX_INDEXED_TEXT_CHARS_DESKTOP = 1_000_000;
+const MAX_INDEXED_TEXT_CHARS_DESKTOP_NOTES = 1_000_000;
+const MAX_INDEXED_TEXT_CHARS_DESKTOP_EXTRACTED = 200_000;
 const MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES = 100_000;
 const MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED = 10_000;
 
 function maxIndexedTextChars(file: TFile): number {
-	if (!Platform.isMobile) return MAX_INDEXED_TEXT_CHARS_DESKTOP;
-	return file.extension === "md" || file.extension === "txt"
-		? MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES
-		: MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED;
+	const authored = file.extension === "md" || file.extension === "txt";
+	if (!Platform.isMobile) {
+		return authored ? MAX_INDEXED_TEXT_CHARS_DESKTOP_NOTES : MAX_INDEXED_TEXT_CHARS_DESKTOP_EXTRACTED;
+	}
+	return authored ? MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES : MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED;
 }
 
 function normalizePattern(pattern: string): string {
@@ -171,6 +177,74 @@ export function isBinaryTextFile(file: TFile): boolean {
 	return BINARY_TEXT_EXTENSIONS.has(file.extension.toLowerCase());
 }
 
+// ---------------------------------------------------------------------------
+// Content groups (which files have their contents indexed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extensions in each optional content group. Anything not listed is a note
+ * (md, txt, canvas, widget, …) and always has its contents indexed.
+ *
+ *   - `pdfs`: large, slow to extract, mostly reference material the user did
+ *     not write.
+ *   - `chats`: past conversations are mostly the model's own answers; indexed,
+ *     retrieval can return them as if they were sources.
+ *   - `data`: structured exports embed poorly (keys and numbers carry little
+ *     meaning), and one dump can become thousands of chunks.
+ */
+const CONTENT_GROUP_EXTENSIONS: Record<ContentGroup, ReadonlySet<string>> = {
+	pdfs: new Set(["pdf"]),
+	chats: new Set(["chat"]),
+	data: new Set(["csv", "json", "yaml", "yml"]),
+};
+
+export const CONTENT_GROUPS = Object.keys(CONTENT_GROUP_EXTENSIONS) as ContentGroup[];
+
+/** Every optional group off: a fresh install indexes the contents of notes only. */
+export const DEFAULT_CONTENT_INDEXING: ContentIndexingSettings = { pdfs: false, chats: false, data: false };
+
+/** The optional content group `file` belongs to, or null for a note (always indexed). */
+export function contentGroupOf(file: Pick<TFile, "extension" | "path">): ContentGroup | null {
+	// Same path fallback as `isEmbeddableFile`: some call sites pass file-like
+	// objects without `extension`.
+	const extension = (file.extension ?? file.path.split(".").pop() ?? "").toLowerCase();
+	for (const group of CONTENT_GROUPS) {
+		if (CONTENT_GROUP_EXTENSIONS[group].has(extension)) return group;
+	}
+	return null;
+}
+
+/**
+ * Where the content-group switches are read from. Installed by the data store on
+ * construction, for the same reason as `agentPathSource`: the store imports this
+ * module, so this module must not import the store.
+ */
+let contentIndexingSource: (() => ContentIndexingSettings) | null = null;
+
+export function installContentIndexingSource(source: (() => ContentIndexingSettings) | null): void {
+	contentIndexingSource = source;
+}
+
+/** The current switches; the defaults until the data store has been constructed. */
+export function getContentIndexing(): ContentIndexingSettings {
+	return contentIndexingSource?.() ?? DEFAULT_CONTENT_INDEXING;
+}
+
+/** Whether `file`'s contents (not just its title and path) are indexed. */
+export function isContentIndexed(file: Pick<TFile, "extension" | "path">): boolean {
+	const group = contentGroupOf(file);
+	return group === null || getContentIndexing()[group];
+}
+
+/**
+ * Whether indexing `file` means extracting text from a binary container — the
+ * expensive tail of a bulk run, which goes last and gets its own progress phase.
+ * A PDF whose contents are not indexed is read as title-only and costs nothing.
+ */
+export function needsExtraction(file: TFile): boolean {
+	return isBinaryTextFile(file) && isContentIndexed(file);
+}
+
 /**
  * Returns `true` when `path` lives inside the configurable agent root folder (default
  * "Agents"). That folder holds all agent context — `Memories/`, `Skills/` (skill dirs, core
@@ -222,6 +296,9 @@ export function isIndexableFile(file: TFile): boolean {
  */
 export function isEmbeddableFile(file: TFile): boolean {
 	if (!isIndexableFile(file)) return false;
+	// A group whose contents are off would embed as a title-only vector: the same
+	// noise-floor problem as the extensions below.
+	if (!isContentIndexed(file)) return false;
 	// Fall back to the path suffix: `extension` is absent on some call sites'
 	// file-like objects, and treating that as "no extension" would silently
 	// re-admit every excluded type.
@@ -285,6 +362,10 @@ export async function readIndexableContent(vault: Vault, file: TFile): Promise<s
 }
 
 async function readIndexableContentRaw(vault: Vault, file: TFile): Promise<string> {
+	// A content group switched off is indexed by title and path only — and never
+	// read, so an excluded PDF costs no extraction at all.
+	if (!isContentIndexed(file)) return "";
+
 	// Size gates come before any read: the cost of reading an oversized file is
 	// paid before truncation could help.
 	if (Platform.isMobile && file.stat.size > MOBILE_MAX_READ_BYTES) {

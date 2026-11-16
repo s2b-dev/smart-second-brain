@@ -8,11 +8,13 @@ import {
 	bulkBatchPauseMs,
 	bulkCheckpointPauseMs,
 	bulkStartDelayMs,
+	countExtractionTail,
 	orderForBulkIndexing,
 	resetBulkRunQueue,
 	type VaultLocalStorage,
 	scheduleBulkRun,
 } from "../../src/search/bulkPacing";
+import { installContentIndexingSource } from "../../src/utils/fileFiltering";
 
 /*
  * The pacing and crash-backoff shared by the lexical and embedding bulk
@@ -187,7 +189,18 @@ describe("scheduleBulkRun", () => {
 });
 
 describe("orderForBulkIndexing", () => {
+	afterEach(() => installContentIndexingSource(null));
+
+	it("leaves PDFs in place when their contents are not indexed (reading them costs nothing)", () => {
+		installContentIndexingSource(() => ({ pdfs: false, chats: false, data: false }));
+		const file = (path: string, extension: string) => ({ path, extension }) as never;
+		const ordered = orderForBulkIndexing([file("a.pdf", "pdf"), file("b.md", "md")]);
+		expect(ordered.map((f: { path: string }) => f.path)).toEqual(["a.pdf", "b.md"]);
+		expect(countExtractionTail(ordered)).toBe(0);
+	});
+
 	it("moves binary-extraction files (PDFs) after text files, keeping relative order", () => {
+		installContentIndexingSource(() => ({ pdfs: true, chats: false, data: false }));
 		const file = (path: string, extension: string) => ({ path, extension }) as never;
 		const ordered = orderForBulkIndexing([
 			file("a.pdf", "pdf"),
@@ -196,5 +209,6 @@ describe("orderForBulkIndexing", () => {
 			file("d.md", "md"),
 		]);
 		expect(ordered.map((f: { path: string }) => f.path)).toEqual(["b.md", "d.md", "a.pdf", "c.pdf"]);
+		expect(countExtractionTail(ordered)).toBe(2);
 	});
 });
