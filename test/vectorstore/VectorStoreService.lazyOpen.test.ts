@@ -138,6 +138,12 @@ const indexStats: Record<string, unknown> = {};
 let providerTrusted = true;
 let privatePaths = new Set<string>();
 const privacyListeners = new Set<() => void>();
+/** Whether PDFs' contents are indexed (the one content group these tests exercise). */
+let pdfContent = false;
+const contentIndexingListeners = new Set<() => void>();
+function pdfEmbeddable(f: FakeFile): boolean {
+	return f.extension !== "pdf" || pdfContent;
+}
 
 /** Configured index ids; a test that renames a provider swaps the entry. */
 let indexIds = [INDEX];
@@ -175,6 +181,10 @@ const fakeData = {
 	onPrivacyRulesChange: (listener: () => void) => {
 		privacyListeners.add(listener);
 		return () => privacyListeners.delete(listener);
+	},
+	onContentIndexingChange: (listener: () => void) => {
+		contentIndexingListeners.add(listener);
+		return () => contentIndexingListeners.delete(listener);
 	},
 	getResolvedProviderAuth: () => null,
 };
@@ -215,10 +225,11 @@ vi.mock("../../src/lib/modelMetadataNormalizer", () => ({
 vi.mock("../../src/utils/fileFiltering", () => ({
 	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
 	isExcalidrawPath: (path: string) => path.endsWith(".excalidraw.md"),
-	getEmbeddableVaultFiles: () => vaultFiles,
+	getEmbeddableVaultFiles: () => vaultFiles.filter((f) => pdfEmbeddable(f)),
 	hasNoEmbeddableText: (_f: FakeFile, content: string) => content.trim() === "",
-	isEmbeddableFile: () => true,
+	isEmbeddableFile: (f: FakeFile) => pdfEmbeddable(f),
 	isBinaryTextFile: (f: FakeFile) => f.extension === "pdf",
+	needsExtraction: (f: FakeFile) => f.extension === "pdf" && pdfContent,
 	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
 		if (readFailures.has(f.path)) throw new Error(`cannot read ${f.path}`);
 		if (emptyPaths.has(f.path)) return "";
@@ -280,6 +291,8 @@ beforeEach(() => {
 	providerTrusted = true;
 	privatePaths = new Set();
 	privacyListeners.clear();
+	pdfContent = false;
+	contentIndexingListeners.clear();
 	showActionNotice.mockClear();
 	embedDocuments.mockClear();
 	embedQuery.mockClear();
@@ -1004,6 +1017,44 @@ describe("indexing review follow-ups", () => {
 		for (const listener of privacyListeners) listener();
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect([...(store?.docs.keys() ?? [])]).toEqual(["secret.md#0"]);
+	});
+
+	it("a content-indexing change re-validates: a group switched on comes in, switched off goes", async () => {
+		platform.isMobile = false;
+		const pdf: FakeFile = { ...file("paper.pdf"), basename: "paper", extension: "pdf" };
+		vaultFiles = [file("a.md"), pdf];
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const store = stores.get(INDEX);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+
+		pdfContent = true;
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...(store?.docs.keys() ?? [])].sort()).toEqual(["a.md#0", "paper.pdf#0"]);
+
+		pdfContent = false;
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+	});
+
+	it("reports the PDF tail as its own phase, and clears it when the run ends", async () => {
+		platform.isMobile = false;
+		pdfContent = true;
+		const pdf = (path: string): FakeFile => ({ ...file(path), basename: path, extension: "pdf" });
+		vaultFiles = [pdf("one.pdf"), file("a.md"), file("b.md"), pdf("two.pdf")];
+		const svc = await startService();
+		const seen: Array<{ done: number; total: number; active: boolean } | null | undefined> = [];
+		svc.onProgress((progress) => seen.push(progress.extraction && { ...progress.extraction }), INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// Announced from the start, entered once the notes are read, counted per PDF.
+		expect(seen).toContainEqual({ done: 0, total: 2, active: false });
+		expect(seen).toContainEqual({ done: 0, total: 2, active: true });
+		expect(seen).toContainEqual({ done: 2, total: 2, active: true });
+		expect(svc.getProgress(INDEX).extraction ?? null).toBeNull();
+		expect(stores.get(INDEX)?.docs.size).toBe(4);
 	});
 
 	it("a note that stopped being indexable is dropped when its next event arrives", async () => {

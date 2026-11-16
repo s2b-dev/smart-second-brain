@@ -9,7 +9,7 @@
  */
 
 import { type App, Platform, type TFile } from "obsidian";
-import { isBinaryTextFile } from "../utils/fileFiltering";
+import { needsExtraction } from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 
 /**
@@ -175,8 +175,20 @@ export function scheduleBulkRun(label: string, marker: BulkAttemptMarker, work: 
  * Bulk-indexing file order: cheap text files first, binary-extraction files
  * (PDFs) last. PDF text extraction is minutes of work on a large vault, and
  * putting it first held the whole searchable corpus hostage to it — this way
- * every note is searchable early even if the PDF tail never finishes.
+ * every note is searchable early even if the PDF tail never finishes. A PDF
+ * whose contents are not indexed costs nothing and is not held back.
+ *
+ * Both indexers report that tail as its own progress phase
+ * ({@link countExtractionTail}): counted in files, one PDF weighs as much as one
+ * note, so the bar reached ~99 % on the notes and then sat there for the PDFs.
  */
 export function orderForBulkIndexing(files: TFile[]): TFile[] {
-	return [...files].sort((a, b) => Number(isBinaryTextFile(a)) - Number(isBinaryTextFile(b)));
+	return [...files].sort((a, b) => Number(needsExtraction(a)) - Number(needsExtraction(b)));
+}
+
+/** How many of `files` are in the expensive extraction tail that {@link orderForBulkIndexing} puts last. */
+export function countExtractionTail(files: readonly TFile[]): number {
+	let count = 0;
+	for (const file of files) if (needsExtraction(file)) count++;
+	return count;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", () => import("../__mocks__/obsidian"));
 
@@ -10,6 +10,10 @@ import { installAgentPathSource } from "../../src/utils/agentPathSource";
 installAgentPathSource({ agentFolder: () => "Agents", agentName: () => undefined });
 
 import {
+	contentGroupOf,
+	installContentIndexingSource,
+	isContentIndexed,
+	needsExtraction,
 	extractExcalidrawContent,
 	hasNoEmbeddableText,
 	isAgentFilePath,
@@ -21,6 +25,11 @@ import {
 } from "../../src/utils/fileFiltering";
 import { deflateThreadData } from "../../src/agent/threadDataCodec";
 import { gzipString, toArrayBuffer } from "../../src/utils/gzip";
+
+// The extraction suites below test what is read once a group is on; the switches
+// themselves have their own suite, which installs its own source.
+const ALL_CONTENT = { pdfs: true, chats: true, data: true };
+installContentIndexingSource(() => ALL_CONTENT);
 
 describe("isAgentPath (pure)", () => {
 	it("matches the folder itself and files inside it", () => {
@@ -550,5 +559,51 @@ describe("hasNoEmbeddableText", () => {
 	it("never takes an empty extraction from a container as a verdict: it may be a failed read", () => {
 		expect(hasNoEmbeddableText(f("Papers/scan.pdf", "pdf"), "")).toBe(false);
 		expect(hasNoEmbeddableText(f("Chats/Thread.chat", "chat"), "")).toBe(false);
+	});
+});
+
+describe("content groups", () => {
+	const f = (path: string, extension: string) => ({ path, extension, basename: path }) as never;
+	afterEach(() => installContentIndexingSource(() => ALL_CONTENT));
+
+	it("sorts files into groups; anything else is a note", () => {
+		expect(contentGroupOf(f("Papers/paper.PDF", "PDF"))).toBe("pdfs");
+		expect(contentGroupOf(f("Chats/thread.chat", "chat"))).toBe("chats");
+		expect(contentGroupOf(f("Data/export.csv", "csv"))).toBe("data");
+		expect(contentGroupOf(f("Data/config.yml", "yml"))).toBe("data");
+		expect(contentGroupOf(f("Notes/note.md", "md"))).toBeNull();
+		expect(contentGroupOf(f("Boards/board.canvas", "canvas"))).toBeNull();
+	});
+
+	it("falls back to the path when a file-like object has no extension", () => {
+		expect(contentGroupOf({ path: "Papers/paper.pdf" } as never)).toBe("pdfs");
+	});
+
+	it("indexes only notes' contents by default (no source installed yet)", () => {
+		installContentIndexingSource(null);
+		expect(isContentIndexed(f("Notes/note.md", "md"))).toBe(true);
+		expect(isContentIndexed(f("Papers/paper.pdf", "pdf"))).toBe(false);
+		expect(isContentIndexed(f("Chats/thread.chat", "chat"))).toBe(false);
+		expect(isContentIndexed(f("Data/export.json", "json"))).toBe(false);
+	});
+
+	it("a group switched off is not embedded, and is read title-only without touching the file", async () => {
+		installContentIndexingSource(() => ({ pdfs: false, chats: true, data: true }));
+		const pdf = f("Papers/paper.pdf", "pdf");
+		expect(isEmbeddableFile(pdf)).toBe(false);
+		expect(needsExtraction(pdf)).toBe(false);
+		expect(isIndexableFile(pdf)).toBe(true);
+
+		const readBinary = vi.fn();
+		expect(await readIndexableContent({ adapter: { readBinary } } as never, pdf)).toBe("");
+		expect(readBinary).not.toHaveBeenCalled();
+	});
+
+	it("a group switched on is embedded and extracted", () => {
+		installContentIndexingSource(() => ({ pdfs: true, chats: false, data: false }));
+		const pdf = f("Papers/paper.pdf", "pdf");
+		expect(isEmbeddableFile(pdf)).toBe(true);
+		expect(needsExtraction(pdf)).toBe(true);
+		expect(isEmbeddableFile(f("Chats/thread.chat", "chat"))).toBe(false);
 	});
 });

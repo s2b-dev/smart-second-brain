@@ -199,6 +199,14 @@ export interface IndexingProgress {
 	percentage: number;
 	/** Estimated milliseconds remaining, or null when not yet known */
 	etaMs: number | null;
+	/**
+	 * The bulk run's extraction tail (PDFs, ordered last): how many of those files
+	 * are done (indexed or skipped) out of how many, and whether the run has
+	 * reached them yet. Absent or null when the run has none. Counted in files,
+	 * the bar reached ~99 % on the notes and then sat there for the PDFs, so the
+	 * UI names this phase and the ETA is measured per phase.
+	 */
+	extraction?: { done: number; total: number; active: boolean } | null;
 }
 
 /** Reasons a file can be skipped during indexing */

@@ -27,6 +27,11 @@ const removeDocument = vi.fn();
 const flush = vi.fn(async () => {});
 /** Per-path gate on `readIndexableContent`; a path without one reads at once. */
 let readGates: Map<string, Promise<void>>;
+/** The content-group switches as the settings hold them now. */
+let contentIndexing: { pdfs: boolean; chats: boolean; data: boolean };
+/** Vault-local storage (`App.loadLocalStorage`), where the index records the groups it applied. */
+let localStore: Map<string, string>;
+const contentIndexingListeners = new Set<() => void>();
 
 vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 	MiniSearchService: class {
@@ -61,8 +66,20 @@ vi.mock("../../src/vectorstore/MiniSearchService", () => ({
 		close() {}
 	},
 }));
-vi.mock("../../src/stores/dataStore.svelte", () => ({ getData: () => ({ vaultSlug: "vault-1" }) }));
+vi.mock("../../src/stores/dataStore.svelte", () => ({
+	getData: () => ({
+		vaultSlug: "vault-1",
+		onContentIndexingChange: (listener: () => void) => {
+			contentIndexingListeners.add(listener);
+			return () => contentIndexingListeners.delete(listener);
+		},
+	}),
+}));
 vi.mock("../../src/utils/fileFiltering", () => ({
+	CONTENT_GROUPS: ["pdfs", "chats", "data"],
+	contentGroupOf: (f: FakeFile) => (f.extension === "pdf" ? "pdfs" : null),
+	getContentIndexing: () => contentIndexing,
+	needsExtraction: (f: FakeFile) => f.extension === "pdf" && contentIndexing.pdfs,
 	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
 	isExcalidrawPath: (path: string) => path.endsWith(".excalidraw.md"),
 	getIndexableVaultFiles: () => vaultFiles,
@@ -90,10 +107,14 @@ function fakePlugin(options: { deferLayoutReady?: boolean } = {}) {
 			},
 			vault: { getFiles: () => vaultFiles, on: () => ({}) },
 			metadataCache: { getFileCache: () => null },
-			loadLocalStorage: () => null,
-			saveLocalStorage: () => {},
+			loadLocalStorage: (key: string) => localStore.get(key) ?? null,
+			saveLocalStorage: (key: string, value: string | null) => {
+				if (value === null) localStore.delete(key);
+				else localStore.set(key, value);
+			},
 		},
 		registerEvent: () => {},
+		register: () => {},
 	} as never;
 }
 
@@ -105,6 +126,9 @@ beforeEach(() => {
 	loaded = new Map();
 	vaultFiles = [];
 	readGates = new Map();
+	contentIndexing = { pdfs: false, chats: false, data: false };
+	localStore = new Map();
+	contentIndexingListeners.clear();
 	layoutReady = null;
 	addDocument.mockClear();
 	removeDocument.mockClear();
@@ -250,5 +274,35 @@ describe("LexicalSearchService.validateIndex", () => {
 
 		expect(addDocument).not.toHaveBeenCalled();
 		expect(removeDocument).not.toHaveBeenCalled();
+	});
+
+	it("re-reads the files of a content group whose switch changed, even with unchanged mtimes", async () => {
+		const pdf = (path: string): FakeFile => ({ ...file(path, 1_000), extension: "pdf" });
+		loaded = new Map([
+			["a.md", 1_000],
+			["paper.pdf", 1_000],
+		]);
+		vaultFiles = [file("a.md", 1_000), pdf("paper.pdf")];
+		// An index with no record predates the setting: built with PDF contents in it.
+		service = LexicalSearchService.startInitialize(fakePlugin());
+		expect(await waitForLexicalSearch()).toBe(true);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// PDFs are off by default, so the PDF is re-read (now title-only); the note is not.
+		expect(addDocument.mock.calls.map((call) => call[0])).toEqual(["paper.pdf"]);
+		expect(JSON.parse(localStore.get("s2b-lexical-content-groups") ?? "null")).toEqual(contentIndexing);
+
+		// Switching PDFs on re-reads it again; nothing else moves.
+		addDocument.mockClear();
+		contentIndexing = { ...contentIndexing, pdfs: true };
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument.mock.calls.map((call) => call[0])).toEqual(["paper.pdf"]);
+
+		// With the record matching the settings, the next validation leaves it alone.
+		addDocument.mockClear();
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(addDocument).not.toHaveBeenCalled();
 	});
 });

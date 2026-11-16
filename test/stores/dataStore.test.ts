@@ -1308,4 +1308,40 @@ describe("reloadFromDisk (onExternalSettingsChange)", () => {
 		expect(change?.changedProviderIds).toEqual(["ollama"]);
 		expect(store.getAllProviderIds()).toContain("ollama");
 	});
+
+	it("a content group switched on another device re-validates the indexes", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		const listener = vi.fn();
+		store.onContentIndexingChange(listener);
+
+		const edited = disk.readDisk();
+		edited.contentIndexing = { pdfs: true };
+		disk.writeExternally(edited);
+		await store.reloadFromDisk();
+
+		// A partial record is filled from the defaults, like at startup.
+		expect(store.contentIndexing).toEqual({ pdfs: true, chats: false, data: false });
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("content indexing", () => {
+	beforeEach(() => {
+		__resetPluginDataStoreForTests();
+	});
+
+	it("defaults to notes only, and notifies only on a real change", async () => {
+		const plugin = { ...createMockPlugin(), loadData: vi.fn(async () => null) };
+		const store = await createData(plugin as never);
+		expect(store.contentIndexing).toEqual({ pdfs: false, chats: false, data: false });
+
+		const listener = vi.fn();
+		store.onContentIndexingChange(listener);
+		store.setContentIndexed("chats", false);
+		expect(listener).not.toHaveBeenCalled();
+		store.setContentIndexed("chats", true);
+		expect(store.contentIndexing.chats).toBe(true);
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
 });

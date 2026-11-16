@@ -7,7 +7,7 @@ import {
 	rewriteViewFilterForRename,
 } from "../lib/views";
 import { getSecret, listSecrets, removeSecret, setSecret } from "../lib/secretStorage";
-import { isAgentFilePath } from "../utils/fileFiltering";
+import { DEFAULT_CONTENT_INDEXING, installContentIndexingSource, isAgentFilePath } from "../utils/fileFiltering";
 import { sanitizeAgentFileName } from "../utils/agentPaths";
 import { installAgentPathSource } from "../utils/agentPathSource";
 import { DEFAULT_AGENT_ID, createDefaultAgent, createDefaultAgentConfig, normalizeAgents } from "./agentDefaults";
@@ -21,6 +21,8 @@ import type {
 	BuiltInToolId,
 	DefaultEmbedModel,
 	ChatOpenLocation,
+	ContentGroup,
+	ContentIndexingSettings,
 	DiffViewMode,
 	EmbeddingIndexConfig,
 	MCPServerConfig,
@@ -224,6 +226,9 @@ export const DEFAULT_SETTINGS: PluginData = {
 	privacyMode: "private-by-default",
 	privacyFilter: createEmptyPrivacyFilter(),
 
+	// Indexing
+	contentIndexing: { ...DEFAULT_CONTENT_INDEXING },
+
 	// UI state
 	isVerbose: false,
 	showToolIODetails: false,
@@ -333,6 +338,7 @@ export class PluginDataStore {
 			agentFolder: () => this.agentFolder,
 			agentName: (agentId) => this.agents[agentId]?.name,
 		});
+		installContentIndexingSource(() => this.#data.contentIndexing);
 		this._plugin = plugin;
 		this.#data = $state(initialData);
 
@@ -469,6 +475,11 @@ export class PluginDataStore {
 			);
 		if (privacyChanged) this.notifyPrivacyRulesChanged();
 
+		// Another device switched a content group on or off: the indexes follow.
+		if (JSON.stringify(previous.contentIndexing) !== JSON.stringify(next.contentIndexing)) {
+			this.notifyContentIndexingChanged();
+		}
+
 		if (previous.isVerbose !== next.isVerbose) applyVerboseLogging(next.isVerbose);
 
 		return {
@@ -574,6 +585,39 @@ export class PluginDataStore {
 
 	private notifyPrivacyRulesChanged(): void {
 		for (const listener of this.#privacyListeners) listener();
+	}
+
+	// ============================================================================
+	// Content indexing
+	// ============================================================================
+
+	get contentIndexing(): Readonly<ContentIndexingSettings> {
+		return this.#data.contentIndexing;
+	}
+
+	setContentIndexed(group: ContentGroup, enabled: boolean): void {
+		if (this.#data.contentIndexing[group] === enabled) return;
+		this.#data.contentIndexing = { ...this.#data.contentIndexing, [group]: enabled };
+		void this.saveSettings();
+		this.notifyContentIndexingChanged();
+	}
+
+	/**
+	 * Listeners for a change to which file groups have their contents indexed.
+	 * Both indexers subscribe: the embedding indexes re-validate (a group switched
+	 * off leaves as orphans, one switched on is embedded as missing), the search
+	 * index re-reads the affected files.
+	 */
+	readonly #contentIndexingListeners = new Set<() => void>();
+
+	/** Subscribe to content-indexing changes; returns the unsubscribe. */
+	onContentIndexingChange(listener: () => void): () => void {
+		this.#contentIndexingListeners.add(listener);
+		return () => this.#contentIndexingListeners.delete(listener);
+	}
+
+	private notifyContentIndexingChanged(): void {
+		for (const listener of this.#contentIndexingListeners) listener();
 	}
 
 	/**
@@ -2367,6 +2411,9 @@ async function normalizeLoadedData(
 	};
 
 	runMigrations(mergedData);
+	// Nested, so the shallow merge above would drop a group added after this data
+	// was saved.
+	mergedData.contentIndexing = { ...DEFAULT_CONTENT_INDEXING, ...mergedData.contentIndexing };
 
 	// If the data was written by a newer plugin, skip normalizeAgents() too — it
 	// would rewrite prompt fields using this plugin's older defaults and those

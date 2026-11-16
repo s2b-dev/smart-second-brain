@@ -3,6 +3,12 @@ import type { ProviderInstanceMeta } from "../types/provider/index";
 import type { UUIDv7 } from "../utils/uuid7Validator";
 import type { SmartGraphSettings } from "./graph";
 
+/** The optional file groups whose contents can be indexed. See `contentGroupOf` in `utils/fileFiltering.ts`. */
+export type ContentGroup = "pdfs" | "chats" | "data";
+
+/** Per-group switch: true indexes the group's contents, false indexes title and path only. */
+export type ContentIndexingSettings = Record<ContentGroup, boolean>;
+
 /**
  * Retrieval strategy.
  *
@@ -525,6 +531,17 @@ export interface PluginData {
 	privacyMode: PrivacyMode;
 	/** Filter-backed private file set used to block files for untrusted providers. */
 	privacyFilter: import("./viewFilter").ViewFilter;
+
+	// ============================================================================
+	// Indexing
+	// ============================================================================
+
+	/**
+	 * Which optional file groups have their *contents* indexed (search and
+	 * embeddings). Notes are always indexed; a group switched off is still found
+	 * by title and path, and the agent can still read its files on demand.
+	 */
+	contentIndexing: ContentIndexingSettings;
 
 	// ============================================================================
 	// UI State
