@@ -1279,6 +1279,20 @@ describe("reloadFromDisk (onExternalSettingsChange)", () => {
 		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(128000);
 	});
 
+	it("keeps the vault slug in use when the file carries another one", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.vaultSlug = "other-device-slug";
+		edited.isVerbose = true;
+		disk.writeExternally(edited);
+
+		expect(await store.reloadFromDisk()).not.toBeNull();
+		expect(store.isVerbose).toBe(true);
+		expect(store.vaultSlug).toBe("test-vault");
+	});
+
 	it("reports changed providers", async () => {
 		const disk = createDiskBackedPlugin(initialSettings());
 		const store = await createData(disk.plugin as never);

@@ -2352,8 +2352,7 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
  * external-change reload (`PluginDataStore.reloadFromDisk`) so a file edited while
  * Obsidian runs goes through exactly the path it would on the next launch.
  *
- * `currentVaultSlug` is the slug already in use; a reload keeps it when the incoming
- * file lacks one rather than resolving a new one (which could orphan the indexes).
+ * `currentVaultSlug` is the slug already in use (null at startup); a reload always keeps it.
  */
 async function normalizeLoadedData(
 	plugin: SecondBrainPlugin,
@@ -2389,9 +2388,14 @@ async function normalizeLoadedData(
 		normalizeAgents(mergedData);
 	}
 
-	// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
-	if (!mergedData.vaultSlug) {
-		mergedData.vaultSlug = currentVaultSlug ?? (await resolveVaultSlug(plugin.app.vault.getName()));
+	// A reload always keeps the slug in use: the search and vector stores opened their
+	// IndexedDB databases under it, and those databases are local to this device, so a
+	// different slug arriving from another device's data.json must not move them.
+	if (currentVaultSlug) {
+		mergedData.vaultSlug = currentVaultSlug;
+	} else if (!mergedData.vaultSlug) {
+		// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
+		mergedData.vaultSlug = await resolveVaultSlug(plugin.app.vault.getName());
 	}
 
 	return mergedData;

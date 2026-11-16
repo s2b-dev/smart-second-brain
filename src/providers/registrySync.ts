@@ -99,15 +99,21 @@ export function syncAllProviders(data: ProviderConfigSource): void {
 	const registry = getRegistry();
 	const configured = new Set(data.getConfiguredProviders());
 
+	let removed = false;
 	for (const providerId of registry.list()) {
 		if (!configured.has(providerId)) {
 			registry.unregister(providerId);
+			removed = true;
 		}
 	}
 
 	for (const providerId of configured) {
 		syncProvider(data, providerId);
 	}
+
+	// `syncProvider` notifies per configured provider, so when none remain, removals alone
+	// would never reach the listeners and their model subscriptions would outlive the provider.
+	if (removed && configured.size === 0) notifyProvidersChanged();
 }
 
 /**
