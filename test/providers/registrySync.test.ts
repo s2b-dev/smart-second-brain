@@ -12,6 +12,7 @@ import { getRegistry, resetRegistry } from "../../src/providers/registry.ts";
 import {
 	type ProviderConfigSource,
 	ensureProviderRegistered,
+	onProvidersChanged,
 	syncAllProviders,
 	syncProvider,
 	unsyncProvider,
@@ -139,6 +140,20 @@ describe("registrySync", () => {
 			syncAllProviders(data);
 
 			expect(getRegistry().list()).toEqual(["openai"]);
+		});
+
+		it("notifies listeners when the last configured provider is removed", () => {
+			data.add("openai");
+			syncAllProviders(data);
+
+			let notified = 0;
+			const unsubscribe = onProvidersChanged(() => notified++);
+			data.remove("openai");
+			syncAllProviders(data);
+			unsubscribe();
+
+			expect(getRegistry().list()).toEqual([]);
+			expect(notified).toBe(1);
 		});
 
 		it("handles a rename: old ID dropped, new ID registered", () => {

@@ -272,6 +272,16 @@ export const DEFAULT_SETTINGS: PluginData = {
 	vaultSlug: null,
 };
 
+/** What a {@link PluginDataStore.reloadFromDisk} changed, for refreshing state kept outside the store. */
+export interface ExternalSettingsChange {
+	/** Providers added, removed, or with edited config/meta. The registry is already resynced. */
+	changedProviderIds: string[];
+	/** Any agent added, removed, or edited (their AGENT.md cache may need refreshing). */
+	agentsChanged: boolean;
+	/** The agent context root moved; the caller must re-seed and re-discover under it. */
+	agentFolderChanged: boolean;
+}
+
 export class PluginDataStore {
 	#data: PluginData;
 	private readonly _plugin: SecondBrainPlugin;
@@ -306,7 +316,19 @@ export class PluginDataStore {
 		this.#staleSkills = [...skillNames];
 	}
 
-	constructor(plugin: SecondBrainPlugin, initialData: PluginData) {
+	/**
+	 * `data.json` as this store last saw it on disk — the raw file at load, then each
+	 * snapshot we successfully wrote. `reloadFromDisk` compares the file against it, so
+	 * Obsidian echoing our own write back as an "external" change is a no-op.
+	 */
+	#lastDiskContent: string | null;
+	/** Saves started but not yet settled; a reload waits for them before reading. */
+	readonly #pendingSaves = new Set<Promise<void>>();
+	/** Bumped on every save start; a reload that sees it move knows the file changed under it. */
+	#saveGeneration = 0;
+
+	constructor(plugin: SecondBrainPlugin, initialData: PluginData, diskContent: string | null = null) {
+		this.#lastDiskContent = diskContent;
 		installAgentPathSource({
 			agentFolder: () => this.agentFolder,
 			agentName: (agentId) => this.agents[agentId]?.name,
@@ -366,7 +388,94 @@ export class PluginDataStore {
 	/** Persist and propagate failure, for callers that must observe a failed write. */
 	private async saveSettingsOrThrow(): Promise<void> {
 		const snap = $state.snapshot(this.#data);
-		await this._plugin.saveData(snap);
+		const content = JSON.stringify(snap);
+		this.#saveGeneration++;
+		const write = this._plugin.saveData(snap).then(() => {
+			this.#lastDiskContent = content;
+		});
+		const tracked = write.finally(() => this.#pendingSaves.delete(tracked));
+		// Keep the tracked promise from surfacing as an unhandled rejection; the caller
+		// awaits `write` and handles (or propagates) the failure itself.
+		tracked.catch(() => {});
+		this.#pendingSaves.add(tracked);
+		await write;
+	}
+
+	/**
+	 * Re-read `data.json` after it changed on disk (Obsidian Sync, a hand edit) and apply it
+	 * in place, so the change is picked up instead of being overwritten by the stale
+	 * in-memory copy on the next save. Runs the same defaults + migrations + normalization
+	 * as startup.
+	 *
+	 * The store object is kept (components and services hold references to it); only its
+	 * reactive data is swapped, so every getter-driven view re-renders with the new values.
+	 *
+	 * Our own writes are guarded two ways: in-flight saves are awaited before reading, and a
+	 * file whose content equals what we last wrote is skipped as an echo. If a save starts
+	 * while the file is being read, the read is retried — that save has just overwritten
+	 * the file with our in-memory state, which is what the next read will see.
+	 *
+	 * Returns what changed so the caller can refresh state derived outside the store, or
+	 * `null` when nothing was applied.
+	 */
+	async reloadFromDisk(): Promise<ExternalSettingsChange | null> {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const generation = this.#saveGeneration;
+			await Promise.allSettled([...this.#pendingSaves]);
+			const rawData: Partial<PluginData> | null = await this._plugin.loadData();
+			if (generation !== this.#saveGeneration) continue;
+			// A missing or emptied file is not a settings change worth wiping everything for;
+			// keep what we have (the next save rewrites it).
+			if (!rawData) return null;
+
+			const content = JSON.stringify(rawData);
+			if (content === this.#lastDiskContent) return null;
+
+			const next = await normalizeLoadedData(this._plugin, rawData, this.#data.vaultSlug);
+			if (generation !== this.#saveGeneration) continue;
+
+			const previous = $state.snapshot(this.#data) as PluginData;
+			this.#data = next;
+			this.#lastDiskContent = content;
+			return this.applyExternalChange(previous, next);
+		}
+		Logger.warn("Skipped reloading settings changed on disk: the plugin kept saving while reading them.");
+		return null;
+	}
+
+	/** Refresh store-owned side effects of a reload and report what changed. */
+	private applyExternalChange(previous: PluginData, next: PluginData): ExternalSettingsChange {
+		const changedProviderIds = [
+			...new Set([
+				...Object.keys(previous.providerConfig),
+				...Object.keys(next.providerConfig),
+				...Object.keys(previous.providerMeta),
+				...Object.keys(next.providerMeta),
+			]),
+		].filter(
+			(id) =>
+				JSON.stringify(previous.providerConfig[id]) !== JSON.stringify(next.providerConfig[id]) ||
+				JSON.stringify(previous.providerMeta[id]) !== JSON.stringify(next.providerMeta[id]),
+		);
+		if (changedProviderIds.length > 0) syncAllProviders(this);
+
+		const privacyChanged =
+			previous.privacyMode !== next.privacyMode ||
+			JSON.stringify(previous.privacyFilter) !== JSON.stringify(next.privacyFilter) ||
+			changedProviderIds.some(
+				(id) =>
+					previous.providerConfig[id]?.trustedForPrivateData !==
+					next.providerConfig[id]?.trustedForPrivateData,
+			);
+		if (privacyChanged) this.notifyPrivacyRulesChanged();
+
+		if (previous.isVerbose !== next.isVerbose) applyVerboseLogging(next.isVerbose);
+
+		return {
+			changedProviderIds,
+			agentsChanged: JSON.stringify(previous.agents) !== JSON.stringify(next.agents),
+			agentFolderChanged: previous.agentFolder !== next.agentFolder,
+		};
 	}
 
 	/**
@@ -2223,17 +2332,41 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 	if (_pluginDataStore) return _pluginDataStore;
 
 	const rawData = await plugin.loadData();
-
-	const mergedData: PluginData = {
-		...DEFAULT_SETTINGS,
-		...rawData,
-	};
-
-	runMigrations(mergedData);
+	// Stringify before normalizing: the merge is shallow, so normalization mutates the raw
+	// file's nested objects in place.
+	const diskContent = rawData ? JSON.stringify(rawData) : null;
+	const mergedData = await normalizeLoadedData(plugin, rawData, null);
 
 	// A fresh install has nothing to catch up on: record the running version so the
 	// first update announces only what changed since.
 	if (!rawData) mergedData.lastSeenVersion = plugin.manifest.version;
+
+	_pluginDataStore = new PluginDataStore(plugin, mergedData, diskContent);
+
+	return _pluginDataStore;
+}
+
+/**
+ * Turn a raw `data.json` payload into a usable `PluginData`: defaults for missing keys,
+ * migrations, agent normalization, vault slug. Shared by startup (`createData`) and the
+ * external-change reload (`PluginDataStore.reloadFromDisk`) so a file edited while
+ * Obsidian runs goes through exactly the path it would on the next launch.
+ *
+ * `currentVaultSlug` is the slug already in use (null at startup); a reload always keeps it.
+ */
+async function normalizeLoadedData(
+	plugin: SecondBrainPlugin,
+	rawData: Partial<PluginData> | null | undefined,
+	currentVaultSlug: string | null,
+): Promise<PluginData> {
+	// Clone the defaults: the spread is shallow, so without it the nested default objects
+	// would be shared with (and mutated through) the live store.
+	const mergedData: PluginData = {
+		...structuredClone(DEFAULT_SETTINGS),
+		...rawData,
+	};
+
+	runMigrations(mergedData);
 
 	// If the data was written by a newer plugin, skip normalizeAgents() too — it
 	// would rewrite prompt fields using this plugin's older defaults and those
@@ -2255,14 +2388,17 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 		normalizeAgents(mergedData);
 	}
 
-	// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
-	if (!mergedData.vaultSlug) {
+	// A reload always keeps the slug in use: the search and vector stores opened their
+	// IndexedDB databases under it, and those databases are local to this device, so a
+	// different slug arriving from another device's data.json must not move them.
+	if (currentVaultSlug) {
+		mergedData.vaultSlug = currentVaultSlug;
+	} else if (!mergedData.vaultSlug) {
+		// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
 		mergedData.vaultSlug = await resolveVaultSlug(plugin.app.vault.getName());
 	}
 
-	_pluginDataStore = new PluginDataStore(plugin, mergedData);
-
-	return _pluginDataStore;
+	return mergedData;
 }
 
 export function getData(): PluginDataStore {
