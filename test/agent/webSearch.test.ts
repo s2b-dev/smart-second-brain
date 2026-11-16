@@ -134,11 +134,17 @@ describe("web_search — Keenable", () => {
 	it("returns provider-specific errors for Keenable HTTP failures", async () => {
 		const tool = createWebSearchTool();
 
+		pluginState.webSearchApiKey = "keenable-secret";
 		mockFetch.mockResolvedValueOnce(jsonResponse({}, 401));
 		expect(await tool.invoke({ query: "bad key" })).toBe("Error searching the web: Invalid Keenable API key");
 
 		mockFetch.mockResolvedValueOnce(jsonResponse({}, 403));
 		expect(await tool.invoke({ query: "forbidden" })).toBe("Error searching the web: Invalid Keenable API key");
+
+		// Keyless: a 403 is the public endpoint refusing the request, not a bad key.
+		pluginState.webSearchApiKey = "";
+		mockFetch.mockResolvedValueOnce(jsonResponse({}, 403));
+		expect(await tool.invoke({ query: "refused" })).toBe("Error searching the web: Keenable returned HTTP 403");
 
 		mockFetch.mockResolvedValueOnce(jsonResponse({}, 429));
 		expect(await tool.invoke({ query: "limited" })).toBe(
@@ -147,6 +153,45 @@ describe("web_search — Keenable", () => {
 
 		mockFetch.mockResolvedValueOnce(jsonResponse({}, 502));
 		expect(await tool.invoke({ query: "upstream" })).toBe("Error searching the web: Keenable returned HTTP 502");
+	});
+
+	it("caps long descriptions and never returns more than maxResults", async () => {
+		mockFetch.mockResolvedValueOnce(
+			jsonResponse({
+				results: Array.from({ length: 8 }, (_, i) => ({
+					title: `R${i}`,
+					url: `https://r${i}.example`,
+					description: "d".repeat(1500),
+				})),
+			}),
+		);
+
+		const tool = createWebSearchTool();
+		const raw = (await tool.invoke({ query: "many" })) as string;
+		const payload = JSON.parse(raw) as { totalResults: number; results: Array<{ snippet: string }> };
+
+		expect(payload.totalResults).toBe(5);
+		expect(payload.results.every((r) => r.snippet.length === 1000)).toBe(true);
+	});
+
+	it("aborts the request signal when the search times out", async () => {
+		vi.useFakeTimers();
+		try {
+			let signal: AbortSignal | undefined;
+			mockFetch.mockImplementationOnce((_url: string, init: RequestInit) => {
+				signal = init.signal ?? undefined;
+				return new Promise(() => {});
+			});
+
+			const tool = createWebSearchTool();
+			const pending = tool.invoke({ query: "slow" });
+			await vi.advanceTimersByTimeAsync(15_000);
+
+			expect(await pending).toBe("Error: Web search timed out after 15000ms.");
+			expect(signal?.aborted).toBe(true);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("does not require an API key when Keenable is selected", async () => {
