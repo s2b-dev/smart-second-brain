@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
+import { countTokensApproximately } from "langchain";
 
 vi.mock("obsidian", () => import("../__mocks__/obsidian"));
 
 import {
+	countMessageTokens,
 	estimateContextUsage,
 	estimateContextUsageBreakdown,
 	formatContextUsage,
@@ -40,26 +42,26 @@ describe("tokenEstimator", () => {
 			const messages = createConversation("hello world", "goodbye world");
 			const result = estimateContextUsage(messages, "", 128000);
 
-			// "hello world" = 2 words * 1.3 = 2.6 ≈ 3 tokens
-			// "goodbye world" = 2 words * 1.3 = 2.6 ≈ 3 tokens
-			// Per-message overhead: 80 + 80 = 160
-			// Total: 3 + 3 + 160 = 166
-			expect(result.estimatedUsedTokens).toBe(166);
-			expect(result.usagePercent).toBeCloseTo(0.13, 2);
+			// "hello world" = 11 chars / 4 ≈ 3 tokens
+			// "goodbye world" = 13 chars / 4 ≈ 4 tokens
+			// Per-message overhead: 4 + 4 = 8
+			// Total: 3 + 4 + 8 = 15
+			expect(result.estimatedUsedTokens).toBe(15);
+			expect(result.usagePercent).toBeCloseTo(0.0117, 4);
 		});
 
 		it("should include draft text in estimation", () => {
 			const messages = createConversation("hello", "hi");
 			const result = estimateContextUsage(messages, "what is this", 128000);
 
-			// hello = 1 word * 1.3 ≈ 2 tokens (rounded up)
-			// hi = 1 word * 1.3 ≈ 2 tokens (rounded up)
-			// Message overheads: 160
-			// Draft "what is this" = 3 words * 1.3 = 3.9 ≈ 4 tokens
+			// hello = 5 chars / 4 ≈ 2 tokens (rounded up)
+			// hi = 2 chars / 4 ≈ 1 token (rounded up)
+			// Message overheads: 8
+			// Draft "what is this" = 12 chars / 4 = 3 tokens
 			// Draft overhead: 20
-			// Total: 2 + 2 + 160 + 4 + 20 = 188
-			expect(result.estimatedUsedTokens).toBe(188);
-			expect(result.usagePercent).toBeCloseTo(0.147, 2);
+			// Total: 2 + 1 + 8 + 3 + 20 = 34
+			expect(result.estimatedUsedTokens).toBe(34);
+			expect(result.usagePercent).toBeCloseTo(0.0266, 4);
 		});
 
 		it("should ignore empty draft text", () => {
@@ -75,8 +77,8 @@ describe("tokenEstimator", () => {
 			const result = estimateContextUsage(messages, "", 128000);
 
 			// 2 attachments * 200 tokens each = 400
-			// Plus other content: ~164 (hello + hi + message overheads)
-			// Expected: ~564
+			// Plus other content: 11 (hello + hi + message overheads)
+			// Expected: 411
 			expect(result.estimatedUsedTokens).toBeGreaterThan(400);
 			expect(result.estimatedUsedTokens).toBeLessThan(600);
 		});
@@ -181,7 +183,7 @@ describe("tokenEstimator", () => {
 			const result = estimateContextUsage(messages, "", 128000);
 
 			// Should accumulate tokens from all three pairs
-			expect(result.estimatedUsedTokens).toBeGreaterThan(300); // At least 3 * ~100
+			expect(result.estimatedUsedTokens).toBeGreaterThan(30);
 			expect(result.usagePercent).toBeGreaterThan(0);
 		});
 
@@ -190,7 +192,7 @@ describe("tokenEstimator", () => {
 			const messages = createConversation(longText, "short response");
 			const result = estimateContextUsage(messages, "", 128000);
 
-			// long text (1000 words) * 1.3 ≈ 1300 tokens + overhead
+			// long text (4999 chars) / 4 ≈ 1250 tokens + overhead
 			expect(result.estimatedUsedTokens).toBeGreaterThan(1000);
 		});
 
@@ -198,8 +200,8 @@ describe("tokenEstimator", () => {
 			const messages = createConversation("", "");
 			const result = estimateContextUsage(messages, "", 128000);
 
-			// Only message overhead: 80 + 80 = 160
-			expect(result.estimatedUsedTokens).toBe(160);
+			// Only message overhead: 4 + 4 = 8
+			expect(result.estimatedUsedTokens).toBe(8);
 		});
 
 		it("should not double-count when messages and draft are both empty", () => {
@@ -261,6 +263,55 @@ describe("tokenEstimator", () => {
 			);
 
 			expect(withToolCall.estimatedUsedTokens).toBeGreaterThan(withoutToolCall.estimatedUsedTokens);
+		});
+
+		it("counts tool result bodies under tool tokens (#545)", () => {
+			const toolOutput = "x".repeat(4000);
+			const breakdown = estimateContextUsageBreakdown(
+				[
+					new HumanMessage("read it"),
+					new AIMessage({
+						content: "",
+						tool_calls: [{ id: "tc-1", name: "read_content", args: { path: "note.md" } }],
+					}),
+					new ToolMessage({ content: toolOutput, tool_call_id: "tc-1" }),
+				],
+				"",
+			);
+
+			// 4000 chars / 4 = 1000, plus the call payload and framing.
+			expect(breakdown.toolTokens).toBeGreaterThanOrEqual(1000);
+			expect(breakdown.toolTokens).toBeLessThan(1100);
+		});
+	});
+
+	describe("countMessageTokens", () => {
+		it("matches the meter's message payload, so meter and summarization trigger agree", () => {
+			const messages = [
+				new HumanMessage("hello there"),
+				new AIMessage({
+					content: "on it",
+					tool_calls: [{ id: "tc-1", name: "read_content", args: { path: "a.md" } }],
+				}),
+				new ToolMessage({ content: "note body ".repeat(200), tool_call_id: "tc-1" }),
+			];
+			const breakdown = estimateContextUsageBreakdown(messages, "");
+
+			expect(countMessageTokens(messages)).toBe(
+				breakdown.humanTokens + breakdown.assistantTokens + breakdown.toolTokens,
+			);
+		});
+
+		it("stays within a few percent of LangChain's chars/4 counter on text-heavy history", () => {
+			const messages = [
+				new HumanMessage("Summarize my notes about the project roadmap. ".repeat(40)),
+				new AIMessage("Here is what the roadmap says about the next quarter. ".repeat(60)),
+				new ToolMessage({ content: "A long note body with plenty of text. ".repeat(300), tool_call_id: "t" }),
+			];
+			const ours = countMessageTokens(messages);
+			const langchain = countTokensApproximately(messages);
+
+			expect(Math.abs(ours - langchain) / langchain).toBeLessThan(0.02);
 		});
 	});
 

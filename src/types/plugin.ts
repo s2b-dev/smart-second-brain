@@ -79,6 +79,12 @@ export interface EmbeddingIndexConfig {
 	 * that mtime changes; absent when nothing failed.
 	 */
 	failedNotes?: Record<string, number>;
+	/**
+	 * Notes with no text to embed (a blank note, a drawing with nothing on the back
+	 * of the note), keyed by path with the mtime they were read at. Same lifecycle
+	 * as `failedNotes`; absent when there are none.
+	 */
+	emptyNotes?: Record<string, number>;
 }
 
 // ============================================================================

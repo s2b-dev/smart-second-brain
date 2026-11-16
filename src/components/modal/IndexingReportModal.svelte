@@ -21,6 +21,7 @@ const skipReasonLabels: Record<SkipReason, string> = {
 	"not-indexed": "Not yet indexed",
 	"read-error": "Failed to read file",
 	"embed-error": "Embedding failed",
+	empty: "No text to embed",
 };
 
 const skipReasonIcons: Record<SkipReason, string> = {
@@ -29,6 +30,7 @@ const skipReasonIcons: Record<SkipReason, string> = {
 	"not-indexed": "clock",
 	"read-error": "alert-triangle",
 	"embed-error": "zap-off",
+	empty: "file-x",
 };
 
 const skippedByReason = $derived.by(() => {
