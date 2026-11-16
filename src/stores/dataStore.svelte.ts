@@ -1449,6 +1449,7 @@ export class PluginDataStore {
 			documentCount?: number;
 			dimensions?: number;
 			failedNotes?: Record<string, number>;
+			emptyNotes?: Record<string, number>;
 		},
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
@@ -1475,6 +1476,13 @@ export class PluginDataStore {
 			const next = Object.keys(stats.failedNotes).length > 0 ? stats.failedNotes : undefined;
 			if (next !== undefined || config.failedNotes !== undefined) {
 				config.failedNotes = next;
+				changed = true;
+			}
+		}
+		if (stats.emptyNotes !== undefined) {
+			const next = Object.keys(stats.emptyNotes).length > 0 ? stats.emptyNotes : undefined;
+			if (next !== undefined || config.emptyNotes !== undefined) {
+				config.emptyNotes = next;
 				changed = true;
 			}
 		}

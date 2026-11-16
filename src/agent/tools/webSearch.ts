@@ -12,18 +12,20 @@ const MAX_MAX_RESULTS = 20;
 const FETCH_TIMEOUT_MS = 15_000;
 
 /**
- * Race a promise against a wall-clock deadline. Necessary because
- * createObsidianFetch may fall back to Obsidian's requestUrl, which ignores
- * AbortSignal — leaving the raw fetch to hang indefinitely.
+ * Run a request against a wall-clock deadline, aborting its signal when the
+ * deadline passes. The race is still necessary because createObsidianFetch may
+ * fall back to Obsidian's requestUrl, which ignores AbortSignal.
  */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
+	const controller = new AbortController();
 	return new Promise<T>((resolve, reject) => {
 		const timer = window.setTimeout(() => {
 			const err = new Error(`Web search timed out after ${timeoutMs}ms.`);
 			err.name = "TimeoutError";
+			controller.abort();
 			reject(err);
 		}, timeoutMs);
-		promise.then(
+		run(controller.signal).then(
 			(value) => {
 				window.clearTimeout(timer);
 				resolve(value);
@@ -59,6 +61,43 @@ interface WebSearchPayload {
 }
 
 // ============================================================================
+// Provider table
+// ============================================================================
+
+export interface WebSearchProviderInfo {
+	id: string;
+	label: string;
+	/** Works without an API key; a key only raises rate limits. */
+	keyless: boolean;
+	/** Help text for the API key setting. */
+	keyHelp: string;
+}
+
+/** Every web search provider, in settings-dropdown order. Read by the tool and ToolConfigForm. */
+export const WEB_SEARCH_PROVIDERS: readonly WebSearchProviderInfo[] = [
+	{
+		id: "firecrawl",
+		label: "Firecrawl (keyless)",
+		keyless: true,
+		keyHelp:
+			"Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier.",
+	},
+	{ id: "brave", label: "Brave Search", keyless: false, keyHelp: "Brave Search API key from api.search.brave.com." },
+	{ id: "tavily", label: "Tavily", keyless: false, keyHelp: "Tavily API key from app.tavily.com." },
+	{
+		id: "keenable",
+		label: "Keenable (keyless)",
+		keyless: true,
+		keyHelp:
+			"Optional — add a Keenable API key for higher rate limits. Leave empty to use the free public endpoint.",
+	},
+];
+
+export function getWebSearchProvider(id: string): WebSearchProviderInfo | undefined {
+	return WEB_SEARCH_PROVIDERS.find((p) => p.id === id);
+}
+
+// ============================================================================
 // Brave Search
 // ============================================================================
 
@@ -77,10 +116,10 @@ async function searchBrave(
 	apiKey: string,
 	count: number,
 	fetchImpl: ReturnType<typeof createObsidianFetch>,
+	signal: AbortSignal,
 ): Promise<WebSearchResult[]> {
 	const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}&text_decorations=false&search_lang=en`;
 
-	const controller = new AbortController();
 	const response = await fetchImpl(url, {
 		method: "GET",
 		headers: {
@@ -88,7 +127,7 @@ async function searchBrave(
 			"Accept-Encoding": "gzip",
 			"X-Subscription-Token": apiKey,
 		},
-		signal: controller.signal,
+		signal,
 	});
 
 	if (!response.ok) {
@@ -119,8 +158,8 @@ async function searchTavily(
 	apiKey: string,
 	count: number,
 	fetchImpl: ReturnType<typeof createObsidianFetch>,
+	signal: AbortSignal,
 ): Promise<WebSearchResult[]> {
-	const controller = new AbortController();
 	const response = await fetchImpl("https://api.tavily.com/search", {
 		method: "POST",
 		headers: {
@@ -134,7 +173,7 @@ async function searchTavily(
 			include_answer: false,
 			include_raw_content: false,
 		}),
-		signal: controller.signal,
+		signal,
 	});
 
 	if (!response.ok) {
@@ -178,11 +217,11 @@ async function searchFirecrawl(
 	apiKey: string,
 	count: number,
 	fetchImpl: ReturnType<typeof createObsidianFetch>,
+	signal: AbortSignal,
 ): Promise<WebSearchResult[]> {
 	const headers: Record<string, string> = { "Content-Type": "application/json" };
 	if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-	const controller = new AbortController();
 	const response = await fetchImpl("https://api.firecrawl.dev/v2/search", {
 		method: "POST",
 		headers,
@@ -191,7 +230,7 @@ async function searchFirecrawl(
 			limit: count,
 			sources: ["web"],
 		}),
-		signal: controller.signal,
+		signal,
 	});
 
 	if (!response.ok) {
@@ -212,6 +251,62 @@ async function searchFirecrawl(
 		url: r.url ?? "",
 		snippet: r.description ?? "",
 	}));
+}
+
+// ============================================================================
+// Keenable Search
+// ============================================================================
+
+const KEENABLE_SNIPPET_MAX_CHARS = 1000;
+
+interface KeenableSearchResponse {
+	results?: Array<{ title?: string; url?: string; description?: string; snippet?: string }>;
+}
+
+/**
+ * Keenable search. Works keyless via the public endpoint; an optional API key
+ * switches to the keyed endpoint (sent as X-API-Key) for higher limits.
+ */
+async function searchKeenable(
+	query: string,
+	apiKey: string,
+	count: number,
+	fetchImpl: ReturnType<typeof createObsidianFetch>,
+	signal: AbortSignal,
+): Promise<WebSearchResult[]> {
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		"X-Keenable-Title": "Smart Second Brain",
+	};
+	if (apiKey) headers["X-API-Key"] = apiKey;
+	const endpoint = apiKey ? "https://api.keenable.ai/v1/search" : "https://api.keenable.ai/v1/search/public";
+
+	const response = await fetchImpl(endpoint, {
+		method: "POST",
+		headers,
+		body: JSON.stringify({ query, max_results: count }),
+		signal,
+	});
+
+	if (!response.ok) {
+		// Without a key, a 401/403 is the public endpoint refusing us, not a bad key.
+		if (apiKey && (response.status === 401 || response.status === 403)) throw new Error("Invalid Keenable API key");
+		if (response.status === 429)
+			throw new Error("Keenable rate limit exceeded — try again shortly, or add an API key for higher limits");
+		throw new Error(`Keenable returned HTTP ${response.status}`);
+	}
+
+	const data = (await response.json()) as KeenableSearchResponse;
+	return (data.results ?? [])
+		.filter((r) => !!r.url)
+		.slice(0, count)
+		.map((r, i) => ({
+			rank: i + 1,
+			title: r.title ?? "",
+			url: r.url ?? "",
+			// Prefer the short description; the snippet can be a long page excerpt.
+			snippet: (r.description || r.snippet || "").slice(0, KEENABLE_SNIPPET_MAX_CHARS),
+		}));
 }
 
 // ============================================================================
@@ -238,9 +333,11 @@ export function createWebSearchTool(agentId = "") {
 			return "Error: No web search provider configured. Go to Settings → General → Web Search and select a provider with a valid API key.";
 		}
 
+		const providerInfo = getWebSearchProvider(provider);
+		if (!providerInfo) return `Error: Unknown web search provider "${provider}".`;
+
 		const apiKey = pluginData.webSearchApiKey;
-		// Firecrawl works keyless; Brave and Tavily require a key.
-		if (!apiKey && provider !== "firecrawl") {
+		if (!apiKey && !providerInfo.keyless) {
 			return `Error: No API key configured for web search provider "${provider}". Go to Settings → General → Web Search and add an API key.`;
 		}
 
@@ -252,11 +349,25 @@ export function createWebSearchTool(agentId = "") {
 			let results: WebSearchResult[];
 
 			if (provider === "brave") {
-				results = await withTimeout(searchBrave(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
+				results = await withTimeout(
+					(signal) => searchBrave(trimmed, apiKey, maxResults, fetchImpl, signal),
+					FETCH_TIMEOUT_MS,
+				);
 			} else if (provider === "tavily") {
-				results = await withTimeout(searchTavily(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
+				results = await withTimeout(
+					(signal) => searchTavily(trimmed, apiKey, maxResults, fetchImpl, signal),
+					FETCH_TIMEOUT_MS,
+				);
 			} else if (provider === "firecrawl") {
-				results = await withTimeout(searchFirecrawl(trimmed, apiKey, maxResults, fetchImpl), FETCH_TIMEOUT_MS);
+				results = await withTimeout(
+					(signal) => searchFirecrawl(trimmed, apiKey, maxResults, fetchImpl, signal),
+					FETCH_TIMEOUT_MS,
+				);
+			} else if (provider === "keenable") {
+				results = await withTimeout(
+					(signal) => searchKeenable(trimmed, apiKey, maxResults, fetchImpl, signal),
+					FETCH_TIMEOUT_MS,
+				);
 			} else {
 				return `Error: Unknown web search provider "${provider}".`;
 			}

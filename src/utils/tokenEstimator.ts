@@ -1,19 +1,22 @@
 import type { BaseMessage } from "@langchain/core/messages";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 
-const TOKENS_PER_WORD = 1.3; // Conservative estimate for English text
-const PER_MESSAGE_OVERHEAD = 80; // Separators, metadata, framing
+// Same ratio as LangChain's `countTokensApproximately`. `countMessageTokens` is
+// also the summarization middleware's `tokenCounter`, so the meter, the
+// pre-send prediction and the actual trigger all measure with one ruler (#545).
+const CHARS_PER_TOKEN = 4;
+const PER_MESSAGE_OVERHEAD = 4; // Role marker and separators
 const SYSTEM_PROMPT_OVERHEAD = 120;
 const ATTACHMENT_OVERHEAD = 200;
 const VISIBLE_NOTES_OVERHEAD = 100;
 const SELECTION_OVERHEAD = 50;
 const GRAPH_NOTES_OVERHEAD = 100;
-const TOOL_CALL_OVERHEAD = 60;
+const TOOL_CALL_OVERHEAD = 10;
 const DRAFT_OVERHEAD = 20;
 
 /**
  * Estimated context usage breakdown.
- * All token counts are approximations based on word counts.
+ * All token counts are approximations based on character counts.
  */
 export interface UsageEstimate {
 	/** Estimated tokens used by the entire conversation (messages + draft) */
@@ -77,8 +80,9 @@ export interface LiveContextOptions {
  * Estimates context usage for a conversation thread including the current draft.
  *
  * Estimation logic:
- * - Word count approximation: ~1.3 tokens per word (conservative for English)
- * - Per-message overhead: 80 tokens (for separators, metadata, etc.)
+ * - Character approximation: ~4 characters per token (LangChain's ratio)
+ * - Per-message overhead: 4 tokens (role marker, separators)
+ * - Tool results (ToolMessage bodies) count like any other message text
  * - Attachments: +200 tokens per attachment (conservative approximation)
  * - Visible notes context: +100 tokens total if present
  * - Selection context: +50 tokens if present
@@ -186,15 +190,6 @@ export function buildUsageEstimate(totalTokens: number, contextWindow: number | 
 	};
 }
 
-/**
- * Simple word count approximation.
- * Splits on whitespace and filters out empty strings.
- */
-function countWords(text: string): number {
-	if (!text) return 0;
-	return text.split(/\s+/).filter((word) => word.length > 0).length;
-}
-
 function stringifyForTokenEstimate(value: unknown): string {
 	if (value === undefined || value === null) return "";
 	if (typeof value === "string") return value;
@@ -207,11 +202,11 @@ function stringifyForTokenEstimate(value: unknown): string {
 
 function estimateTextTokens(text: string, fixedOverhead = 0): number {
 	if (!text.trim()) return 0;
-	const wordCount = countWords(text);
-	return Math.ceil(wordCount * TOKENS_PER_WORD) + fixedOverhead;
+	return Math.ceil(text.length / CHARS_PER_TOKEN) + fixedOverhead;
 }
 
-function estimateSystemPromptTokens(systemPrompt: string | undefined): number {
+/** Estimated tokens of the assembled system prompt, as the meter counts it. */
+export function estimateSystemPromptTokens(systemPrompt: string | undefined): number {
 	if (!systemPrompt?.trim()) return 0;
 	return estimateTextTokens(systemPrompt, SYSTEM_PROMPT_OVERHEAD);
 }
@@ -225,6 +220,16 @@ function estimateAdditionalTextBlockTokens(additionalTextBlocks: string[] | unde
 		totalTokens += estimateTextTokens(block, DRAFT_OVERHEAD);
 	}
 	return totalTokens;
+}
+
+/**
+ * Estimated tokens of a message list, using the meter's estimator. Passed to the
+ * summarization middleware as its `tokenCounter` so the trigger fires where the
+ * meter says it will.
+ */
+export function countMessageTokens(messages: BaseMessage[]): number {
+	const { humanTokens, assistantTokens, toolTokens } = estimateBaseMessagePayloadTokens(messages);
+	return humanTokens + assistantTokens + toolTokens;
 }
 
 function estimateBaseMessagePayloadTokens(messages: BaseMessage[]): {
@@ -278,6 +283,11 @@ function estimateBaseMessagePayloadTokens(messages: BaseMessage[]): {
 					toolTokens += estimateTextTokens(payload, TOOL_CALL_OVERHEAD);
 				}
 			}
+			continue;
+		}
+
+		if (ToolMessage.isInstance(message)) {
+			toolTokens += estimateTextTokens(message.text || "") + PER_MESSAGE_OVERHEAD;
 		}
 	}
 
