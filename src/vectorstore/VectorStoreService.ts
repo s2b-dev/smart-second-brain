@@ -44,6 +44,7 @@ import {
 	isDocumentRejectionError,
 	isProviderUnreachableError,
 	isRateLimitError,
+	isRequestTimeoutError,
 } from "../lib/transportErrors";
 import {
 	configureEmbedIndexAction,
@@ -170,6 +171,20 @@ const MODIFY_DEBOUNCE_MS = 5_000;
  * on prose; estimating high dropped whole notes from the index (#485).
  */
 const CHARS_PER_TOKEN = 3;
+
+/**
+ * Ceiling on one document chunk, in tokens, whatever the model's input window.
+ *
+ * The window says how much a model *can* take, not how much a chunk *should*
+ * hold. Sizing chunks to it meant a ~24k-char chunk for every 8191-token model
+ * (and the fallback for any model with no metadata), which hurt twice: a vector
+ * averaged over that much text matches no specific query well, and a local
+ * server embedding a batch of them (a 0.6B MLX model behind oMLX) blew through
+ * the request timeout on every batch until indexing stopped as "unreachable"
+ * (#543, #544). 2048 tokens is still roomy for a section; models with smaller
+ * windows keep their own, smaller limit.
+ */
+const MAX_EMBED_CHUNK_TOKENS = 2048;
 
 /**
  * Over-fetch factor for semantic search. A note is stored as one vector per
@@ -843,6 +858,15 @@ export class VectorStoreService {
 	): Promise<number> {
 		const maxInputTokens = await this.getEmbeddingMaxInputTokens(inst, defaultModel);
 		return maxInputTokens * CHARS_PER_TOKEN;
+	}
+
+	/** Upper bound on one document chunk: the model window, capped at `MAX_EMBED_CHUNK_TOKENS`. */
+	private async getMaxEmbeddingChunkLength(
+		inst: IndexInstance,
+		defaultModel: DefaultEmbedModel | null,
+	): Promise<number> {
+		const maxInputTokens = await this.getEmbeddingMaxInputTokens(inst, defaultModel);
+		return Math.min(maxInputTokens, MAX_EMBED_CHUNK_TOKENS) * CHARS_PER_TOKEN;
 	}
 
 	/**
@@ -1723,8 +1747,10 @@ export class VectorStoreService {
 	): Promise<BulkEmbedOutcome> {
 		const { vault } = this.plugin.app;
 		const { notice, report } = options;
-		const batchSize = this.getBatchSize(inst.indexId, model.provider);
-		const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
+		// Lowered for the rest of the run when a batch times out and has to be
+		// split (see `embedBatch`), so later batches do not repeat the timeout.
+		let batchSize = this.getBatchSize(inst.indexId, model.provider);
+		const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
 		const ordered = orderForBulkIndexing(files);
 		// The extraction tail (PDFs, last in `ordered`) gets its own progress phase.
 		const extractionPaths = new Set(ordered.filter(needsExtraction).map((file) => file.path));
@@ -1883,6 +1909,32 @@ export class VectorStoreService {
 				// entry by entry would only spend more of the quota and raise one
 				// "failed to embed" notice per note. Stop and let the next run resume.
 				if (this.abortForRateLimit(inst, error)) return false;
+				// A timeout on a multi-chunk batch says the request was too big for
+				// the server to answer in time, not that the server is gone: the
+				// same server embeds a smaller request fine. Resending the identical
+				// batch (the transport retry below) just times out again, queued
+				// behind the abandoned request the server is still computing, and
+				// the second failure stopped the run as "unreachable" (#544). Split
+				// it instead and keep the smaller size for the rest of the run;
+				// only a timeout on a single chunk goes on to the unreachable path.
+				if (isRequestTimeoutError(error) && batch.length > 1) {
+					const half = Math.ceil(batch.length / 2);
+					batchSize = Math.min(batchSize, half);
+					Logger.warn(
+						`[VectorStore] Batch ${batchNumber} (${batch.length} chunks) timed out; retrying in batches of ${half}`,
+					);
+					await bulkPause(this.UNREACHABLE_RETRY_PAUSE_MS);
+					if (aborted()) return false;
+					batchNumber--;
+					// Drain at the *current* size, read afresh per piece: a nested
+					// split inside the first half lowers it further, and the rest
+					// must not go out at a size that already timed out.
+					const remaining = [...batch];
+					while (remaining.length > 0) {
+						if (!(await embedBatch(remaining.splice(0, batchSize)))) return false;
+					}
+					return true;
+				}
 				Logger.warn(`[VectorStore] Batch ${batchNumber} failed, falling back to sequential:`, error);
 				// A transport failure will hit every remaining chunk the same way,
 				// so retrying this batch entry-by-entry is pure waste. Give the
@@ -2156,7 +2208,7 @@ export class VectorStoreService {
 				await this.markNoteEmpty(inst, file.path, mtime);
 				return;
 			}
-			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
+			const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
 			chunks = chunkText(content, file.basename, maxContentLength);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to read ${file.path} (${inst.indexId}):`, error);
