@@ -448,7 +448,7 @@ const showThinkingHeader = $derived(steps.length > 0 || !!isStreaming);
  * style without a stream-level signal to key it on.
  */
 const PROSE_MARKDOWN_CLASS =
-	"message-text markdown-preview-view leading-[1.5] !p-0 !w-full !max-w-full !m-0 [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_code]:bg-code-background [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.9em] [&_pre]:bg-code-background [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2 [&_pre]:text-[0.85em] [&_pre]:relative [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[1em] [&_pre_.clickable-icon]:absolute [&_pre_.clickable-icon]:top-1.5 [&_pre_.clickable-icon]:right-1.5 [&_pre_.clickable-icon]:opacity-0 [&_pre:hover_.clickable-icon]:opacity-100";
+	"message-text markdown-preview-view s2b-leading-[1.5] !s2b-p-0 !s2b-w-full !s2b-max-w-full !s2b-m-0 [&_p]:s2b-my-2 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_strong]:s2b-font-semibold [&_code]:s2b-bg-code-background [&_code]:s2b-px-1.5 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.9em] [&_pre]:s2b-bg-code-background [&_pre]:s2b-p-3 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-2 [&_pre]:s2b-text-[0.85em] [&_pre]:s2b-relative [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0 [&_pre_code]:s2b-text-[1em] [&_pre_.clickable-icon]:s2b-absolute [&_pre_.clickable-icon]:s2b-top-1.5 [&_pre_.clickable-icon]:s2b-right-1.5 [&_pre_.clickable-icon]:s2b-opacity-0 [&_pre:hover_.clickable-icon]:s2b-opacity-100";
 </script>
 
 {#snippet preambleBlock(text: string)}
@@ -523,7 +523,7 @@ const PROSE_MARKDOWN_CLASS =
         {#each formatToolInput(tool.input) as { key, value } (key)}
           <div class="tool-io-entry">
             <span class="tool-io-key">{key}</span>
-            <MarkdownRenderer content={formatValue(value)} class="tool-io-value [&_p]:m-0" />
+            <MarkdownRenderer content={formatValue(value)} class="tool-io-value [&_p]:s2b-m-0" />
           </div>
         {/each}
       </div>
@@ -702,7 +702,7 @@ const PROSE_MARKDOWN_CLASS =
   {#if model.kind === "markdown"}
     <MarkdownRenderer
       content={model.markdown}
-      class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.82rem] leading-[1.6] break-words [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_code]:bg-[--background-primary] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.88em] [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-1.5 [&_pre_code]:bg-transparent [&_pre_code]:p-0"
+      class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.82rem] s2b-leading-[1.6] s2b-break-words [&_p]:s2b-my-1 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_code]:s2b-bg-[--background-primary] [&_code]:s2b-px-1 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.88em] [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-1.5 [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0"
     />
   {:else if model.kind === "scalar"}
     <div class="tool-output-scalar">{model.value}</div>
@@ -763,7 +763,7 @@ const PROSE_MARKDOWN_CLASS =
             </summary>
             <MarkdownRenderer
               content={formatRawToolOutput(section.json)}
-              class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+              class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
             />
           </details>
         {/each}
@@ -774,7 +774,7 @@ const PROSE_MARKDOWN_CLASS =
            visible without the developer raw-I/O toggle. -->
       <MarkdownRenderer
         content={formatRawToolOutput(model.json)}
-        class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+        class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
       />
     {/if}
   {:else if model.kind === "search_notes"}
@@ -900,7 +900,7 @@ const PROSE_MARKDOWN_CLASS =
     <div class="tool-output-read-content-card">
       <MarkdownRenderer
         content={model.payload.content}
-        class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.82rem] leading-[1.6] break-words [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_code]:bg-[--background-primary] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.88em] [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-1.5 [&_pre_code]:bg-transparent [&_pre_code]:p-0"
+        class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.82rem] s2b-leading-[1.6] s2b-break-words [&_p]:s2b-my-1 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_code]:s2b-bg-[--background-primary] [&_code]:s2b-px-1 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.88em] [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-1.5 [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0"
       />
     </div>
   {:else if model.kind === "execute_javascript"}
@@ -934,7 +934,7 @@ const PROSE_MARKDOWN_CLASS =
         <div class="tool-output-group-title">Return Value</div>
         <MarkdownRenderer
           content={formatRawToolOutput(model.payload.resultText)}
-          class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+          class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
         />
       </div>
     {/if}
@@ -943,7 +943,7 @@ const PROSE_MARKDOWN_CLASS =
         <summary class="tool-output-raw-summary">Executed Code</summary>
         <MarkdownRenderer
           content={"```javascript\n" + model.payload.code + "\n```"}
-          class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+          class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
         />
       </details>
     {/if}
@@ -952,7 +952,7 @@ const PROSE_MARKDOWN_CLASS =
         <summary class="tool-output-raw-summary">Input</summary>
         <MarkdownRenderer
           content={formatRawToolOutput(model.payload.inputJson)}
-          class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+          class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
         />
       </details>
     {/if}
@@ -965,7 +965,7 @@ const PROSE_MARKDOWN_CLASS =
       <summary class="tool-output-raw-summary">Raw output</summary>
       <MarkdownRenderer
         content={formatRawToolOutput(model.rawText)}
-        class="tool-output-content markdown-preview-view !m-0 !p-0 text-[0.8rem] leading-[1.55] [&_pre]:my-0 [&_pre]:bg-[--background-primary] [&_pre]:p-2.5 [&_pre]:rounded"
+        class="tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.8rem] s2b-leading-[1.55] [&_pre]:s2b-my-0 [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded"
       />
     </details>
   {/if}
@@ -1230,8 +1230,8 @@ const PROSE_MARKDOWN_CLASS =
     opacity: 0;
     transition: opacity 0.15s ease;
   }
-  :global(.group:hover) .thinking-summary-header.is-collapsed .thinking-summary-status,
-  :global(.group:hover) .thinking-summary-header.is-collapsed .thinking-summary-chevron,
+  :global(.s2b-group:hover) .thinking-summary-header.is-collapsed .thinking-summary-status,
+  :global(.s2b-group:hover) .thinking-summary-header.is-collapsed .thinking-summary-chevron,
   .thinking-summary-header.is-collapsed:hover .thinking-summary-status,
   .thinking-summary-header.is-collapsed:hover .thinking-summary-chevron {
     opacity: 1;

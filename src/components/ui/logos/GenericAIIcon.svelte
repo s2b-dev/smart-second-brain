@@ -11,7 +11,7 @@ let { width = 16, height = 16, class: className = "" }: Props = $props();
 </script>
 
 <div
-	class="p-0 flex items-center {className}"
+	class="s2b-p-0 s2b-flex s2b-items-center {className}"
 	use:icon={"sparkles"}
 	style="--icon-size: {width}px"
 ></div>

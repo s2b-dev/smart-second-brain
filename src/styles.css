@@ -5,49 +5,12 @@
 @import "tailwindcss/components.css";
 @import "tailwindcss/utilities.css";
 
-/* Hide scrollbar utility */
-.scrollbar-hide {
-	scrollbar-width: none; /* Firefox */
-	-ms-overflow-style: none; /* IE/Edge */
-}
-.scrollbar-hide::-webkit-scrollbar {
-	display: none; /* Chrome/Safari/Opera */
-}
-
 :root {
 	--icon-xs: 0.75rem;
 	--icon-sm: 1rem;
 	--icon-md: 1.25rem;
 	--icon-lg: 1.5rem;
 	--icon-xl: 2rem;
-}
-
-.obsidian-border {
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-
-/* Obsidian border-solid fix utilities
-   In Obsidian, border-solid creates borders on all sides by default.
-   These utilities reset unwanted borders to 0. Use with border-solid + border-[color] */
-@layer utilities {
-	.ob-border-b {
-		border-top-width: 0;
-		border-left-width: 0;
-		border-right-width: 0;
-	}
-	.ob-border-t {
-		border-bottom-width: 0;
-		border-left-width: 0;
-		border-right-width: 0;
-	}
-	.ob-border-x {
-		border-top-width: 0;
-		border-bottom-width: 0;
-	}
-	.ob-border-y {
-		border-left-width: 0;
-		border-right-width: 0;
-	}
 }
 
 /* Note access policy modal — the title carries the same shield-check mark, in

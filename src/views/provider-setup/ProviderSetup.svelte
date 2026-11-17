@@ -621,7 +621,7 @@ const canFinish = $derived(
 {#snippet oauthSignIn()}
   {#if oauth}
     <SettingItem name={`${oauth.label} Sign-In`} desc={oauth.description ?? ""}>
-      <div class="flex gap-2 items-center">
+      <div class="s2b-flex s2b-gap-2 s2b-items-center">
         {#if isSigningIn && oauth.cancelSignIn}
           <!-- While a sign-in is pending, let the user abort it (e.g. they closed the
                browser tab) and retry, instead of waiting out the timeout. -->
@@ -656,7 +656,7 @@ const canFinish = $derived(
         name="Paste authorization code"
         desc="Copy the authorization code shown in the browser and paste it here to finish connecting."
       >
-        <div class="flex gap-2 items-center" onfocusin={scrollManualCodeIntoView}>
+        <div class="s2b-flex s2b-gap-2 s2b-items-center" onfocusin={scrollManualCodeIntoView}>
           <Text inputType="text" bind:value={manualCode} placeholder="Authorization code" />
           <Button buttonText="Submit" disabled={!manualCode.trim()} onClick={handleSubmitManualCode} />
         </div>

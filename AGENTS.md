@@ -164,6 +164,7 @@ Tests mock `obsidian`, `electron`, and `@sap-ai-sdk/langchain` via `test/__mocks
 - **Svelte 5 runes:**
   - Use `$effect` for: DOM manipulation (canvas, animations), third-party library integration, cleanup (timers, listeners), one-time init, browser-only operations (analytics, logging).
   - **Avoid `$effect`** for state synchronization (don't sync state between variables) or for computed values (use `$derived`).
+- **Tailwind utilities carry the `s2b-` prefix** (`s2b-flex`, `hover:s2b-bg-…`, `!s2b-p-0`, `[&_p]:s2b-m-0`; the `group` marker is `s2b-group`, its variant stays `group-hover:`). Plugin stylesheets are global in Obsidian, so an unprefixed utility restyles any other plugin's element with that class name (#558: `.static` blanked Excalidraw). An unprefixed class now silently does nothing. Arbitrary properties (`[overflow-wrap:anywhere]`) can't be prefixed; add a named utility in `tailwind.config.js` `plugins` instead. `test/styles/tailwindUtilities.test.ts` fails on any rule not scoped to an `s2b-` class.
 - **Custom components over raw HTML.** This project has Obsidian-styled wrappers — use them. In particular: every form control in settings must be wrapped in a `SettingContainer` (with `name=` and `desc=`) so the layout matches Obsidian conventions:
   ```svelte
   <SettingContainer name="API Key" desc="Your provider API key">

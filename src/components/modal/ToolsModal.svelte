@@ -180,7 +180,7 @@ function openToolConfig(toolId: BuiltInToolId) {
   {/if}
 
   <div class="tools-modal-footer">
-    <div class="flex-1"></div>
+    <div class="s2b-flex-1"></div>
     <Button buttonText="Done" cta={true} onClick={() => modal.close()} />
   </div>
 </div>

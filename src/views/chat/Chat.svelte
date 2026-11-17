@@ -428,7 +428,7 @@ function portalComposer(node: HTMLElement) {
 
 <QueryClientProvider client={plugin.queryClient}>
   <div
-    class="chat-root relative h-full flex flex-col gap-0 overflow-hidden"
+    class="chat-root s2b-relative s2b-h-full s2b-flex s2b-flex-col s2b-gap-0 s2b-overflow-hidden"
     data-testid="chat-root"
     role="region"
     ondragenter={handleRootDragEnter}
@@ -453,7 +453,7 @@ function portalComposer(node: HTMLElement) {
       />
     {:else}
       <div
-        class="flex h-full items-center justify-center p-4 text-center text-sm text-[--text-muted]"
+        class="s2b-flex s2b-h-full s2b-items-center s2b-justify-center s2b-p-4 s2b-text-center s2b-text-sm s2b-text-[--text-muted]"
       >
         Chat session is not available yet. Reopen this view after plugin initialization completes.
       </div>
@@ -467,16 +467,16 @@ function portalComposer(node: HTMLElement) {
            this chicklet" and left the actual target unmarked. The label sits
            inside the frame and no longer carries a border of its own. -->
       <div
-        class="chat-drop-overlay absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 {dragHasIssue
+        class="chat-drop-overlay s2b-absolute s2b-inset-0 s2b-z-30 s2b-pointer-events-none s2b-flex s2b-items-center s2b-justify-center s2b-p-2 {dragHasIssue
           ? 'chat-drop-overlay-issue'
           : 'chat-drop-overlay-active'}"
       >
-        <div class="chat-drop-frame flex items-center justify-center rounded-[16px]">
+        <div class="chat-drop-frame s2b-flex s2b-items-center s2b-justify-center s2b-rounded-[16px]">
           <div
-            class="chat-drop-overlay-panel flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium"
+            class="chat-drop-overlay-panel s2b-flex s2b-items-center s2b-gap-3 s2b-rounded-2xl s2b-px-5 s2b-py-4 s2b-text-sm s2b-font-medium"
           >
             <div
-              class="h-icon-s w-icon-s"
+              class="s2b-h-icon-s s2b-w-icon-s"
               style="--icon-size: var(--icon-s)"
               data-testid="chat-drop-overlay-icon"
               use:icon={dragHasIssue ? "alert-triangle" : "upload"}

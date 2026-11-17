@@ -72,9 +72,9 @@ function createNewAgent() {
   <!-- No agents configured (shouldn't happen, but handle gracefully) -->
   <Button
     onClick={() => openAgentEditor("default-agent")}
-    styles="clickable-icon flex flex-row items-center gap-1"
+    styles="clickable-icon s2b-flex s2b-flex-row s2b-items-center s2b-gap-1"
   >
-    <div class="text-[--text-muted] text-xs">Configure Agent</div>
+    <div class="s2b-text-[--text-muted] s2b-text-xs">Configure Agent</div>
   </Button>
 {:else}
   <PickerPopover
@@ -127,12 +127,12 @@ function createNewAgent() {
 
         {#if isSelected}
           {#snippet trailing()}
-            <Icon name="check" size="xs" class="text-[--text-accent]" />
+            <Icon name="check" size="xs" class="s2b-text-[--text-accent]" />
           {/snippet}
         {/if}
 
         {#snippet action()}
-          <Icon name="settings" size="xs" class="text-[--text-faint]" />
+          <Icon name="settings" size="xs" class="s2b-text-[--text-faint]" />
         {/snippet}
       </PickerOptionRow>
     {/each}

@@ -229,7 +229,7 @@ async function handleCheckLangSmithConnection() {
     </SettingItem>
 
     <SettingItem name="Endpoint URL" desc="Override LangSmith API base URL (optional)">
-      <div class="flex items-center gap-2 w-full">
+      <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-w-full">
         <Button
           iconId={getLangSmithCheckIcon()}
           ariaLabel="Check LangSmith API key and endpoint"
@@ -242,7 +242,7 @@ async function handleCheckLangSmithConnection() {
           placeholder={DEFAULT_LANGSMITH_ENDPOINT}
           inputType="text"
           bind:value={langSmithEndpointDraft}
-          class="flex-1"
+          class="s2b-flex-1"
           onblur={(v) => (pluginData.langSmithEndpoint = v)}
         />
       </div>

@@ -88,7 +88,7 @@ function handleOpenNote() {
   {#if !readOnly}
     <div class="system-prompt-actions">
       <Button buttonText="Cancel" onClick={() => modal.close()} />
-      <div class="flex-1"></div>
+      <div class="s2b-flex-1"></div>
       {#if accessors.notePath}
         <Button buttonText="Open note" onClick={handleOpenNote} />
       {/if}

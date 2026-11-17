@@ -832,7 +832,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           name="System prompt"
           desc="This agent's instructions, including how it uses memory, stored as its own AGENT.md note in your vault"
         >
-          <div class="flex items-center gap-2 justify-end">
+          <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-justify-end">
             <Button
               iconId="pencil"
               ariaLabel="Open agent note"
@@ -883,7 +883,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onSecondary={selectedAgent.summarizationModel ? resetSummarizationModel : undefined}
             />
             {#if summarizationContextWindowWarning}
-              <div class="agent-model-warning text-sm">{summarizationContextWindowWarning}</div>
+              <div class="agent-model-warning s2b-text-sm">{summarizationContextWindowWarning}</div>
             {/if}
           </div>
         </SettingItem>

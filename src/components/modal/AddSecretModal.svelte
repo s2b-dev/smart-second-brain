@@ -57,7 +57,7 @@ function handleSave() {
 
 <div class="modal-content">
 	<!-- Description -->
-	<div class="setting-item-description mb-4">
+	<div class="setting-item-description s2b-mb-4">
 		<p>
 			Secrets are stored securely in Obsidian's Keychain, separate from plugin data. This allows you
 			to share API keys across multiple plugins without storing them in plaintext.
@@ -74,7 +74,7 @@ function handleSave() {
 			inputType="text"
 			placeholder="my-api-key"
 			bind:value={secretId}
-			styles={secretId.length > 0 && !isValidId ? "!border-[--background-modifier-error]" : ""}
+			styles={secretId.length > 0 && !isValidId ? "!s2b-border-[--background-modifier-error]" : ""}
 		/>
 	</SettingContainer>
 
@@ -84,7 +84,7 @@ function handleSave() {
 
 	{#if error}
 		<div class="setting-item">
-			<div class="text-[--text-error] text-sm">{error}</div>
+			<div class="s2b-text-[--text-error] s2b-text-sm">{error}</div>
 		</div>
 	{/if}
 </div>

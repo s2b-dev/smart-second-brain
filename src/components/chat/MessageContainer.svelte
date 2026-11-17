@@ -675,60 +675,60 @@ $effect(() => {
 });
 </script>
 
-<div class="message-area relative flex-1 min-h-0 z-20">
+<div class="message-area s2b-relative s2b-flex-1 s2b-min-h-0 s2b-z-20">
   <!-- Scrollable messages area -->
   <div
     bind:this={scrollContainer}
-    class="scroll-container h-full overflow-y-auto overflow-x-clip px-2 pt-4 pb-8"
+    class="scroll-container s2b-h-full s2b-overflow-y-auto s2b-overflow-x-clip s2b-px-2 s2b-pt-4 s2b-pb-8"
     tabindex="-1"
     onscroll={recomputeJumpToBottom}
   >
-    <!-- `min-h-full` when there are messages, NOT `h-full`: a long conversation
+    <!-- `s2b-min-h-full` when there are messages, NOT `s2b-h-full`: a long conversation
          must be allowed to grow past the scroller's content-box height, or the
          mobile `padding-bottom` (which reserves the portaled composer's height)
          gets laid out relative to a collapsed box and the last message scrolls
          under the composer. But with zero messages there's nothing to scroll
-         under anything, and `min-h-full`'s effective height doesn't reliably
+         under anything, and `s2b-min-h-full`'s effective height doesn't reliably
          resolve to 100% through this ancestor chain (percentage heights need a
          parent with a *definite* height, and `min-height: 100%` doesn't count as
-         one) — so the empty-state's own centering `h-full` collapses to its
+         one) — so the empty-state's own centering `s2b-h-full` collapses to its
          content height instead of the pane's, and "Start a new conversation"
-         renders near the top instead of vertically centred. `h-full` here (only
+         renders near the top instead of vertically centred. `s2b-h-full` here (only
          for the empty/loading branches) is a definite height and doesn't have
          that gap. -->
     <div
-      class="w-full max-w-[--file-line-width] mx-auto"
-      class:min-h-full={messages && messages.length > 0}
-      class:h-full={!messages || messages.length === 0}
+      class="s2b-w-full s2b-max-w-[--file-line-width] s2b-mx-auto"
+      class:s2b-min-h-full={messages && messages.length > 0}
+      class:s2b-h-full={!messages || messages.length === 0}
     >
       {#if registry.isLoadingSession}
         <!-- Loading skeleton -->
         <div
-          class="flex flex-col gap-4 pt-2 px-1 animate-pulse"
+          class="s2b-flex s2b-flex-col s2b-gap-4 s2b-pt-2 s2b-px-1 s2b-animate-pulse"
           data-testid="chat-loading-skeleton"
         >
-          <div class="flex justify-end">
-            <div class="h-9 w-48 rounded-2xl bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-justify-end">
+            <div class="s2b-h-9 s2b-w-48 s2b-rounded-2xl s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex flex-col gap-2">
-            <div class="h-3 w-full rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-4/5 rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-2/3 rounded bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-flex-col s2b-gap-2">
+            <div class="s2b-h-3 s2b-w-full s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-4/5 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-2/3 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex justify-end">
-            <div class="h-9 w-64 rounded-2xl bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-justify-end">
+            <div class="s2b-h-9 s2b-w-64 s2b-rounded-2xl s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex flex-col gap-2">
-            <div class="h-3 w-full rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-3/4 rounded bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-flex-col s2b-gap-2">
+            <div class="s2b-h-3 s2b-w-full s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-3/4 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
           </div>
         </div>
       {:else if !messages || messages.length === 0}
-        <!-- Empty state. `items-stretch`, not `items-center`: ChatRecommendations
+        <!-- Empty state. `s2b-items-stretch`, not `s2b-items-center`: ChatRecommendations
              is a single left-aligned column that centres itself via its own
              max-width + auto margins, so centring here would collapse it to its
              content width and re-ragged the left edge. -->
-        <div class="flex flex-col items-stretch justify-center h-full">
+        <div class="s2b-flex s2b-flex-col s2b-items-stretch s2b-justify-center s2b-h-full">
           <ChatRecommendations {registry} {threadPath} />
         </div>
       {:else}
@@ -736,11 +736,11 @@ $effect(() => {
           <div class="s2b-chat-turn" use:offscreenTurn>
           {#if messagePair.transcriptEvent?.type === "summarization_marker"}
             <div
-              class="summary-marker-row flex justify-center my-4"
-              class:mb-12={index === messages.length - 1}
+              class="summary-marker-row s2b-flex s2b-justify-center s2b-my-4"
+              class:s2b-mb-12={index === messages.length - 1}
             >
               <div
-                class="summary-marker inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs"
+                class="summary-marker s2b-inline-flex s2b-items-center s2b-gap-2 s2b-rounded-full s2b-px-3 s2b-py-1.5 s2b-text-xs"
                 title={messagePair.transcriptEvent.source === "manual_summarization"
                   ? "Manual conversation compaction"
                   : "Automatic conversation compaction"}
@@ -755,7 +755,7 @@ $effect(() => {
             <!-- User Message -->
             <div
               use:registerMessageRef={messagePair.id + "-user"}
-              class="group mr-2 flex flex-col items-end gap-2 mb-2"
+              class="s2b-group s2b-mr-2 s2b-flex s2b-flex-col s2b-items-end s2b-gap-2 s2b-mb-2"
             >
               {#if messagePair.userMessage.attachments?.some( (a) => a.mimeType.startsWith("image/"), )}
                   <UserAttachmentImages
@@ -772,7 +772,7 @@ $effect(() => {
                   />
                 {/if}
                 {#if messagePair.userMessage.visibleNotes?.length || messagePair.userMessage.selection || messagePair.userMessage.graphNotes?.length}
-                  <div class="visible-notes-history flex flex-row flex-wrap gap-1.5 justify-end">
+                  <div class="visible-notes-history s2b-flex s2b-flex-row s2b-flex-wrap s2b-gap-1.5 s2b-justify-end">
                     {#if messagePair.userMessage.visibleNotes?.length}
                       {#each messagePair.userMessage.visibleNotes as note (note.path)}
                         {@const noteLinkPath = linkPathForReference(
@@ -844,7 +844,7 @@ $effect(() => {
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
-                  class="flex flex-col items-end w-full s2b-user-press-target"
+                  class="s2b-flex s2b-flex-col s2b-items-end s2b-w-full s2b-user-press-target"
                   use:longPress={{
                     enabled: onMobile && !isBeingEdited,
                     onLongPress: (x, y) => openUserMessageMenu(messagePair, x, y),
@@ -854,9 +854,9 @@ $effect(() => {
                   <CollapsibleUserBubble
                     content={messagePair.userMessage.content}
                     attachments={messagePair.userMessage.attachments}
-                    class="max-w-[80%] rounded-[16px] px-4 py-2 {isBeingEdited
+                    class="s2b-max-w-[80%] s2b-rounded-[16px] s2b-px-4 s2b-py-2 {isBeingEdited
                       ? 's2b-user-bubble-editing'
-                      : 'bg-[color-mix(in_srgb,var(--color-accent)_20%,transparent)]'}"
+                      : 's2b-bg-[color-mix(in_srgb,var(--color-accent)_20%,transparent)]'}"
                   />
                 </div>
 
@@ -869,15 +869,15 @@ $effect(() => {
                    buttons and timestamp are suppressed) — removing the whole
                    row collapses its height and shifts the assistant reply
                    below it. -->
-              <div class="flex flex-row items-center gap-2">
+              <div class="s2b-flex s2b-flex-row s2b-items-center s2b-gap-2">
                 {#if !(onMobile && !messagePair.userBranchInfo)}
                   <div
-                    class="message-footer flex flex-row items-center gap-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 ease-out"
+                    class="message-footer s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                   >
                     {#if !onMobile && !isBeingEdited && formatMessageTimestamp(messagePair)}
                       <span class="message-timestamp">{formatMessageTimestamp(messagePair)}</span>
                     {/if}
-                    <div class="footer-actions flex flex-row items-center gap-1.5">
+                    <div class="footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                       {#if messagePair.userBranchInfo}
                         <BranchNavigator
                           branchInfo={messagePair.userBranchInfo}
@@ -906,10 +906,10 @@ $effect(() => {
 
             <!-- Assistant Message -->
             <div
-              class:min-h-[95%]={index === messages.length - 1}
-              class:pb-12={index === messages.length - 1}
+              class:s2b-min-h-[95%]={index === messages.length - 1}
+              class:s2b-pb-12={index === messages.length - 1}
             >
-              <div class="group flex flex-col px-2 gap-3 mb-2 w-full">
+              <div class="s2b-group s2b-flex s2b-flex-col s2b-px-2 s2b-gap-3 s2b-mb-2 s2b-w-full">
                 {#if messagePair.assistantMessage.toolCalls?.length || (messagePair.assistantMessage.assistantTimeline?.length ?? 0) > 0 || messagePair.assistantMessage.state === AssistantState.idle || messagePair.assistantMessage.state === AssistantState.streaming}
                   <!-- Tools + Answer integrated in timeline (or processing dot).
                      Keep ToolCallsSection mounted during all streaming/idle states so that
@@ -940,14 +940,14 @@ $effect(() => {
                     {#if renderInfo.renderContent}
                       <MarkdownRenderer
                         content={renderInfo.content}
-                        class="message-text markdown-preview-view leading-[1.5] !p-0 !w-full !max-w-full !m-0 [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_code]:bg-code-background [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.9em] [&_pre]:bg-code-background [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2 [&_pre]:text-[0.85em] [&_pre]:relative [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[1em] [&_pre_.clickable-icon]:absolute [&_pre_.clickable-icon]:top-1.5 [&_pre_.clickable-icon]:right-1.5 [&_pre_.clickable-icon]:opacity-0 [&_pre:hover_.clickable-icon]:opacity-100"
+                        class="message-text markdown-preview-view s2b-leading-[1.5] !s2b-p-0 !s2b-w-full !s2b-max-w-full !s2b-m-0 [&_p]:s2b-my-2 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_strong]:s2b-font-semibold [&_code]:s2b-bg-code-background [&_code]:s2b-px-1.5 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.9em] [&_pre]:s2b-bg-code-background [&_pre]:s2b-p-3 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-2 [&_pre]:s2b-text-[0.85em] [&_pre]:s2b-relative [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0 [&_pre_code]:s2b-text-[1em] [&_pre_.clickable-icon]:s2b-absolute [&_pre_.clickable-icon]:s2b-top-1.5 [&_pre_.clickable-icon]:s2b-right-1.5 [&_pre_.clickable-icon]:s2b-opacity-0 [&_pre:hover_.clickable-icon]:s2b-opacity-100"
                       />
                     {/if}
                   {/if}
                 {/if}
 
                 {#if messagePair.assistantMessage.state === AssistantState.error}
-                  <div class="flex flex-row items-center">
+                  <div class="s2b-flex s2b-flex-row s2b-items-center">
                     <Button
                       iconId="refresh-cw"
                       buttonText="Retry"
@@ -966,9 +966,9 @@ $effect(() => {
                 {@const genLabel = shouldShowGenerationLabel(index) ? getGenerationLabel(messagePair) : null}
                 {@const timestamp = onMobile ? null : formatMessageTimestamp(messagePair)}
                 <div
-                  class="message-footer message-footer-assistant flex flex-row items-center gap-3 flex-nowrap opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 ease-out"
+                  class="message-footer message-footer-assistant s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-flex-nowrap s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                 >
-                  <div class="footer-actions flex flex-row items-center gap-1.5">
+                  <div class="footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                     {#if messagePair.assistantBranchInfo}
                       <BranchNavigator
                         branchInfo={messagePair.assistantBranchInfo}
@@ -990,10 +990,10 @@ $effect(() => {
                   </div>
 
                   {#if genLabel || timestamp}
-                    <div class="footer-meta flex flex-row items-center gap-2 min-w-0">
+                    <div class="footer-meta s2b-flex s2b-flex-row s2b-items-center s2b-gap-2 s2b-min-w-0">
                       {#if genLabel}
                         <span
-                          class="generation-label inline-flex items-center gap-1 min-w-0"
+                          class="generation-label s2b-inline-flex s2b-items-center s2b-gap-1 s2b-min-w-0"
                           title={[genLabel.agent, genLabel.model].filter(Boolean).join(" · ")}
                         >
                           {#if genLabel.agent}
@@ -1002,13 +1002,13 @@ $effect(() => {
                                 <Icon name={genLabel.agentIcon} size="xs" />
                               </span>
                             {/if}
-                            <span class="generation-agent truncate">{genLabel.agent}</span>
+                            <span class="generation-agent s2b-truncate">{genLabel.agent}</span>
                           {/if}
                           {#if genLabel.agent && genLabel.model}
                             <span class="generation-sep" aria-hidden="true">·</span>
                           {/if}
                           {#if genLabel.model}
-                            <span class="generation-model truncate">{genLabel.model}</span>
+                            <span class="generation-model s2b-truncate">{genLabel.model}</span>
                           {/if}
                         </span>
                       {/if}

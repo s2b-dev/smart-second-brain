@@ -556,7 +556,7 @@ function handleMobileTapFocus(event: TouchEvent) {
 
 /** A click on the composer card's empty padding focuses the editor, so the
  * whole card acts as the text target — the editor box hugs its content
- * (`min-h-[24px]`) instead of padding the card out with clickable dead space.
+ * (`s2b-min-h-[24px]`) instead of padding the card out with clickable dead space.
  * Controls and the editor itself are excluded: buttons/chips keep their own
  * behavior, and clicks inside CM must keep placing the caret. */
 function handleWrapperClick(event: MouseEvent) {
@@ -1226,16 +1226,16 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
 <div
   bind:this={containerEl}
-  class="chat-input-container w-full flex flex-col relative isolate gap-1 mx-auto max-w-[--file-line-width]"
+  class="chat-input-container s2b-w-full s2b-flex s2b-flex-col s2b-relative s2b-isolate s2b-gap-1 s2b-mx-auto s2b-max-w-[--file-line-width]"
   role="region"
 >
   {#if selectedChatModel && models.unavailableProviders.includes(selectedChatModel.provider)}
     <button
-      class="provider-unreachable-banner flex flex-row items-center gap-1.5 text-xs cursor-pointer"
+      class="provider-unreachable-banner s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5 s2b-text-xs s2b-cursor-pointer"
       onclick={models.refetchProviders}
       title="Click to retry connection"
     >
-      <div class="h-icon-xs shrink-0" use:icon={"alert-triangle"} style="--icon-size: var(--icon-xs)"></div>
+      <div class="s2b-h-icon-xs s2b-shrink-0" use:icon={"alert-triangle"} style="--icon-size: var(--icon-xs)"></div>
       <span>Cannot connect to {selectedChatModel.provider} — click to retry</span>
     </button>
   {/if}
@@ -1244,15 +1244,15 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
   <!-- Input wrapper with glow effect.
        Transition is scoped to the two properties that actually change state
        (border-color on focus/drag, background on drag-active) rather than
-       `transition-all`, which also animated layout geometry — including the
+       `s2b-transition-all`, which also animated layout geometry — including the
        reflow when the mobile keyboard opens. -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -- the click is a
        pointer-only convenience (focus the editor from the card's padding);
        keyboard users reach the editor by Tab, so no key handler is needed. -->
   <div
-    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate {showDragActive
-      ? 'border-[--interactive-accent] chat-input-wrapper-drag-active'
+    class="chat-input-wrapper s2b-flex s2b-flex-col s2b-gap-3 s2b-border s2b-border-solid s2b-pb-2 s2b-px-3 s2b-transition-[background-color,border-color] s2b-duration-200 s2b-ease-in-out s2b-relative s2b-isolate {showDragActive
+      ? 's2b-border-[--interactive-accent] chat-input-wrapper-drag-active'
       : ''}"
     ondragenter={dropTargetMode === "input" ? handleDragEnter : undefined}
     ondragover={dropTargetMode === "input" ? handleDragOver : undefined}
@@ -1263,11 +1263,11 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     bind:this={wrapperEl}
     style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}
   >
-    <!-- `pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
-         6px below the border. The old `pt-2` put it at 12px — a visibly large
+    <!-- `s2b-pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
+         6px below the border. The old `s2b-pt-2` put it at 12px — a visibly large
          gap. -->
     <div
-      class="composer-tray-row flex flex-row flex-wrap items-start gap-1.5 pt-0.5 min-w-0"
+      class="composer-tray-row s2b-flex s2b-flex-row s2b-flex-wrap s2b-items-start s2b-gap-1.5 s2b-pt-0.5 s2b-min-w-0"
       bind:clientHeight={trayRowHeight}
     >
       <ContextTray
@@ -1282,20 +1282,20 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         attachmentPreviewUrls={previewUrls}
       />
       {#if savingFiles}
-        <div class="text-xs text-text-muted flex items-center">Saving...</div>
+        <div class="s2b-text-xs s2b-text-text-muted s2b-flex s2b-items-center">Saving...</div>
       {/if}
     </div>
 
     <!-- Markdown Editor Container -->
     <div
       bind:this={editorContainer}
-      class="markdown-editor-container w-full overflow-y-auto py-1 min-h-[24px]"
+      class="markdown-editor-container s2b-w-full s2b-overflow-y-auto s2b-py-1 s2b-min-h-[24px]"
       id="chat-view-user-input-element"
       data-testid="message-input"
     ></div>
 
     <!-- Actions row: attachment, agent+model, send -->
-    <div class="chat-actions-row flex items-center gap-2" bind:clientHeight={actionsRowHeight}>
+    <div class="chat-actions-row s2b-flex s2b-items-center s2b-gap-2" bind:clientHeight={actionsRowHeight}>
       <input
         bind:this={attachmentInputEl}
         type="file"
@@ -1325,7 +1325,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
       />
       <AgentPopover {threadPath} />
       <ModelSelectButton {threadPath} />
-      <div class="ml-auto flex items-center gap-2">
+      <div class="s2b-ml-auto s2b-flex s2b-items-center s2b-gap-2">
         <!-- Always on for desktop: the ring is the only place the running
              context estimate (and the Summarize action in its popover) lives,
              so it stays in view at every usage level. It used to appear only
@@ -1352,7 +1352,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
               ariaLabel="Cancel edit"
               tooltip="Cancel edit"
               onClick={cancelActiveEdit}
-              styles="chat-input-icon-button clickable-icon mr-2"
+              styles="chat-input-icon-button clickable-icon s2b-mr-2"
               iconId="x"
             />
           {/if}
@@ -1370,7 +1370,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
                   : "Send message"}
             onClick={attemptSend}
             dataTestId="send-message-button"
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
+            styles="send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200 disabled:s2b-cursor-not-allowed"
             style={sendButtonStyle}
             iconId={isEditing ? "check" : "arrow-up"}
           />
@@ -1379,7 +1379,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
             ariaLabel="stop streaming"
             tooltip="Stop streaming"
             onClick={() => session?.stopStreaming()}
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200"
+            styles="send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200"
             style={sendButtonStyle}
             iconId="square"
           />
@@ -1389,12 +1389,12 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
     {#if dropTargetMode === "input" && isDragging}
       <div
-        class="absolute inset-0 z-20 rounded-[22px] pointer-events-none flex items-center justify-center gap-2 text-sm font-medium {dragHasIssue
-          ? 'text-[--text-error]'
-          : 'text-[--text-accent]'}"
+        class="s2b-absolute s2b-inset-0 s2b-z-20 s2b-rounded-[22px] s2b-pointer-events-none s2b-flex s2b-items-center s2b-justify-center s2b-gap-2 s2b-text-sm s2b-font-medium {dragHasIssue
+          ? 's2b-text-[--text-error]'
+          : 's2b-text-[--text-accent]'}"
       >
         <div
-          class="w-[--icon-s] h-[--icon-s]"
+          class="s2b-w-[--icon-s] s2b-h-[--icon-s]"
           style="--icon-size: var(--icon-s)"
           use:icon={dragHasIssue ? "alert-triangle" : "upload"}
         ></div>
@@ -1404,7 +1404,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
   </div>
 
   <!-- Spacer to keep the input glow from being clipped at the bottom edge -->
-  <div class="h-4" aria-hidden="true"></div>
+  <div class="s2b-h-4" aria-hidden="true"></div>
 </div>
 
 <style>
