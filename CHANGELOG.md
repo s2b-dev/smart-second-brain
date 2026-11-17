@@ -20,6 +20,13 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.4.3 (2026-11-17)
+
+Long chats open faster and use less memory.
+
+### Improvements
+- **Chat: long conversations stay fast.** Each saved step in a chat used to store the whole conversation again, so a chat's file, opening time and memory grew with every turn. Each step now stores only the messages it added, plus a full copy every 50 steps. On a chat with about 2,000 steps, the file is about 6x smaller, and opening and saving it are about 3x faster. Existing chats keep working as they are; only their new turns are stored the new way (#540, #562).
+
 ## 2.4.2 (2026-11-17)
 
 Indexing with a local embedding server no longer stops on long notes, and the plugin's styles can no longer affect other plugins.
