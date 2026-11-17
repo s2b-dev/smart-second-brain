@@ -75,7 +75,7 @@ function makeQuadraticThread(): ThreadData {
 			},
 		},
 		writes: {
-			"cp-1": [["messages", [copy(a1)]] as never],
+			"cp-1": [["task-1", "messages", [copy(a1)], "~__pregel_pull, agent", 0]],
 		},
 	};
 }
@@ -128,8 +128,8 @@ describe("threadDataCodec", () => {
 			inflated.checkpoints["cp-1"].metadata as unknown as { writes: { agent: { messages: unknown[] } } }
 		).writes;
 		expect(metadataWrites.agent.messages[0]).toBe(msgs1[1]);
-		const pendingWrite = inflated.writes["cp-1"][0] as unknown as [string, unknown[]];
-		expect(pendingWrite[1][0]).toBe(msgs1[1]);
+		const pendingWrite = inflated.writes["cp-1"][0];
+		expect((pendingWrite[2] as unknown[])[0]).toBe(msgs1[1]);
 	});
 
 	it("strips the message table from the inflated in-memory thread", () => {
@@ -174,6 +174,28 @@ describe("threadDataCodec", () => {
 		const inflated = inflateThreadData(legacy);
 		expect(inflated).toBe(legacy);
 		expect(JSON.parse(JSON.stringify(inflated))).toEqual(pristine);
+	});
+
+	it("upgrades pre-v3 `[channel, value]` writes to full records, keeping their order", () => {
+		const legacy = makeQuadraticThread();
+		legacy.version = 2;
+		const first = { lc: 1, type: "constructor", id: ["x"], kwargs: { content: "a" } };
+		const second = { lc: 1, type: "constructor", id: ["x"], kwargs: { content: "b" } };
+		legacy.writes = {
+			"cp-1": [
+				["messages", [first]],
+				["__error__", "boom"],
+				["messages", [second]],
+			] as never,
+		};
+
+		const inflated = inflateThreadData(legacy);
+
+		expect(inflated.writes["cp-1"]).toEqual([
+			["", "messages", [first], "", 0],
+			["", "__error__", "boom", "", 1],
+			["", "messages", [second], "", 2],
+		]);
 	});
 
 	it("writes the schema version as the first key so it can be sniffed from a prefix", () => {

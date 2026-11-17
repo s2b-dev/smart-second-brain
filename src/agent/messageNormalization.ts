@@ -3,6 +3,7 @@ import {
 	type BaseMessage,
 	HumanMessage,
 	type ContentBlock,
+	RemoveMessage,
 	SystemMessage,
 	ToolMessage,
 } from "@langchain/core/messages";
@@ -146,6 +147,11 @@ function convertSerializedLangChainMessage(msg: Record<string, unknown>): BaseMe
 			const toolCallId = typeof kwargs.tool_call_id === "string" ? kwargs.tool_call_id : "";
 			return new ToolMessage({ content: c, tool_call_id: toolCallId, id });
 		}
+		// A removal marker (summarization writes `RemoveMessage(REMOVE_ALL)`).
+		// Stored per-step `messages` writes carry these; replaying them through the
+		// messages reducer needs the real class, not the AIMessage fallback below.
+		case "RemoveMessage":
+			return id ? new RemoveMessage({ id }) : undefined;
 		default:
 			// Default to AIMessage for unknown types
 			return new AIMessage({

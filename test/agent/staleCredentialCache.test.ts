@@ -15,6 +15,7 @@ const { createAgentMock, summarizationMiddlewareMock } = vi.hoisted(() => ({
 vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
+	createMiddleware: (config: unknown) => config,
 }));
 
 vi.mock("../../src/stores/dataStore.svelte", () => ({

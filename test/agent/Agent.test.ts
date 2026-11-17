@@ -10,6 +10,7 @@ const { createAgentMock, summarizationMiddlewareMock } = vi.hoisted(() => ({
 vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
+	createMiddleware: (config: unknown) => config,
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -70,7 +71,10 @@ describe("Agent summarization middleware", () => {
 		expect(registry.createChatInstance).toHaveBeenCalledWith("openai", "gpt-4o-mini", { contextWindow: 100_000 });
 		expect(createAgentMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				middleware: [expect.objectContaining({ kind: "summary" })],
+				middleware: [
+					expect.objectContaining({ name: "S2BGenerationMetadata" }),
+					expect.objectContaining({ kind: "summary" }),
+				],
 			}),
 		);
 	});
@@ -131,7 +135,7 @@ describe("Agent summarization middleware", () => {
 		expect(summarizationMiddlewareMock).not.toHaveBeenCalled();
 		expect(createAgentMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				middleware: [],
+				middleware: [expect.objectContaining({ name: "S2BGenerationMetadata" })],
 			}),
 		);
 	});

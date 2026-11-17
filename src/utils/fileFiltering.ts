@@ -4,7 +4,13 @@ import { stripWidgetFences } from "../widget/widgetFences";
 import { widgetIndexText } from "../widget/widgetSpec";
 import { getAgentPathSource } from "./agentPathSource";
 import { agentRootDir } from "./agentPaths";
-import { THREAD_DATA_DEDUP_VERSION, inflateThreadData, sniffThreadDataVersion } from "../agent/threadDataCodec";
+import {
+	THREAD_DATA_DEDUP_VERSION,
+	type ThreadData,
+	inflateThreadData,
+	sniffThreadDataVersion,
+} from "../agent/threadDataCodec";
+import { replayPathMessages } from "../agent/threadReplay";
 import { gunzipPrefixToString, gunzipToString } from "./gzip";
 import { extractTextFromPdf } from "./pdfExtractor";
 
@@ -563,7 +569,8 @@ function hasToolCalls(msg: unknown): boolean {
  * usable before `AgentManager` has initialized. Verified to agree with the UI on all
  * 49 threads in the test vault by comparing against `metadata.lastMessagePreview`.
  */
-function selectActiveMessages(checkpoints: Record<string, unknown>): unknown[] {
+function selectActiveMessages(data: ThreadData): unknown[] {
+	const checkpoints = data.checkpoints as unknown as Record<string, unknown>;
 	const nodes = new Map<string, { id: string; ts: string; step: number; entry: unknown; children: string[] }>();
 	for (const [id, entry] of Object.entries(checkpoints)) {
 		const record = entry as Record<string, unknown>;
@@ -623,7 +630,12 @@ function selectActiveMessages(checkpoints: Record<string, unknown>): unknown[] {
 		current = next;
 	}
 
-	return getNestedMessages(nodes.get(current)?.entry);
+	const tip = nodes.get(current)?.entry;
+	const stored = getNestedMessages(tip);
+	if (stored.length > 0 || !current) return stored;
+	// Delta-stored step: rebuild from the nearest snapshot plus the writes since,
+	// serialized back to the stored shape the helpers below read.
+	return replayPathMessages(data, current).map((message) => message.toJSON());
 }
 
 /**
@@ -667,7 +679,7 @@ function extractChatContent(raw: string): string {
 				answer = "";
 			};
 
-			for (const msg of selectActiveMessages(checkpoints)) {
+			for (const msg of selectActiveMessages(data)) {
 				// An unrecognised shape has no class to check; indexing it risks
 				// re-admitting tool output, so skip it.
 				const messageClass = getMessageClass(msg);
