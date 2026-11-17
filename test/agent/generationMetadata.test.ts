@@ -50,6 +50,22 @@ describe("generation metadata", () => {
 		expect(reply.response_metadata).toMatchObject({ agent_id: "agent-1", model_provider: "openai" });
 	});
 
+	it("keeps the run's metadata when the context is gone after the model call", async () => {
+		runMetadata.current = RUN;
+		const middleware = createGenerationMetadataMiddleware() as unknown as {
+			wrapModelCall: (request: unknown, handler: (request: unknown) => Promise<unknown>) => Promise<unknown>;
+		};
+		const reply = new AIMessage({ content: "The answer" });
+
+		// Mobile's AsyncLocalStorage shim can drop the store across the await.
+		await middleware.wrapModelCall({}, async () => {
+			runMetadata.current = undefined;
+			return reply;
+		});
+
+		expect(reply.response_metadata).toMatchObject({ agent_id: "agent-1", model_provider: "openai" });
+	});
+
 	it("leaves the reply untouched outside a run with metadata", async () => {
 		runMetadata.current = undefined;
 		const middleware = createGenerationMetadataMiddleware() as unknown as {

@@ -61,10 +61,11 @@ export function createGenerationMetadataMiddleware() {
 	return createMiddleware({
 		name: "S2BGenerationMetadata",
 		wrapModelCall: async (request, handler) => {
+			// Read the run's metadata before awaiting: on mobile the AsyncLocalStorage
+			// shim may no longer hold the run's config once the model call resolves.
+			const generation = readGenerationMetadata(currentRunMetadata());
 			const response = await handler(request);
-			if (AIMessage.isInstance(response)) {
-				stampGenerationMetadata(response, readGenerationMetadata(currentRunMetadata()));
-			}
+			if (AIMessage.isInstance(response)) stampGenerationMetadata(response, generation);
 			return response;
 		},
 	});
