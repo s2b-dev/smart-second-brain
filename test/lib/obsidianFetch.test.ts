@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { requestUrl } from "obsidian";
-import { createObsidianFetch } from "../../src/lib/obsidianFetch";
+import { createObsidianFetch, requestTimeoutMs } from "../../src/lib/obsidianFetch";
 
 const mockRequestUrl = vi.mocked(requestUrl);
 
@@ -240,6 +240,53 @@ describe("createObsidianFetch timeout", () => {
 			await fetchImpl("https://example.com/v1/embeddings", { method: "POST", body: "{}" });
 
 			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+});
+
+/*
+ * The timeout covers the server's whole computation for a non-streamed request,
+ * which grows with the input: a flat 60 s timed out every full embedding batch
+ * against a slow local server (#544).
+ */
+describe("requestTimeoutMs", () => {
+	it("keeps small requests on the 60 s floor", () => {
+		expect(requestTimeoutMs(undefined)).toBe(60_000);
+		expect(requestTimeoutMs("{}")).toBe(60_000);
+		expect(requestTimeoutMs("x".repeat(1_999))).toBe(60_000);
+	});
+
+	it("adds a second per 2,000 characters of body", () => {
+		expect(requestTimeoutMs("x".repeat(120_000))).toBe(120_000);
+		expect(requestTimeoutMs(new Uint8Array(20_000))).toBe(70_000);
+		expect(requestTimeoutMs(new ArrayBuffer(4_000))).toBe(62_000);
+	});
+
+	it("caps at five minutes", () => {
+		expect(requestTimeoutMs("x".repeat(10_000_000))).toBe(300_000);
+	});
+
+	it("fires the scaled timeout, not the floor, for a large body", async () => {
+		vi.useFakeTimers();
+		try {
+			mockRequestUrl.mockReset();
+			mockRequestUrl.mockReturnValue(new Promise(() => {}) as ReturnType<typeof requestUrl>);
+			const fetchImpl = createObsidianFetch();
+			let settled = false;
+			const pending = fetchImpl("http://localhost:8008/v1/embeddings", {
+				method: "POST",
+				body: "x".repeat(120_000),
+			}).catch((error: unknown) => {
+				settled = true;
+				return error;
+			});
+
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(settled).toBe(false);
+			await vi.advanceTimersByTimeAsync(60_000);
+			expect(await pending).toMatchObject({ name: "TimeoutError" });
 		} finally {
 			vi.useRealTimers();
 		}

@@ -828,7 +828,7 @@ describe("unreachable provider", () => {
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 
-	it("a timeout gets the same batch retried once before the run stops", async () => {
+	it("a persistent timeout splits the batch down to one chunk, retries that once, then stops", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md"), file("e.md"), file("f.md")];
 		embedDocuments.mockImplementation(async () => {
@@ -837,16 +837,19 @@ describe("unreachable provider", () => {
 		await startService();
 		await vi.advanceTimersByTimeAsync(10_000);
 
-		expect(embedDocuments).toHaveBeenCalledTimes(2);
-		// The retry is of the batch that failed, not the next one.
-		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
+		// [a, b] timed out, so it was split; [a] alone timed out, was retried
+		// once as the same request, and the second failure stopped the run.
+		expect(embedDocuments).toHaveBeenCalledTimes(3);
+		expect(embedDocuments.mock.calls[0][0]).toHaveLength(2);
+		expect(embedDocuments.mock.calls[1][0]).toEqual([embedDocuments.mock.calls[0][0][0]]);
+		expect(embedDocuments.mock.calls[2][0]).toEqual(embedDocuments.mock.calls[1][0]);
 		expect(embedQuery).not.toHaveBeenCalled();
 		expect(showActionNotice).toHaveBeenCalledTimes(1);
 		expect(await stores.get(INDEX)?.countNotes()).toBe(0);
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 
-	it("a single blip drops no notes: the batch is retried and the build completes whole", async () => {
+	it("a timed-out batch is split, the smaller size sticks, and the build completes whole", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
 		embedDocuments.mockImplementationOnce(async () => {
@@ -855,9 +858,13 @@ describe("unreachable provider", () => {
 		await startService();
 		await vi.advanceTimersByTimeAsync(10_000);
 
-		// Batch 1 failed once and was retried; batch 2 went through first time.
-		expect(embedDocuments).toHaveBeenCalledTimes(3);
-		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
+		// [a, b] timed out and went again as [a], [b]; the rest of the run kept
+		// the batch size that worked rather than timing out on every batch.
+		const [first, ...rest] = embedDocuments.mock.calls.map(([texts]) => texts);
+		expect(first).toHaveLength(2);
+		expect(rest.slice(0, 2)).toEqual([[first[0]], [first[1]]]);
+		expect(rest.every((texts) => texts.length === 1)).toBe(true);
+		expect(rest).toHaveLength(4);
 		expect(showActionNotice).not.toHaveBeenCalled();
 		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
@@ -1139,7 +1146,7 @@ describe("atomic notes and renames", () => {
 	it("a multi-chunk note whose chunks span batches is written once, whole", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("long.md"), file("short.md")];
-		// ~60k chars against a 24k-char chunk budget: three chunks, more than the batch size of 2.
+		// ~60k chars against a ~6k-char chunk budget: many chunks, more than the batch size of 2.
 		longContent = "word ".repeat(12_000);
 		const svc = await startService();
 		const store = stores.get(INDEX);
@@ -1153,6 +1160,20 @@ describe("atomic notes and renames", () => {
 		expect(longWrites[0][0].map((c) => c.chunkIndex)).toEqual(longWrites[0][0].map((_, i) => i));
 		expect(embedDocuments.mock.calls.length).toBeGreaterThan(1);
 		expect(svc.getProgress(INDEX)).toMatchObject({ indexed: 2, total: 2, percentage: 100 });
+	});
+
+	it("chunks stay small even when the model's window is large (#543)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("long.md")];
+		// 20k chars would fit one 8191-token window (~24.5k chars) as a single
+		// chunk; the per-chunk cap splits it so no request carries a whole note.
+		longContent = "word ".repeat(4_000);
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const texts = embedDocuments.mock.calls.flatMap(([batch]) => batch);
+		expect(texts.length).toBeGreaterThan(2);
+		expect(Math.max(...texts.map((text) => text.length))).toBeLessThanOrEqual(2048 * 3);
 	});
 
 	it("a note that fails one chunk reaches the store not at all", async () => {
