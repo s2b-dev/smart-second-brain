@@ -28,7 +28,15 @@ import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { extractTextFromPdf } from "../utils/pdfExtractor";
 import { Logger } from "../utils/logging";
 import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
+import { createGenerationMetadataMiddleware } from "./generationMetadata";
 import { normalizeMessages } from "./messageNormalization";
+import {
+	MESSAGES_CHANNEL,
+	type ReplayNode,
+	createDeltaMessagesStateSchema,
+	rebuildMessages,
+	replayMessages,
+} from "./threadReplay";
 import { type ThreadSnapshot, type ThreadStore, createSnapshot } from "./memory/ThreadStore";
 import {
 	getSummarizationTriggerTokens,
@@ -329,7 +337,7 @@ export class Agent {
 		this.registry = options.registry;
 		this.telemetry = options.telemetry;
 		this.threadStore = options.threadStore;
-		this.checkpointer = this.wrapCheckpointer(options.checkpointer ?? new MemorySaver());
+		this.checkpointer = options.checkpointer ?? new MemorySaver();
 		Logger.debug("agent.init", {
 			hasTelemetry: Boolean(this.telemetry),
 			hasThreadStore: Boolean(this.threadStore),
@@ -613,7 +621,13 @@ export class Agent {
 				tools: Array.isArray(tools) ? [...tools] : [],
 				systemPrompt,
 				checkpointer: this.checkpointer,
+				// `messages` as a DeltaChannel: each checkpoint stores only its step's
+				// new messages plus a periodic snapshot, not the whole history (#540).
+				// Same value and input types as the default `messages`, so the runnable
+				// keeps the default agent type; the cast only hides the schema class.
+				stateSchema: createDeltaMessagesStateSchema() as never,
 				middleware: [
+					createGenerationMetadataMiddleware(),
 					...this.buildSummarizationMiddleware(selectedModel, systemPrompt, resolvedSummarization),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
 				] as never,
@@ -1389,7 +1403,7 @@ export class Agent {
 					updatedAt: checkpointTimestamp,
 					createdAt: checkpointTimestamp,
 				});
-		const messages = tuple ? this.extractMessagesFromCheckpoint(tuple) : [];
+		const messages = tuple ? await this.extractMessagesFromCheckpoint(tuple) : [];
 		const { lastError, errorCount } = tuple
 			? this.extractErrorsFromCheckpoint(tuple)
 			: { lastError: undefined, errorCount: 0 };
@@ -1408,23 +1422,38 @@ export class Agent {
 	 * Used for building the checkpoint-to-message mapping for regenerate/edit operations.
 	 */
 	async getCheckpointHistory(threadId: string): Promise<CheckpointHistoryItem[]> {
-		const results: CheckpointHistoryItem[] = [];
+		// The vault saver replays straight from the loaded thread, normalizing each
+		// distinct message once (see `threadReplay`).
+		const vaultSaver = this.checkpointer as {
+			readCheckpointHistory?: (path: string) => Promise<CheckpointHistoryItem[]>;
+		};
+		if (typeof vaultSaver.readCheckpointHistory === "function") {
+			return vaultSaver.readCheckpointHistory.call(this.checkpointer, threadId);
+		}
 
+		// Any other saver: collect every checkpoint's stored value and writes, then replay.
 		const config = { configurable: { thread_id: threadId } };
-
+		const nodes = new Map<string, ReplayNode>();
+		const items: Omit<CheckpointHistoryItem, "messages">[] = [];
 		for await (const tuple of this.checkpointer.list(config)) {
 			const checkpointId = tuple.config.configurable?.checkpoint_id as string | undefined;
 			if (!checkpointId) continue;
-
-			const messages = this.extractMessagesFromCheckpoint(tuple);
-			const step = (tuple.metadata?.step as number) ?? 0;
 			const parentCheckpointId = tuple.parentConfig?.configurable?.checkpoint_id as string | undefined;
-			const ts = tuple.checkpoint?.ts as string | undefined;
-
-			results.push({ checkpointId, messages, step, parentCheckpointId, ts });
+			const values = tuple.checkpoint?.channel_values as Record<string, unknown> | undefined;
+			nodes.set(checkpointId, {
+				parentId: parentCheckpointId,
+				seed: values && Object.hasOwn(values, MESSAGES_CHANNEL) ? values[MESSAGES_CHANNEL] : undefined,
+				writes: (tuple.pendingWrites ?? []).filter((write) => write[1] === MESSAGES_CHANNEL),
+			});
+			items.push({
+				checkpointId,
+				step: (tuple.metadata?.step as number) ?? 0,
+				parentCheckpointId,
+				ts: tuple.checkpoint?.ts as string | undefined,
+			});
 		}
-
-		return results;
+		const replayed = replayMessages(nodes);
+		return items.map((item) => ({ ...item, messages: replayed.get(item.checkpointId) ?? [] }));
 	}
 
 	/**
@@ -1535,63 +1564,6 @@ export class Agent {
 		} as RunnableConfig;
 	}
 
-	private wrapCheckpointer(checkpointer: BaseCheckpointSaver): BaseCheckpointSaver {
-		// The async generator below is a `function*` (arrow generators do not exist),
-		// so it cannot see the class `this`; hand it a bound normalizer instead.
-		const normalizeTuple = (tuple: CheckpointTuple | undefined) => this.normalizeCheckpointTuple(tuple);
-		return new Proxy(checkpointer, {
-			get: (target, prop, receiver) => {
-				if (prop === "getTuple") {
-					return async (...args: unknown[]) => {
-						const getTuple = Reflect.get(target, prop, receiver) as (
-							...innerArgs: unknown[]
-						) => Promise<CheckpointTuple | undefined>;
-						const tuple = await getTuple.apply(target, args);
-						return normalizeTuple(tuple);
-					};
-				}
-
-				if (prop === "list") {
-					return async function* (...args: unknown[]) {
-						const list = Reflect.get(target, prop, receiver) as (
-							...innerArgs: unknown[]
-						) => AsyncIterable<CheckpointTuple>;
-						for await (const tuple of list.apply(target, args)) {
-							yield normalizeTuple(tuple) as CheckpointTuple;
-						}
-					};
-				}
-
-				const value = Reflect.get(target, prop, receiver);
-				return typeof value === "function" ? value.bind(target) : value;
-			},
-		});
-	}
-
-	private normalizeCheckpointTuple(tuple: CheckpointTuple | undefined): CheckpointTuple | undefined {
-		if (!tuple?.checkpoint?.channel_values) {
-			return tuple;
-		}
-
-		const channelValues = tuple.checkpoint.channel_values;
-		const rawMessages = channelValues.messages;
-		if (!Array.isArray(rawMessages)) {
-			return tuple;
-		}
-
-		const normalizedMessages = normalizeMessages(rawMessages);
-		return {
-			...tuple,
-			checkpoint: {
-				...tuple.checkpoint,
-				channel_values: {
-					...channelValues,
-					messages: normalizedMessages,
-				},
-			},
-		};
-	}
-
 	private extractMessagesFromResult(result: unknown): BaseMessage[] {
 		if (!result || typeof result !== "object" || !("messages" in result)) {
 			return [];
@@ -1604,17 +1576,22 @@ export class Agent {
 		return normalizeMessages(messages);
 	}
 
-	private extractMessagesFromCheckpoint(tuple: CheckpointTuple): BaseMessage[] {
+	/**
+	 * The checkpoint's message list. `messages` is a delta channel, so most
+	 * checkpoints store none: those are rebuilt from the saver's delta history.
+	 */
+	private async extractMessagesFromCheckpoint(tuple: CheckpointTuple): Promise<BaseMessage[]> {
 		const channelValues = tuple.checkpoint?.channel_values as Record<string, unknown> | undefined;
-		if (!channelValues) {
-			return [];
-		}
-		const messages = channelValues.messages;
-		if (!Array.isArray(messages)) {
-			return [];
-		}
-		// Convert serialized messages to BaseMessage instances
-		return normalizeMessages(messages);
+		const ownValue =
+			channelValues && Object.hasOwn(channelValues, MESSAGES_CHANNEL)
+				? channelValues[MESSAGES_CHANNEL]
+				: undefined;
+		if (ownValue !== undefined) return rebuildMessages(ownValue, undefined);
+		const history = await this.checkpointer.getDeltaChannelHistory({
+			config: tuple.config,
+			channels: [MESSAGES_CHANNEL],
+		});
+		return rebuildMessages(undefined, history[MESSAGES_CHANNEL]);
 	}
 
 	/**
@@ -1961,7 +1938,7 @@ ${userMessage}`;
 			return undefined;
 		}
 
-		const messages = this.extractMessagesFromCheckpoint(tuple);
+		const messages = await this.extractMessagesFromCheckpoint(tuple);
 		if (messages.length === 0) {
 			return undefined;
 		}

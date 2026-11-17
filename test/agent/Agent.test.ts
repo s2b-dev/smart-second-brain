@@ -10,9 +10,11 @@ const { createAgentMock, summarizationMiddlewareMock } = vi.hoisted(() => ({
 vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
+	createMiddleware: (config: unknown) => config,
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { DeltaValue } from "@langchain/langgraph";
 import { Agent, sanitizeRunnableName } from "../../src/agent/Agent";
 import { getTrimTokensToSummarize } from "../../src/agent/summarization";
 import { countMessageTokens, estimateSystemPromptTokens } from "../../src/utils/tokenEstimator";
@@ -70,7 +72,10 @@ describe("Agent summarization middleware", () => {
 		expect(registry.createChatInstance).toHaveBeenCalledWith("openai", "gpt-4o-mini", { contextWindow: 100_000 });
 		expect(createAgentMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				middleware: [expect.objectContaining({ kind: "summary" })],
+				middleware: [
+					expect.objectContaining({ name: "S2BGenerationMetadata" }),
+					expect.objectContaining({ kind: "summary" }),
+				],
 			}),
 		);
 	});
@@ -131,9 +136,27 @@ describe("Agent summarization middleware", () => {
 		expect(summarizationMiddlewareMock).not.toHaveBeenCalled();
 		expect(createAgentMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				middleware: [],
+				middleware: [expect.objectContaining({ name: "S2BGenerationMetadata" })],
 			}),
 		);
+	});
+
+	it("stores messages as deltas", async () => {
+		const registry = makeRegistry();
+		const agent = new Agent({ registry: registry as never });
+		await agent.resolveRun({
+			...BASE_RESOLVE_PARAMS,
+			cacheKey: "test-key-delta",
+			provider: "openai",
+			chatModel: "gpt-4o",
+			options: {},
+		});
+
+		const [options] = createAgentMock.mock.calls[0] as unknown as [
+			{ stateSchema: { fields: Record<string, unknown> } },
+		];
+		const { stateSchema } = options;
+		expect(stateSchema.fields.messages).toBeInstanceOf(DeltaValue);
 	});
 });
 
