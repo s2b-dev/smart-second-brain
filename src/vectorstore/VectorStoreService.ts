@@ -1926,7 +1926,14 @@ export class VectorStoreService {
 					await bulkPause(this.UNREACHABLE_RETRY_PAUSE_MS);
 					if (aborted()) return false;
 					batchNumber--;
-					return (await embedBatch(batch.slice(0, half))) && embedBatch(batch.slice(half));
+					// Drain at the *current* size, read afresh per piece: a nested
+					// split inside the first half lowers it further, and the rest
+					// must not go out at a size that already timed out.
+					const remaining = [...batch];
+					while (remaining.length > 0) {
+						if (!(await embedBatch(remaining.splice(0, batchSize)))) return false;
+					}
+					return true;
 				}
 				Logger.warn(`[VectorStore] Batch ${batchNumber} failed, falling back to sequential:`, error);
 				// A transport failure will hit every remaining chunk the same way,

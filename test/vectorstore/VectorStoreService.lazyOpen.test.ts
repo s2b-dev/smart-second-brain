@@ -145,6 +145,9 @@ function pdfEmbeddable(f: FakeFile): boolean {
 	return f.extension !== "pdf" || pdfContent;
 }
 
+/** The index's configured batch size; most tests rely on 2. */
+let configuredBatchSize = 2;
+
 /** Configured index ids; a test that renames a provider swaps the entry. */
 let indexIds = [INDEX];
 const renameListeners = new Set<(oldId: string, newId: string) => Promise<void> | void>();
@@ -163,7 +166,7 @@ const fakeData = {
 			id,
 			provider,
 			model,
-			batchSize: 2,
+			batchSize: configuredBatchSize,
 			// Mirror the stats the service wrote, as the real config would.
 			lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
 			failedNotes: indexStats.failedNotes as Record<string, number> | undefined,
@@ -285,6 +288,7 @@ beforeEach(() => {
 	readFailures = new Set();
 	emptyPaths = new Set();
 	longContent = "";
+	configuredBatchSize = 2;
 	indexIds = [INDEX];
 	fakeData.searchEmbedIndex = INDEX;
 	renameListeners.clear();
@@ -870,6 +874,25 @@ describe("unreachable provider", () => {
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
 		const report = await service?.getReport(INDEX);
 		expect(report?.skippedFiles).toEqual([]);
+	});
+	it("after a nested split, the rest of the batch goes out at the smallest size that worked", async () => {
+		platform.isMobile = false;
+		configuredBatchSize = 8;
+		vaultFiles = ["a", "b", "c", "d", "e", "f", "g", "h"].map((name) => file(`${name}.md`));
+		// Anything over two chunks times out.
+		embedDocuments.mockImplementation(async (texts: string[]) => {
+			if (texts.length > 2) throw new DOMException("Request timed out after 60000ms", "TimeoutError");
+			return texts.map(() => [1, 0, 0]);
+		});
+		await startService();
+		await vi.advanceTimersByTimeAsync(30_000);
+
+		// 8 timed out → 4 timed out → 2, 2 worked → the other half goes as 2, 2,
+		// never again as one request of 4.
+		expect(embedDocuments.mock.calls.map(([texts]) => texts.length)).toEqual([8, 4, 2, 2, 2, 2]);
+		expect(showActionNotice).not.toHaveBeenCalled();
+		expect(await stores.get(INDEX)?.countNotes()).toBe(8);
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 });
 
