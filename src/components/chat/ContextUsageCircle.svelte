@@ -135,9 +135,9 @@ function formatCompact(value: number): string {
 </script>
 
 <PickerPopover
-  triggerStyles="context-usage-trigger"
+  triggerStyles="s2b-context-usage-trigger"
   triggerClass="s2b-group s2b-relative s2b-w-9 s2b-h-9 s2b-flex s2b-items-center s2b-justify-center s2b-rounded-md s2b-p-0 s2b-appearance-none"
-  contentClass="context-usage-popover"
+  contentClass="s2b-context-usage-popover"
   tooltip={tooltipText}
   align="end"
   sideOffset={6}
@@ -214,12 +214,12 @@ function formatCompact(value: number): string {
 </PickerPopover>
 
 <style>
-  :global(.context-usage-trigger),
-  :global(.context-usage-trigger:hover),
-  :global(.context-usage-trigger:active),
-  :global(.context-usage-trigger:focus),
-  :global(.context-usage-trigger:focus-visible),
-  :global(.context-usage-trigger[data-state="open"]) {
+  :global(.s2b-context-usage-trigger),
+  :global(.s2b-context-usage-trigger:hover),
+  :global(.s2b-context-usage-trigger:active),
+  :global(.s2b-context-usage-trigger:focus),
+  :global(.s2b-context-usage-trigger:focus-visible),
+  :global(.s2b-context-usage-trigger[data-state="open"]) {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
@@ -261,12 +261,12 @@ function formatCompact(value: number): string {
     letter-spacing: -0.05em;
   }
 
-  :global(.context-usage-trigger:hover) .s2b-context-ring-label,
-  :global(.context-usage-trigger[data-state="open"]) .s2b-context-ring-label {
+  :global(.s2b-context-usage-trigger:hover) .s2b-context-ring-label,
+  :global(.s2b-context-usage-trigger[data-state="open"]) .s2b-context-ring-label {
     color: var(--text-normal);
   }
 
-  :global(.context-usage-popover) {
+  :global(.s2b-context-usage-popover) {
     min-width: 0;
     width: max-content;
   }

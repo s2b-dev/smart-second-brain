@@ -30,7 +30,7 @@ describe("end-to-end chat flow", () => {
 		enablePlugin();
 		await sleep(5000);
 		executeCommand("smart-second-brain:new-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(1000);
 	}, 30_000);
 
@@ -59,7 +59,7 @@ describe("end-to-end chat flow", () => {
 
 	it.skipIf(!providerAvailable)("should hide the empty state logo after messages are sent", async () => {
 		executeCommand("smart-second-brain:open-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(500);
 		const logoCount = domCount(".logo-container");
 		expect(logoCount).toBeDefined();

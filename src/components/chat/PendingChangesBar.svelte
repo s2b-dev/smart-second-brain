@@ -653,7 +653,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                        an error with extra steps. If the note reverts to the staged
                        content, the vault-event recompute re-enables it. -->
                   <button
-                    class="pcb-action-icon pcb-action-accept"
+                    class="s2b-pcb-action-icon pcb-action-accept"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleAccept(entry);
@@ -668,7 +668,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     <div use:icon={"check"} style="--icon-size: 12px"></div>
                   </button>
                   <button
-                    class="pcb-action-icon pcb-action-reject"
+                    class="s2b-pcb-action-icon pcb-action-reject"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleReject(entry);
@@ -684,7 +684,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                        (both early-return on non-pending), so offer the one action that
                        still does something — undoing the text left in the note. -->
                   <button
-                    class="pcb-action-icon pcb-action-reject"
+                    class="s2b-pcb-action-icon pcb-action-reject"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleUndoApplied(entry);
@@ -850,7 +850,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
     background: color-mix(in srgb, var(--color-red) 15%, transparent);
   }
 
-  .pcb-action-icon {
+  .s2b-pcb-action-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -864,7 +864,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
 
   /* 12px icons + 2px padding are pointer-sized; on touch, bump the hit areas
      to guideline size. Obsidian marks mobile with body.is-mobile. */
-  :global(.is-mobile) .pcb-action-icon,
+  :global(.is-mobile) .s2b-pcb-action-icon,
   :global(.is-mobile) .pcb-preview-toggle {
     padding: 8px;
   }
@@ -872,12 +872,12 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
   /* Disabled accept on a stale row: keep it visible (its absence would read as
      "this row can't be accepted ever") but clearly inert. pointer-events stays
      on so the explanatory title tooltip still shows on hover. */
-  .pcb-action-icon[disabled] {
+  .s2b-pcb-action-icon[disabled] {
     opacity: 0.35;
     cursor: not-allowed;
   }
 
-  .pcb-action-icon[disabled]:hover {
+  .s2b-pcb-action-icon[disabled]:hover {
     background: transparent;
   }
 

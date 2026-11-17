@@ -52,7 +52,7 @@ function openModelSelectionModal() {
 </script>
 
 <Button
-  styles="clickable-icon model-select-btn"
+  styles="clickable-icon s2b-model-select-btn"
   tooltip="Select model"
   dataTestId="model-select-button"
   onClick={openModelSelectionModal}
@@ -73,7 +73,7 @@ function openModelSelectionModal() {
      — the attach/send buttons are fixed-size touch targets, and the agent
      collapses to an icon at its own breakpoint. An over-long model name
      ellipsises instead of pushing the send button onto a second line. */
-  :global(.model-select-btn) {
+  :global(.s2b-model-select-btn) {
     display: flex;
     align-items: center;
     gap: 0.25rem;

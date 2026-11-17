@@ -76,10 +76,10 @@ function getLangSmithCheckIcon(): string {
 }
 
 function getLangSmithCheckButtonStyles(): string {
-	if (langSmithCheckState === "success") return "langsmith-check-button is-success";
-	if (langSmithCheckState === "error") return "langsmith-check-button is-error";
-	if (langSmithCheckState === "pending") return "langsmith-check-button is-pending";
-	return "langsmith-check-button";
+	if (langSmithCheckState === "success") return "s2b-langsmith-check-button is-success";
+	if (langSmithCheckState === "error") return "s2b-langsmith-check-button is-error";
+	if (langSmithCheckState === "pending") return "s2b-langsmith-check-button is-pending";
+	return "s2b-langsmith-check-button";
 }
 
 function normalizeLangSmithEndpoint(endpoint: string): string {
@@ -251,19 +251,19 @@ async function handleCheckLangSmithConnection() {
 </SettingGroup>
 
 <style>
-  :global(.langsmith-check-button) {
+  :global(.s2b-langsmith-check-button) {
     color: var(--text-muted);
   }
 
-  :global(.langsmith-check-button.is-success) {
+  :global(.s2b-langsmith-check-button.is-success) {
     color: var(--text-success, #4caf50);
   }
 
-  :global(.langsmith-check-button.is-error) {
+  :global(.s2b-langsmith-check-button.is-error) {
     color: var(--text-error);
   }
 
-  :global(.langsmith-check-button.is-pending .s2b-button-icon) {
+  :global(.s2b-langsmith-check-button.is-pending .s2b-button-icon) {
     animation: langsmith-check-spin 1s linear infinite;
   }
 

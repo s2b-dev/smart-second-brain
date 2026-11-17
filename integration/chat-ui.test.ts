@@ -22,7 +22,7 @@ describe("chat view UI", () => {
 		enablePlugin();
 		await sleep(5000);
 		executeCommand("smart-second-brain:new-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(1000);
 	});
 
@@ -32,7 +32,7 @@ describe("chat view UI", () => {
 	});
 
 	it("should render the chat root element", () => {
-		expect(domCount(".chat-root")).toBeGreaterThanOrEqual(1);
+		expect(domCount(".s2b-chat-root")).toBeGreaterThanOrEqual(1);
 	});
 
 	it("should show the empty state logo on a fresh chat", () => {
@@ -80,7 +80,7 @@ describe("chat view UI", () => {
 	it("should handle file drag events across the chat view without errors", async () => {
 		const dragResult = obsidianEval(`
 			(() => {
-				const root = document.querySelector(".chat-root");
+				const root = document.querySelector(".s2b-chat-root");
 				if (!root) return "missing-root";
 				const dataTransfer = {
 					types: ["Files"],

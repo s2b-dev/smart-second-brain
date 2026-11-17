@@ -29,8 +29,8 @@ function pick(action: () => void) {
   bind:element={anchor}
   tooltip="Add context"
   dataTestId="attach-context-button"
-  triggerStyles="clickable-icon attach-context-button"
-  contentClass="attach-context-popover"
+  triggerStyles="clickable-icon s2b-attach-context-button"
+  contentClass="s2b-attach-context-popover"
   side="top"
   align="start"
   sideOffset={8}
@@ -71,7 +71,7 @@ function pick(action: () => void) {
 
 <style>
   /* The attach options are short; don't inherit the picker's wide min-width. */
-  :global(.attach-context-popover) {
+  :global(.s2b-attach-context-popover) {
     min-width: 0;
     width: max-content;
   }
@@ -81,7 +81,7 @@ function pick(action: () => void) {
      `.clickable-icon`'s default padding, which is wider than tall — that
      rendered this as an oval next to send's true circle. The tint mixes with
      `--background-primary`, the fill the composer actually has. */
-  :global(.attach-context-button.clickable-icon) {
+  :global(.s2b-attach-context-button.clickable-icon) {
     background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
     color: var(--interactive-accent);
     border-radius: 999px;
@@ -92,17 +92,17 @@ function pick(action: () => void) {
   }
 
   /* Same touch-size bump the send button gets on mobile. */
-  :global(.is-mobile .attach-context-button.clickable-icon) {
+  :global(.is-mobile .s2b-attach-context-button.clickable-icon) {
     width: 2.75rem;
     height: 2.75rem;
   }
 
-  :global(.attach-context-button.clickable-icon:hover) {
+  :global(.s2b-attach-context-button.clickable-icon:hover) {
     background: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-primary));
     color: var(--interactive-accent);
   }
 
-  :global(.attach-context-button.clickable-icon .svg-icon) {
+  :global(.s2b-attach-context-button.clickable-icon .svg-icon) {
     stroke-width: 2.5;
   }
 </style>

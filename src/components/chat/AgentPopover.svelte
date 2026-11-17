@@ -82,8 +82,8 @@ function createNewAgent() {
     bind:element={customAnchor}
     tooltip="Agent options"
     dataTestId="agent-select-button"
-    triggerStyles="clickable-icon model-select-btn"
-    triggerClass="agent-popover-trigger"
+    triggerStyles="clickable-icon s2b-model-select-btn"
+    triggerClass="s2b-agent-popover-trigger"
     side="top"
     align="start"
     sideOffset={8}
@@ -137,7 +137,7 @@ function createNewAgent() {
       </PickerOptionRow>
     {/each}
 
-    <div class="picker-popover-separator menu-separator"></div>
+    <div class="s2b-picker-popover-separator menu-separator"></div>
 
     <PickerOptionRow onClick={createNewAgent} actionTitle="Create agent">
       {#snippet leading()}
@@ -152,13 +152,13 @@ function createNewAgent() {
 {/if}
 
 <style>
-  :global(.agent-popover-trigger) {
+  :global(.s2b-agent-popover-trigger) {
     max-width: 190px;
   }
 
   /* Collapse to icon-only on mobile — there isn't enough width for icon +
      label + model pill + send button on one row without wrapping. */
-  :global(.is-mobile .agent-popover-trigger) {
+  :global(.is-mobile .s2b-agent-popover-trigger) {
     max-width: none;
   }
 

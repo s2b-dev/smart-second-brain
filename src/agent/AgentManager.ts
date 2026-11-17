@@ -1970,7 +1970,7 @@ export class AgentManager {
 			// Reuse a tab already showing this exact thread instead of always opening a
 			// fresh one — otherwise every reopen of a backgrounded chat (running-indicator
 			// tap, "Ask agent", openLatestChat) stacks a new leaf on top of the old one.
-			// That leaves a stale, unmounted-but-still-registered .chat-root leaf behind,
+			// That leaves a stale, unmounted-but-still-registered .s2b-chat-root leaf behind,
 			// which corrupts touch hit-testing on mobile (double-tap bug). On mobile there's
 			// effectively one active pane, so getLeaf("tab") duplicating is especially costly.
 			leaf = workspace

@@ -126,7 +126,7 @@ const sendButtonStyle = $derived.by(() => {
 	const disabledColor = "color-mix(in srgb, var(--text-accent) 68%, var(--background-primary) 32%)";
 
 	// Only custom properties go inline. Sizing and colour live in the
-	// `.chat-input-container button.send-message-button` rules below — an inline
+	// `.s2b-chat-input-container button.s2b-send-message-button` rules below — an inline
 	// `width`/`background` would beat every stylesheet rule, including the mobile
 	// touch-target sizes, which is what used to force `!important` everywhere.
 	return [
@@ -1226,7 +1226,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
 <div
   bind:this={containerEl}
-  class="chat-input-container s2b-w-full s2b-flex s2b-flex-col s2b-relative s2b-isolate s2b-gap-1 s2b-mx-auto s2b-max-w-[--file-line-width]"
+  class="s2b-chat-input-container s2b-w-full s2b-flex s2b-flex-col s2b-relative s2b-isolate s2b-gap-1 s2b-mx-auto s2b-max-w-[--file-line-width]"
   role="region"
 >
   {#if selectedChatModel && models.unavailableProviders.includes(selectedChatModel.provider)}
@@ -1352,7 +1352,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
               ariaLabel="Cancel edit"
               tooltip="Cancel edit"
               onClick={cancelActiveEdit}
-              styles="chat-input-icon-button clickable-icon s2b-mr-2"
+              styles="s2b-chat-input-icon-button clickable-icon s2b-mr-2"
               iconId="x"
             />
           {/if}
@@ -1370,7 +1370,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
                   : "Send message"}
             onClick={attemptSend}
             dataTestId="send-message-button"
-            styles="send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200 disabled:s2b-cursor-not-allowed"
+            styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200 disabled:s2b-cursor-not-allowed"
             style={sendButtonStyle}
             iconId={isEditing ? "check" : "arrow-up"}
           />
@@ -1379,7 +1379,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
             ariaLabel="stop streaming"
             tooltip="Stop streaming"
             onClick={() => session?.stopStreaming()}
-            styles="send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200"
+            styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200"
             style={sendButtonStyle}
             iconId="square"
           />
@@ -1408,7 +1408,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 </div>
 
 <style>
-  .chat-input-container {
+  .s2b-chat-input-container {
     background: transparent !important;
     /* Same fill as the page, everywhere. The composer is defined by its
        border, not by a contrasting slab — see `.chat-input-wrapper`. */
@@ -1445,7 +1445,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      which against a dark theme's near-black page reads as a distinctly
      lighter band with visible edges down both sides of the inset input.
      Verified on-device in dark mode: page `#000` vs wrapper `rgb(30,30,30)`. */
-  :global(.is-mobile .chat-input-container) {
+  :global(.is-mobile .s2b-chat-input-container) {
     background: linear-gradient(to bottom, transparent 0%, var(--background-primary) 24px) !important;
   }
 
@@ -1493,7 +1493,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     flex-shrink: 0;
   }
 
-  .chat-actions-row :global(.model-select-btn) {
+  .chat-actions-row :global(.s2b-model-select-btn) {
     flex-shrink: 1;
     min-width: 0;
   }
@@ -1516,7 +1516,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      with an ellipsis instead (`max-width` in ModelSelectButton) and is the
      last label standing. */
   @container chat-composer (max-width: 340px) {
-    .chat-actions-row :global(.context-usage-trigger) {
+    .chat-actions-row :global(.s2b-context-usage-trigger) {
       display: none;
     }
   }
@@ -1528,14 +1528,14 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
     /* The 190px trigger cap exists to bound the LABEL; with the label gone it
        would just leave dead space around the icon. */
-    .chat-actions-row :global(.agent-popover-trigger) {
+    .chat-actions-row :global(.s2b-agent-popover-trigger) {
       max-width: none;
     }
   }
 
   /* Circular, matching the attach button (already `999px`) and the reference
      design. The 6px radius made it the odd one out in the action row. */
-  :global(.chat-input-container button.send-message-button) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button) {
     border-radius: 999px;
   }
 
@@ -1578,11 +1578,11 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     visibility: hidden;
   }
 
-  /* `.chat-input-container button.…` (0,2,1) out-specifies every core button
+  /* `.s2b-chat-input-container button.…` (0,2,1) out-specifies every core button
      and `.clickable-icon` rule, mobile variants included, so nothing here needs
      `!important` — which also lets the touch-target rules in styles.css win on
      specificity alone. */
-  :global(.chat-input-container button.send-message-button) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button) {
     background: var(--send-button-bg);
     color: var(--text-on-accent);
     width: 1.75rem;
@@ -1599,30 +1599,30 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      attach button, the other icon in this row that needed the same
      correction. Applies to all three states (arrow-up / check / square), so
      the button's weight doesn't shift as it changes state. */
-  :global(.send-message-button .svg-icon) {
+  :global(.s2b-send-message-button .svg-icon) {
     stroke-width: 2.5;
   }
 
   /* Bump the send target to a comfortable touch size on mobile. */
-  :global(.is-mobile .chat-input-container button.send-message-button) {
+  :global(.is-mobile .s2b-chat-input-container button.s2b-send-message-button) {
     width: 2.75rem;
     height: 2.75rem;
     min-width: 2.75rem;
     min-height: 2.75rem;
   }
 
-  :global(.chat-input-container button.send-message-button:hover:not(:disabled)) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button:hover:not(:disabled)) {
     background: var(--send-button-bg-hover);
     color: var(--text-on-accent);
   }
 
-  :global(.chat-input-container button.send-message-button:disabled) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button:disabled) {
     background: var(--send-button-bg-disabled);
     color: color-mix(in srgb, var(--text-on-accent) 82%, transparent);
     opacity: 1;
   }
 
-  :global(.chat-input-container .chat-input-icon-button.clickable-icon) {
+  :global(.s2b-chat-input-container .s2b-chat-input-icon-button.clickable-icon) {
     width: 1.75rem;
     height: 1.75rem;
     min-width: 1.75rem;
@@ -1647,15 +1647,15 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      Only then does the card shrink, down to `cardMinHeight` — its controls plus
      one editor line — so the send row is never squeezed out. The banner and
      editing bar are single rows and keep their size. */
-  .chat-input-container {
+  .s2b-chat-input-container {
     max-height: var(--s2b-chat-pane-height);
   }
 
-  .chat-input-container > :global(:not(.chat-input-wrapper, .pcb-container)) {
+  .s2b-chat-input-container > :global(:not(.chat-input-wrapper, .pcb-container)) {
     flex-shrink: 0;
   }
 
-  .chat-input-container > :global(.pcb-container) {
+  .s2b-chat-input-container > :global(.pcb-container) {
     flex-shrink: 1000;
   }
 

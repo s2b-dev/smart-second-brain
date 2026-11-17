@@ -282,7 +282,7 @@ function handlePropertyValuesChange(raw: string) {
                     onblur={handleComboBlur}
                   />
                   {#if comboOpen && comboTarget === "live" && getSuggestions(liveType, comboQuery).length > 0}
-                    <div class="filter-combo-list picker-popover-content">
+                    <div class="filter-combo-list s2b-picker-popover-content">
                       <div class="picker-popover-menu">
                         {#each getSuggestions(liveType, comboQuery) as suggestion (suggestion)}
                           <PickerOptionRow onClick={() => pickSuggestion(suggestion, "live")}>
@@ -294,7 +294,7 @@ function handlePropertyValuesChange(raw: string) {
                       </div>
                     </div>
                   {:else if comboOpen && comboTarget === "live" && showsEmptyPoolHint(liveType)}
-                    <div class="filter-combo-list picker-popover-content">
+                    <div class="filter-combo-list s2b-picker-popover-content">
                       <div class="filter-combo-empty">
                         No properties found in vault — type a name to use it anyway.
                       </div>
@@ -396,7 +396,7 @@ function handlePropertyValuesChange(raw: string) {
             onblur={handleComboBlur}
           />
           {#if comboOpen && comboTarget === "leaf" && getSuggestions(leafType, comboQuery).length > 0}
-            <div class="filter-combo-list picker-popover-content">
+            <div class="filter-combo-list s2b-picker-popover-content">
               <div class="picker-popover-menu">
                 {#each getSuggestions(leafType, comboQuery) as suggestion (suggestion)}
                   <PickerOptionRow onClick={() => pickSuggestion(suggestion, "leaf")}>
@@ -408,7 +408,7 @@ function handlePropertyValuesChange(raw: string) {
               </div>
             </div>
           {:else if comboOpen && comboTarget === "leaf" && showsEmptyPoolHint(leafType)}
-            <div class="filter-combo-list picker-popover-content">
+            <div class="filter-combo-list s2b-picker-popover-content">
               <div class="filter-combo-empty">No properties found in vault — type a name to use it anyway.</div>
             </div>
           {/if}

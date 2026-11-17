@@ -39,7 +39,7 @@ describe("agent interaction", () => {
 
 	async function openFreshChat(): Promise<void> {
 		executeCommand("smart-second-brain:new-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(1000);
 	}
 
@@ -110,7 +110,7 @@ describe("agent with tool use", () => {
 		"should invoke tools when asked to search vault content",
 		async () => {
 			executeCommand("smart-second-brain:new-chat");
-			await waitForSelector(".chat-root");
+			await waitForSelector(".s2b-chat-root");
 			await sleep(1000);
 
 			const prompt = "Use the search_notes tool to find notes about machine learning in my vault";

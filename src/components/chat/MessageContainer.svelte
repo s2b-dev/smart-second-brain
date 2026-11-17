@@ -661,7 +661,7 @@ $effect(() => {
 	};
 	// The whole chat view (thread + composer), not just the scroller: the
 	// composer is where the drag is headed.
-	const view = el.closest(".chat-root") ?? el;
+	const view = el.closest(".s2b-chat-root") ?? el;
 	const win = el.win;
 	view.addEventListener("dragover", onDragOver, true);
 	win.addEventListener("drop", release, true);
@@ -872,12 +872,12 @@ $effect(() => {
               <div class="s2b-flex s2b-flex-row s2b-items-center s2b-gap-2">
                 {#if !(onMobile && !messagePair.userBranchInfo)}
                   <div
-                    class="message-footer s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
+                    class="s2b-message-footer s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                   >
                     {#if !onMobile && !isBeingEdited && formatMessageTimestamp(messagePair)}
                       <span class="message-timestamp">{formatMessageTimestamp(messagePair)}</span>
                     {/if}
-                    <div class="footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
+                    <div class="s2b-footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                       {#if messagePair.userBranchInfo}
                         <BranchNavigator
                           branchInfo={messagePair.userBranchInfo}
@@ -940,7 +940,7 @@ $effect(() => {
                     {#if renderInfo.renderContent}
                       <MarkdownRenderer
                         content={renderInfo.content}
-                        class="message-text markdown-preview-view s2b-leading-[1.5] !s2b-p-0 !s2b-w-full !s2b-max-w-full !s2b-m-0 [&_p]:s2b-my-2 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_strong]:s2b-font-semibold [&_code]:s2b-bg-code-background [&_code]:s2b-px-1.5 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.9em] [&_pre]:s2b-bg-code-background [&_pre]:s2b-p-3 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-2 [&_pre]:s2b-text-[0.85em] [&_pre]:s2b-relative [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0 [&_pre_code]:s2b-text-[1em] [&_pre_.clickable-icon]:s2b-absolute [&_pre_.clickable-icon]:s2b-top-1.5 [&_pre_.clickable-icon]:s2b-right-1.5 [&_pre_.clickable-icon]:s2b-opacity-0 [&_pre:hover_.clickable-icon]:s2b-opacity-100"
+                        class="s2b-message-text markdown-preview-view s2b-leading-[1.5] !s2b-p-0 !s2b-w-full !s2b-max-w-full !s2b-m-0 [&_p]:s2b-my-2 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_strong]:s2b-font-semibold [&_code]:s2b-bg-code-background [&_code]:s2b-px-1.5 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.9em] [&_pre]:s2b-bg-code-background [&_pre]:s2b-p-3 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-2 [&_pre]:s2b-text-[0.85em] [&_pre]:s2b-relative [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0 [&_pre_code]:s2b-text-[1em] [&_pre_.clickable-icon]:s2b-absolute [&_pre_.clickable-icon]:s2b-top-1.5 [&_pre_.clickable-icon]:s2b-right-1.5 [&_pre_.clickable-icon]:s2b-opacity-0 [&_pre:hover_.clickable-icon]:s2b-opacity-100"
                       />
                     {/if}
                   {/if}
@@ -966,9 +966,9 @@ $effect(() => {
                 {@const genLabel = shouldShowGenerationLabel(index) ? getGenerationLabel(messagePair) : null}
                 {@const timestamp = onMobile ? null : formatMessageTimestamp(messagePair)}
                 <div
-                  class="message-footer message-footer-assistant s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-flex-nowrap s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
+                  class="s2b-message-footer message-footer-assistant s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-flex-nowrap s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                 >
-                  <div class="footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
+                  <div class="s2b-footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                     {#if messagePair.assistantBranchInfo}
                       <BranchNavigator
                         branchInfo={messagePair.assistantBranchInfo}
@@ -1129,14 +1129,14 @@ $effect(() => {
      sit left in muted color and warm to normal on hover; metadata reads as a
      single subdued, consistently-sized group so it never competes with the
      message content above it. */
-  .message-footer {
+  .s2b-message-footer {
     min-height: 22px;
     font-size: 11px;
     color: var(--text-faint);
   }
 
   /* Everything below is scoped to `.message-footer-assistant`. The user
-     message reuses `.message-footer` but lays out in the OPPOSITE order
+     message reuses `.s2b-message-footer` but lays out in the OPPOSITE order
      (timestamp then actions, right-aligned) and carries no metadata group,
      so the sizing rules here actively break it: pinning its actions with
      nothing else able to yield pushes the buttons off the right edge. */
@@ -1156,7 +1156,7 @@ $effect(() => {
      annotates. With nowrap the overflow has to go somewhere, so pin the
      controls and let ONLY the metadata shrink — otherwise the browser is
      free to squeeze the icon buttons and deform the touch targets. */
-  .message-footer-assistant .footer-actions {
+  .message-footer-assistant .s2b-footer-actions {
     flex-shrink: 0;
   }
 
