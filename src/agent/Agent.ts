@@ -30,7 +30,13 @@ import { Logger } from "../utils/logging";
 import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
 import { createGenerationMetadataMiddleware } from "./generationMetadata";
 import { normalizeMessages } from "./messageNormalization";
-import { MESSAGES_CHANNEL, type ReplayNode, rebuildMessages, replayMessages } from "./threadReplay";
+import {
+	MESSAGES_CHANNEL,
+	type ReplayNode,
+	createDeltaMessagesStateSchema,
+	rebuildMessages,
+	replayMessages,
+} from "./threadReplay";
 import { type ThreadSnapshot, type ThreadStore, createSnapshot } from "./memory/ThreadStore";
 import {
 	getSummarizationTriggerTokens,
@@ -615,6 +621,11 @@ export class Agent {
 				tools: Array.isArray(tools) ? [...tools] : [],
 				systemPrompt,
 				checkpointer: this.checkpointer,
+				// `messages` as a DeltaChannel: each checkpoint stores only its step's
+				// new messages plus a periodic snapshot, not the whole history (#540).
+				// Same value and input types as the default `messages`, so the runnable
+				// keeps the default agent type; the cast only hides the schema class.
+				stateSchema: createDeltaMessagesStateSchema() as never,
 				middleware: [
 					createGenerationMetadataMiddleware(),
 					...this.buildSummarizationMiddleware(selectedModel, systemPrompt, resolvedSummarization),

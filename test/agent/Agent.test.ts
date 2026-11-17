@@ -14,6 +14,7 @@ vi.mock("langchain", () => ({
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { DeltaValue } from "@langchain/langgraph";
 import { Agent, sanitizeRunnableName } from "../../src/agent/Agent";
 import { getTrimTokensToSummarize } from "../../src/agent/summarization";
 import { countMessageTokens, estimateSystemPromptTokens } from "../../src/utils/tokenEstimator";
@@ -138,6 +139,24 @@ describe("Agent summarization middleware", () => {
 				middleware: [expect.objectContaining({ name: "S2BGenerationMetadata" })],
 			}),
 		);
+	});
+
+	it("stores messages as deltas", async () => {
+		const registry = makeRegistry();
+		const agent = new Agent({ registry: registry as never });
+		await agent.resolveRun({
+			...BASE_RESOLVE_PARAMS,
+			cacheKey: "test-key-delta",
+			provider: "openai",
+			chatModel: "gpt-4o",
+			options: {},
+		});
+
+		const [options] = createAgentMock.mock.calls[0] as unknown as [
+			{ stateSchema: { fields: Record<string, unknown> } },
+		];
+		const { stateSchema } = options;
+		expect(stateSchema.fields.messages).toBeInstanceOf(DeltaValue);
 	});
 });
 
