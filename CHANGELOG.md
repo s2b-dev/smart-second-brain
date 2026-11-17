@@ -20,6 +20,14 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.4.2 (2026-11-17)
+
+Indexing with a local embedding server no longer stops on long notes, and the plugin's styles can no longer affect other plugins.
+
+### Fixes
+- **Indexing: local embedding servers no longer time out.** With a slower local server (such as a small model on oMLX), indexing often stopped with "embedding provider is not reachable" even though the server was running. Long notes are now split into smaller pieces, a request that times out is retried in smaller parts instead of resent whole, and large requests get more time. Notes that were indexed before keep their old pieces until you edit them or rebuild the index (#561).
+- **Styles: the plugin's styles stay inside its own views.** Every style rule the plugin ships is now scoped to the plugin's own elements, so none can change how another plugin or Obsidian's own views look. On phones, this also stops the plugin enlarging the buttons in Obsidian's core graph view (#560).
+
 ## 2.4.1 (2026-11-17)
 
 Excalidraw drawings display again while Smart Second Brain is enabled.
