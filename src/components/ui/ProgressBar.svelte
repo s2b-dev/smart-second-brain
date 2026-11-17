@@ -12,7 +12,7 @@ let { progress = 0 }: Props = $props();
     style="--dynamic-color: {chatLayout.isSidebar
         ? 'var(--background-secondary-alt)'
         : 'var(--background-primary-alt)'};"
-    class="my-2 h-2 w-full rounded-lg border border-solid border-[--background-modifier-border] appearance-none [&::-webkit-progress-bar]:bg-[--dynamic-color] [&::-webkit-progress-bar]:shadow-[0px_0px_0px_0.3px_var(--background-modifier-form-field)_inset] [&::-webkit-progress-bar]:rounded-lg [&::-webkit-progress-bar]:overflow-hidden [&::-webkit-progress-value]:rounded-lg [&::-webkit-progress-value]:bg-[--color-accent] [&::-moz-progress-bar]:bg-[--dynamic-color] [&::-moz-progress-bar]:shadow-[0px_0px_0px_0.3px_var(--background-modifier-form-field)_inset] [&::-moz-progress-bar]:rounded-none [&::-moz-progress-bar]:overflow-hidden"
+    class="s2b-my-2 s2b-h-2 s2b-w-full s2b-rounded-lg s2b-border s2b-border-solid s2b-border-[--background-modifier-border] s2b-appearance-none [&::-webkit-progress-bar]:s2b-bg-[--dynamic-color] [&::-webkit-progress-bar]:s2b-shadow-[0px_0px_0px_0.3px_var(--background-modifier-form-field)_inset] [&::-webkit-progress-bar]:s2b-rounded-lg [&::-webkit-progress-bar]:s2b-overflow-hidden [&::-webkit-progress-value]:s2b-rounded-lg [&::-webkit-progress-value]:s2b-bg-[--color-accent] [&::-moz-progress-bar]:s2b-bg-[--dynamic-color] [&::-moz-progress-bar]:s2b-shadow-[0px_0px_0px_0.3px_var(--background-modifier-form-field)_inset] [&::-moz-progress-bar]:s2b-rounded-none [&::-moz-progress-bar]:s2b-overflow-hidden"
     value={progress}
     max="100"
 ></progress>

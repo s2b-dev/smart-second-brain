@@ -1,3 +1,5 @@
+import plugin from "tailwindcss/plugin.js";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./src/**/*.{js,svelte,ts}", "./v2/**/*.{js,svelte,ts}"],
@@ -233,24 +235,14 @@ export default {
   corePlugins: {
     preflight: false,
   },
-  // Tailwind generates a utility for every word in the scanned sources that
-  // names one, used as a class or not: a TS `static` keyword, `position:
-  // static` in a <style> block, an icon named `columns-2`, `!visible` in a
-  // condition. Those utilities ship unscoped, and in Obsidian they apply to
-  // every plugin's DOM. `.static{position:static}` overrode Excalidraw's
-  // `.excalidraw__canvas{position:absolute}` on its `canvas.static` and blanked
-  // every drawing while S2B was enabled (#558). These are the generic names S2B
-  // never uses as a class; `test/styles/tailwindUtilities.test.ts` fails when a
-  // new one starts shipping.
-  blocklist: [
-    "static", "fixed", "sticky",
-    "hidden", "invisible", "collapse", "contents",
-    "inline", "inline-block", "flow-root", "list-item", "table", "grid", "container",
-    "grow", "shrink", "flex-shrink", "columns-2", "border-collapse", "resize",
-    "transform", "transition", "filter", "backdrop-filter", "blur", "invert",
-    "ring", "shadow", "outline", "italic", "underline", "lowercase", "antialiased",
-    "!block", "!filter", "!ring", "!visible", "!container",
-  ],
+  // Every utility carries the plugin's own prefix (`s2b-flex`, `hover:s2b-bg-…`,
+  // `!s2b-p-0`). Plugin stylesheets are global in Obsidian, so an unprefixed
+  // `.flex` or `.static` applies to every plugin's DOM: `.static{position:static}`
+  // overrode Excalidraw's canvas positioning and blanked its drawings (#558).
+  // With the prefix, a utility only matches an element S2B put the class on,
+  // and words Tailwind picks up from prose or code (`static`, `hidden`) no
+  // longer generate anything. `test/styles/tailwindUtilities.test.ts` guards it.
+  prefix: "s2b-",
   // Emit the `--tw-*` defaults only on elements that use a utility needing
   // them, not on `*, ::before, ::after`. A custom property declared on an
   // element gives it its own copy of every inherited custom property (~1300
@@ -261,5 +253,12 @@ export default {
   experimental: {
     optimizeUniversalDefaults: true,
   },
-  plugins: [],
+  plugins: [
+    // `overflow-wrap: anywhere` as a named utility (Tailwind 4 ships it as
+    // `wrap-anywhere`). The arbitrary-property form, `[overflow-wrap:anywhere]`,
+    // can't take the prefix, so it would ship as an unscoped class.
+    plugin(({ addUtilities }) => {
+      addUtilities({ ".wrap-anywhere": { "overflow-wrap": "anywhere" } });
+    }),
+  ],
 };

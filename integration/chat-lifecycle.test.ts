@@ -21,7 +21,7 @@ describe("new chat creation", () => {
 		enablePlugin();
 		await sleep(5000);
 		executeCommand("smart-second-brain:new-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(1000);
 	}, 30_000);
 
@@ -41,7 +41,7 @@ describe("new chat creation", () => {
 	});
 
 	it("should render the chat UI", () => {
-		expect(domCount(".chat-root")).toBeGreaterThanOrEqual(1);
+		expect(domCount(".s2b-chat-root")).toBeGreaterThanOrEqual(1);
 	});
 
 	it("should not have any errors after chat creation", () => {

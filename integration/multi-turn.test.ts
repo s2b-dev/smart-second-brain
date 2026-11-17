@@ -48,7 +48,7 @@ describe.skipIf(!providerAvailable)("multi-turn conversation", () => {
 
 	async function openFreshChat(): Promise<void> {
 		executeCommand("smart-second-brain:new-chat");
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(1000);
 	}
 
@@ -84,7 +84,7 @@ describe.skipIf(!providerAvailable)("multi-turn conversation", () => {
 		label: string,
 	): Promise<NonNullable<ReturnType<typeof getPersistedChatSummary>>> {
 		obsidian(`open path="${threadPath}"`);
-		await waitForSelector(".chat-root");
+		await waitForSelector(".s2b-chat-root");
 		await sleep(500);
 
 		const submitResult = await submitChatMessageViaUi(message);

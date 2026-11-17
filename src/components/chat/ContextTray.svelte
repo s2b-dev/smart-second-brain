@@ -280,7 +280,7 @@ onDestroy(() => {
 </script>
 
 {#if hasAny}
-  <div class="context-tray flex flex-row flex-wrap items-start gap-1.5 min-w-0 max-w-full">
+  <div class="context-tray s2b-flex s2b-flex-row s2b-flex-wrap s2b-items-start s2b-gap-1.5 s2b-min-w-0 s2b-max-w-full">
     <!-- Attachments: tiles on their own row, so what's being sent is visible
          at a glance rather than hidden behind a filename. Images and PDFs show
          a thumbnail; anything without one shows a file card. -->

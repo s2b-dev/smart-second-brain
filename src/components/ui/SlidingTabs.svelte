@@ -150,7 +150,7 @@ function registerTrigger(node: HTMLElement, id: T) {
 <Tabs.Root bind:value onValueChange={(v) => onValueChange?.(v as T)} class={className}>
 	<Tabs.List
 		bind:ref={listEl}
-		class={`s2b-sliding-tabs ${collapseInactiveOnPhone ? "s2b-tabs-collapse " : ""}flex flex-wrap justify-center gap-1 border-b border-t-0 border-x-0 border-solid border-[--background-modifier-border] pb-2 mb-4`}
+		class={`s2b-sliding-tabs ${collapseInactiveOnPhone ? "s2b-tabs-collapse " : ""}s2b-flex s2b-flex-wrap s2b-justify-center s2b-gap-1 s2b-border-b s2b-border-t-0 s2b-border-x-0 s2b-border-solid s2b-border-[--background-modifier-border] s2b-pb-2 s2b-mb-4`}
 	>
 		<!-- Sliding accent indicator: a soft pill that glides to the active trigger.
 		     Hidden until first measured to avoid a flash at 0,0. -->
@@ -168,7 +168,7 @@ function registerTrigger(node: HTMLElement, id: T) {
 			<Tabs.Trigger
 				value={tab.id}
 				{@attach (node) => registerTrigger(node, tab.id)}
-				class="s2b-tab-trigger relative z-[1] px-3 py-1.5 text-sm font-medium rounded-[10px] border border-transparent bg-transparent shadow-none transition-colors data-[state=active]:text-[--text-normal] data-[state=inactive]:text-[--text-muted] data-[state=inactive]:hover:text-[--text-normal]"
+				class="s2b-tab-trigger s2b-relative s2b-z-[1] s2b-px-3 s2b-py-1.5 s2b-text-sm s2b-font-medium s2b-rounded-[10px] s2b-border s2b-border-transparent s2b-bg-transparent s2b-shadow-none s2b-transition-colors data-[state=active]:s2b-text-[--text-normal] data-[state=inactive]:s2b-text-[--text-muted] data-[state=inactive]:hover:s2b-text-[--text-normal]"
 			>
 				<span class="s2b-tab-label">
 					{#if tab.icon}

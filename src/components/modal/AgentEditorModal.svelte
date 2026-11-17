@@ -731,8 +731,8 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         <SettingItem name="Name" desc="This agent's display name and icon">
           <PickerPopover
             bind:open={isAgentIconPickerOpen}
-            triggerClass="agent-icon-trigger"
-            contentClass="agent-icon-popover"
+            triggerClass="s2b-agent-icon-trigger"
+            contentClass="s2b-agent-icon-popover"
             tooltip="Change icon"
             side="bottom"
             align="start"
@@ -786,7 +786,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 
           <Text
             inputType="text"
-            class="agent-overview-name-input"
+            class="s2b-agent-overview-name-input"
             placeholder="Agent name"
             value={selectedAgent.name}
             onblur={(value: string) => updateAgentName(value)}
@@ -832,7 +832,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           name="System prompt"
           desc="This agent's instructions, including how it uses memory, stored as its own AGENT.md note in your vault"
         >
-          <div class="flex items-center gap-2 justify-end">
+          <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-justify-end">
             <Button
               iconId="pencil"
               ariaLabel="Open agent note"
@@ -883,7 +883,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onSecondary={selectedAgent.summarizationModel ? resetSummarizationModel : undefined}
             />
             {#if summarizationContextWindowWarning}
-              <div class="agent-model-warning text-sm">{summarizationContextWindowWarning}</div>
+              <div class="agent-model-warning s2b-text-sm">{summarizationContextWindowWarning}</div>
             {/if}
           </div>
         </SettingItem>
@@ -1084,7 +1084,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         </SettingContainer>
         {#each customSkills as ext (ext.id)}
           <ManagedEntityItem
-            class="skill-entity"
+            class="s2b-skill-entity"
             name={ext.displayName}
             desc={ext.description}
           >
@@ -1129,7 +1129,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               {@const toolsState = getServerToolsState(serverId)}
               {@const isExpanded = expandedServerId === serverId}
               <ManagedEntityItem
-                class="mcp-entity"
+                class="s2b-mcp-entity"
                 name={config.displayName}
                 desc={config.url}
                 meta="Remote HTTP MCP server"
@@ -1139,7 +1139,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                   <Badge
                     interactive
                     onclick={() => toggleToolsList(serverId)}
-                    class={`mcp-tools-badge ${toolsState?.error ? "error" : ""} ${toolsState?.tools && toolsState.tools.length > 0 ? "has-tools" : ""}`}
+                    class={`s2b-mcp-tools-badge ${toolsState?.error ? "error" : ""} ${toolsState?.tools && toolsState.tools.length > 0 ? "has-tools" : ""}`}
                   >
                     {#if toolsState?.loading}
                       <Icon name="loader" size="xs" />
@@ -1234,13 +1234,13 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 
   /* `:global` because the class is handed to `Text.svelte` as a prop, so this component's
      scope hash never reaches the rendered input. */
-  :global(.agent-overview-name-input) {
+  :global(.s2b-agent-overview-name-input) {
     font-size: var(--font-ui-medium);
   }
 
   /* Icon-only trigger sitting immediately left of the name input, sized to match the
      input's height so the pair reads as one control. */
-  :global(.agent-icon-trigger) {
+  :global(.s2b-agent-icon-trigger) {
     min-width: 0;
     justify-content: center;
     padding: 0;
@@ -1254,12 +1254,12 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
      min-content. Pin the trigger to its square and give the freed space back to
      the input. `!important` because core's `.is-phone .modal .setting-item-control`
      rules out-specify these single-class selectors. */
-  :global(.is-phone .modal .setting-item-control button.agent-icon-trigger) {
+  :global(.is-phone .modal .setting-item-control button.s2b-agent-icon-trigger) {
     width: var(--input-height) !important;
     flex: 0 0 auto !important;
   }
 
-  :global(.is-phone .modal .setting-item-control input.agent-overview-name-input) {
+  :global(.is-phone .modal .setting-item-control input.s2b-agent-overview-name-input) {
     flex: 1 1 auto !important;
     width: auto !important;
     min-width: 0;
@@ -1272,7 +1272,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
     flex-shrink: 0;
   }
 
-  :global(.agent-icon-popover) {
+  :global(.s2b-agent-icon-popover) {
     width: min(380px, calc(100vw - 48px));
     max-width: min(380px, calc(100vw - 48px));
     z-index: calc(var(--layer-popover) + 20);
@@ -1368,7 +1368,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
   /* Muted text like `ManagedEntitySection`'s empty state. Aligns with the
      "Skills" / "MCP servers" heading rows above it rather than the card edge:
      the message stands in for the whole list block, so it should line up with
-     that block's heading. (The `.skill-entity` / `.mcp-entity` rows zero their
+     that block's heading. (The `.s2b-skill-entity` / `.s2b-mcp-entity` rows zero their
      own side padding because they carry their own internal inset — an empty
      paragraph has none, so matching them would outdent it.) */
   .skill-empty-state,
@@ -1376,20 +1376,20 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
     margin: 0;
     padding: 8px 16px;
   }
-  :global(.skill-entity),
-  :global(.mcp-entity) {
+  :global(.s2b-skill-entity),
+  :global(.s2b-mcp-entity) {
     padding-left: 0;
     padding-right: 0;
   }
-  :global(.mcp-tools-badge) {
+  :global(.s2b-mcp-tools-badge) {
     min-height: 22px;
   }
-  :global(.mcp-tools-badge.has-tools) {
+  :global(.s2b-mcp-tools-badge.has-tools) {
     background: rgba(var(--color-green-rgb, 76, 175, 80), 0.15);
     border-color: var(--text-success, #4caf50);
     color: var(--text-success, #4caf50);
   }
-  :global(.mcp-tools-badge.error) {
+  :global(.s2b-mcp-tools-badge.error) {
     background: rgba(var(--color-red-rgb, 244, 67, 54), 0.15);
     border-color: var(--text-error, #f44336);
     color: var(--text-error, #f44336);

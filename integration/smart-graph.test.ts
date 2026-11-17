@@ -26,7 +26,7 @@ describe("graph view UI", () => {
 	beforeAll(async () => {
 		clearBuffers();
 		executeCommand("smart-second-brain:open-smart-graph");
-		await waitForSelector(".smart-graph-container");
+		await waitForSelector(".s2b-smart-graph-container");
 		expandGraphPanel();
 		await waitForSelector(".graph-controls-title");
 	});
@@ -36,11 +36,11 @@ describe("graph view UI", () => {
 	});
 
 	it("should render the graph container", () => {
-		expect(domCount(".smart-graph-container")).toBeGreaterThanOrEqual(1);
+		expect(domCount(".s2b-smart-graph-container")).toBeGreaterThanOrEqual(1);
 	});
 
 	it("should render a canvas element for the force graph", () => {
-		expect(domCount(".smart-graph-container canvas")).toBeGreaterThanOrEqual(1);
+		expect(domCount(".s2b-smart-graph-container canvas")).toBeGreaterThanOrEqual(1);
 	});
 
 	it("should display graph statistics (nodes and edges)", () => {
@@ -87,7 +87,7 @@ describe("graph with vault content", () => {
 		clearBuffers();
 		// Ensure graph is open
 		executeCommand("smart-second-brain:open-smart-graph");
-		await waitForSelector(".smart-graph-container");
+		await waitForSelector(".s2b-smart-graph-container");
 		expandGraphPanel();
 		await waitForSelector(".graph-controls-title");
 	});

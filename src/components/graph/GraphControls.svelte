@@ -508,7 +508,7 @@ $effect(() => {
       <!-- A heading row like the others, so the naming button lands in the
            control slot Obsidian already right-aligns rather than needing a
            bespoke flex row. -->
-      <SettingContainer name="Found · {segments.length}" isHeading class="section-heading--action">
+      <SettingContainer name="Found · {segments.length}" isHeading class="s2b-section-heading--action">
         {#snippet nameSuffix()}
           {#if !onMobile}<span class="section-label-hint">shift/⌘ multi-select</span>{/if}
         {/snippet}
@@ -522,7 +522,7 @@ $effect(() => {
           ariaLabel={isLabeling ? "Cancel naming topics" : "Name topics with AI"}
           tooltip={isLabeling ? "Cancel naming" : "Name topics with AI"}
           onClick={() => (isLabeling ? onCancelLabeling?.() : onLabelTopics?.())}
-          styles={isLabeling && !showCancelLabeling ? "is-spinning" : ""}
+          styles={isLabeling && !showCancelLabeling ? "s2b-is-spinning" : ""}
         />
       </SettingContainer>
       <div class="setting-items segment-list">
@@ -675,7 +675,10 @@ $effect(() => {
     {@render panelBody()}
   </BottomSheet>
 {:else}
-  <div class="graph-controls" class:collapsed={isCollapsed} bind:clientHeight={mainPanelHeight}>
+  <!-- `graph-controls` is Obsidian's own graph-view class, kept for its native panel
+       look (padding, hidden scrollbar); S2B's rules key on `s2b-graph-controls` so they
+       never reach the core graph view's controls. -->
+  <div class="graph-controls s2b-graph-controls" class:collapsed={isCollapsed} bind:clientHeight={mainPanelHeight}>
     {#if !isCollapsed}
       {@render panelBody()}
     {/if}
@@ -685,7 +688,7 @@ $effect(() => {
 <!-- Dev panel (dev build only) -->
 {#if import.meta.env.DEV}
   <div
-    class="graph-controls graph-controls--dev"
+    class="graph-controls s2b-graph-controls graph-controls--dev"
     class:collapsed={isDevCollapsed}
     class:graph-controls--main-open={!isCollapsed}
     style="--s2b-graph-main-panel-height: {mainPanelHeight}px"
@@ -896,7 +899,7 @@ $effect(() => {
     display: flex;
   }
 
-  .graph-controls {
+  .s2b-graph-controls {
     position: absolute;
     top: 8px;
     right: 52px;
@@ -917,7 +920,7 @@ $effect(() => {
     width: min(300px, calc(100vw - 68px));
   }
 
-  .graph-controls.collapsed {
+  .s2b-graph-controls.collapsed {
     display: none;
   }
 
@@ -994,7 +997,7 @@ $effect(() => {
 
   /* A heading row carries no control by default, so it has no min-height to
      stop the naming button from squashing it. */
-  :global(.section-heading--action) {
+  :global(.s2b-section-heading--action) {
     min-height: 32px;
   }
 
@@ -1024,7 +1027,7 @@ $effect(() => {
   }
 
   /* The label button reuses Obsidian's clickable-icon chrome; only the spin is ours. */
-  :global(.is-spinning svg) {
+  :global(.s2b-is-spinning svg) {
     animation: s2b-label-spin 1s linear infinite;
   }
 

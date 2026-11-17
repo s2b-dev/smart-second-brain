@@ -352,7 +352,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if imageProcessor}
                 <span>{imageProcessor.provider}/{imageProcessor.model}</span>
               {:else}
-                <span class="text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">Select model…</span>
               {/if}
             </Button>
           {/if}
@@ -379,7 +379,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if pdfProcessor}
                 <span>{pdfProcessor.provider}/{pdfProcessor.model}</span>
               {:else}
-                <span class="text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">Select model…</span>
               {/if}
             </Button>
           {/if}
@@ -419,7 +419,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
   {#if footer === "modal"}
     <div class="tool-config-actions">
       <Button buttonText="Cancel" onClick={() => onCancel?.()} />
-      <div class="flex-1"></div>
+      <div class="s2b-flex-1"></div>
       {#if showResetToDefault}
         <Button buttonText="Reset to default" onClick={handleResetToDefault} />
       {/if}

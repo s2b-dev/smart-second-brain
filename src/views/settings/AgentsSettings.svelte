@@ -151,15 +151,15 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
         {/snippet}
 
         {#snippet children()}
-          <div class="agent-summary-row">
-            <span class="agent-model-summary">{getAgentModelSummary(agentId)}</span>
+          <div class="s2b-agent-summary-row">
+            <span class="s2b-agent-model-summary">{getAgentModelSummary(agentId)}</span>
             {#if skillsSummary.count > 0}
-              <span class="agent-skills-icons">
+              <span class="s2b-agent-skills-icons">
                 {#each skillsSummary.icons as icon, i (i)}
                   <Icon name={icon} size="xs" />
                 {/each}
                 {#if skillsSummary.overflow > 0}
-                  <span class="agent-skills-overflow">+{skillsSummary.overflow}</span>
+                  <span class="s2b-agent-skills-overflow">+{skillsSummary.overflow}</span>
                 {/if}
               </span>
             {/if}
@@ -316,7 +316,7 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
      within {#if} branches, so Svelte's scoped-CSS analysis prunes the plain-class rules
      (unlike .agent-avatar, which survives via its class: directive). Scope them with
      :global so the flex layout actually reaches the rendered row. */
-  :global(.agent-summary-row) {
+  :global(.s2b-agent-summary-row) {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -325,11 +325,11 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     color: var(--text-muted);
   }
 
-  :global(.agent-model-summary) {
+  :global(.s2b-agent-model-summary) {
     color: var(--text-muted);
   }
 
-  :global(.agent-skills-icons) {
+  :global(.s2b-agent-skills-icons) {
     display: inline-flex;
     align-items: center;
     flex-wrap: wrap;
@@ -337,7 +337,7 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     color: var(--text-muted);
   }
 
-  :global(.agent-skills-overflow) {
+  :global(.s2b-agent-skills-overflow) {
     font-size: 0.8rem;
     color: var(--text-muted);
   }

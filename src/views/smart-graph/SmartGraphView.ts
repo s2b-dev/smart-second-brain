@@ -28,7 +28,7 @@ export class SmartGraphView extends SvelteItemView {
 		this.mountComponent(
 			SmartGraphViewComponent,
 			{},
-			{ containerClass: "smart-graph-container", testId: "smart-graph-view" },
+			{ containerClass: "s2b-smart-graph-container", testId: "smart-graph-view" },
 		);
 	}
 

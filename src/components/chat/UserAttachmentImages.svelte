@@ -76,14 +76,14 @@ $effect(() => {
 });
 </script>
 
-<div class="flex flex-wrap gap-2 justify-end">
+<div class="s2b-flex s2b-flex-wrap s2b-gap-2 s2b-justify-end">
   {#each attachments as att (att.vaultPath)}
     {@const url = previewUrls.get(att.vaultPath)}
-    <div class="relative h-32 w-48 rounded-lg overflow-hidden shadow-sm bg-[--background-modifier-hover]">
+    <div class="s2b-relative s2b-h-32 s2b-w-48 s2b-rounded-lg s2b-overflow-hidden s2b-shadow-sm s2b-bg-[--background-modifier-hover]">
       {#if url}
-        <img src={url} alt={att.name} class="h-full w-full object-cover" />
+        <img src={url} alt={att.name} class="s2b-h-full s2b-w-full s2b-object-cover" />
       {:else}
-        <div class="flex h-full w-full items-center justify-center gap-1 text-xs text-[--text-muted]">
+        <div class="s2b-flex s2b-h-full s2b-w-full s2b-items-center s2b-justify-center s2b-gap-1 s2b-text-xs s2b-text-[--text-muted]">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"

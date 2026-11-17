@@ -236,7 +236,7 @@ $effect(() => cancelPendingPreview);
       use:lazyFileIcon={{ app, path: entry.path }}
     ></span>
     <a
-      class="internal-link space-file-link truncate"
+      class="internal-link space-file-link s2b-truncate"
       href={entry.path}
       data-href={entry.path}
       onclick={handleFileLinkClick}
@@ -248,7 +248,7 @@ $effect(() => cancelPendingPreview);
       {entry.displayName ?? getFileDisplayName(entry.path)}
     </a>
     {#if entry.contextLabel}
-      <span class="space-file-context truncate">{entry.contextLabel}</span>
+      <span class="space-file-context s2b-truncate">{entry.contextLabel}</span>
     {/if}
   </div>
 

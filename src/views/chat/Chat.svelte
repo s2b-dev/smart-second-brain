@@ -101,7 +101,7 @@ function portalComposer(node: HTMLElement) {
 	// viewport height, so the same 100vh-anchored positioning holds, and being a
 	// descendant inherits the drawer's own slide transform exactly like mod-root's.
 	//
-	// Resolved lazily, not once at mount: this action runs as soon as `.chat-root`
+	// Resolved lazily, not once at mount: this action runs as soon as `.s2b-chat-root`
 	// exists, which can be BEFORE Obsidian has moved the leaf into the drawer (the
 	// composer itself is awaited via MutationObserver below, so `portal()` often
 	// runs a good deal later). Capturing the host up front therefore pinned
@@ -151,7 +151,7 @@ function portalComposer(node: HTMLElement) {
 		// scroller cannot inherit this to reserve room for it.
 		node.style.setProperty("--s2b-composer-height", `${Math.round(height)}px`);
 		// The view's own top edge, so the message area can be sized against the
-		// viewport instead of its stale parent (see `.chat-root` in the styles).
+		// viewport instead of its stale parent (see `.s2b-chat-root` in the styles).
 		// Measured while the keyboard is DOWN only: once it is up this element is
 		// exactly the stale box we are working around, and re-reading it then
 		// would bake the stale value in.
@@ -380,10 +380,10 @@ function portalComposer(node: HTMLElement) {
 
 	// `<Input>` is rendered by a child component, so it may not exist yet when
 	// this action runs on the root. Wait for it rather than giving up.
-	const existing = node.querySelector<HTMLElement>(".chat-input-container");
+	const existing = node.querySelector<HTMLElement>(".s2b-chat-input-container");
 	const mo = new MutationObserver(() => {
 		if (composer) return;
-		const found = node.querySelector<HTMLElement>(".chat-input-container");
+		const found = node.querySelector<HTMLElement>(".s2b-chat-input-container");
 		if (found) {
 			mo.disconnect();
 			portal(found);
@@ -428,7 +428,7 @@ function portalComposer(node: HTMLElement) {
 
 <QueryClientProvider client={plugin.queryClient}>
   <div
-    class="chat-root relative h-full flex flex-col gap-0 overflow-hidden"
+    class="s2b-chat-root s2b-relative s2b-h-full s2b-flex s2b-flex-col s2b-gap-0 s2b-overflow-hidden"
     data-testid="chat-root"
     role="region"
     ondragenter={handleRootDragEnter}
@@ -453,7 +453,7 @@ function portalComposer(node: HTMLElement) {
       />
     {:else}
       <div
-        class="flex h-full items-center justify-center p-4 text-center text-sm text-[--text-muted]"
+        class="s2b-flex s2b-h-full s2b-items-center s2b-justify-center s2b-p-4 s2b-text-center s2b-text-sm s2b-text-[--text-muted]"
       >
         Chat session is not available yet. Reopen this view after plugin initialization completes.
       </div>
@@ -467,16 +467,16 @@ function portalComposer(node: HTMLElement) {
            this chicklet" and left the actual target unmarked. The label sits
            inside the frame and no longer carries a border of its own. -->
       <div
-        class="chat-drop-overlay absolute inset-0 z-30 pointer-events-none flex items-center justify-center p-2 {dragHasIssue
+        class="chat-drop-overlay s2b-absolute s2b-inset-0 s2b-z-30 s2b-pointer-events-none s2b-flex s2b-items-center s2b-justify-center s2b-p-2 {dragHasIssue
           ? 'chat-drop-overlay-issue'
           : 'chat-drop-overlay-active'}"
       >
-        <div class="chat-drop-frame flex items-center justify-center rounded-[16px]">
+        <div class="chat-drop-frame s2b-flex s2b-items-center s2b-justify-center s2b-rounded-[16px]">
           <div
-            class="chat-drop-overlay-panel flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium"
+            class="chat-drop-overlay-panel s2b-flex s2b-items-center s2b-gap-3 s2b-rounded-2xl s2b-px-5 s2b-py-4 s2b-text-sm s2b-font-medium"
           >
             <div
-              class="h-icon-s w-icon-s"
+              class="s2b-h-icon-s s2b-w-icon-s"
               style="--icon-size: var(--icon-s)"
               data-testid="chat-drop-overlay-icon"
               use:icon={dragHasIssue ? "alert-triangle" : "upload"}
@@ -490,7 +490,7 @@ function portalComposer(node: HTMLElement) {
 </QueryClientProvider>
 
 <style>
-  :global(.chat-root .scroll-container) {
+  :global(.s2b-chat-root .scroll-container) {
     padding-top: 44px;
   }
 
@@ -509,46 +509,46 @@ function portalComposer(node: HTMLElement) {
 
      This also removes the need for the composer to paint an opaque
      background: nothing scrolls behind it any more. */
-  :global(.is-mobile .chat-root .scroll-container) {
+  :global(.is-mobile .s2b-chat-root .scroll-container) {
     /* `+ 24px`: run the content 24px PAST the composer's top edge, so it
        passes under the composer's own top padding band. That band carries a
-       transparent→page-colour gradient (see `.chat-input-container` in
+       transparent→page-colour gradient (see `.s2b-chat-input-container` in
        Input.svelte) which needs real text underneath it to dissolve — ending
        the scroller exactly at the composer's top instead leaves the last line
        hard-cut against a bare slab of page colour, with nothing to fade. */
     height: calc(100% - var(--s2b-composer-height, 0px) + 24px);
   }
 
-  /* Also matches the portaled composer, which is no longer a `.chat-root`
+  /* Also matches the portaled composer, which is no longer a `.s2b-chat-root`
      child (see `portalComposer`); the mobile rule below resets `margin-top`. */
-  :global(.chat-root > .chat-input-container),
-  :global(.chat-input-container.s2b-composer-portaled) {
+  :global(.s2b-chat-root > .s2b-chat-input-container),
+  :global(.s2b-chat-input-container.s2b-composer-portaled) {
     margin-top: -12px;
     padding-top: 12px;
     z-index: 10;
   }
 
-  .chat-root {
+  .s2b-chat-root {
     --chat-bg: var(--background-primary);
   }
 
   /* The composer sizes itself against the chat pane's height (see
      `--s2b-chat-pane-height` in Input.svelte). On desktop it is an in-flow
-     child of `.chat-root`, so the pane is a size container and `cqh` measures
+     child of `.s2b-chat-root`, so the pane is a size container and `cqh` measures
      it directly. Mobile portals the composer out of the pane (see
      `portalComposer`), where `cqh` would fall back to the full viewport and
      ignore the keyboard — the portaled rule below restates the height with the
      pane's own formula instead. */
-  :global(body:not(.is-mobile)) .chat-root {
+  :global(body:not(.is-mobile)) .s2b-chat-root {
     container-type: size;
   }
 
-  :global(body:not(.is-mobile) .chat-root > .chat-input-container) {
+  :global(body:not(.is-mobile) .s2b-chat-root > .s2b-chat-input-container) {
     --s2b-chat-pane-height: 100cqh;
   }
 
-  :global(.mod-left-split .chat-root),
-  :global(.mod-right-split .chat-root) {
+  :global(.mod-left-split .s2b-chat-root),
+  :global(.mod-right-split .s2b-chat-root) {
     --chat-bg: var(--background-secondary);
   }
 
@@ -589,7 +589,7 @@ function portalComposer(node: HTMLElement) {
      `--s2b-view-top` is published by `portalComposer` (the leaf's own top edge,
      sampled while the keyboard is down); the bottom edge matches the composer's
      so the two stay flush. */
-  :global(.is-mobile) .chat-root {
+  :global(.is-mobile) .s2b-chat-root {
     position: absolute;
     inset: 0;
     bottom: auto;
@@ -619,7 +619,7 @@ function portalComposer(node: HTMLElement) {
      `z-index: auto`, so leaving this unstyled lets them paint on top where they
      belong. An explicit stacking value here is what made the composer cover
      them. */
-  :global(.is-mobile .chat-input-container.s2b-composer-portaled) {
+  :global(.is-mobile .s2b-chat-input-container.s2b-composer-portaled) {
     position: absolute;
     /* Inset from the leaf's own edges (published as --s2b-composer-left/width,
        the leaf's true bounds) rather than the full viewport, so the composer
@@ -655,9 +655,9 @@ function portalComposer(node: HTMLElement) {
     );
     margin-top: 0;
     z-index: auto;
-    /* The same height `.chat-root` gets in the mobile rule above.
+    /* The same height `.s2b-chat-root` gets in the mobile rule above.
        `--s2b-view-top` is published on the composer too: it is no longer a
-       descendant of `.chat-root`, so it can't inherit it from there. */
+       descendant of `.s2b-chat-root`, so it can't inherit it from there. */
     --s2b-chat-pane-height: calc(
       100vh - var(--s2b-view-top, 0px) -
         max(
@@ -678,18 +678,18 @@ function portalComposer(node: HTMLElement) {
     display: none;
   }
 
-  :global(.is-mobile .chat-root.s2b-composing),
-  :global(.is-mobile .chat-input-container.s2b-composer-portaled.s2b-composing) {
+  :global(.is-mobile .s2b-chat-root.s2b-composing),
+  :global(.is-mobile .s2b-chat-input-container.s2b-composer-portaled.s2b-composing) {
     --mobile-toolbar-height: -14px;
   }
 
-  /* Anchor the absolute chat-root to the leaf's content area. `:has` is supported
+  /* Anchor the absolute s2b-chat-root to the leaf's content area. `:has` is supported
      on the iOS WebKit / modern Electron Obsidian runs on. */
-  :global(.is-mobile .view-content:has(> .chat-root)) {
+  :global(.is-mobile .view-content:has(> .s2b-chat-root)) {
     position: relative;
   }
 
-  .chat-root::after {
+  .s2b-chat-root::after {
     content: "";
     position: absolute;
     top: 0;
@@ -708,7 +708,7 @@ function portalComposer(node: HTMLElement) {
   /* The frame IS the drop affordance: dashed border marking the boundary, plus
      a uniform wash across the interior so the whole enclosed area reads as one
      active region. This replaces the radial glow that used to sit at the top of
-     the view (`.chat-root::before`, no longer triggered) — a gradient anchored
+     the view (`.s2b-chat-root::before`, no longer triggered) — a gradient anchored
      to one edge suggested the target was up there rather than everywhere.
      16px radius matches the composer and message bubbles. */
   .chat-drop-frame {

@@ -13,7 +13,7 @@ type Props = {
 let { suggestionText, iconId, app, suggestionPath, iconKind = "file" }: Props = $props();
 </script>
 
-<span class="flex flex-row gap-2 items-center">
+<span class="s2b-flex s2b-flex-row s2b-gap-2 s2b-items-center">
   <div
     class="s2b-path-icon"
     use:pathIcon={{ app, path: suggestionPath, kind: iconKind, fallbackIconId: iconId }}
