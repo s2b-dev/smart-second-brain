@@ -20,6 +20,13 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.4.1 (2026-11-17)
+
+Excalidraw drawings display again while Smart Second Brain is enabled.
+
+### Fixes
+- **Excalidraw drawings no longer go blank.** A generic style rule in the plugin's stylesheet moved Excalidraw's drawing canvas out of place, so drawings looked empty until the plugin was disabled. The plugin no longer ships that rule or similar unused ones that could affect other plugins (#559).
+
 ## 2.4.0 (2026-11-16)
 
 You choose which files have their contents indexed, web search gains a second keyless provider, and long chats keep their older history when they are summarized.
