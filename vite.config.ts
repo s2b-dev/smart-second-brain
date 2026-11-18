@@ -1,6 +1,7 @@
 // vite.config.ts
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { patchVendoredLib, vendoredLibPatchesFor } from "./src/widget/vendoredLibPatches";
+import { builtinRequireRouterPrelude } from "./src/lib/builtinRequireRouter";
 import { defineConfig, type Plugin } from "vite";
 import { copyFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -28,16 +29,10 @@ const configDir = fileURLToPath(new URL(".", import.meta.url));
  * `window.require`/`globalThis.require` (both work) and falls back to the
  * injected `require`. On mobile, where no Node require exists at all, the helper
  * returns an empty object so module-eval doesn't throw; code that actually needs
- * a builtin still guards/degrades (Node features are desktop-only).
- */
-/**
- * `events` polyfill (Node's EventEmitter, browser build from the `events`
- * package). On mobile there is no Node `require`, so `require$builtin("events")`
- * would otherwise return `{}` — and bundled deps that do
- * `class Graph extends events.EventEmitter {}` (graphology) then extend
- * `undefined` and throw "The superclass is not a constructor" at load. We inline
- * the polyfill and hand it back for `events`/`node:events` when no native require
- * exists, so the superclass is a real constructor on iOS/Android.
+ * a builtin still guards/degrades (Node features are desktop-only). The few
+ * builtins that bundled deps *use* at module top-level (`events`, `util`,
+ * `async_hooks`) get working shims instead; the helper's source and the reasons
+ * live in `src/lib/builtinRequireRouter.ts`, where a unit test evaluates it.
  */
 const EVENTS_POLYFILL_SRC = readFileSync(resolve(configDir, "node_modules/events/events.js"), "utf8");
 
@@ -48,40 +43,7 @@ function routeBuiltinRequiresThroughWindow() {
 		builtinSet.add(bare);
 		builtinSet.add(`node:${bare}`);
 	}
-	// Build the `events` polyfill once into a module-like object the helper can
-	// return. The polyfill is CJS (`module.exports = EventEmitter`), so evaluate
-	// it against a fresh module/exports pair and cache the result.
-	//
-	// `events` MUST be resolved to the polyfill BEFORE consulting the injected
-	// `require`: on mobile Obsidian *does* inject a `window.require`, but it
-	// returns `null` for Node builtins — and `null ?? {}` yields `{}` (no
-	// `EventEmitter`), so graphology's `class Graph extends events.EventEmitter`
-	// still extends `undefined` and throws at load. Short-circuiting `events`
-	// first guarantees a real `EventEmitter` constructor on every platform where
-	// a native `events` isn't actually available.
-	//
-	// `util` gets the same treatment for a different reason: bundled SDK code
-	// does `util.promisify(child_process.execFile)` at MODULE TOP-LEVEL. On mobile
-	// `util` resolves to `{}`, so `util.promisify` is undefined and the call throws
-	// at load (`ZTe.promisify is not a function`). We provide a minimal `util`
-	// shim whose `promisify` returns a function that rejects when actually invoked
-	// (these are desktop-only features — `execFile` etc. — never called on mobile),
-	// so module evaluation survives and the feature simply degrades.
-	const prelude =
-		"const require$eventsPolyfill=(function(){var module={exports:{}};var exports=module.exports;" +
-		`(function(module,exports){${EVENTS_POLYFILL_SRC}\n})(module,exports);` +
-		"return module.exports;})();\n" +
-		"const require$utilShim=(function(){var mkErr=function(){return new Error('Node util not available on this platform');};" +
-		"return {promisify:function(fn){return function(){return Promise.reject(mkErr());};}," +
-		"inherits:function(ctor,superCtor){if(superCtor){ctor.super_=superCtor;ctor.prototype=Object.create(superCtor.prototype,{constructor:{value:ctor,enumerable:false,writable:true,configurable:true}});}}," +
-		"inspect:function(o){try{return String(o);}catch(e){return '';}}," +
-		"format:function(){return Array.prototype.join.call(arguments,' ');}," +
-		"deprecate:function(fn){return fn;},types:{},TextEncoder:(typeof TextEncoder!=='undefined'?TextEncoder:undefined),TextDecoder:(typeof TextDecoder!=='undefined'?TextDecoder:undefined)};})();\n" +
-		"const require$builtin=(id)=>{" +
-		"const tryNative=()=>{try{const r=(typeof window!=='undefined'&&window.require)||(typeof globalThis!=='undefined'&&globalThis.require);if(typeof r==='function'){const m=r(id);if(m)return m;}}catch(e){}try{const m=require(id);if(m)return m;}catch(e){}return null;};" +
-		"if(id==='events'||id==='node:events'){const n=tryNative();return (n&&n.EventEmitter)?n:require$eventsPolyfill;}" +
-		"if(id==='util'||id==='node:util'){const n=tryNative();return (n&&typeof n.promisify==='function')?n:require$utilShim;}" +
-		"return tryNative()??{};};\n";
+	const prelude = builtinRequireRouterPrelude(EVENTS_POLYFILL_SRC);
 	return {
 		name: "route-builtin-requires-through-window",
 		renderChunk(code: string) {
