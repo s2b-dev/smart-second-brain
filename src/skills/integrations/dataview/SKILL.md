@@ -57,7 +57,20 @@ the complete, live list for the user and costs you no context, so do not run the
 large set: when it could be large (a common tag, a whole folder), count it first
 (`api.pages(...).length`), and above about 100 notes show the first 100 with `LIMIT 100`, since
 Dataview has no paging and a longer list is slow to render. Say how many there are in total and
-offer to narrow it (by folder, a property, or a date).
+offer to narrow it (by folder, a property, or a date). "All" does not lift this cap; the offer to
+narrow does that.
+
+**Check a filter before you show it.** The fence renders for the user only; you never see what it
+returned. So when the query filters (a property value, a date range), first run the same filter
+with `exec_dataview` and return only the count. If it is 0, the query is usually wrong, not the
+vault empty: find out why before answering.
+
+- **Dates:** filter on the date property these notes actually carry, not a guessed `date`. Look at
+  the set: `api.pages("#tag").slice(0, 5).map(p => Object.keys(p.file.frontmatter))` shows which
+  keys they use (task-style notes often use `scheduled` or `due`). Fall back to `file.day` (a date
+  in the file name) or `file.ctime` only when no property holds the date, and say which one you used.
+- **Your own files:** your skills and memories are notes too, and a tag mentioned in them matches.
+  Exclude the folder that holds them (the parent of your memory folder) with `AND !"<folder>"`.
 
 **Results you need to work with yourself**: when the set could be large (a whole folder, a common
 tag), get the count first (`api.pages(...).length`) and fetch only what you need, slicing for
