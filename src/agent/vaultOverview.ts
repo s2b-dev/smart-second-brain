@@ -51,6 +51,8 @@ export interface VaultOverviewData {
 	propertyCounts: Map<string, number>;
 	/** How many files the privacy filter held back. */
 	skippedPrivateFiles: number;
+	/** How many files the model may see. */
+	visibleFiles: number;
 }
 
 /** The three rendered placeholder values. */
@@ -70,6 +72,7 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 	const tagCounts = new Map<string, number>();
 	const propertyCounts = new Map<string, number>();
 	let skippedPrivateFiles = 0;
+	let visibleFiles = 0;
 	let lastFolder: string | null = null;
 
 	for (const file of app.vault.getFiles()) {
@@ -78,6 +81,7 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 			skippedPrivateFiles++;
 			continue;
 		}
+		visibleFiles++;
 
 		const slash = file.path.lastIndexOf("/");
 		const folder = slash === -1 ? "" : file.path.slice(0, slash);
@@ -104,7 +108,7 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 		}
 	}
 
-	return { folders: [...folders], tagCounts, propertyCounts, skippedPrivateFiles };
+	return { folders: [...folders], tagCounts, propertyCounts, skippedPrivateFiles, visibleFiles };
 }
 
 /** Compare two folder paths segment by segment, so a folder always sorts directly before its children. */
@@ -171,6 +175,13 @@ export function renderVaultProperties(propertyCounts: ReadonlyMap<string, number
  * silent, the model would read a short overview as the whole vault and reason from it.
  */
 export function renderVaultOverview(data: VaultOverviewData): VaultOverviewText {
+	// Private-by-default with nothing shared, and a provider that isn't trusted: every list is
+	// empty, and "No folders yet" or "No tags in use yet" would be false. Say what is true.
+	if (data.skippedPrivateFiles > 0 && data.visibleFiles === 0) {
+		const allPrivate =
+			"None listed: every note in the vault is private for the current model, so nothing from it is shown here and your tools cannot read it either.";
+		return { folders: allPrivate, tags: allPrivate, properties: allPrivate };
+	}
 	const privacyNote =
 		data.skippedPrivateFiles > 0
 			? "\n(Notes that are private for the current model are left out of this overview.)"

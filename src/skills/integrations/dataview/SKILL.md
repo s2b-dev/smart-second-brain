@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Dataview plugin to be installed and enabled in Obsidian
 metadata:
   author: "S2B"
-  version: "1.3"
+  version: "1.5"
   linkedPlugin: "dataview"
 ---
 
@@ -53,7 +53,27 @@ below. That renders natively and does not need the `exec_dataview` tool.
 **Showing notes to the user** ("what are my X notes", "list all my books"): answer with a
 ```dataview fence in your reply (see [Displaying Lists/Tables](#displaying-liststables)). It renders
 the complete, live list for the user and costs you no context, so do not run the query with
-`exec_dataview` first just to show it, and do not add a `LIMIT` unless the user asked for a few.
+`exec_dataview` first just to show it. Add a `LIMIT` only when the user asked for a few, or for a
+large set: when it could be large (a common tag, a whole folder), count it first
+(`api.pages(...).length`), and above about 100 notes show the first 100 with `LIMIT 100`, since
+Dataview has no paging and a longer list is slow to render. Say how many there are in total and
+offer to narrow it (by folder, a property, or a date). "All" does not lift this cap; the offer to
+narrow does that.
+
+**Get the filter right the first time.** The fence renders for the user only; you never see what
+it returned, so a wrong filter reaches them as an empty or wrong table.
+
+- **Names:** take tags and property keys from the `# Vault` section, not from memory of how vaults
+  usually look.
+- **Dates** ("last week", "in March"): filter on the property these notes keep their date in, not a
+  guessed `date`. Task-style notes usually use `scheduled` or `due`; if you can't tell which one this
+  set uses, read one of its notes first. Fall back to `file.day` (a date in the file name) or
+  `file.ctime` only when no property holds the date, and say which one you used.
+- **Your own files:** your skills and memories are notes too, and a tag mentioned in them matches.
+  Exclude the folder that holds them (the parent of your memory folder) with `AND !"<folder>"`.
+- **When the user says a result is empty or wrong**, fix the query, and keep what you learned (say,
+  which property holds these notes' dates) where your instructions on learning send it, so the next
+  query gets it right without being told.
 
 **Results you need to work with yourself**: when the set could be large (a whole folder, a common
 tag), get the count first (`api.pages(...).length`) and fetch only what you need, slicing for
