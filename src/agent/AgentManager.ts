@@ -63,7 +63,13 @@ import {
 	substitutePromptPlaceholders,
 	usesVaultOverview,
 } from "./prompts";
-import { collectMemoryIndex, memoryAlwaysBudget, renderMemoryIndex, selectAlwaysLoaded } from "./memoryNotes";
+import {
+	type MemoryIndexEntry,
+	collectMemoryIndex,
+	memoryAlwaysBudget,
+	renderMemoryIndex,
+	selectAlwaysLoaded,
+} from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
@@ -382,6 +388,13 @@ export class AgentManager {
 	private memoryIndexSnapshot = "";
 
 	/**
+	 * The memory entries collected by the last {@link assembleSystemPrompt}. Subagents run on
+	 * their own model, so `resolveSubAgentSpecs` re-renders the index from these against each
+	 * child's context window instead of reusing the parent's rendering.
+	 */
+	private memoryEntriesSnapshot: MemoryIndexEntry[] = [];
+
+	/**
 	 * Always-loaded memory notes the last notice was about, so the user hears once that a note
 	 * was too large for the model, not on every assembly. Reset when every note fits again.
 	 */
@@ -448,6 +461,7 @@ export class AgentManager {
 		// Always-loaded notes go in whole; the only limit is a share of this agent's context
 		// window (see memoryNotes.memoryAlwaysBudget), so a small local model is not swamped.
 		const memoryEntries = await collectMemoryIndex(this.plugin.app, memoryFolder);
+		this.memoryEntriesSnapshot = memoryEntries;
 		const contextWindow = selectedAgent.chatModel?.modelConfig?.contextWindow;
 		const alwaysBudget = memoryAlwaysBudget(contextWindow);
 		this.memoryIndexSnapshot = renderMemoryIndex(memoryEntries, alwaysBudget);
@@ -1249,15 +1263,32 @@ export class AgentManager {
 				// The subagent runs on its own model, so its vault overview honours its own
 				// provider's privacy trust, not the parent's.
 				const refVault = this.buildVaultOverview(ref, refBody);
-				const refBasePrompt = substitutePromptPlaceholders(refBody, {
+				const refValues = {
 					memoryFolder: normalizePath(memoriesDir()),
 					date: currentDateValue(),
-					memoryIndex: this.memoryIndexSnapshot,
+					// Rendered against the child's own context window: a parent with a large window
+					// may load a note whole that would swamp a small child model.
+					memoryIndex: renderMemoryIndex(
+						this.memoryEntriesSnapshot,
+						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
+					),
 					vaultFolders: refVault.folders,
 					vaultTags: refVault.tags,
 					vaultProperties: refVault.properties,
-				});
-				const promptHint = refBasePrompt.trim().replace(/\s+/g, " ").slice(0, 160);
+				};
+				const refBasePrompt = substitutePromptPlaceholders(refBody, refValues);
+				// The hint goes to the PARENT's model as the tool description, so it must not carry
+				// the child's vault overview: that is filtered by the child's provider trust, and a
+				// trusted child would otherwise leak private names to an untrusted parent.
+				const promptHint = substitutePromptPlaceholders(refBody, {
+					...refValues,
+					vaultFolders: "",
+					vaultTags: "",
+					vaultProperties: "",
+				})
+					.trim()
+					.replace(/\s+/g, " ")
+					.slice(0, 160);
 				let description: string;
 				if (isSelf) {
 					description = `Delegate a subtask to a fresh isolated-context copy of yourself ("${ref.name}"). Use this to keep the main conversation's context clean while handling a self-contained subtask.`;
@@ -1609,6 +1640,7 @@ export class AgentManager {
 		chatModel: ChatModel,
 		summarizationModel: ChatModel,
 		systemPrompt: string,
+		subAgents: readonly SubAgentSpec[],
 	): string {
 		return JSON.stringify({
 			provider: chatModel.provider,
@@ -1638,6 +1670,9 @@ export class AgentManager {
 			// without this a cached runnable would keep showing the model a stale overview.
 			// Covers the date and memory index too; the terms above stay for what they document.
 			prompt: fingerprint(systemPrompt),
+			// Each subagent's assembled prompt and description too: a child can keep the vault
+			// placeholders its parent dropped, and its overview must not go stale either.
+			subPrompts: subAgents.map((spec) => fingerprint(`${spec.description}\n${spec.systemPrompt}`)),
 		});
 	}
 
@@ -1679,7 +1714,13 @@ export class AgentManager {
 		const systemPrompt = await this.assembleSystemPrompt(selectedAgent);
 		const tools = await this.assembleToolsForAgent(selectedAgent);
 		const subAgents = this.resolveSubAgentSpecs(selectedAgent);
-		const cacheKey = this.buildRunnableCacheKey(selectedAgent, chatModel, summarizationModel, systemPrompt);
+		const cacheKey = this.buildRunnableCacheKey(
+			selectedAgent,
+			chatModel,
+			summarizationModel,
+			systemPrompt,
+			subAgents,
+		);
 
 		// Self-heal before resolving: the registry is normally kept in step by the data
 		// store's provider mutations, but a run can still reach a provider that isn't
