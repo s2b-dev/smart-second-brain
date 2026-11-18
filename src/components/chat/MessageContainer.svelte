@@ -1058,6 +1058,15 @@ $effect(() => {
     display: none !important;
   }
 
+  /* A Dataview result in a reply can list hundreds of notes. Dataview has no
+     paging, so cap the block and let it scroll on its own rather than
+     stretching the conversation. */
+  .s2b-chat-turn :global(.block-language-dataview),
+  .s2b-chat-turn :global(.block-language-dataviewjs) {
+    max-height: min(24rem, 60vh);
+    overflow-y: auto;
+  }
+
   /* Highlights the bubble anchored above the composer while it's being
      edited. `:global` because CollapsibleUserBubble renders its own root
      element from the `class` prop, outside this component's style scope.
@@ -1109,7 +1118,6 @@ $effect(() => {
     /* Enable native elastic/rubber-band scrolling on macOS/iOS */
     -webkit-overflow-scrolling: touch;
     /* Allow the container to have its own scroll bounce */
-    overscroll-behavior: contain;
     mask-image: linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
   }

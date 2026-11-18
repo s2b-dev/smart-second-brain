@@ -86,6 +86,9 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 			//      listing defaulted to `LIMIT 10` and tag/property names were verified with tools
 			//      instead of read from the `# Vault` section.
 			["1.2", "91ff059caaf10c33"],
+			// 1.3 (shipped in 2.5.0-beta.1): before the 100-note threshold, when a listing of any
+			//      size was rendered in full.
+			["1.3", "9dd44cf7dc5412f2"],
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Dataview plugin to be installed and enabled in Obsidian
 metadata:
   author: "S2B"
-  version: "1.3"
+  version: "1.4"
   linkedPlugin: "dataview"
 ---
 
@@ -54,6 +54,10 @@ below. That renders natively and does not need the `exec_dataview` tool.
 ```dataview fence in your reply (see [Displaying Lists/Tables](#displaying-liststables)). It renders
 the complete, live list for the user and costs you no context, so do not run the query with
 `exec_dataview` first just to show it, and do not add a `LIMIT` unless the user asked for a few.
+When the set could be large (a common tag, a whole folder), count it first (`api.pages(...).length`).
+Above about 100 notes, Dataview has no paging, so a full list is slow to render: show the first 100
+with `LIMIT 100`, say how many there are in total, and offer to narrow it (by folder, a property,
+or a date).
 
 **Results you need to work with yourself**: when the set could be large (a whole folder, a common
 tag), get the count first (`api.pages(...).length`) and fetch only what you need, slicing for
