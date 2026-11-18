@@ -160,7 +160,7 @@ describe("buildToolSummary", () => {
 
 	describe("load_skill", () => {
 		it("labels with the skill name", () => {
-			const s = buildToolSummary("load_skill", { name: "canvas" }, undefined, "completed");
+			const s = buildToolSummary("load_skill", { skillName: "canvas" }, undefined, "completed");
 			expect(s.label).toBe("Loaded skill canvas");
 		});
 	});

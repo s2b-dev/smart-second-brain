@@ -276,7 +276,7 @@ function summarizeWebSearch(
 }
 
 function summarizeLoadSkill(input: Record<string, unknown> | null | undefined): RawSummary {
-	const name = stringInput(input, "name") ?? stringInput(input, "skill");
+	const name = stringInput(input, "skillName");
 	const label: Label = name
 		? { verb: verb("Loading skill", "Loaded skill"), rest: truncateTarget(name) }
 		: { verb: verb("Loading a skill", "Loaded a skill") };
@@ -524,7 +524,7 @@ const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 	},
 	load_skill: {
 		verb: verb("Loading skill", "Loaded skill"),
-		target: (input) => stringInput(input, "name") ?? stringInput(input, "skill"),
+		target: (input) => stringInput(input, "skillName"),
 		quoted: false,
 	},
 };
