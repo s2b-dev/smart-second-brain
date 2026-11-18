@@ -152,6 +152,7 @@ describe("renderVaultOverview", () => {
 		tagCounts: new Map(),
 		propertyCounts: new Map(),
 		skippedPrivateFiles,
+		visibleFiles: 1,
 	});
 
 	// Left silent, the model would read a short overview as the whole vault.
@@ -173,6 +174,15 @@ describe("renderVaultOverview", () => {
 		expect(out.properties).not.toContain("No properties in use yet");
 		expect(out.properties).toContain("still indexing");
 		expect(renderVaultOverview({ ...collected, unindexedNotes: 0 }).tags).not.toContain("indexing");
+	});
+
+	// Private-by-default with nothing shared: "No folders yet" would be false.
+	it("says every note is private instead of calling the vault empty", () => {
+		const out = renderVaultOverview({ ...data(5), folders: [], visibleFiles: 0 });
+		for (const text of [out.folders, out.tags, out.properties]) {
+			expect(text).toContain("every note in the vault is private for the current model");
+			expect(text).not.toContain("yet");
+		}
 	});
 
 	it("renders empty tag and property lists as plain sentences", () => {
