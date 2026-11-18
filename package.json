@@ -1,6 +1,6 @@
 {
   "name": "smart-second-brain",
-  "version": "2.4.4",
+  "version": "2.5.0",
   "main": "main.js",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

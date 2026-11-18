@@ -20,6 +20,21 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.5.0 (2026-11-18)
+
+Your agent now knows how your vault is organized, so new notes land in the right place with the right names and tags.
+
+### New
+- **Agents: a live overview of your vault in every conversation.** The system prompt has a new `# Vault` section with your vault settings from Obsidian (daily notes folder and date format, templates folder, where new notes go, wikilinks or Markdown links) and the folders, tags and properties already in use. The agent files new notes in the folder that fits, names them like their neighbours, and reuses your tags instead of inventing new ones, without calling a tool first. Notes that are private for the agent's model are left out. Like the other sections, it lives in the agent's note, so you can delete it to opt out (#565, #567).
+
+### Improvements
+- **Memory: always-loaded notes are never cut short.** They used to share a fixed 3,000-character budget and were truncated past it. Now each one is sent whole, up to a quarter of the model's context window; a note too large for a small model is listed for the agent to read instead, and you get a notice (#565).
+- **Chat: long Dataview lists stay manageable.** A Dataview result in a reply now scrolls on its own instead of stretching the conversation, and for a large set the agent shows the first 100 notes with the total and offers to narrow it (#568).
+- **Agents: better Dataview queries.** The agent takes tag and property names from the vault overview, filters dates on the property your notes actually use, leaves its own skill and memory notes out of results, and no longer caps note lists at 10 (#565, #568).
+
+### Fixes
+- **Chat: the skill card shows which skill was loaded.** It always said "Loaded a skill" (#566).
+
 ## 2.4.4 (2026-11-18)
 
 The plugin loads on iPhone and iPad again.
