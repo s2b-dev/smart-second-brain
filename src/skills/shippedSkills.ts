@@ -89,6 +89,8 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 			// 1.3 (shipped in 2.5.0-beta.1): before the 100-note threshold, when a listing of any
 			//      size was rendered in full.
 			["1.3", "9dd44cf7dc5412f2"],
+			// 1.4 (shipped in 2.5.0-beta.2): before the "no LIMIT" rule named the large-set exception.
+			["1.4", "038b2a6ebdea2dd0"],
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
