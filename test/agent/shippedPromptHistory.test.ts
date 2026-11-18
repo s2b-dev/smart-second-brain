@@ -34,7 +34,7 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * update the literal below. The tag replay at the bottom of this file checks the recorded old
  * fingerprints against what each release actually shipped.
  */
-const CURRENT_FINGERPRINT = "04edbb546b57e3b8"; // DEFAULT_AGENT_PROMPT at v5
+const CURRENT_FINGERPRINT = "e36040327476a827"; // DEFAULT_AGENT_PROMPT at v6
 
 const history: ShippedHistory = SHIPPED_AGENT_PROMPTS;
 const version = AGENT_PROMPT_VERSION;
@@ -86,6 +86,7 @@ describe("default agent prompt composition", () => {
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryFolder}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{date}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryIndex}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultSettings}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultFolders}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultTags}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultProperties}}");

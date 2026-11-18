@@ -71,6 +71,7 @@ import {
 	selectAlwaysLoaded,
 } from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
+import { collectVaultSettings, redactVaultSettings, renderVaultSettings, windowMomentFormatter } from "./vaultSettings";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
@@ -406,18 +407,34 @@ export class AgentManager {
 	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
 	 * carry none of the placeholders skip the scan.
 	 */
-	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText {
-		if (!usesVaultOverview(body)) return { folders: "", tags: "", properties: "" };
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { vaultSettings: string } {
+		if (!usesVaultOverview(body)) return { vaultSettings: "", folders: "", tags: "", properties: "" };
 		const data = getData();
 		const store = getPendingChangesStore();
 		const provider = agentCfg.chatModel?.provider;
 		const isPrivate = provider && !data.isProviderTrusted(provider) ? data.privacyPredicate() : () => false;
-		return renderVaultOverview(
-			collectVaultOverview(this.plugin.app, {
-				isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+		const overviewData = collectVaultOverview(this.plugin.app, {
+			isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+			isPrivate,
+		});
+		// The configured folders and files are names too: a folder is hidden only when it holds
+		// private files and none this model can see. A missing or empty folder has nothing private
+		// to reveal, and is just where the first note should go.
+		const visibleFolders = new Set(overviewData.folders);
+		const isFolderVisible = (folder: string) => {
+			if (visibleFolders.has(folder)) return true;
+			const prefix = `${normalizePath(folder)}/`;
+			return !this.plugin.app.vault
+				.getFiles()
+				.some((file) => file.path.startsWith(prefix) && isPrivate(file.path));
+		};
+		const vaultSettings = renderVaultSettings(
+			redactVaultSettings(collectVaultSettings(this.plugin.app, windowMomentFormatter()), {
+				isFolderVisible,
 				isPrivate,
 			}),
 		);
+		return { vaultSettings, ...renderVaultOverview(overviewData) };
 	}
 
 	/**
@@ -483,6 +500,7 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
+			vaultSettings: vault.vaultSettings,
 			vaultFolders: vault.folders,
 			vaultTags: vault.tags,
 			vaultProperties: vault.properties,
@@ -1272,6 +1290,7 @@ export class AgentManager {
 						this.memoryEntriesSnapshot,
 						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
 					),
+					vaultSettings: refVault.vaultSettings,
 					vaultFolders: refVault.folders,
 					vaultTags: refVault.tags,
 					vaultProperties: refVault.properties,
@@ -1282,6 +1301,7 @@ export class AgentManager {
 				// trusted child would otherwise leak private names to an untrusted parent.
 				const promptHint = substitutePromptPlaceholders(refBody, {
 					...refValues,
+					vaultSettings: "",
 					vaultFolders: "",
 					vaultTags: "",
 					vaultProperties: "",

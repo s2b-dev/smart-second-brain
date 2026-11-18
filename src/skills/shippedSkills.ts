@@ -104,7 +104,15 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		]),
 	],
 	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
-	["manage-notes", new Map([["1.0", "eab47f33c57cb977"]])],
+	// 1.1 (shipped in 2.3.0 through 2.4.4): before the "Creating a Note" section (match the
+	//      folder's naming pattern and structure, use the `# Vault` section's settings).
+	[
+		"manage-notes",
+		new Map([
+			["1.0", "eab47f33c57cb977"],
+			["1.1", "e52ac4f10f9dbfbb"],
+		]),
+	],
 ]);
 
 /**
