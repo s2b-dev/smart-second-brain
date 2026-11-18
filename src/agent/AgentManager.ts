@@ -422,14 +422,20 @@ export class AgentManager {
 			isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
 			isPrivate,
 		});
-		// The configured folders and files are names too: a folder is shown only when the overview
-		// may show it (it holds a file this model can see) or it doesn't exist yet, so there is
-		// nothing private in it to reveal.
+		// The configured folders and files are names too: a folder is hidden only when it holds
+		// private files and none this model can see. A missing or empty folder has nothing private
+		// to reveal, and is just where the first note should go.
 		const visibleFolders = new Set(overviewData.folders);
+		const isFolderVisible = (folder: string) => {
+			if (visibleFolders.has(folder)) return true;
+			const prefix = `${normalizePath(folder)}/`;
+			return !this.plugin.app.vault
+				.getFiles()
+				.some((file) => file.path.startsWith(prefix) && isPrivate(file.path));
+		};
 		const newNoteSettings = renderNewNoteSettings(
 			redactNewNoteSettings(collectNewNoteSettings(this.plugin.app, windowMomentFormatter()), {
-				isFolderVisible: (folder) =>
-					visibleFolders.has(folder) || !this.plugin.app.vault.getFolderByPath(normalizePath(folder)),
+				isFolderVisible,
 				isPrivate,
 			}),
 		);

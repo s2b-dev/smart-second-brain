@@ -169,6 +169,17 @@ describe("redactNewNoteSettings", () => {
 		expect(out.dailyNotes?.todayPath).toBe("Journal/2026-11-18.md");
 	});
 
+	// Private-by-default sharing matches the exact file path, so each file must be checked once, by that path.
+	it("keeps a file that is shared by its exact path", () => {
+		const shared = new Set(["Journal/2026-11-18.md", "Private/Day.md"]);
+		const out = redactNewNoteSettings(data, {
+			isFolderVisible: () => true,
+			isPrivate: (path) => !shared.has(path),
+		});
+		expect(out.dailyNotes?.todayPath).toBe("Journal/2026-11-18.md");
+		expect(out.dailyNotes?.template).toBe("Private/Day");
+	});
+
 	it("changes nothing when everything is visible", () => {
 		expect(redactNewNoteSettings(data, { isFolderVisible: () => true, isPrivate: () => false })).toEqual({
 			...data,

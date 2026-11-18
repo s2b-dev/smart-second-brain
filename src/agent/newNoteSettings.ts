@@ -139,8 +139,9 @@ export interface NewNoteSettingsPrivacy {
 export function redactNewNoteSettings(data: NewNoteSettingsData, privacy: NewNoteSettingsPrivacy): NewNoteSettingsData {
 	const folderHidden = (folder: string) => folder !== "" && !privacy.isFolderVisible(folder);
 	const fileVisible = (path: string | undefined, folderPrivate: boolean) =>
-		// Obsidian stores the template path without its extension, while privacy rules match files.
-		path && !folderPrivate && !privacy.isPrivate(path) && !privacy.isPrivate(`${path}.md`) ? path : undefined;
+		// Obsidian stores the template path without its extension, while privacy rules match the
+		// file itself: resolve the file's path, then check that one path.
+		path && !folderPrivate && !privacy.isPrivate(path.endsWith(".md") ? path : `${path}.md`) ? path : undefined;
 	const out: NewNoteSettingsData = { ...data };
 
 	if (data.dailyNotes) {
