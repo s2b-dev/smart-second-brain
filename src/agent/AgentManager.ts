@@ -71,6 +71,7 @@ import {
 	selectAlwaysLoaded,
 } from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
+import { collectVaultSetup, renderVaultSetup, windowMomentFormatter } from "./vaultSetup";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
@@ -406,18 +407,21 @@ export class AgentManager {
 	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
 	 * carry none of the placeholders skip the scan.
 	 */
-	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText {
-		if (!usesVaultOverview(body)) return { folders: "", tags: "", properties: "" };
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { setup: string } {
+		if (!usesVaultOverview(body)) return { setup: "", folders: "", tags: "", properties: "" };
+		// Obsidian settings, not note content, so no privacy filter applies.
+		const setup = renderVaultSetup(collectVaultSetup(this.plugin.app, windowMomentFormatter()));
 		const data = getData();
 		const store = getPendingChangesStore();
 		const provider = agentCfg.chatModel?.provider;
 		const isPrivate = provider && !data.isProviderTrusted(provider) ? data.privacyPredicate() : () => false;
-		return renderVaultOverview(
+		const overview = renderVaultOverview(
 			collectVaultOverview(this.plugin.app, {
 				isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
 				isPrivate,
 			}),
 		);
+		return { setup, ...overview };
 	}
 
 	/**
@@ -483,6 +487,7 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
+			vaultSetup: vault.setup,
 			vaultFolders: vault.folders,
 			vaultTags: vault.tags,
 			vaultProperties: vault.properties,
@@ -1272,6 +1277,7 @@ export class AgentManager {
 						this.memoryEntriesSnapshot,
 						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
 					),
+					vaultSetup: refVault.setup,
 					vaultFolders: refVault.folders,
 					vaultTags: refVault.tags,
 					vaultProperties: refVault.properties,
@@ -1282,6 +1288,7 @@ export class AgentManager {
 				// trusted child would otherwise leak private names to an untrusted parent.
 				const promptHint = substitutePromptPlaceholders(refBody, {
 					...refValues,
+					vaultSetup: "",
 					vaultFolders: "",
 					vaultTags: "",
 					vaultProperties: "",

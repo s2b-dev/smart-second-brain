@@ -15,6 +15,7 @@ import {
 	VAULT_FOLDERS_PLACEHOLDER,
 	VAULT_PLACEHOLDERS,
 	VAULT_PROPERTIES_PLACEHOLDER,
+	VAULT_SETUP_PLACEHOLDER,
 	VAULT_TAGS_PLACEHOLDER,
 	buildDateSection,
 	buildMemorySection,
@@ -28,6 +29,7 @@ const VALUES = {
 	memoryFolder: "Agents/Memories",
 	date: "Monday, 2026-09-01",
 	memoryIndex: "## Memory notes\n- `Agents/Memories/User.md` — who the user is",
+	vaultSetup: "- Daily notes: in `Daily/`",
 	vaultFolders: "<vault_folders>\nMeetings/\n</vault_folders>",
 	vaultTags: "<vault_tags>\n#project\n</vault_tags>",
 	vaultProperties: "<vault_properties>\nstatus\n</vault_properties>",
@@ -42,6 +44,7 @@ describe("substitutePromptPlaceholders", () => {
 		expect(result).not.toContain(MEMORY_INDEX_PLACEHOLDER);
 		for (const placeholder of VAULT_PLACEHOLDERS) expect(result).not.toContain(placeholder);
 		expect(result).not.toMatch(/\{\{[a-zA-Z]+\}\}/);
+		expect(result).toContain("- Daily notes: in `Daily/`");
 		expect(result).toContain("Meetings/");
 		expect(result).toContain("#project");
 		expect(result).toContain("status");
@@ -130,6 +133,7 @@ describe("vault section", () => {
 	it("carries each vault placeholder under its own heading, so one list can be dropped alone", () => {
 		const section = buildVaultSection();
 		expect(section.startsWith("# Vault")).toBe(true);
+		expect(section).toContain(`## Notes setup\n${VAULT_SETUP_PLACEHOLDER}`);
 		expect(section).toContain(`## Folders\n${VAULT_FOLDERS_PLACEHOLDER}`);
 		expect(section).toContain(`## Tags, most used first\n${VAULT_TAGS_PLACEHOLDER}`);
 		expect(section).toContain(`## Properties, most used first\n${VAULT_PROPERTIES_PLACEHOLDER}`);

@@ -4,7 +4,7 @@ description: Create, update, delete, and move notes. All writes are staged for t
 allowed-tools: manage_notes
 metadata:
   author: "S2B"
-  version: "1.1"
+  version: "1.2"
   category: "core"
 ---
 
@@ -14,6 +14,12 @@ metadata:
 - Modify only what the user asked for and preserve surrounding content.
 - Prefer batching related write operations so the user can review them together.
 - Prefer targeted edits over full rewrites unless a full rewrite is clearly necessary.
+
+## Creating a Note
+New notes should look like they were always part of the vault.
+- **Where:** use the `# Vault` section of your instructions: the existing folder that fits, the daily-notes folder for a daily note, never the templates folder. Follow the user if they name a place.
+- **What to call it:** before creating a note in a folder, look at the names already there (`list_directory` with that folder's path) and match their pattern: date prefixes and their format, capitalisation, spaces or dashes, prefixes like `Meeting -`. A daily note is named exactly by the daily-notes date format. Skip the look only when the folder is new or empty.
+- **What goes in it:** if the folder's notes share frontmatter properties or a heading structure, follow it; read one existing note there when you are unsure. Use the link style the `# Vault` section names.
 
 ## Correcting an Edit You Already Staged
 Staged changes wait for the user's review, so you can still revise them — but by
