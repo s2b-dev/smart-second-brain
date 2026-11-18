@@ -71,7 +71,12 @@ import {
 	selectAlwaysLoaded,
 } from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
-import { collectVaultSetup, redactVaultSetup, renderVaultSetup, windowMomentFormatter } from "./vaultSetup";
+import {
+	collectNewNoteSettings,
+	redactNewNoteSettings,
+	renderNewNoteSettings,
+	windowMomentFormatter,
+} from "./newNoteSettings";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
@@ -407,8 +412,8 @@ export class AgentManager {
 	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
 	 * carry none of the placeholders skip the scan.
 	 */
-	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { setup: string } {
-		if (!usesVaultOverview(body)) return { setup: "", folders: "", tags: "", properties: "" };
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { newNoteSettings: string } {
+		if (!usesVaultOverview(body)) return { newNoteSettings: "", folders: "", tags: "", properties: "" };
 		const data = getData();
 		const store = getPendingChangesStore();
 		const provider = agentCfg.chatModel?.provider;
@@ -421,14 +426,14 @@ export class AgentManager {
 		// may show it (it holds a file this model can see) or it doesn't exist yet, so there is
 		// nothing private in it to reveal.
 		const visibleFolders = new Set(overviewData.folders);
-		const setup = renderVaultSetup(
-			redactVaultSetup(collectVaultSetup(this.plugin.app, windowMomentFormatter()), {
+		const newNoteSettings = renderNewNoteSettings(
+			redactNewNoteSettings(collectNewNoteSettings(this.plugin.app, windowMomentFormatter()), {
 				isFolderVisible: (folder) =>
 					visibleFolders.has(folder) || !this.plugin.app.vault.getFolderByPath(normalizePath(folder)),
 				isPrivate,
 			}),
 		);
-		return { setup, ...renderVaultOverview(overviewData) };
+		return { newNoteSettings, ...renderVaultOverview(overviewData) };
 	}
 
 	/**
@@ -494,7 +499,7 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
-			vaultSetup: vault.setup,
+			newNoteSettings: vault.newNoteSettings,
 			vaultFolders: vault.folders,
 			vaultTags: vault.tags,
 			vaultProperties: vault.properties,
@@ -1284,7 +1289,7 @@ export class AgentManager {
 						this.memoryEntriesSnapshot,
 						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
 					),
-					vaultSetup: refVault.setup,
+					newNoteSettings: refVault.newNoteSettings,
 					vaultFolders: refVault.folders,
 					vaultTags: refVault.tags,
 					vaultProperties: refVault.properties,
@@ -1295,7 +1300,7 @@ export class AgentManager {
 				// trusted child would otherwise leak private names to an untrusted parent.
 				const promptHint = substitutePromptPlaceholders(refBody, {
 					...refValues,
-					vaultSetup: "",
+					newNoteSettings: "",
 					vaultFolders: "",
 					vaultTags: "",
 					vaultProperties: "",

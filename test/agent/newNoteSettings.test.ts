@@ -1,5 +1,5 @@
 /**
- * The notes-setup placeholder reports Obsidian settings to the model. These pin the reading of
+ * The new-note settings placeholder reports Obsidian settings to the model. These pin the reading of
  * the (internal) core-plugin options, including the shapes Obsidian leaves when a setting was
  * never touched, and the rendering of each line.
  */
@@ -7,7 +7,12 @@
 import { describe, expect, it } from "vitest";
 import { App } from "obsidian";
 
-import { type VaultSetupData, collectVaultSetup, redactVaultSetup, renderVaultSetup } from "../../src/agent/vaultSetup";
+import {
+	type NewNoteSettingsData,
+	collectNewNoteSettings,
+	redactNewNoteSettings,
+	renderNewNoteSettings,
+} from "../../src/agent/newNoteSettings";
 
 function fakeApp(
 	config: Record<string, unknown>,
@@ -24,7 +29,7 @@ function fakeApp(
 	return app;
 }
 
-describe("collectVaultSetup", () => {
+describe("collectNewNoteSettings", () => {
 	it("reads the daily-notes and templates options and the new-note settings", () => {
 		const app = fakeApp(
 			{ newFileLocation: "folder", newFileFolderPath: "/Inbox/", useMarkdownLinks: true },
@@ -36,7 +41,7 @@ describe("collectVaultSetup", () => {
 				templates: { enabled: true, options: { folder: "Templates" } },
 			},
 		);
-		const data = collectVaultSetup(app, (format) => (format === "DD.MM.YYYY" ? "18.11.2026" : "?"));
+		const data = collectNewNoteSettings(app, (format) => (format === "DD.MM.YYYY" ? "18.11.2026" : "?"));
 		expect(data).toEqual({
 			dailyNotes: {
 				folder: "Journal/Daily",
@@ -54,7 +59,7 @@ describe("collectVaultSetup", () => {
 	// Obsidian stores no options until the user changes one: the defaults are the vault root and YYYY-MM-DD.
 	it("falls back to Obsidian's defaults for an untouched daily-notes plugin", () => {
 		const app = fakeApp({}, { "daily-notes": { enabled: true } });
-		const data = collectVaultSetup(app, () => "2026-11-18");
+		const data = collectNewNoteSettings(app, () => "2026-11-18");
 		expect(data.dailyNotes).toEqual({
 			folder: "",
 			format: "YYYY-MM-DD",
@@ -67,27 +72,27 @@ describe("collectVaultSetup", () => {
 
 	it("reports nothing for disabled core plugins", () => {
 		const app = fakeApp({}, { "daily-notes": { enabled: false }, templates: { enabled: false } });
-		const data = collectVaultSetup(app);
+		const data = collectNewNoteSettings(app);
 		expect(data.dailyNotes).toBeUndefined();
 		expect(data.templates).toBeUndefined();
 	});
 
 	it("leaves out today's path when there is no formatter or it throws", () => {
 		const app = fakeApp({}, { "daily-notes": { enabled: true } });
-		expect(collectVaultSetup(app).dailyNotes?.todayPath).toBeUndefined();
+		expect(collectNewNoteSettings(app).dailyNotes?.todayPath).toBeUndefined();
 		expect(
-			collectVaultSetup(app, () => {
+			collectNewNoteSettings(app, () => {
 				throw new Error("bad format");
 			}).dailyNotes?.todayPath,
 		).toBeUndefined();
 	});
 });
 
-describe("renderVaultSetup", () => {
-	const base: VaultSetupData = { newNoteLocation: "root", newNoteFolder: "", useMarkdownLinks: false };
+describe("renderNewNoteSettings", () => {
+	const base: NewNoteSettingsData = { newNoteLocation: "root", newNoteFolder: "", useMarkdownLinks: false };
 
 	it("renders daily notes with today's path and template, and the templates folder", () => {
-		const out = renderVaultSetup({
+		const out = renderNewNoteSettings({
 			...base,
 			dailyNotes: {
 				folder: "Daily",
@@ -106,7 +111,7 @@ describe("renderVaultSetup", () => {
 	});
 
 	it("says when daily notes are off and names a Markdown-link vault", () => {
-		const out = renderVaultSetup({
+		const out = renderNewNoteSettings({
 			...base,
 			newNoteLocation: "folder",
 			newNoteFolder: "Inbox",
@@ -119,8 +124,8 @@ describe("renderVaultSetup", () => {
 	});
 });
 
-describe("redactVaultSetup", () => {
-	const data: VaultSetupData = {
+describe("redactNewNoteSettings", () => {
+	const data: NewNoteSettingsData = {
 		dailyNotes: {
 			folder: "Journal",
 			format: "YYYY-MM-DD",
@@ -134,7 +139,7 @@ describe("redactVaultSetup", () => {
 	};
 
 	it("hides private folders and files, and says a private folder exists", () => {
-		const out = redactVaultSetup(data, {
+		const out = redactNewNoteSettings(data, {
 			isFolderVisible: (folder) => folder !== "Journal" && folder !== "Private",
 			isPrivate: () => false,
 		});
@@ -147,7 +152,7 @@ describe("redactVaultSetup", () => {
 		});
 		expect(out.templates).toEqual({ folder: "", folderPrivate: true });
 		expect(out.newNoteFolder).toBe("");
-		const rendered = renderVaultSetup(out);
+		const rendered = renderNewNoteSettings(out);
 		expect(rendered).not.toContain("Journal");
 		expect(rendered).not.toContain("Private");
 		expect(rendered).toContain("- Daily notes: in a folder that is private for this model");
@@ -156,7 +161,7 @@ describe("redactVaultSetup", () => {
 
 	// Obsidian stores the template path without `.md`; privacy rules match the file itself.
 	it("hides a private template file named without its extension", () => {
-		const out = redactVaultSetup(data, {
+		const out = redactNewNoteSettings(data, {
 			isFolderVisible: () => true,
 			isPrivate: (path) => path === "Private/Day.md",
 		});
@@ -165,7 +170,7 @@ describe("redactVaultSetup", () => {
 	});
 
 	it("changes nothing when everything is visible", () => {
-		expect(redactVaultSetup(data, { isFolderVisible: () => true, isPrivate: () => false })).toEqual({
+		expect(redactNewNoteSettings(data, { isFolderVisible: () => true, isPrivate: () => false })).toEqual({
 			...data,
 			dailyNotes: { ...data.dailyNotes, folderPrivate: undefined },
 			templates: { folder: "Private", folderPrivate: undefined },

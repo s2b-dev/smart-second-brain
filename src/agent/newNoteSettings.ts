@@ -1,6 +1,6 @@
 /**
- * The vault's note setup: the Obsidian settings that decide where a new note goes and what it
- * is called, substituted for the `{{vaultSetup}}` placeholder of an agent's `# Vault` section.
+ * Obsidian's settings for new notes: the settings that decide where a new note goes and what it
+ * is called, substituted for the `{{newNoteSettings}}` placeholder of an agent's `# Vault` section.
  *
  * The folder/tag/property overview (`vaultOverview.ts`) is inferred from the notes; these are
  * settings, so they are read rather than guessed: the Daily notes core plugin's folder, file
@@ -11,7 +11,7 @@
  * The core plugins' options are an internal API (`app.internalPlugins`), read defensively: a
  * shape this code does not recognise leaves its line out rather than failing assembly.
  *
- * Folder and file names are content, so {@link redactVaultSetup} applies the same per-provider
+ * Folder and file names are content, so {@link redactNewNoteSettings} applies the same per-provider
  * privacy rules the folder overview does before anything is rendered.
  */
 
@@ -21,7 +21,7 @@ import type { App } from "obsidian";
 const DEFAULT_DAILY_FORMAT = "YYYY-MM-DD";
 
 /** The settings the placeholder reports. Undefined plugin blocks mean the core plugin is off. */
-export interface VaultSetupData {
+export interface NewNoteSettingsData {
 	dailyNotes?: {
 		/** Folder, vault-relative; empty for the vault root. */
 		folder: string;
@@ -85,11 +85,11 @@ function vaultConfig(app: App, key: string): unknown {
 }
 
 /**
- * Read the setup from the app. `formatToday` turns a Moment.js format into today's file name;
+ * Read the settings from the app. `formatToday` turns a Moment.js format into today's file name;
  * Obsidian provides Moment as `window.moment`, and without it the "today" line is left out.
  */
-export function collectVaultSetup(app: App, formatToday?: (format: string) => string): VaultSetupData {
-	const data: VaultSetupData = {
+export function collectNewNoteSettings(app: App, formatToday?: (format: string) => string): NewNoteSettingsData {
+	const data: NewNoteSettingsData = {
 		newNoteLocation: "root",
 		newNoteFolder: "",
 		useMarkdownLinks: vaultConfig(app, "useMarkdownLinks") === true,
@@ -123,8 +123,8 @@ export function collectVaultSetup(app: App, formatToday?: (format: string) => st
 	return data;
 }
 
-/** What the current model may see, for {@link redactVaultSetup}. */
-export interface VaultSetupPrivacy {
+/** What the current model may see, for {@link redactNewNoteSettings}. */
+export interface NewNoteSettingsPrivacy {
 	/** Whether a folder's name may be shown (the vault root always may). */
 	isFolderVisible(folder: string): boolean;
 	/** Whether a file is private for the current model. */
@@ -136,12 +136,12 @@ export interface VaultSetupPrivacy {
  * reported as private rather than dropped, so the model still knows the setting exists and
  * doesn't invent a location; a hidden file (template, today's note) is left out.
  */
-export function redactVaultSetup(data: VaultSetupData, privacy: VaultSetupPrivacy): VaultSetupData {
+export function redactNewNoteSettings(data: NewNoteSettingsData, privacy: NewNoteSettingsPrivacy): NewNoteSettingsData {
 	const folderHidden = (folder: string) => folder !== "" && !privacy.isFolderVisible(folder);
 	const fileVisible = (path: string | undefined, folderPrivate: boolean) =>
 		// Obsidian stores the template path without its extension, while privacy rules match files.
 		path && !folderPrivate && !privacy.isPrivate(path) && !privacy.isPrivate(`${path}.md`) ? path : undefined;
-	const out: VaultSetupData = { ...data };
+	const out: NewNoteSettingsData = { ...data };
 
 	if (data.dailyNotes) {
 		const folderPrivate = folderHidden(data.dailyNotes.folder);
@@ -182,7 +182,7 @@ const folderLabel = (folder: string, folderPrivate?: boolean) =>
 	folderPrivate ? PRIVATE_FOLDER : folder ? `\`${folder}/\`` : "the vault root";
 
 /** Render the placeholder value: one line per setting. */
-export function renderVaultSetup(data: VaultSetupData): string {
+export function renderNewNoteSettings(data: NewNoteSettingsData): string {
 	const lines: string[] = [];
 
 	if (data.dailyNotes) {
