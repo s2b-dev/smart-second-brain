@@ -61,6 +61,10 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", fingerprint(exploreVault10)],
 			["1.1", fingerprint(exploreVault11)],
+			// 1.2 (shipped in 2.3.0 through 2.4.4): before the `# Vault` section, when the model
+			//      was told to call get_all_tags / get_properties / list_directory first to learn
+			//      the vault's organisation.
+			["1.2", "65c96a8f87c81e89"],
 		]),
 	],
 	// 1.0 as actually released in 2.0.2-beta — i.e. the post-#381 body, which #381 edited
@@ -78,6 +82,10 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", fingerprint(dataview10)],
 			["1.1", fingerprint(dataview11)],
+			// 1.2 (shipped in 2.3.0 through 2.4.4): before the Result Size rewrite, when every
+			//      listing defaulted to `LIMIT 10` and tag/property names were verified with tools
+			//      instead of read from the `# Vault` section.
+			["1.2", "91ff059caaf10c33"],
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],

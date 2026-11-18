@@ -643,6 +643,23 @@ export class PluginDataStore {
 		return listed;
 	}
 
+	/**
+	 * A predicate answering {@link isFilePrivate}, with an advanced filter resolved once rather
+	 * than per call. For callers that check every file in the vault (the prompt's vault
+	 * overview), where the per-call form re-resolves the filter for each file.
+	 */
+	privacyPredicate(): (filePath: string) => boolean {
+		const parsed = parsePrivacyMembershipFilter(this.#data.privacyFilter);
+		let listed: (filePath: string) => boolean;
+		if (parsed.isAdvanced) {
+			const paths = resolveViewFilter(this._plugin.app, this.#data.privacyFilter, this.getAllVaultPaths()).paths;
+			listed = (filePath) => paths.has(filePath);
+		} else {
+			listed = (filePath) => matchesPrivacyMembershipDraftPath(this._plugin.app, parsed.draft, filePath);
+		}
+		return this.#data.privacyMode === "private-by-default" ? (filePath) => !listed(filePath) : listed;
+	}
+
 	private isFileListedInPrivacyFilter(filePath: string): boolean {
 		const parsed = parsePrivacyMembershipFilter(this.#data.privacyFilter);
 		if (parsed.isAdvanced) {

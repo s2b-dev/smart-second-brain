@@ -12,16 +12,25 @@ import {
 	DEFAULT_AGENT_PROMPT,
 	MEMORY_FOLDER_PLACEHOLDER,
 	MEMORY_INDEX_PLACEHOLDER,
+	VAULT_FOLDERS_PLACEHOLDER,
+	VAULT_PLACEHOLDERS,
+	VAULT_PROPERTIES_PLACEHOLDER,
+	VAULT_TAGS_PLACEHOLDER,
 	buildDateSection,
 	buildMemorySection,
 	currentDateValue,
+	buildVaultSection,
 	substitutePromptPlaceholders,
+	usesVaultOverview,
 } from "../../src/agent/prompts";
 
 const VALUES = {
 	memoryFolder: "Agents/Memories",
 	date: "Monday, 2026-09-01",
 	memoryIndex: "## Memory notes\n- `Agents/Memories/User.md` — who the user is",
+	vaultFolders: "<vault_folders>\nMeetings/\n</vault_folders>",
+	vaultTags: "<vault_tags>\n#project\n</vault_tags>",
+	vaultProperties: "<vault_properties>\nstatus\n</vault_properties>",
 };
 
 describe("substitutePromptPlaceholders", () => {
@@ -31,6 +40,11 @@ describe("substitutePromptPlaceholders", () => {
 		expect(result).not.toContain(MEMORY_FOLDER_PLACEHOLDER);
 		expect(result).not.toContain(DATE_PLACEHOLDER);
 		expect(result).not.toContain(MEMORY_INDEX_PLACEHOLDER);
+		for (const placeholder of VAULT_PLACEHOLDERS) expect(result).not.toContain(placeholder);
+		expect(result).not.toMatch(/\{\{[a-zA-Z]+\}\}/);
+		expect(result).toContain("Meetings/");
+		expect(result).toContain("#project");
+		expect(result).toContain("status");
 		expect(result).toContain("`Agents/Memories/`");
 		expect(result).toContain("Monday, 2026-09-01");
 		expect(result).toContain("- `Agents/Memories/User.md` — who the user is");
@@ -41,6 +55,18 @@ describe("substitutePromptPlaceholders", () => {
 	it("inserts the memory index literally", () => {
 		const result = substitutePromptPlaceholders(MEMORY_INDEX_PLACEHOLDER, { ...VALUES, memoryIndex: "$& $1" });
 		expect(result).toBe("$& $1");
+	});
+
+	// Folder, tag and property names are vault text; a folder named "$&" must not re-inject the placeholder.
+	it("inserts the vault overview literally", () => {
+		const body = `${VAULT_FOLDERS_PLACEHOLDER}|${VAULT_TAGS_PLACEHOLDER}|${VAULT_PROPERTIES_PLACEHOLDER}`;
+		const result = substitutePromptPlaceholders(body, {
+			...VALUES,
+			vaultFolders: "$&",
+			vaultTags: "$1",
+			vaultProperties: "$$",
+		});
+		expect(result).toBe("$&|$1|$$");
 	});
 
 	it("replaces every occurrence, not just the first", () => {
@@ -97,5 +123,23 @@ describe("prompt section builders", () => {
 
 	it("renders the date as weekday and ISO date", () => {
 		expect(currentDateValue(new Date(2026, 8, 1))).toBe("Tuesday, 2026-09-01");
+	});
+});
+
+describe("vault section", () => {
+	it("carries each vault placeholder under its own heading, so one list can be dropped alone", () => {
+		const section = buildVaultSection();
+		expect(section.startsWith("# Vault")).toBe(true);
+		expect(section).toContain(`## Folders\n${VAULT_FOLDERS_PLACEHOLDER}`);
+		expect(section).toContain(`## Tags, most used first\n${VAULT_TAGS_PLACEHOLDER}`);
+		expect(section).toContain(`## Properties, most used first\n${VAULT_PROPERTIES_PLACEHOLDER}`);
+	});
+
+	// The scan is skipped for a body without any vault placeholder; a body keeping only one
+	// list must still get it.
+	it("detects a body that asks for any part of the overview", () => {
+		expect(usesVaultOverview(DEFAULT_AGENT_PROMPT)).toBe(true);
+		expect(usesVaultOverview(`my prompt\n${VAULT_TAGS_PLACEHOLDER}`)).toBe(true);
+		expect(usesVaultOverview("my prompt without a vault section")).toBe(false);
 	});
 });
