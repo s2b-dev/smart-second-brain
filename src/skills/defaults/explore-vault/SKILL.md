@@ -1,6 +1,6 @@
 ---
 name: explore-vault
-description: Search, read, and explore the user's vault — find notes by tag, property, folder, or keyword, then read their content. Load this before answering any question that depends on what's in the vault; it holds the note-finding procedure (check the tags, properties and folders that exist before querying, don't guess) and what to do when a search comes back weak (reformulate, escalate the algorithm once).
+description: Search and read the user's vault for what notes say — keyword and semantic search, grep, reading notes, and counting or computing across them. Load this before searching note content, or when the `# Vault` section doesn't tell you where the notes the user means live; it holds the search procedure and what to do when a search comes back weak (reformulate, escalate the algorithm once). Not needed just to list the notes in a folder or with a tag shown in the `# Vault` section.
 allowed-tools: search_notes list_directory read_content grep_notes get_all_tags get_properties execute_javascript
 metadata:
   author: "S2B"

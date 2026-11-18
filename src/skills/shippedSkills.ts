@@ -82,6 +82,10 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", fingerprint(dataview10)],
 			["1.1", fingerprint(dataview11)],
+			// 1.2 (shipped in 2.3.0 through 2.4.4): before the Result Size rewrite, when every
+			//      listing defaulted to `LIMIT 10` and tag/property names were verified with tools
+			//      instead of read from the `# Vault` section.
+			["1.2", "91ff059caaf10c33"],
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
