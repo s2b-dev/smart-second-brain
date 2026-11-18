@@ -160,6 +160,21 @@ describe("renderVaultOverview", () => {
 		expect(renderVaultOverview(data(0)).folders).not.toContain("private");
 	});
 
+	// A note without a metadata cache entry reports no tags; "No tags in use yet" would be false.
+	it("says the tag and property lists are incomplete while Obsidian is indexing", () => {
+		const app = fakeApp([{ path: "Work/A.md", tags: ["#work"] }, { path: "Work/B.md" }]);
+		const getFileCache = app.metadataCache.getFileCache;
+		app.metadataCache.getFileCache = (file: TFile) => (file.path === "Work/B.md" ? null : getFileCache(file));
+		const collected = collectVaultOverview(app, OPEN);
+		expect(collected.unindexedNotes).toBe(1);
+		const out = renderVaultOverview(collected);
+		expect(out.tags).toContain("#work");
+		expect(out.tags).toContain("still indexing 1 notes");
+		expect(out.properties).not.toContain("No properties in use yet");
+		expect(out.properties).toContain("still indexing");
+		expect(renderVaultOverview({ ...collected, unindexedNotes: 0 }).tags).not.toContain("indexing");
+	});
+
 	it("renders empty tag and property lists as plain sentences", () => {
 		const out = renderVaultOverview(data(0));
 		expect(out.tags).toBe("No tags in use yet.");

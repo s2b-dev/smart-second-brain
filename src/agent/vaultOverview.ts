@@ -33,6 +33,9 @@ export const VAULT_TAGS_MAX = 100;
 /** Most property keys listed, by use. */
 export const VAULT_PROPERTIES_MAX = 60;
 
+const NO_TAGS = "No tags in use yet.";
+const NO_PROPERTIES = "No properties in use yet.";
+
 /** Which files the overview may draw on. */
 export interface VaultOverviewFilter {
 	/** Plugin machinery and other paths that are never part of the user's vault view. */
@@ -51,6 +54,8 @@ export interface VaultOverviewData {
 	propertyCounts: Map<string, number>;
 	/** How many files the privacy filter held back. */
 	skippedPrivateFiles: number;
+	/** Visible notes Obsidian has not indexed yet (no metadata cache entry), so their tags and properties are missing. */
+	unindexedNotes?: number;
 }
 
 /** The three rendered placeholder values. */
@@ -70,6 +75,7 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 	const tagCounts = new Map<string, number>();
 	const propertyCounts = new Map<string, number>();
 	let skippedPrivateFiles = 0;
+	let unindexedNotes = 0;
 	let lastFolder: string | null = null;
 
 	for (const file of app.vault.getFiles()) {
@@ -95,7 +101,12 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 
 		if (file.extension !== "md") continue;
 		const cache = app.metadataCache.getFileCache(file);
-		if (!cache) continue;
+		if (!cache) {
+			// Right after startup — on mobile for a long while in a large vault — Obsidian is still
+			// indexing, and an unindexed note reports no tags or properties at all.
+			unindexedNotes++;
+			continue;
+		}
 		for (const tag of new Set(getAllTags(cache) ?? [])) bump(tagCounts, tag);
 		if (cache.frontmatter) {
 			for (const key of Object.keys(cache.frontmatter)) {
@@ -104,7 +115,7 @@ export function collectVaultOverview(app: App, filter: VaultOverviewFilter): Vau
 		}
 	}
 
-	return { folders: [...folders], tagCounts, propertyCounts, skippedPrivateFiles };
+	return { folders: [...folders], tagCounts, propertyCounts, skippedPrivateFiles, unindexedNotes };
 }
 
 /** Compare two folder paths segment by segment, so a folder always sorts directly before its children. */
@@ -158,12 +169,12 @@ function renderMostUsed(
 
 /** Render the tag list, most used first. */
 export function renderVaultTags(tagCounts: ReadonlyMap<string, number>, max = VAULT_TAGS_MAX): string {
-	return renderMostUsed(tagCounts, max, "vault_tags", "tags", "No tags in use yet.");
+	return renderMostUsed(tagCounts, max, "vault_tags", "tags", NO_TAGS);
 }
 
 /** Render the property-key list, most used first. */
 export function renderVaultProperties(propertyCounts: ReadonlyMap<string, number>, max = VAULT_PROPERTIES_MAX): string {
-	return renderMostUsed(propertyCounts, max, "vault_properties", "properties", "No properties in use yet.");
+	return renderMostUsed(propertyCounts, max, "vault_properties", "properties", NO_PROPERTIES);
 }
 
 /**
@@ -175,9 +186,17 @@ export function renderVaultOverview(data: VaultOverviewData): VaultOverviewText 
 		data.skippedPrivateFiles > 0
 			? "\n(Notes that are private for the current model are left out of this overview.)"
 			: "";
+	// Said on both lists it affects, so "no tags" is never read as a fact while indexing runs.
+	const unindexed = data.unindexedNotes ?? 0;
+	const indexingNote =
+		unindexed > 0
+			? `(Obsidian is still indexing ${unindexed} notes, so this list may be incomplete; get_all_tags and get_properties return the current set.)`
+			: "";
+	const withIndexingNote = (text: string, emptyText: string) =>
+		!indexingNote ? text : text === emptyText ? indexingNote : `${text}\n${indexingNote}`;
 	return {
 		folders: `${renderVaultFolders(data.folders)}${privacyNote}`,
-		tags: renderVaultTags(data.tagCounts),
-		properties: renderVaultProperties(data.propertyCounts),
+		tags: withIndexingNote(renderVaultTags(data.tagCounts), NO_TAGS),
+		properties: withIndexingNote(renderVaultProperties(data.propertyCounts), NO_PROPERTIES),
 	};
 }
