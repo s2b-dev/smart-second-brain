@@ -71,7 +71,7 @@ import {
 	selectAlwaysLoaded,
 } from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
-import { collectVaultSetup, renderVaultSetup, windowMomentFormatter } from "./vaultSetup";
+import { collectVaultSetup, redactVaultSetup, renderVaultSetup, windowMomentFormatter } from "./vaultSetup";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
@@ -409,19 +409,26 @@ export class AgentManager {
 	 */
 	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { setup: string } {
 		if (!usesVaultOverview(body)) return { setup: "", folders: "", tags: "", properties: "" };
-		// Obsidian settings, not note content, so no privacy filter applies.
-		const setup = renderVaultSetup(collectVaultSetup(this.plugin.app, windowMomentFormatter()));
 		const data = getData();
 		const store = getPendingChangesStore();
 		const provider = agentCfg.chatModel?.provider;
 		const isPrivate = provider && !data.isProviderTrusted(provider) ? data.privacyPredicate() : () => false;
-		const overview = renderVaultOverview(
-			collectVaultOverview(this.plugin.app, {
-				isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+		const overviewData = collectVaultOverview(this.plugin.app, {
+			isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+			isPrivate,
+		});
+		// The configured folders and files are names too: a folder is shown only when the overview
+		// may show it (it holds a file this model can see) or it doesn't exist yet, so there is
+		// nothing private in it to reveal.
+		const visibleFolders = new Set(overviewData.folders);
+		const setup = renderVaultSetup(
+			redactVaultSetup(collectVaultSetup(this.plugin.app, windowMomentFormatter()), {
+				isFolderVisible: (folder) =>
+					visibleFolders.has(folder) || !this.plugin.app.vault.getFolderByPath(normalizePath(folder)),
 				isPrivate,
 			}),
 		);
-		return { setup, ...overview };
+		return { setup, ...renderVaultOverview(overviewData) };
 	}
 
 	/**

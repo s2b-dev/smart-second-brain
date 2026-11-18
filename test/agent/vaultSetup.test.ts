@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { App } from "obsidian";
 
-import { type VaultSetupData, collectVaultSetup, renderVaultSetup } from "../../src/agent/vaultSetup";
+import { type VaultSetupData, collectVaultSetup, redactVaultSetup, renderVaultSetup } from "../../src/agent/vaultSetup";
 
 function fakeApp(
 	config: Record<string, unknown>,
@@ -116,5 +116,59 @@ describe("renderVaultSetup", () => {
 		expect(out).not.toContain("Templates:");
 		expect(out).toContain("in `Inbox/`");
 		expect(out).toContain("Markdown links");
+	});
+});
+
+describe("redactVaultSetup", () => {
+	const data: VaultSetupData = {
+		dailyNotes: {
+			folder: "Journal",
+			format: "YYYY-MM-DD",
+			template: "Private/Day",
+			todayPath: "Journal/2026-11-18.md",
+		},
+		templates: { folder: "Private" },
+		newNoteLocation: "folder",
+		newNoteFolder: "Journal",
+		useMarkdownLinks: false,
+	};
+
+	it("hides private folders and files, and says a private folder exists", () => {
+		const out = redactVaultSetup(data, {
+			isFolderVisible: (folder) => folder !== "Journal" && folder !== "Private",
+			isPrivate: () => false,
+		});
+		expect(out.dailyNotes).toEqual({
+			folder: "",
+			format: "YYYY-MM-DD",
+			template: undefined,
+			todayPath: undefined,
+			folderPrivate: true,
+		});
+		expect(out.templates).toEqual({ folder: "", folderPrivate: true });
+		expect(out.newNoteFolder).toBe("");
+		const rendered = renderVaultSetup(out);
+		expect(rendered).not.toContain("Journal");
+		expect(rendered).not.toContain("Private");
+		expect(rendered).toContain("- Daily notes: in a folder that is private for this model");
+		expect(rendered).toContain("- Templates: in a folder that is private for this model");
+	});
+
+	// Obsidian stores the template path without `.md`; privacy rules match the file itself.
+	it("hides a private template file named without its extension", () => {
+		const out = redactVaultSetup(data, {
+			isFolderVisible: () => true,
+			isPrivate: (path) => path === "Private/Day.md",
+		});
+		expect(out.dailyNotes?.template).toBeUndefined();
+		expect(out.dailyNotes?.todayPath).toBe("Journal/2026-11-18.md");
+	});
+
+	it("changes nothing when everything is visible", () => {
+		expect(redactVaultSetup(data, { isFolderVisible: () => true, isPrivate: () => false })).toEqual({
+			...data,
+			dailyNotes: { ...data.dailyNotes, folderPrivate: undefined },
+			templates: { folder: "Private", folderPrivate: undefined },
+		});
 	});
 });

@@ -10,6 +10,9 @@
  *
  * The core plugins' options are an internal API (`app.internalPlugins`), read defensively: a
  * shape this code does not recognise leaves its line out rather than failing assembly.
+ *
+ * Folder and file names are content, so {@link redactVaultSetup} applies the same per-provider
+ * privacy rules the folder overview does before anything is rendered.
  */
 
 import type { App } from "obsidian";
@@ -28,15 +31,21 @@ export interface VaultSetupData {
 		template?: string;
 		/** Today's daily note path, when a date formatter was available. */
 		todayPath?: string;
+		/** The folder is private for the current model; `folder` is not shown. */
+		folderPrivate?: boolean;
 	};
 	templates?: {
 		/** Folder, vault-relative; empty when unset. */
 		folder: string;
+		/** The folder is private for the current model; `folder` is not shown. */
+		folderPrivate?: boolean;
 	};
 	/** Obsidian's "Default location for new notes". */
 	newNoteLocation: "root" | "current" | "folder";
 	/** Folder for new notes when {@link newNoteLocation} is `"folder"`. */
 	newNoteFolder: string;
+	/** The new-notes folder is private for the current model; `newNoteFolder` is not shown. */
+	newNoteFolderPrivate?: boolean;
 	/** Whether Obsidian writes Markdown links instead of wikilinks. */
 	useMarkdownLinks: boolean;
 }
@@ -114,21 +123,71 @@ export function collectVaultSetup(app: App, formatToday?: (format: string) => st
 	return data;
 }
 
+/** What the current model may see, for {@link redactVaultSetup}. */
+export interface VaultSetupPrivacy {
+	/** Whether a folder's name may be shown (the vault root always may). */
+	isFolderVisible(folder: string): boolean;
+	/** Whether a file is private for the current model. */
+	isPrivate(path: string): boolean;
+}
+
+/**
+ * Hide every configured folder and file the current model may not see. A hidden folder is
+ * reported as private rather than dropped, so the model still knows the setting exists and
+ * doesn't invent a location; a hidden file (template, today's note) is left out.
+ */
+export function redactVaultSetup(data: VaultSetupData, privacy: VaultSetupPrivacy): VaultSetupData {
+	const folderHidden = (folder: string) => folder !== "" && !privacy.isFolderVisible(folder);
+	const fileVisible = (path: string | undefined, folderPrivate: boolean) =>
+		// Obsidian stores the template path without its extension, while privacy rules match files.
+		path && !folderPrivate && !privacy.isPrivate(path) && !privacy.isPrivate(`${path}.md`) ? path : undefined;
+	const out: VaultSetupData = { ...data };
+
+	if (data.dailyNotes) {
+		const folderPrivate = folderHidden(data.dailyNotes.folder);
+		const templateFolder = data.dailyNotes.template?.includes("/")
+			? data.dailyNotes.template.slice(0, data.dailyNotes.template.lastIndexOf("/"))
+			: "";
+		out.dailyNotes = {
+			folder: folderPrivate ? "" : data.dailyNotes.folder,
+			format: data.dailyNotes.format,
+			template: fileVisible(data.dailyNotes.template, folderHidden(templateFolder)),
+			todayPath: fileVisible(data.dailyNotes.todayPath, folderPrivate),
+			folderPrivate: folderPrivate || undefined,
+		};
+	}
+	if (data.templates) {
+		const folderPrivate = folderHidden(data.templates.folder);
+		out.templates = {
+			folder: folderPrivate ? "" : data.templates.folder,
+			folderPrivate: folderPrivate || undefined,
+		};
+	}
+	if (folderHidden(data.newNoteFolder)) {
+		out.newNoteFolder = "";
+		out.newNoteFolderPrivate = true;
+	}
+	return out;
+}
+
 /** Today's file name formatter from Obsidian's global Moment, when present. */
 export function windowMomentFormatter(): ((format: string) => string) | undefined {
 	const moment = (globalThis as { moment?: () => { format(format: string): string } }).moment;
 	return typeof moment === "function" ? (format) => moment().format(format) : undefined;
 }
 
-const folderLabel = (folder: string) => (folder ? `\`${folder}/\`` : "the vault root");
+const PRIVATE_FOLDER = "a folder that is private for this model";
+
+const folderLabel = (folder: string, folderPrivate?: boolean) =>
+	folderPrivate ? PRIVATE_FOLDER : folder ? `\`${folder}/\`` : "the vault root";
 
 /** Render the placeholder value: one line per setting. */
 export function renderVaultSetup(data: VaultSetupData): string {
 	const lines: string[] = [];
 
 	if (data.dailyNotes) {
-		const { folder, format, template, todayPath } = data.dailyNotes;
-		let line = `- Daily notes: in ${folderLabel(folder)}, named by the date format \`${format}\``;
+		const { folder, format, template, todayPath, folderPrivate } = data.dailyNotes;
+		let line = `- Daily notes: in ${folderLabel(folder, folderPrivate)}, named by the date format \`${format}\``;
 		if (todayPath) line += ` (today's is \`${todayPath}\`)`;
 		if (template) line += `, created from the template \`${template}\``;
 		lines.push(`${line}.`);
@@ -138,15 +197,15 @@ export function renderVaultSetup(data: VaultSetupData): string {
 
 	if (data.templates) {
 		lines.push(
-			data.templates.folder
-				? `- Templates: in ${folderLabel(data.templates.folder)}. These are templates, not notes; don't file new notes there.`
+			data.templates.folder || data.templates.folderPrivate
+				? `- Templates: in ${folderLabel(data.templates.folder, data.templates.folderPrivate)}. These are templates, not notes; don't file new notes there.`
 				: "- Templates: the core plugin is on, but no template folder is set.",
 		);
 	}
 
 	const newNotes =
 		data.newNoteLocation === "folder"
-			? `in ${folderLabel(data.newNoteFolder)}`
+			? `in ${folderLabel(data.newNoteFolder, data.newNoteFolderPrivate)}`
 			: data.newNoteLocation === "current"
 				? "next to the note the user is working in"
 				: "at the vault root";
