@@ -71,12 +71,7 @@ import {
 	selectAlwaysLoaded,
 } from "./memoryNotes";
 import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
-import {
-	collectNewNoteSettings,
-	redactNewNoteSettings,
-	renderNewNoteSettings,
-	windowMomentFormatter,
-} from "./newNoteSettings";
+import { collectVaultSettings, redactVaultSettings, renderVaultSettings, windowMomentFormatter } from "./vaultSettings";
 import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
@@ -412,8 +407,8 @@ export class AgentManager {
 	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
 	 * carry none of the placeholders skip the scan.
 	 */
-	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { newNoteSettings: string } {
-		if (!usesVaultOverview(body)) return { newNoteSettings: "", folders: "", tags: "", properties: "" };
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { vaultSettings: string } {
+		if (!usesVaultOverview(body)) return { vaultSettings: "", folders: "", tags: "", properties: "" };
 		const data = getData();
 		const store = getPendingChangesStore();
 		const provider = agentCfg.chatModel?.provider;
@@ -433,13 +428,13 @@ export class AgentManager {
 				.getFiles()
 				.some((file) => file.path.startsWith(prefix) && isPrivate(file.path));
 		};
-		const newNoteSettings = renderNewNoteSettings(
-			redactNewNoteSettings(collectNewNoteSettings(this.plugin.app, windowMomentFormatter()), {
+		const vaultSettings = renderVaultSettings(
+			redactVaultSettings(collectVaultSettings(this.plugin.app, windowMomentFormatter()), {
 				isFolderVisible,
 				isPrivate,
 			}),
 		);
-		return { newNoteSettings, ...renderVaultOverview(overviewData) };
+		return { vaultSettings, ...renderVaultOverview(overviewData) };
 	}
 
 	/**
@@ -505,7 +500,7 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
-			newNoteSettings: vault.newNoteSettings,
+			vaultSettings: vault.vaultSettings,
 			vaultFolders: vault.folders,
 			vaultTags: vault.tags,
 			vaultProperties: vault.properties,
@@ -1295,7 +1290,7 @@ export class AgentManager {
 						this.memoryEntriesSnapshot,
 						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
 					),
-					newNoteSettings: refVault.newNoteSettings,
+					vaultSettings: refVault.vaultSettings,
 					vaultFolders: refVault.folders,
 					vaultTags: refVault.tags,
 					vaultProperties: refVault.properties,
@@ -1306,7 +1301,7 @@ export class AgentManager {
 				// trusted child would otherwise leak private names to an untrusted parent.
 				const promptHint = substitutePromptPlaceholders(refBody, {
 					...refValues,
-					newNoteSettings: "",
+					vaultSettings: "",
 					vaultFolders: "",
 					vaultTags: "",
 					vaultProperties: "",

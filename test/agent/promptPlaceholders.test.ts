@@ -15,7 +15,7 @@ import {
 	VAULT_FOLDERS_PLACEHOLDER,
 	VAULT_PLACEHOLDERS,
 	VAULT_PROPERTIES_PLACEHOLDER,
-	NEW_NOTE_SETTINGS_PLACEHOLDER,
+	VAULT_SETTINGS_PLACEHOLDER,
 	VAULT_TAGS_PLACEHOLDER,
 	buildDateSection,
 	buildMemorySection,
@@ -29,7 +29,7 @@ const VALUES = {
 	memoryFolder: "Agents/Memories",
 	date: "Monday, 2026-09-01",
 	memoryIndex: "## Memory notes\n- `Agents/Memories/User.md` — who the user is",
-	newNoteSettings: "- Daily notes: in `Daily/`",
+	vaultSettings: "- Daily notes: in `Daily/`",
 	vaultFolders: "<vault_folders>\nMeetings/\n</vault_folders>",
 	vaultTags: "<vault_tags>\n#project\n</vault_tags>",
 	vaultProperties: "<vault_properties>\nstatus\n</vault_properties>",
@@ -133,7 +133,7 @@ describe("vault section", () => {
 	it("carries each vault placeholder under its own heading, so one list can be dropped alone", () => {
 		const section = buildVaultSection();
 		expect(section.startsWith("# Vault")).toBe(true);
-		expect(section).toContain(`## Obsidian's settings for new notes\n${NEW_NOTE_SETTINGS_PLACEHOLDER}`);
+		expect(section).toContain(`## Vault settings\n${VAULT_SETTINGS_PLACEHOLDER}`);
 		expect(section).toContain(`## Folders in the vault\n${VAULT_FOLDERS_PLACEHOLDER}`);
 		expect(section).toContain(`## Tags in use, most used first\n${VAULT_TAGS_PLACEHOLDER}`);
 		expect(section).toContain(`## Properties in use, most used first\n${VAULT_PROPERTIES_PLACEHOLDER}`);
