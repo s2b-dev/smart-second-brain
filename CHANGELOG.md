@@ -20,6 +20,13 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.4.4 (2026-11-18)
+
+The plugin loads on iPhone and iPad again.
+
+### Fixes
+- **Mobile: the plugin failed to load on iOS and iPadOS.** Since 2.4.3, turning the plugin on did nothing on iPhone and iPad, even in a new vault. A library added in that release needed a Node feature that Obsidian's mobile app doesn't have. The plugin now loads normally on mobile; desktop was never affected (#563, #564).
+
 ## 2.4.3 (2026-11-17)
 
 Long chats open faster and use less memory.
