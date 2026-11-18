@@ -33,6 +33,7 @@ import type { ChatAttachment, ReviewStatusRef } from "../types/shared";
 import { gzipString, toArrayBuffer } from "../utils/gzip";
 import { Logger } from "../utils/logging";
 import { agentDefinitionPath, memoriesDir } from "../utils/agentPaths";
+import { isAgentFilePath } from "../utils/fileFiltering";
 import {
 	editProviderAction,
 	openNoteAction,
@@ -60,8 +61,11 @@ import {
 	currentDateValue,
 	localIsoDate,
 	substitutePromptPlaceholders,
+	usesVaultOverview,
 } from "./prompts";
-import { collectMemoryIndex, renderMemoryIndex } from "./memoryNotes";
+import { collectMemoryIndex, memoryAlwaysBudget, renderMemoryIndex, selectAlwaysLoaded } from "./memoryNotes";
+import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
+import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
@@ -377,6 +381,51 @@ export class AgentManager {
 	 */
 	private memoryIndexSnapshot = "";
 
+	/**
+	 * Always-loaded memory notes the last notice was about, so the user hears once that a note
+	 * was too large for the model, not on every assembly. Reset when every note fits again.
+	 */
+	private omittedMemoryNoticeSignature = "";
+
+	/**
+	 * The vault overview substituted for the `# Vault` placeholders, as the agent's provider may
+	 * see it: files private for that provider are left out, exactly as the read tools leave them
+	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
+	 * carry none of the placeholders skip the scan.
+	 */
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText {
+		if (!usesVaultOverview(body)) return { folders: "", tags: "", properties: "" };
+		const data = getData();
+		const store = getPendingChangesStore();
+		const provider = agentCfg.chatModel?.provider;
+		const isPrivate = provider && !data.isProviderTrusted(provider) ? data.privacyPredicate() : () => false;
+		return renderVaultOverview(
+			collectVaultOverview(this.plugin.app, {
+				isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+				isPrivate,
+			}),
+		);
+	}
+
+	/**
+	 * Tell the user when always-loaded memory notes were too large to load for this agent's model.
+	 * The model still sees them listed and reads them on demand; the notice is for the user, who
+	 * otherwise has no way to learn why the agent seems to have forgotten a note.
+	 */
+	private noticeOmittedMemory(omittedPaths: string[], contextWindow: number | undefined): void {
+		const signature = omittedPaths.join("\n");
+		if (signature === this.omittedMemoryNoticeSignature) return;
+		this.omittedMemoryNoticeSignature = signature;
+		if (omittedPaths.length === 0) return;
+		const names = omittedPaths.map((path) => path.split("/").pop()?.replace(/\.md$/i, "") ?? path).join(", ");
+		const window = contextWindow ? ` (${Math.round(contextWindow / 1000)}k tokens)` : "";
+		showActionNotice(
+			`Memory too large for this model${window}: ${names} ${omittedPaths.length === 1 ? "is" : "are"} no longer loaded into every message. The agent reads ${omittedPaths.length === 1 ? "it" : "them"} only when needed. Shorten the note or use a model with a larger context window.`,
+			openNoteAction(omittedPaths[0], "Open note"),
+			15000,
+		);
+	}
+
 	async assembleSystemPrompt(agent?: AgentConfig): Promise<string> {
 		const pluginData = getData();
 		const selectedAgent = agent ?? pluginData.getSelectedAgent();
@@ -395,7 +444,22 @@ export class AgentManager {
 		// the agent folder — memory notes included — invalidates every cached runnable (see the
 		// vault watcher in main.ts), so the next turn re-assembles and the model sees the note
 		// it just wrote.
-		this.memoryIndexSnapshot = renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder));
+		//
+		// Always-loaded notes go in whole; the only limit is a share of this agent's context
+		// window (see memoryNotes.memoryAlwaysBudget), so a small local model is not swamped.
+		const memoryEntries = await collectMemoryIndex(this.plugin.app, memoryFolder);
+		const contextWindow = selectedAgent.chatModel?.modelConfig?.contextWindow;
+		const alwaysBudget = memoryAlwaysBudget(contextWindow);
+		this.memoryIndexSnapshot = renderMemoryIndex(memoryEntries, alwaysBudget);
+		if (body.includes(MEMORY_FOLDER_PLACEHOLDER)) {
+			const { omitted } = selectAlwaysLoaded(memoryEntries, alwaysBudget);
+			this.noticeOmittedMemory(
+				omitted.map((entry) => entry.path),
+				contextWindow,
+			);
+		}
+
+		const vault = this.buildVaultOverview(selectedAgent, body);
 
 		// The model has no reliable notion of "now", and the memory folder is user-configurable;
 		// both are written into the note as placeholders and substituted here, so nothing stale
@@ -405,6 +469,9 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
+			vaultFolders: vault.folders,
+			vaultTags: vault.tags,
+			vaultProperties: vault.properties,
 		});
 
 		// Best-effort ensure the memory folder exists so list_directory has somewhere to look
@@ -1178,14 +1245,18 @@ export class AgentManager {
 				const name = isSelf ? `${ref.name} (isolated)` : ref.name;
 				// Substituted up front so neither the delegated prompt nor the hint below (which
 				// the parent model reads as the tool's description) ever shows a raw placeholder.
-				const refBasePrompt = substitutePromptPlaceholders(
-					this.plugin.promptFilesService?.getAgentPrompt(ref.id) ?? DEFAULT_AGENT_PROMPT,
-					{
-						memoryFolder: normalizePath(memoriesDir()),
-						date: currentDateValue(),
-						memoryIndex: this.memoryIndexSnapshot,
-					},
-				);
+				const refBody = this.plugin.promptFilesService?.getAgentPrompt(ref.id) ?? DEFAULT_AGENT_PROMPT;
+				// The subagent runs on its own model, so its vault overview honours its own
+				// provider's privacy trust, not the parent's.
+				const refVault = this.buildVaultOverview(ref, refBody);
+				const refBasePrompt = substitutePromptPlaceholders(refBody, {
+					memoryFolder: normalizePath(memoriesDir()),
+					date: currentDateValue(),
+					memoryIndex: this.memoryIndexSnapshot,
+					vaultFolders: refVault.folders,
+					vaultTags: refVault.tags,
+					vaultProperties: refVault.properties,
+				});
 				const promptHint = refBasePrompt.trim().replace(/\s+/g, " ").slice(0, 160);
 				let description: string;
 				if (isSelf) {
@@ -1533,7 +1604,12 @@ export class AgentManager {
 		});
 	}
 
-	private buildRunnableCacheKey(agent: AgentConfig, chatModel: ChatModel, summarizationModel: ChatModel): string {
+	private buildRunnableCacheKey(
+		agent: AgentConfig,
+		chatModel: ChatModel,
+		summarizationModel: ChatModel,
+		systemPrompt: string,
+	): string {
 		return JSON.stringify({
 			provider: chatModel.provider,
 			model: chatModel.model,
@@ -1557,6 +1633,11 @@ export class AgentManager {
 			// session left open overnight would keep telling the model yesterday's date.
 			// Costs at most one rebuild per day per config.
 			today: localIsoDate(),
+			// The assembled prompt itself. The vault overview changes with notes outside the
+			// agent folder — a new folder, tag or property — which no invalidation hook sees, so
+			// without this a cached runnable would keep showing the model a stale overview.
+			// Covers the date and memory index too; the terms above stay for what they document.
+			prompt: fingerprint(systemPrompt),
 		});
 	}
 
@@ -1598,7 +1679,7 @@ export class AgentManager {
 		const systemPrompt = await this.assembleSystemPrompt(selectedAgent);
 		const tools = await this.assembleToolsForAgent(selectedAgent);
 		const subAgents = this.resolveSubAgentSpecs(selectedAgent);
-		const cacheKey = this.buildRunnableCacheKey(selectedAgent, chatModel, summarizationModel);
+		const cacheKey = this.buildRunnableCacheKey(selectedAgent, chatModel, summarizationModel, systemPrompt);
 
 		// Self-heal before resolving: the registry is normally kept in step by the data
 		// store's provider mutations, but a run can still reach a provider that isn't

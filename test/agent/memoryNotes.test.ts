@@ -9,12 +9,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
 	DEFAULT_USER_MEMORY_NOTE,
-	MEMORY_ALWAYS_BUDGET,
+	MEMORY_ALWAYS_CONTEXT_FRACTION,
 	MEMORY_INDEX_BUDGET,
 	MEMORY_INDEX_LINE_MAX,
 	type MemoryIndexEntry,
 	collectMemoryIndex,
+	memoryAlwaysBudget,
 	renderMemoryIndex,
+	selectAlwaysLoaded,
 	seedMemoryFolder,
 } from "../../src/agent/memoryNotes";
 
@@ -23,6 +25,32 @@ const entry = (path: string, summary: string | null, extra: Partial<MemoryIndexE
 	summary,
 	always: false,
 	...extra,
+});
+
+describe("memoryAlwaysBudget", () => {
+	it("is unlimited when the context window is unknown", () => {
+		expect(memoryAlwaysBudget(undefined)).toBeUndefined();
+		expect(memoryAlwaysBudget(0)).toBeUndefined();
+	});
+
+	it("is a share of the context window, in characters", () => {
+		expect(memoryAlwaysBudget(8000)).toBe(Math.floor(8000 * MEMORY_ALWAYS_CONTEXT_FRACTION * 4));
+	});
+});
+
+describe("selectAlwaysLoaded", () => {
+	it("reports the left-out notes in path order and skips notes that are not always-loaded", () => {
+		const { loaded, omitted } = selectAlwaysLoaded(
+			[
+				entry("Agents/Memories/Z.md", "z", { always: true, body: "z".repeat(300) }),
+				entry("Agents/Memories/A.md", "a", { always: true, body: "a".repeat(300) }),
+				entry("Agents/Memories/M.md", "m", { body: "m".repeat(10_000) }),
+			],
+			400,
+		);
+		expect(loaded.map((e) => e.path)).toEqual(["Agents/Memories/A.md"]);
+		expect(omitted.map((e) => e.path)).toEqual(["Agents/Memories/Z.md"]);
+	});
 });
 
 describe("renderMemoryIndex", () => {
@@ -93,17 +121,31 @@ describe("renderMemoryIndex", () => {
 		expect(out).toContain("(always loaded)");
 	});
 
-	it("truncates always-loaded bodies at the budget and says so", () => {
-		const out = renderMemoryIndex([
-			entry("Agents/Memories/A.md", "a", { always: true, body: "x".repeat(MEMORY_ALWAYS_BUDGET - 10) }),
-			entry("Agents/Memories/B.md", "b", { always: true, body: "y".repeat(100) }),
-			entry("Agents/Memories/C.md", "c", { always: true, body: "z".repeat(100) }),
-		]);
-		expect(out).toContain(`${"y".repeat(10)}\n(truncated — read_content for the rest)`);
-		expect(out).toContain("### Agents/Memories/C.md\n(not loaded — always-loaded budget exhausted");
-		// Nothing past the budget leaks in.
-		expect(out).not.toContain("y".repeat(11));
-		expect(out).not.toContain("zzz");
+	// No fixed cap: a note cut off mid-way can leave the model acting on half a rule.
+	it("loads always-loaded notes in full when no budget applies", () => {
+		const body = "x".repeat(50_000);
+		const out = renderMemoryIndex([entry("Agents/Memories/A.md", "a", { always: true, body })]);
+		expect(out).toContain(`### Agents/Memories/A.md\n${body}`);
+		expect(out).not.toContain("too large");
+	});
+
+	it("leaves out a note that does not fit whole, never cutting it, and marks it in the list", () => {
+		const out = renderMemoryIndex(
+			[
+				entry("Agents/Memories/A.md", "a", { always: true, body: "x".repeat(900) }),
+				entry("Agents/Memories/B.md", "b", { always: true, body: "y".repeat(200) }),
+				entry("Agents/Memories/C.md", "c", { always: true, body: "z".repeat(50) }),
+			],
+			1000,
+		);
+		expect(out).toContain(`### Agents/Memories/A.md\n${"x".repeat(900)}`);
+		expect(out).not.toContain("yyy");
+		// A later, smaller note still fits after a larger one was left out.
+		expect(out).toContain(`### Agents/Memories/C.md\n${"z".repeat(50)}`);
+		expect(out).toContain(
+			"- `Agents/Memories/B.md` — b (always loaded, but too large for this model: read_content it)",
+		);
+		expect(out).toContain("- `Agents/Memories/A.md` — a (always loaded)");
 	});
 
 	it("stops listing at the index budget and reports how many are hidden", () => {
