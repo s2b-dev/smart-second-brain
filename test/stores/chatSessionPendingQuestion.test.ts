@@ -89,6 +89,7 @@ describe("pendingToolInterrupts", () => {
 describe("ChatSession — answering an open question", () => {
 	const resumeFromInterrupt = vi.fn();
 	const streamQuery = vi.fn();
+	const getCheckpointHistory = vi.fn();
 
 	type Internals = {
 		runStream: (
@@ -117,7 +118,12 @@ describe("ChatSession — answering an open question", () => {
 	beforeEach(() => {
 		resumeFromInterrupt.mockReset();
 		streamQuery.mockReset();
-		setPlugin({ agentManager: { resumeFromInterrupt, streamQuery } } as unknown as SecondBrainPlugin);
+		getCheckpointHistory.mockReset();
+		// By default the stubbed run saves nothing.
+		getCheckpointHistory.mockResolvedValue(pausedHistory());
+		setPlugin({
+			agentManager: { resumeFromInterrupt, streamQuery, getCheckpointHistory },
+		} as unknown as SecondBrainPlugin);
 	});
 
 	afterEach(() => {
@@ -165,6 +171,42 @@ describe("ChatSession — answering an open question", () => {
 		const { session } = makeSession();
 		await session.answerInterrupts(() => "the answer");
 		// The stubbed run wrote no checkpoint, so the thread is still paused where it was.
+		expect(session.pendingInterrupts).toEqual([INTERRUPT]);
+	});
+
+	it("does not reopen a question whose answer was saved before the run failed", async () => {
+		const { session } = makeSession();
+		// The run wrote the answer, then died on the next model call: runStream never
+		// synced the graph, but the thread has moved past the paused checkpoint.
+		const answered = new ToolMessage({ content: "the answer", tool_call_id: "call_ask" });
+		getCheckpointHistory.mockResolvedValue([
+			...pausedHistory(),
+			checkpoint("c", 2, [HUMAN, ASKING, answered], "b"),
+		]);
+
+		await session.answerInterrupts(() => "the answer");
+
+		expect(session.pendingInterrupts).toEqual([]);
+		expect(session.getActiveCheckpointId()).toBe("c");
+	});
+
+	it("carries the composer's context with a typed answer, apart from the reply", async () => {
+		const { session } = makeSession();
+
+		await session.sendMessage("use these notes", undefined, undefined, undefined, [
+			{ path: "Notes/Plan.md", basename: "Plan" },
+		]);
+
+		const [, , , responses] = resumeFromInterrupt.mock.calls[0];
+		const sent = JSON.parse(responses[0].message) as { reply: string; context?: string };
+		expect(sent.reply).toBe("use these notes");
+		expect(sent.context).toContain("[[Notes/Plan]]");
+	});
+
+	it("refuses attachments on a typed answer instead of dropping them", async () => {
+		const { session } = makeSession();
+		await expect(session.sendMessage("see file", [{ path: "a.png" } as never])).rejects.toThrow(/question/);
+		expect(resumeFromInterrupt).not.toHaveBeenCalled();
 		expect(session.pendingInterrupts).toEqual([INTERRUPT]);
 	});
 

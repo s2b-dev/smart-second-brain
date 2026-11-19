@@ -97,11 +97,16 @@ export function formatAnswersResult(questions: AskQuestion[], answers: (Question
 	});
 }
 
-/** The tool result when the user answered by typing a chat message instead. */
-export function formatReplyResult(reply: string): string {
+/**
+ * The tool result when the user answered by typing a chat message instead. `context` is
+ * what the composer attached to that message (open notes, a selection), kept apart from
+ * the reply so the chat shows the user's words alone.
+ */
+export function formatReplyResult(reply: string, context?: string): string {
 	return JSON.stringify({
 		status: "replied",
 		reply: reply.trim(),
+		...(context?.trim() ? { context: context.trim() } : {}),
 		note: "The user did not pick from the options and replied in their own words instead. Treat the reply as their answer.",
 	});
 }

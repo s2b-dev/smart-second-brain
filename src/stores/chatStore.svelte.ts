@@ -303,7 +303,14 @@ export class ChatSession {
 		// tool call without a result, which providers reject for the rest of the thread.
 		const askingPair = this.messages.at(-1);
 		if (this.pendingInterrupts.length > 0 && askingPair) {
-			await this.answerInterrupts(() => formatReplyResult(content));
+			// An answer is text. Refuse files rather than drop them without a word.
+			if (attachments?.length) {
+				throw new Error("Answer or dismiss the agent's question before attaching files.");
+			}
+			// Whatever the composer attached to the message (open notes, a selection,
+			// graph notes) travels with the answer, as it would with a normal turn.
+			const context = this.augmentWithVisibleNotes("", visibleNotes, selection, graphNotes);
+			await this.answerInterrupts(() => formatReplyResult(content, context));
 			return askingPair.id;
 		}
 
@@ -370,6 +377,7 @@ export class ChatSession {
 		);
 
 		const plugin = getPlugin();
+		const beforeCheckpointIds = new Set(this.graphState.nodes.keys());
 		checkpointDebug("resume.parent", { threadId: this.id, parentCheckpointId: checkpointId });
 		try {
 			await this.runStream(
@@ -385,17 +393,42 @@ export class ChatSession {
 				{
 					reloadAfter: true,
 					parentCheckpointId: checkpointId,
-					beforeCheckpointIds: new Set(this.graphState.nodes.keys()),
+					beforeCheckpointIds,
 					// The wait for the user is not thinking time, but what the agent did
 					// before asking is: keep it in the turn's total.
 					elapsedBeforeMs: assistant.thinkingDurationMs,
 				},
 			);
 		} finally {
-			// A run that failed or was stopped before writing a checkpoint leaves the
-			// thread paused where it was: the question is still open.
-			this.pendingInterrupts = pendingToolInterrupts(this.graphState);
+			await this.settleAfterResume(checkpointId, beforeCheckpointIds);
 		}
+	}
+
+	/**
+	 * Decide what is still open once a resumed run is over.
+	 *
+	 * A run that succeeded has synced the graph and moved the active checkpoint on. One
+	 * that failed or was stopped has not, and there are two cases to tell apart. If it
+	 * wrote no checkpoint, the thread is still paused where it was and the question is
+	 * still open. If it saved the answer and failed later (the next model call, say),
+	 * the question is settled in the thread even though this session's graph does not
+	 * know yet: showing it again would have the user answer from the stale checkpoint
+	 * and fork the thread. So look at what was actually saved before deciding.
+	 */
+	private async settleAfterResume(pausedCheckpointId: string, beforeCheckpointIds: Set<string>): Promise<void> {
+		if (this.graphState.activeCheckpointId === pausedCheckpointId) {
+			try {
+				const history = await getPlugin().agentManager.getCheckpointHistory(this.id);
+				if (history.some((item) => !beforeCheckpointIds.has(item.checkpointId))) {
+					await this.syncGraphAfterRun(pausedCheckpointId, beforeCheckpointIds);
+					// Brings the saved run error along, as opening the chat afresh would.
+					await this.onNeedReload?.();
+				}
+			} catch (err) {
+				Logger.warn("[ChatSession] Failed to refresh after an interrupted resume:", err);
+			}
+		}
+		this.pendingInterrupts = pendingToolInterrupts(this.graphState);
 	}
 
 	/** Abort current streaming (if any) */
