@@ -305,7 +305,13 @@ export class ChatSession {
 	): Promise<UUIDv7> {
 		// The run that just ended may still be finding out whether its question was
 		// answered; deciding "new turn or answer" before it knows would be a guess.
-		if (this.resumeSettling) await this.resumeSettling;
+		if (this.resumeSettling) {
+			await this.resumeSettling;
+			// Another caller that waited alongside may have started a run meanwhile.
+			if (this.messageState !== MessageState.idle) {
+				throw new Error("A response is already in progress for this chat.");
+			}
+		}
 
 		// A message sent while a question is open is the answer to it. It must go
 		// through the resume path: appended as a new turn it would leave the question's
@@ -1450,10 +1456,11 @@ export class ChatSession {
 	}
 
 	async summarizeHistoryNow(): Promise<void> {
+		// Wait first, check second: two callers that waited together must not both pass.
+		if (this.resumeSettling) await this.resumeSettling;
 		if (this.messageState !== MessageState.idle) {
 			throw new Error("Cannot summarize while another response is in progress.");
 		}
-		if (this.resumeSettling) await this.resumeSettling;
 		if (this.pendingInterrupts.length > 0) {
 			throw new Error("Answer or dismiss the open question before summarizing.");
 		}

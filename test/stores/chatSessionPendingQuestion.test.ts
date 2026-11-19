@@ -4,7 +4,7 @@ import type { CheckpointHistoryItem } from "../../src/agent/Agent";
 import type { ToolInterrupt } from "../../src/agent/toolInterrupts";
 import type SecondBrainPlugin from "../../src/main";
 import { ChatSession } from "../../src/stores/chatStore.svelte";
-import { buildCheckpointGraph, pendingToolInterrupts } from "../../src/stores/chatTimeline";
+import { MessageState, buildCheckpointGraph, pendingToolInterrupts } from "../../src/stores/chatTimeline";
 import { setPlugin } from "../../src/stores/state.svelte";
 import { parseAskQuestionResult } from "../../src/utils/askQuestion";
 
@@ -216,6 +216,32 @@ describe("ChatSession — answering an open question", () => {
 
 		expect(streamQuery).not.toHaveBeenCalled();
 		expect(resumeFromInterrupt).toHaveBeenCalledTimes(2);
+	});
+
+	it("lets only one of two messages sent during reconciliation through", async () => {
+		const { session, runStream } = makeSession();
+		let releaseHistory: (items: CheckpointHistoryItem[]) => void = () => {};
+		getCheckpointHistory.mockReturnValueOnce(
+			new Promise<CheckpointHistoryItem[]>((resolve) => {
+				releaseHistory = resolve;
+			}),
+		);
+		const answering = session.answerInterrupts(() => "the answer");
+		await vi.waitFor(() => expect(getCheckpointHistory).toHaveBeenCalled());
+
+		// The first waiter's run holds the chat busy, as a real stream would.
+		runStream.mockImplementationOnce(async () => {
+			session.messageState = MessageState.answering;
+		});
+		const first = session.sendMessage("first");
+		const second = session.sendMessage("second");
+		releaseHistory(pausedHistory());
+		await answering;
+
+		await expect(second).rejects.toThrow(/already in progress/);
+		await first;
+		expect(resumeFromInterrupt).toHaveBeenCalledTimes(1);
+		expect(streamQuery).not.toHaveBeenCalled();
 	});
 
 	it("carries the composer's context with a typed answer, apart from the reply", async () => {
