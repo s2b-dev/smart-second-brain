@@ -263,12 +263,19 @@ async function completeFromRedirect(query: URLSearchParams): Promise<string | nu
  * The `obsidian://s2b-huggingface-auth` protocol handler (mobile redirect). Works whether
  * or not this session started the sign-in: after an iOS restart only the persisted grant
  * is left, and completing it still saves the session the provider reads.
+ *
+ * Resolves true when it completed a sign-in that no setup screen is waiting for (Obsidian
+ * restarted while the user was approving). The provider draft that screen was editing did
+ * not survive the restart, so the caller has to put a provider in place for the session.
  */
-export async function handleHuggingFaceProtocolRedirect(params: Record<string, string>): Promise<void> {
+export async function handleHuggingFaceProtocolRedirect(params: Record<string, string>): Promise<boolean> {
+	const waitedFor = pendingSignIn !== null;
 	const failure = await completeFromRedirect(new URLSearchParams(params));
 	if (failure) {
 		Logger.warn("Hugging Face sign-in redirect failed:", failure);
+		return false;
 	}
+	return !waitedFor;
 }
 
 // =============================================================================
@@ -396,6 +403,13 @@ async function refreshSession(stored: OAuthSession & { refreshToken: string }): 
 		client_id: HUGGING_FACE_CLIENT_ID,
 	});
 	const tokens = readTokens(response);
+	// The user may have disconnected, or signed in again, while the request was out. The
+	// reply then belongs to a session that no longer exists: saving it would sign a
+	// disconnected user back in, and clearing on a rejection would sign out the new one.
+	const current = getHuggingFaceSession();
+	if (current?.refreshToken !== stored.refreshToken) {
+		return current;
+	}
 	if (response.status === 200 && tokens?.access_token) {
 		const next = toSession(tokens, stored);
 		saveHuggingFaceSession(next);

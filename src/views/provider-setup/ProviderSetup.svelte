@@ -462,8 +462,9 @@ $effect(() => {
 type ConnectionStatus = "idle" | "checking" | "connected" | "failed";
 const connectionStatus = $derived.by<ConnectionStatus>(() => {
 	// A failed sign-in is the verdict until the next attempt: the auth query would only
-	// report the generic "not signed in" of the session the sign-in never created.
-	if (signInError) return "failed";
+	// report the generic "not signed in" of the session the sign-in never created. A key
+	// entered afterwards that connects replaces it, though.
+	if (signInError && !(revealApiKey && query.data?.success)) return "failed";
 	if (!hasCredentials) return "idle";
 	if (query.isPending || query.isFetching) return "checking";
 	if (query.data?.success) return "connected";
@@ -471,7 +472,7 @@ const connectionStatus = $derived.by<ConnectionStatus>(() => {
 	return "idle";
 });
 const connectionError = $derived(
-	signInError ??
+	(connectionStatus === "failed" ? signInError : null) ??
 		(query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed"),
 );
 

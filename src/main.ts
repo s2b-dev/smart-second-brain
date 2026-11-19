@@ -429,8 +429,10 @@ export default class SecondBrainPlugin extends Plugin {
 		// "Sign in with Hugging Face" on mobile returns through obsidian://s2b-huggingface-auth
 		// (desktop uses a loopback server). Registered at load, not on demand, because iOS
 		// may restart Obsidian while the user is approving in Safari.
-		this.registerObsidianProtocolHandler(HUGGING_FACE_PROTOCOL_ACTION, (params) => {
-			void handleHuggingFaceProtocolRedirect(params);
+		this.registerObsidianProtocolHandler(HUGGING_FACE_PROTOCOL_ACTION, async (params) => {
+			if (await handleHuggingFaceProtocolRedirect(params)) {
+				await this.ensureHuggingFaceProvider();
+			}
 		});
 		// Sync the Logger's level to the persisted "Developer Console logging" preference.
 		applyVerboseLogging(this.pluginData.isVerbose);
@@ -928,6 +930,25 @@ export default class SecondBrainPlugin extends Plugin {
 
 		StartupProfiler.mark("onload:end", true);
 		this.onloadEndAt = Math.round(performance.now());
+	}
+
+	/**
+	 * Puts a configured Hugging Face provider in place after a sign-in that finished with no
+	 * setup screen waiting: iOS restarted Obsidian while the user was approving in Safari,
+	 * and the startup sweep deleted the unconfigured draft that screen was editing. Without
+	 * this the user would come back signed in but with no provider to use the session.
+	 */
+	private async ensureHuggingFaceProvider(): Promise<void> {
+		const data = this.pluginData;
+		if (data.getProviderIdsByTemplate("huggingface").some((id) => data.isProviderConfigured(id))) return;
+		const taken = new Set(Object.values(data.getAllProviderMeta()).map((m) => m.displayName.trim().toLowerCase()));
+		let n = 1;
+		const name = () => (n === 1 ? "Hugging Face" : `Hugging Face ${n}`);
+		const id = () => (n === 1 ? "huggingface" : `huggingface-${n}`);
+		while (taken.has(name().toLowerCase()) || data.getProviderMeta(id())) n++;
+		await data.addProviderInstance(id(), { templateId: "huggingface", displayName: name() });
+		data.setProviderConfigured(id(), true);
+		new Notice("Connected to Hugging Face.");
 	}
 
 	onunload() {

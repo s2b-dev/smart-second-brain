@@ -203,14 +203,48 @@ describe("mobile sign-in (obsidian:// redirect)", () => {
 		const second = await loadModules();
 		requestUrlMock = vi.mocked((await import("obsidian")).requestUrl);
 		const bodies = replyWith([TOKENS]);
-		await second.oauth.handleHuggingFaceProtocolRedirect({ action: "s2b-huggingface-auth", code: "c", state });
+		// No setup screen survived the restart, so the caller must put a provider in place.
+		await expect(
+			second.oauth.handleHuggingFaceProtocolRedirect({ action: "s2b-huggingface-auth", code: "c", state }),
+		).resolves.toBe(true);
 
 		expect(bodies[0].get("redirect_uri")).toBe("obsidian://s2b-huggingface-auth");
 		expect(second.runtime.getHuggingFaceSession()?.accessToken).toBe("hf_oauth_access");
 
 		// The grant is single-use: replaying the same link does nothing.
-		await second.oauth.handleHuggingFaceProtocolRedirect({ action: "s2b-huggingface-auth", code: "c", state });
+		await expect(
+			second.oauth.handleHuggingFaceProtocolRedirect({ action: "s2b-huggingface-auth", code: "c", state }),
+		).resolves.toBe(false);
 		expect(requestUrlMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("reports no restart when the setup screen is still waiting for the sign-in", async () => {
+		Platform.isDesktopApp = false;
+		const { oauth } = await loadModules();
+		const hrefs: string[] = [];
+		const realLocation = window.location;
+		Object.defineProperty(window, "location", {
+			configurable: true,
+			value: {
+				set href(url: string) {
+					hrefs.push(url);
+				},
+			},
+		});
+		let done: Promise<void>;
+		try {
+			done = oauth.signInWithHuggingFace(CLIENT_ID);
+			await vi.waitFor(() => expect(hrefs).toHaveLength(1));
+		} finally {
+			Object.defineProperty(window, "location", { configurable: true, value: realLocation });
+		}
+		const state = new URL(hrefs[0]).searchParams.get("state") ?? "";
+		replyWith([TOKENS]);
+
+		await expect(
+			oauth.handleHuggingFaceProtocolRedirect({ action: "s2b-huggingface-auth", code: "c", state }),
+		).resolves.toBe(false);
+		await expect(done).resolves.toBeUndefined();
 	});
 });
 
@@ -246,6 +280,48 @@ describe("getValidHuggingFaceSession", () => {
 
 		await expect(oauth.getValidHuggingFaceSession()).resolves.toBeNull();
 		expect(runtime.getHuggingFaceSession()).toBeNull();
+	});
+
+	it("does not sign a user back in who disconnected while the renewal was out", async () => {
+		const { oauth, runtime } = await loadModules();
+		runtime.saveHuggingFaceSession({ accessToken: "old", refreshToken: "r", expiresAt: 0 });
+		let reply!: () => void;
+		requestUrlMock.mockImplementationOnce(
+			(() =>
+				new Promise((resolve) => {
+					reply = () =>
+						resolve({ status: 200, headers: {}, json: TOKENS.json, text: JSON.stringify(TOKENS.json) });
+				})) as unknown as typeof requestUrl,
+		);
+
+		const renewal = oauth.getValidHuggingFaceSession();
+		await vi.waitFor(() => expect(reply).toBeDefined());
+		oauth.clearHuggingFaceSignIn();
+		reply();
+
+		await expect(renewal).resolves.toBeNull();
+		expect(runtime.getHuggingFaceSession()).toBeNull();
+	});
+
+	it("does not sign out a newer sign-in when the old renewal is rejected", async () => {
+		const { oauth, runtime } = await loadModules();
+		runtime.saveHuggingFaceSession({ accessToken: "old", refreshToken: "revoked", expiresAt: 0 });
+		let reply!: () => void;
+		requestUrlMock.mockImplementationOnce(
+			(() =>
+				new Promise((resolve) => {
+					reply = () => resolve({ status: 400, headers: {}, json: { error: "invalid_grant" }, text: "{}" });
+				})) as unknown as typeof requestUrl,
+		);
+
+		const renewal = oauth.getValidHuggingFaceSession();
+		await vi.waitFor(() => expect(reply).toBeDefined());
+		const fresh = { accessToken: "new", refreshToken: "r2", expiresAt: Date.now() + 3_600_000 };
+		runtime.saveHuggingFaceSession(fresh);
+		reply();
+
+		await expect(renewal).resolves.toMatchObject({ accessToken: "new" });
+		expect(runtime.getHuggingFaceSession()?.accessToken).toBe("new");
 	});
 
 	it("keeps the session through a transient server error", async () => {
