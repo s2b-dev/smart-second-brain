@@ -104,6 +104,17 @@ describe("thread replay", () => {
 		expect(ids(all.get("b"))).toEqual(["summary"]);
 	});
 
+	it("applies remove-all stored under a minified class name", () => {
+		// The production bundle minifies RemoveMessage's class name, and that name is
+		// what its serialized id records.
+		const removeAll = new RemoveMessage({ id: REMOVE_ALL_MESSAGES }).toJSON() as { id: string[] };
+		const minified = { ...removeAll, id: [...removeAll.id.slice(0, -1), "Mh"] };
+		const data = thread([checkpoint("root", undefined, [human("h1"), ai("a1")]), checkpoint("a", "root")], {
+			root: [["t1", "messages", [minified, human("summary"), ai("a2")], "", 0]],
+		});
+		expect(ids(replayThreadMessages(data).get("a"))).toEqual(["summary", "a2"]);
+	});
+
 	it("replaces the list on an Overwrite write", () => {
 		const data = thread([checkpoint("root", undefined, [human("h1")]), checkpoint("a", "root")], {
 			root: [["t1", "messages", { __overwrite__: [human("only")] }, "", 0]],

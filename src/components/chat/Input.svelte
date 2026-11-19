@@ -21,6 +21,7 @@ import { getData } from "../../stores/dataStore.svelte";
 import AgentPopover from "./AgentPopover.svelte";
 import ModelSelectButton from "./ModelSelectButton.svelte";
 import PendingChangesBar from "./PendingChangesBar.svelte";
+import TodoListBar from "./TodoListBar.svelte";
 import EditingMessageBar from "./EditingMessageBar.svelte";
 import ContextTray from "./ContextTray.svelte";
 import ContextUsageCircle from "./ContextUsageCircle.svelte";
@@ -1239,6 +1240,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
       <span>Cannot connect to {selectedChatModel.provider} — click to retry</span>
     </button>
   {/if}
+  <TodoListBar {registry} {threadPath} />
   <PendingChangesBar {threadPath} />
   <EditingMessageBar {registry} {threadPath} onCancel={cancelActiveEdit} />
   <!-- Input wrapper with glow effect.
@@ -1645,8 +1647,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      pending-changes list gives way first (its far larger shrink factor): it is
      its own scroller floored at its summary row (see PendingChangesBar.svelte).
      Only then does the card shrink, down to `cardMinHeight` — its controls plus
-     one editor line — so the send row is never squeezed out. The banner and
-     editing bar are single rows and keep their size. */
+     one editor line — so the send row is never squeezed out. The banner,
+     editing bar and task list keep their size (the list scrolls inside a cap). */
   .s2b-chat-input-container {
     max-height: var(--s2b-chat-pane-height);
   }

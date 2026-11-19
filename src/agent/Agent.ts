@@ -5,7 +5,7 @@ import type { RunnableConfig } from "@langchain/core/runnables";
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import type { BaseCheckpointSaver, CheckpointTuple } from "@langchain/langgraph";
 import { MemorySaver } from "@langchain/langgraph";
-import { type ReactAgent, createAgent, summarizationMiddleware } from "langchain";
+import { type ReactAgent, createAgent, modelRefusalMiddleware, summarizationMiddleware } from "langchain";
 import { createSubAgentMiddleware } from "deepagents/browser";
 import { Notice, TFile } from "obsidian";
 
@@ -28,6 +28,7 @@ import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { extractTextFromPdf } from "../utils/pdfExtractor";
 import { Logger } from "../utils/logging";
 import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
+import { createContextOverflowRecoveryMiddleware } from "./contextOverflow";
 import { createGenerationMetadataMiddleware } from "./generationMetadata";
 import { createPromptCachingMiddleware } from "./promptCaching";
 import { normalizeMessages } from "./messageNormalization";
@@ -630,6 +631,10 @@ export class Agent {
 				middleware: [
 					createGenerationMetadataMiddleware(),
 					...this.buildSummarizationMiddleware(selectedModel, systemPrompt, resolvedSummarization),
+					// A refusal is a successful response to the provider, so without this
+					// the turn ends as an empty answer; with it, the turn fails with the
+					// provider's explanation (see `extractErrorMessage`).
+					modelRefusalMiddleware(),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
 					// Last, so it wraps the model call closest to the provider and sees
 					// the request after summarization has rewritten the history.
@@ -659,7 +664,7 @@ export class Agent {
 		const model = summarizationModel?.instance ?? selectedModel.instance;
 		const contextWindow = selectedModel.options?.contextWindow;
 		const triggerTokens = getSummarizationTriggerTokens(contextWindow);
-		if (!triggerTokens) {
+		if (!contextWindow || !triggerTokens) {
 			Logger.warn(
 				`[Agent] Summarization disabled: model "${selectedModel.name}" has no contextWindow configured. Long threads will not be summarized and may hit provider context limits.`,
 			);
@@ -675,34 +680,42 @@ export class Agent {
 		// fire at the same total the context meter shows (#545).
 		const messageTriggerTokens = Math.max(triggerTokens - estimateSystemPromptTokens(systemPrompt), 1);
 
-		return [
-			// Guarded so a failed summary aborts the trim instead of replacing the
-			// trimmed history with an error stub (#435).
-			guardSummarizationFailure(
-				summarizationMiddleware({
-					model,
-					trigger: { tokens: messageTriggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
-					keep: { messages: SUMMARY_KEEP_MESSAGE_COUNT },
-					summaryPrefix: SUMMARY_PREFIX,
-					summaryPrompt: SUMMARY_PROMPT,
-					tokenCounter: countMessageTokens,
-					trimTokensToSummarize,
-				}),
-				{
-					tokenCounter: countMessageTokens,
-					trimTokensToSummarize,
-					onHistoryDropped: ({ droppedTokens }) => {
-						new Notice(
-							`Smart Second Brain: about ${formatThousands(droppedTokens)} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.`,
-						);
-					},
-					onRepeatedFailure: (failures) => {
-						new Notice(
-							`Smart Second Brain: summarizing this chat's history failed ${failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error.`,
-						);
-					},
+		// Guarded so a failed summary aborts the trim instead of replacing the
+		// trimmed history with an error stub (#435).
+		const summarizer = guardSummarizationFailure(
+			summarizationMiddleware({
+				model,
+				trigger: { tokens: messageTriggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
+				keep: { messages: SUMMARY_KEEP_MESSAGE_COUNT },
+				summaryPrefix: SUMMARY_PREFIX,
+				summaryPrompt: SUMMARY_PROMPT,
+				tokenCounter: countMessageTokens,
+				trimTokensToSummarize,
+			}),
+			{
+				tokenCounter: countMessageTokens,
+				trimTokensToSummarize,
+				onHistoryDropped: ({ droppedTokens }) => {
+					new Notice(
+						`Smart Second Brain: about ${formatThousands(droppedTokens)} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.`,
+					);
 				},
-			),
+				onRepeatedFailure: (failures) => {
+					new Notice(
+						`Smart Second Brain: summarizing this chat's history failed ${failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error.`,
+					);
+				},
+			},
+		);
+
+		return [
+			summarizer,
+			// Catches the provider's "prompt too long" when the request overflows
+			// before the proactive trigger fires, summarizes and retries once.
+			createContextOverflowRecoveryMiddleware({
+				summarizer: summarizer.beforeModel as never,
+				tokenCounter: countMessageTokens,
+			}),
 		] as const;
 	}
 

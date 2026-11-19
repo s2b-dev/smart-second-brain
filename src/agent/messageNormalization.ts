@@ -7,6 +7,7 @@ import {
 	SystemMessage,
 	ToolMessage,
 } from "@langchain/core/messages";
+import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
 
 /**
  * Converts various serialized/plain message formats to proper BaseMessage instances.
@@ -106,6 +107,13 @@ function convertSerializedLangChainMessage(msg: Record<string, unknown>): BaseMe
 			id = lastElement;
 		}
 	}
+
+	// The remove-all marker is recognised by its fixed id, not its class name:
+	// `RemoveMessage` is the one message class without a static `lc_name()`, so it
+	// serializes under `constructor.name`, which the bundle minifies (stored as
+	// e.g. "Mh"). Read as the AIMessage fallback, the marker kept every message a
+	// summarization had removed and showed up as an empty reply.
+	if (id === REMOVE_ALL_MESSAGES) return new RemoveMessage({ id });
 
 	// Determine type from class name in id array
 	const className = readLangChainClassName(msg.id);

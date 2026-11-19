@@ -84,6 +84,8 @@ import { createWebSearchTool } from "./tools/webSearch";
 import { createGetPropertiesTool } from "./tools/getProperties";
 import { createGrepNotesTool } from "./tools/grepNotes";
 import { createLoadSkillTool } from "./tools/loadSkill";
+import { createWriteTodosTool } from "./tools/writeTodos";
+import { ALWAYS_ATTACHED_TOOL_IDS } from "./tools/builtInToolDefaults";
 import { createListDirectoryTool } from "./tools/listDirectory";
 import { createManageNotesTool } from "./tools/manageNotes";
 import { createManageSkillsTool } from "./tools/manageSkills";
@@ -869,11 +871,12 @@ export class AgentManager {
 	 * The set of built-in tool ids an agent may use, derived from its *enabled* skills'
 	 * `allowed-tools` frontmatter. A built-in tool is only bound if some enabled skill
 	 * attaches it — this is what makes `allowed-tools` load-bearing (a "core skill" is a
-	 * skill that carries tools). Unknown tool ids (not built-in) are ignored. `load_skill`
+	 * skill that carries tools). Unknown tool ids (not built-in) are ignored. The
+	 * {@link ALWAYS_ATTACHED_TOOL_IDS} start out attached without a skill. `load_skill`
 	 * is never attached this way — it is bound unconditionally when any skill exists.
 	 */
 	private attachedToolIds(agentCfg: AgentConfig): Set<BuiltInToolId> {
-		const attached = new Set<BuiltInToolId>();
+		const attached = new Set<BuiltInToolId>(ALWAYS_ATTACHED_TOOL_IDS);
 		const cache = this.plugin.skillsService?.getCachedSkills();
 		if (!cache) return attached;
 		const builtIn = new Set<string>(BUILT_IN_TOOL_IDS);
@@ -956,13 +959,17 @@ export class AgentManager {
 	 * override in `toolsConfig` hasn't disabled it (default enabled). Shared between the
 	 * main agent (bindBuiltInTools) and subagent resolution (resolveSubAgentSpecs).
 	 */
-	private buildToolsForAgent(agentCfg: AgentConfig): StructuredToolInterface[] {
+	private buildToolsForAgent(agentCfg: AgentConfig, { forSubAgent = false } = {}): StructuredToolInterface[] {
 		const tools: StructuredToolInterface[] = [];
 
 		// A tool must be attached by an enabled skill AND not vetoed by its per-tool override.
 		// Resolved once here rather than via isToolBound per tool, so the skill cache is only
 		// walked a single time while building the whole tool list.
 		const attached = this.attachedToolIds(agentCfg);
+		// A subagent gets no task list: its run is one scoped step of the parent's work.
+		if (forSubAgent) {
+			for (const id of ALWAYS_ATTACHED_TOOL_IDS) attached.delete(id);
+		}
 		const isToolEnabled = (toolId: BuiltInToolId): boolean => {
 			return attached.has(toolId) && (agentCfg.toolsConfig[toolId]?.enabled ?? true);
 		};
@@ -1032,6 +1039,7 @@ export class AgentManager {
 			["fetch_url", () => createFetchUrlTool()],
 			["web_search", () => createWebSearchTool(agentCfg.id)],
 			["manage_skills", () => createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id)],
+			["write_todos", () => createWriteTodosTool(agentCfg.id)],
 		];
 
 		for (const [toolId, factory] of builtInTools) {
@@ -1269,7 +1277,7 @@ export class AgentManager {
 					ref.chatModel.model,
 					ref.chatModel.modelConfig,
 				);
-				const tools = this.buildToolsForAgent(ref);
+				const tools = this.buildToolsForAgent(ref, { forSubAgent: true });
 				const isSelf = ref.id === parentAgent.id;
 				// A self-reference exposes an isolated-context copy of this agent.
 				// Give it a distinct selector name so it never collides with a

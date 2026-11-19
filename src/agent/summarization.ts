@@ -90,12 +90,14 @@ export function isFailedSummaryContent(content: unknown): boolean {
 	);
 }
 
-function isSummaryMessage(msg: unknown): msg is { additional_kwargs: Record<string, unknown>; content?: unknown } {
+export function isSummaryMessage(
+	msg: unknown,
+): msg is { additional_kwargs: Record<string, unknown>; content?: unknown } {
 	const message = msg as { additional_kwargs?: Record<string, unknown> } | null;
 	return message?.additional_kwargs?.lc_source === "summarization";
 }
 
-function getUpdateMessages(update: unknown): unknown[] | null {
+export function getUpdateMessages(update: unknown): unknown[] | null {
 	if (!update || typeof update !== "object") return null;
 	const messages = (update as { messages?: unknown }).messages;
 	return Array.isArray(messages) ? messages : null;
