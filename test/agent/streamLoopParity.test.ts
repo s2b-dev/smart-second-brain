@@ -31,6 +31,7 @@ vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
 	createMiddleware: (config: unknown) => config,
+	anthropicPromptCachingMiddleware: () => ({ name: "PromptCachingMiddleware" }),
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
