@@ -78,6 +78,7 @@ describe("Agent summarization middleware", () => {
 					expect.objectContaining({ kind: "summary" }),
 					expect.objectContaining({ name: "S2BContextOverflowRecovery" }),
 					expect.objectContaining({ name: "modelRefusalMiddleware" }),
+					expect.objectContaining({ name: "S2BPromptCaching" }),
 				],
 			}),
 		);
@@ -143,6 +144,7 @@ describe("Agent summarization middleware", () => {
 				middleware: [
 					expect.objectContaining({ name: "S2BGenerationMetadata" }),
 					expect.objectContaining({ name: "modelRefusalMiddleware" }),
+					expect.objectContaining({ name: "S2BPromptCaching" }),
 				],
 			}),
 		);

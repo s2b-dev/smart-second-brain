@@ -30,6 +30,7 @@ import { Logger } from "../utils/logging";
 import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
 import { createContextOverflowRecoveryMiddleware } from "./contextOverflow";
 import { createGenerationMetadataMiddleware } from "./generationMetadata";
+import { createPromptCachingMiddleware } from "./promptCaching";
 import { normalizeMessages } from "./messageNormalization";
 import {
 	MESSAGES_CHANNEL,
@@ -635,6 +636,9 @@ export class Agent {
 					// provider's explanation (see `extractErrorMessage`).
 					modelRefusalMiddleware(),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
+					// Last, so it wraps the model call closest to the provider and sees
+					// the request after summarization has rewritten the history.
+					createPromptCachingMiddleware(),
 				] as never,
 			});
 			this.pruneStaleAuthGenerations(cacheKey);
@@ -748,7 +752,7 @@ export class Agent {
 						model: s.model as never,
 						systemPrompt: s.systemPrompt,
 						tools: [...s.tools] as never,
-						middleware: [] as never,
+						middleware: [createPromptCachingMiddleware()] as never,
 						// The runnable name is stamped onto the subagent's AIMessage.name,
 						// which serializes into the OpenAI/Azure request as `messages[N].name`.
 						// OpenAI-compatible endpoints enforce the pattern `^[^\s<|\\/>]+$`
