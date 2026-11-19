@@ -1,20 +1,28 @@
 import { ContextOverflowError } from "@langchain/core/errors";
-import { AIMessage, RemoveMessage } from "@langchain/core/messages";
+import { AIMessage, type BaseMessage, RemoveMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { createMiddleware } from "langchain";
 import { Logger } from "../utils/logging";
 import { getUpdateMessages, isSummaryMessage } from "./summarization";
 
 /**
- * Share of the context window kept verbatim when recovering from an overflow.
- * The rest of the history is summarized. It is far below the proactive keep
- * (12 messages), because the provider has just told us that the window we
- * planned against was too optimistic.
+ * Share of the rejected request's history kept verbatim when recovering from an
+ * overflow; the rest is summarized.
+ *
+ * It is a share of what was SENT, not of the configured window: the overflow is
+ * proof that the configured window is too large, so a share of it can still be
+ * far over the real limit (keep 25% of a configured 1M window against a real 32k
+ * one and nothing gets cut). The amount just rejected is known to exceed the
+ * limit, so a quarter of it, plus a summary, fits unless the configured window
+ * overstates the real one more than about fourfold.
  */
 export const OVERFLOW_KEEP_RATIO = 0.25;
 
 /** The summarization middleware's `beforeModel`, as `guardSummarizationFailure` leaves it. */
 type SummarizerBeforeModel = (state: unknown, runtime: unknown) => Promise<unknown>;
+
+/** The same counter the summarizer uses, so the kept share is measured in its units. */
+type TokenCounter = (messages: BaseMessage[]) => number | Promise<number>;
 
 /**
  * Whether `error`, or any error in its `cause` chain, is the provider telling us
@@ -41,7 +49,7 @@ export function isContextOverflowError(error: unknown): boolean {
  * before summarization ever triggers, and the turn simply fails.
  *
  * On a `ContextOverflowError` this runs the same guarded summarizer, forced to
- * fire and keeping only `keepTokens` of recent history, retries the call once
+ * fire and keeping only {@link OVERFLOW_KEEP_RATIO} of the rejected history, retries the call once
  * with the shortened history, and commits that history with the reply: the
  * returned `Command` carries `[RemoveMessage(all), summary, ...kept, reply]`, the
  * same update shape the proactive summarization writes. It lands after the
@@ -52,7 +60,7 @@ export function isContextOverflowError(error: unknown): boolean {
  */
 export function createContextOverflowRecoveryMiddleware(options: {
 	summarizer: SummarizerBeforeModel;
-	keepTokens: number;
+	tokenCounter: TokenCounter;
 }) {
 	return createMiddleware({
 		name: "S2BContextOverflowRecovery",
@@ -62,13 +70,18 @@ export function createContextOverflowRecoveryMiddleware(options: {
 			} catch (error) {
 				if (!isContextOverflowError(error)) throw error;
 
-				Logger.warn("[Agent] Context window exceeded; summarizing the history and retrying once.", error);
+				const sentTokens = await options.tokenCounter(request.state.messages as BaseMessage[]);
+				const keepTokens = Math.max(Math.floor(sentTokens * OVERFLOW_KEEP_RATIO), 1);
+				Logger.warn(
+					`[Agent] Context window exceeded at ~${sentTokens} history tokens; summarizing all but the last ~${keepTokens} and retrying once.`,
+					error,
+				);
 				const update = await options.summarizer(request.state, {
 					...request.runtime,
 					context: {
 						...((request.runtime.context as Record<string, unknown> | undefined) ?? {}),
 						trigger: { messages: 1 },
-						keep: { tokens: options.keepTokens },
+						keep: { tokens: keepTokens },
 					},
 				});
 				const updateMessages = getUpdateMessages(update);

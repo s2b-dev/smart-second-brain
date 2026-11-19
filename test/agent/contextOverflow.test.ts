@@ -81,7 +81,10 @@ function buildAgent(model: BaseChatModel, summaryModel: BaseChatModel): TestAgen
 		middleware: [
 			createGenerationMetadataMiddleware(),
 			summarizer,
-			createContextOverflowRecoveryMiddleware({ summarizer: summarizer.beforeModel as never, keepTokens: 300 }),
+			createContextOverflowRecoveryMiddleware({
+				summarizer: summarizer.beforeModel as never,
+				tokenCounter: countMessageTokens,
+			}),
 		] as never,
 	});
 	return agent as unknown as TestAgent;

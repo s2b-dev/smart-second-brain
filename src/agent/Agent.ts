@@ -28,7 +28,7 @@ import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { extractTextFromPdf } from "../utils/pdfExtractor";
 import { Logger } from "../utils/logging";
 import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
-import { OVERFLOW_KEEP_RATIO, createContextOverflowRecoveryMiddleware } from "./contextOverflow";
+import { createContextOverflowRecoveryMiddleware } from "./contextOverflow";
 import { createGenerationMetadataMiddleware } from "./generationMetadata";
 import { normalizeMessages } from "./messageNormalization";
 import {
@@ -710,7 +710,7 @@ export class Agent {
 			// before the proactive trigger fires, summarizes and retries once.
 			createContextOverflowRecoveryMiddleware({
 				summarizer: summarizer.beforeModel as never,
-				keepTokens: Math.floor(contextWindow * OVERFLOW_KEEP_RATIO),
+				tokenCounter: countMessageTokens,
 			}),
 		] as const;
 	}
