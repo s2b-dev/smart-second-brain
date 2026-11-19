@@ -16,6 +16,7 @@ vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
 	createMiddleware: (config: unknown) => config,
+	modelRefusalMiddleware: () => ({ name: "modelRefusalMiddleware" }),
 }));
 
 vi.mock("../../src/stores/dataStore.svelte", () => ({
