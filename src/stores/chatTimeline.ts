@@ -722,6 +722,17 @@ function buildCheckpointMessageMappingFromGraph(
  * Messages that survived into the tip keep the tip's copy, so the live window
  * renders exactly as before.
  *
+ * Summary messages are tracked apart from ordinary ones: LangChain's
+ * `summarizationMiddleware` gives the summary the id of the first message it
+ * replaces, so the summary shares an id with the conversation's first
+ * question — or, on a repeat summarization, with the previous summary.
+ * Deduplicating by id alone would render the summary in the first question's
+ * slot and drop the first turn. Instead, a summary counts as new whenever it
+ * appears in a checkpoint that reset the channel (its ids don't extend the
+ * previous checkpoint's — only summarization does that); later checkpoints
+ * that merely carry it forward are skipped. An ordinary message never takes a
+ * summary's copy from the tip.
+ *
  * Marker placement: automatic summarization runs *mid-turn* (before the model
  * answers the message that overflowed the context), so its summary message is
  * moved in front of that turn's human message — otherwise the badge would
@@ -746,25 +757,36 @@ function recoverSummarizedHistory(
 		.filter((node): node is CheckpointNode => !!node)
 		.sort(comparePathOrder);
 
+	const isSummary = (msg: BaseMessage) =>
+		HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization";
+
 	const tipById = new Map<string, BaseMessage>();
 	for (const msg of tipMessages) {
-		if (msg.id) tipById.set(msg.id, msg);
+		if (msg.id && !isSummary(msg)) tipById.set(msg.id, msg);
 	}
 
 	const seen = new Set<string>();
+	// Summary ids rendered since the last channel reset; a reset starts a new
+	// summarization event even when its summary repeats an id (and text).
+	const carriedSummaries = new Set<string>();
+	let prevIds: (string | undefined)[] = [];
 	const display: BaseMessage[] = [];
 	for (const node of path) {
+		const ids = node.messages.map((msg) => msg.id);
+		const extendsPrev = prevIds.length <= ids.length && prevIds.every((id, i) => ids[i] === id);
+		if (!extendsPrev) carriedSummaries.clear();
+		prevIds = ids;
+
 		for (const msg of node.messages) {
 			// Every message that went through LangGraph's reducer carries an id.
 			// If one doesn't, occurrences can't be deduplicated across
 			// checkpoints — bail out to the plain tip rather than risk
 			// rendering duplicated turns.
 			if (!msg.id) return tipMessages;
-			if (seen.has(msg.id)) continue;
-			seen.add(msg.id);
 
-			const rendered = tipById.get(msg.id) ?? msg;
-			if (HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization") {
+			if (isSummary(msg)) {
+				if (carriedSummaries.has(msg.id)) continue;
+				carriedSummaries.add(msg.id);
 				let insertAt = display.length;
 				for (let i = display.length - 1; i >= 0; i--) {
 					if (HumanMessage.isInstance(display[i])) {
@@ -772,10 +794,13 @@ function recoverSummarizedHistory(
 						break;
 					}
 				}
-				display.splice(insertAt, 0, rendered);
+				display.splice(insertAt, 0, msg);
 				continue;
 			}
-			display.push(rendered);
+
+			if (seen.has(msg.id)) continue;
+			seen.add(msg.id);
+			display.push(tipById.get(msg.id) ?? msg);
 		}
 	}
 	return display;
