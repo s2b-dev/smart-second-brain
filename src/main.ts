@@ -41,7 +41,8 @@ import { createSessionRegistry, getSessionRegistry, type SessionRegistry } from 
 import { type ExternalSettingsChange, type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
 import { PendingChangesStore, initPendingChangesStore } from "./stores/pendingChangesStore.svelte";
 import { setPlugin } from "./stores/state.svelte";
-import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
+import { onCodexSessionChange, onHuggingFaceSessionChange } from "./stores/providerRuntime.svelte";
+import { HUGGING_FACE_PROTOCOL_ACTION, handleHuggingFaceProtocolRedirect } from "./providers/huggingfaceOAuth";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerWidgetBlocks } from "./widget/registerWidgetBlocks";
@@ -417,6 +418,22 @@ export default class SecondBrainPlugin extends Plugin {
 				}
 			}),
 		);
+		this.register(
+			onHuggingFaceSessionChange(() => {
+				for (const providerId of this.pluginData.getProviderIdsByTemplate("huggingface")) {
+					invalidateAuthState(providerId);
+					invalidateProviderState(providerId);
+				}
+			}),
+		);
+		// "Sign in with Hugging Face" on mobile returns through obsidian://s2b-huggingface-auth
+		// (desktop uses a loopback server). Registered at load, not on demand, because iOS
+		// may restart Obsidian while the user is approving in Safari.
+		this.registerObsidianProtocolHandler(HUGGING_FACE_PROTOCOL_ACTION, async (params) => {
+			if (await handleHuggingFaceProtocolRedirect(params)) {
+				await this.ensureHuggingFaceProvider();
+			}
+		});
 		// Sync the Logger's level to the persisted "Developer Console logging" preference.
 		applyVerboseLogging(this.pluginData.isVerbose);
 
@@ -913,6 +930,25 @@ export default class SecondBrainPlugin extends Plugin {
 
 		StartupProfiler.mark("onload:end", true);
 		this.onloadEndAt = Math.round(performance.now());
+	}
+
+	/**
+	 * Puts a configured Hugging Face provider in place after a sign-in that finished with no
+	 * setup screen waiting: iOS restarted Obsidian while the user was approving in Safari,
+	 * and the startup sweep deleted the unconfigured draft that screen was editing. Without
+	 * this the user would come back signed in but with no provider to use the session.
+	 */
+	private async ensureHuggingFaceProvider(): Promise<void> {
+		const data = this.pluginData;
+		if (data.getProviderIdsByTemplate("huggingface").some((id) => data.isProviderConfigured(id))) return;
+		const taken = new Set(Object.values(data.getAllProviderMeta()).map((m) => m.displayName.trim().toLowerCase()));
+		let n = 1;
+		const name = () => (n === 1 ? "Hugging Face" : `Hugging Face ${n}`);
+		const id = () => (n === 1 ? "huggingface" : `huggingface-${n}`);
+		while (taken.has(name().toLowerCase()) || data.getProviderMeta(id())) n++;
+		await data.addProviderInstance(id(), { templateId: "huggingface", displayName: name() });
+		data.setProviderConfigured(id(), true);
+		new Notice("Connected to Hugging Face.");
 	}
 
 	onunload() {

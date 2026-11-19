@@ -4,6 +4,12 @@ import {
 	extractCapabilities as extractOpenRouterCapabilities,
 	type OpenRouterModelInfo,
 } from "../providers/openrouterModels";
+import {
+	getCachedHuggingFaceModels,
+	type HuggingFaceModelInfo,
+	huggingFaceDisplayName,
+} from "../providers/huggingfaceModels";
+import type { ProviderTemplateId } from "../types/provider";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
 
 const DEFAULT_CHAT_CONTEXT_WINDOW = 128000;
@@ -40,6 +46,11 @@ export interface ModelHydrationSourceData {
 	modelsDevData?: ModelsDevApiResponse | null;
 	openRouterData?: Map<string, OpenRouterModelInfo> | null;
 	ollamaData?: Map<string, OllamaModelInfo> | null;
+	/**
+	 * Template of the provider instance. Needed where the instance id alone can't tell:
+	 * a Hugging Face instance may be named anything ("hugging-face", "hf-work", …).
+	 */
+	templateId?: ProviderTemplateId;
 	temperature?: number;
 	similarityThresholdDefault?: number;
 }
@@ -104,18 +115,23 @@ function lookupMetadata(
 ): {
 	openRouter?: OpenRouterModelInfo;
 	ollama?: OllamaModelInfo;
+	huggingFace?: HuggingFaceModelInfo;
 	modelsDev?: ReturnType<typeof lookupModelInfoSync>;
 } {
+	const isHuggingFace = sourceData.templateId === "huggingface";
 	const openRouter =
 		provider === "openrouter" && sourceData.openRouterData ? sourceData.openRouterData.get(variantKey) : undefined;
 
 	const ollama = provider === "ollama" && sourceData.ollamaData ? sourceData.ollamaData.get(variantKey) : undefined;
 
+	const huggingFace = isHuggingFace ? getCachedHuggingFaceModels().get(variantKey) : undefined;
+
+	// models.dev keys Hugging Face's catalogue as "huggingface", whatever the instance is called.
 	const modelsDev = sourceData.modelsDevData
-		? lookupModelInfoSync(sourceData.modelsDevData, provider, variantKey)
+		? lookupModelInfoSync(sourceData.modelsDevData, isHuggingFace ? "huggingface" : provider, variantKey)
 		: null;
 
-	return { openRouter, ollama, modelsDev };
+	return { openRouter, ollama, huggingFace, modelsDev };
 }
 
 export function hydrateChatModel(
@@ -123,19 +139,26 @@ export function hydrateChatModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedChatModelMetadata {
-	const { openRouter, ollama, modelsDev } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, huggingFace, modelsDev } = lookupMetadata(provider, variantKey, sourceData);
 	const paramSize = normalizeParamSize(ollama?.parameterSize);
 	const quantization = ollama?.quantization;
 
 	const displayName = buildDisplayName(
 		provider,
 		variantKey,
-		openRouter?.name || ollama?.name || modelsDev?.name,
+		openRouter?.name ||
+			ollama?.name ||
+			modelsDev?.name ||
+			(sourceData.templateId === "huggingface" ? huggingFaceDisplayName(variantKey) : undefined),
 		paramSize,
 	);
 
 	const contextWindow =
-		openRouter?.context_length || ollama?.contextLength || modelsDev?.limit?.context || DEFAULT_CHAT_CONTEXT_WINDOW;
+		openRouter?.context_length ||
+		ollama?.contextLength ||
+		huggingFace?.contextLength ||
+		modelsDev?.limit?.context ||
+		DEFAULT_CHAT_CONTEXT_WINDOW;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
 	const outputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.completion);
@@ -153,12 +176,23 @@ export function hydrateChatModel(
 		temperature: sourceData.temperature,
 		capabilities: {
 			toolCalls:
-				openRouterCapabilities?.supportsToolCalls ?? ollama?.supportsTools ?? modelsDev?.tool_call ?? undefined,
+				openRouterCapabilities?.supportsToolCalls ??
+				ollama?.supportsTools ??
+				huggingFace?.supportsTools ??
+				modelsDev?.tool_call ??
+				undefined,
 			vision:
-				openRouterCapabilities?.supportsVision ?? ollama?.supportsVision ?? modelsDev?.attachment ?? undefined,
+				openRouterCapabilities?.supportsVision ??
+				ollama?.supportsVision ??
+				huggingFace?.supportsVision ??
+				modelsDev?.attachment ??
+				undefined,
 			reasoning: openRouterCapabilities?.supportsReasoning ?? modelsDev?.reasoning ?? undefined,
 			structuredOutput:
-				openRouterCapabilities?.supportsStructuredOutput ?? modelsDev?.structured_output ?? undefined,
+				openRouterCapabilities?.supportsStructuredOutput ??
+				huggingFace?.supportsStructuredOutput ??
+				modelsDev?.structured_output ??
+				undefined,
 		},
 		pricing: hasPricing ? { inputUsdPer1M, outputUsdPer1M } : undefined,
 	};

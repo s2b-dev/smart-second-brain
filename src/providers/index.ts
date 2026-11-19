@@ -11,6 +11,7 @@ import { anthropicProvider } from "./anthropic";
 import { ollamaProvider } from "./ollama";
 import { openaiProvider } from "./openai";
 import { openrouterProvider } from "./openrouter";
+import { huggingfaceProvider } from "./huggingface";
 import { openAICodexProvider } from "./openai-codex";
 import { createOmlxProvider } from "./omlx";
 
@@ -50,6 +51,11 @@ const PROVIDER_TEMPLATES: readonly ProviderTemplateDefinition[] = [
 		id: "openrouter",
 		displayName: "OpenRouter",
 		description: "OpenRouter account and model catalog.",
+	},
+	{
+		id: "huggingface",
+		displayName: "Hugging Face",
+		description: "Open models from Hugging Face's inference providers.",
 	},
 ] as const;
 
@@ -94,6 +100,12 @@ function createTemplateDefinition(
 		case "openrouter":
 			return {
 				...openrouterProvider,
+				id: instanceId,
+				displayName: meta.displayName,
+			};
+		case "huggingface":
+			return {
+				...huggingfaceProvider,
 				id: instanceId,
 				displayName: meta.displayName,
 			};

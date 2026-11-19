@@ -16,6 +16,7 @@ import OllamaLogo from "../../components/ui/logos/OllamaLogo.svelte";
 import OpenAILogo from "../../components/ui/logos/OpenAILogo.svelte";
 import OpenRouterLogo from "../../components/ui/logos/OpenRouterLogo.svelte";
 import OmlxLogo from "../../components/ui/logos/OmlxLogo.svelte";
+import HuggingFaceLogo from "../../components/ui/logos/HuggingFaceLogo.svelte";
 import {
 	createAuthStateQuery,
 	getProviderStateQueryOptions,
@@ -60,7 +61,15 @@ const isConfigured = $derived(data.isProviderConfigured(providerId));
 
 // Picker display order: lead with the most-used providers so the grid scans fast.
 // Templates not listed fall to the end in their registry order.
-const PICKER_ORDER: ProviderTemplateId[] = ["openai-compatible", "omlx", "openrouter", "ollama", "openai", "anthropic"];
+const PICKER_ORDER: ProviderTemplateId[] = [
+	"openai-compatible",
+	"omlx",
+	"openrouter",
+	"ollama",
+	"openai",
+	"anthropic",
+	"huggingface",
+];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
 const providerTemplates = [...getAllProviderTemplates()]
 	.filter((t) => t.id !== "omlx" || Platform.isMacOS)
@@ -159,7 +168,7 @@ async function handleOAuthSignIn() {
 		// A user-initiated cancel isn't a failure — clear the flow silently so the CTA
 		// returns to "Sign in" and the user can retry. Cancellation markers set their name.
 		const name = error instanceof Error ? error.name : "";
-		if (name === "OpenRouterSignInCancelledError" || name === "OpenAICodexSignInCancelledError") {
+		if (name.endsWith("SignInCancelledError")) {
 			signInError = null;
 		} else {
 			signInError = error instanceof Error ? error.message : String(error);
@@ -234,6 +243,7 @@ const TEMPLATE_LOGOS: Partial<Record<ProviderTemplateId, Component<LogoProps>>> 
 	ollama: OllamaLogo,
 	omlx: OmlxLogo,
 	openrouter: OpenRouterLogo,
+	huggingface: HuggingFaceLogo,
 };
 
 function getTemplateLogo(id: ProviderTemplateId): Component<LogoProps> {
@@ -451,6 +461,10 @@ $effect(() => {
 // below is the primary signal; the header icon stays as a secondary cue.
 type ConnectionStatus = "idle" | "checking" | "connected" | "failed";
 const connectionStatus = $derived.by<ConnectionStatus>(() => {
+	// A failed sign-in is the verdict until the next attempt: the auth query would only
+	// report the generic "not signed in" of the session the sign-in never created. A key
+	// entered afterwards that connects replaces it, though.
+	if (signInError && !(revealApiKey && query.data?.success)) return "failed";
 	if (!hasCredentials) return "idle";
 	if (query.isPending || query.isFetching) return "checking";
 	if (query.data?.success) return "connected";
@@ -458,7 +472,8 @@ const connectionStatus = $derived.by<ConnectionStatus>(() => {
 	return "idle";
 });
 const connectionError = $derived(
-	query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed",
+	(connectionStatus === "failed" ? signInError : null) ??
+		(query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed"),
 );
 
 // Done must track the *commit*, not just the connection. A valid connection alone isn't

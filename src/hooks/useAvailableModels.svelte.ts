@@ -300,6 +300,7 @@ export class AvailableModels {
 				modelsDevData: this.#modelsDevData,
 				openRouterData: this.#openRouterData,
 				ollamaData,
+				templateId: this.#data.getProviderTemplateId(model.provider),
 				temperature: model.modelConfig.temperature,
 			}),
 		);

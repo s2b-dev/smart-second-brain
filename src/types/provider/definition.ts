@@ -90,7 +90,7 @@ interface ProviderOAuthCapability {
 	/**
 	 * Whether this OAuth flow works on Obsidian mobile. Loopback-server flows (Codex) are
 	 * desktop-only; flows that catch the redirect via an `obsidian://` protocol handler
-	 * (OpenRouter) work everywhere. The setup modal gates the sign-in CTA on
+	 * (OpenRouter, Hugging Face on mobile) work everywhere. The setup modal gates the sign-in CTA on
 	 * `Platform.isDesktopApp || worksOnMobile`. Defaults to false (desktop-only) when omitted.
 	 */
 	worksOnMobile?: boolean;

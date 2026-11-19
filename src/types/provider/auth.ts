@@ -69,10 +69,15 @@ export interface AuthObject {
 	codexSession?: CodexSession;
 }
 
-export interface CodexSession {
+/** A signed-in OAuth session: a short-lived access token and the means to renew it. */
+export interface OAuthSession {
 	accessToken: string;
 	refreshToken?: string;
+	/** Epoch ms after which the access token is no longer accepted. */
 	expiresAt: number;
+}
+
+export interface CodexSession extends OAuthSession {
 	accountId?: string;
 }
 
