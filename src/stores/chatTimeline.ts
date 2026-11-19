@@ -9,6 +9,7 @@
  */
 import { AIMessage, type BaseMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import type { CheckpointHistoryItem } from "../agent/Agent";
+import type { ToolInterrupt } from "../agent/toolInterrupts";
 import type { ChatModelConfig } from "../providers/index";
 import type { ChatAttachment, ReviewStatusRef } from "../types/shared";
 import { type UUIDv7, genUUIDv7 } from "../utils/uuid7Validator";
@@ -241,6 +242,8 @@ export interface CheckpointNode {
 	messages: BaseMessage[];
 	children: string[];
 	ts?: string;
+	/** Tool calls this checkpoint's run paused on (see `pendingToolInterrupts`). */
+	interrupts?: ToolInterrupt[];
 }
 
 export interface CheckpointGraphState {
@@ -417,6 +420,7 @@ export function buildCheckpointGraph(checkpoints: CheckpointHistoryItem[]): Chec
 			messages: checkpoint.messages,
 			children: [],
 			ts: checkpoint.ts,
+			interrupts: checkpoint.interrupts,
 		});
 	}
 
@@ -458,6 +462,30 @@ export function buildCheckpointGraph(checkpoints: CheckpointHistoryItem[]): Chec
 		nodes,
 		rootCheckpointId,
 	};
+}
+
+/**
+ * The tool calls the active branch is paused on, waiting for the user.
+ *
+ * A pause is a property of the branch tip: LangGraph records the interrupt on the
+ * checkpoint the run stopped at, and continuing writes that checkpoint's children. So an
+ * interrupt still waits iff its checkpoint is the active one, nothing descends from it,
+ * and its call has no result in the transcript yet. Derived from the graph alone, which
+ * is why a question survives reloads and comes back when its branch is selected again.
+ */
+export function pendingToolInterrupts(graph: CheckpointGraphState): ToolInterrupt[] {
+	const active = graph.activeCheckpointId ? graph.nodes.get(graph.activeCheckpointId) : undefined;
+	if (!active?.interrupts?.length || active.children.length > 0) return [];
+	const answered = new Set<string>();
+	for (const message of active.messages) {
+		if (ToolMessage.isInstance(message) && message.tool_call_id) answered.add(message.tool_call_id);
+	}
+	const seen = new Set<string>();
+	return active.interrupts.filter((interrupt) => {
+		if (answered.has(interrupt.toolCallId) || seen.has(interrupt.id)) return false;
+		seen.add(interrupt.id);
+		return true;
+	});
 }
 
 function resolveFallbackCheckpoint(graph: CheckpointGraphState, fromCheckpointId?: string): string | undefined {

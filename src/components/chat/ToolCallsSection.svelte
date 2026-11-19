@@ -699,7 +699,22 @@ const PROSE_MARKDOWN_CLASS =
 {/snippet}
 
 {#snippet outputBody(model: ToolOutputRenderModel, toolCallId: string = "")}
-  {#if model.kind === "markdown"}
+  {#if model.kind === "ask_question"}
+    {#if model.result.status === "answered"}
+      <div class="tool-output-kv-list">
+        {#each model.result.answers as item, i (i)}
+          <div class="tool-output-kv-row">
+            <span class="tool-output-kv-key">{item.question}</span>
+            <span class="tool-output-kv-value">{item.answer.length > 0 ? item.answer.join(", ") : "No answer"}</span>
+          </div>
+        {/each}
+      </div>
+    {:else if model.result.status === "replied"}
+      <div class="tool-output-scalar">{model.result.reply}</div>
+    {:else}
+      <div class="tool-output-scalar">Dismissed without an answer.</div>
+    {/if}
+  {:else if model.kind === "markdown"}
     <MarkdownRenderer
       content={model.markdown}
       class="s2b-tool-output-content markdown-preview-view !s2b-m-0 !s2b-p-0 s2b-text-[0.82rem] s2b-leading-[1.6] s2b-break-words [&_p]:s2b-my-1 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_code]:s2b-bg-[--background-primary] [&_code]:s2b-px-1 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.88em] [&_pre]:s2b-bg-[--background-primary] [&_pre]:s2b-p-2.5 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-1.5 [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0"
