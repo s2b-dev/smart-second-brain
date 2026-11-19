@@ -19,9 +19,7 @@ export type {
 
 // Provider definition types
 export type {
-	DeviceCodePrompt,
 	LogoProps,
-	OAuthSignInHooks,
 	ProviderSetupInstructions,
 	AuthValidationResult,
 	BaseProviderDefinition,

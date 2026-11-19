@@ -7,7 +7,6 @@ import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
 import CircularLoader from "../../components/ui/CircularLoader.svelte";
 import DocsLink from "../../components/ui/DocsLink.svelte";
-import ExternalLinkButton from "../../components/ui/ExternalLinkButton.svelte";
 import Text from "../../components/ui/Text.svelte";
 import Toggle from "../../components/ui/Toggle.svelte";
 import ProviderSetupHeader from "./ProviderSetupHeader.svelte";
@@ -26,7 +25,6 @@ import {
 } from "../../lib/query";
 import type SecondBrainPlugin from "../../main";
 import {
-	type DeviceCodePrompt,
 	getAllProviderTemplates,
 	type LogoProps,
 	type OpenAIAuthMode,
@@ -82,9 +80,6 @@ const providerTemplates = [...getAllProviderTemplates()]
 	});
 let isSigningIn = $state(false);
 let signInError = $state<string | null>(null);
-// The code a device-code flow (Hugging Face) asks the user to enter, while that flow polls.
-let deviceCode = $state<DeviceCodePrompt | null>(null);
-let deviceCodeCopied = $state(false);
 
 // OAuth-capable providers expose two auth paths on one instance (sign-in vs API key).
 // Sign-in is the primary path; the API-key field is revealed on demand via a link.
@@ -162,14 +157,8 @@ async function handleOAuthSignIn() {
 	if (!oauth) return;
 	isSigningIn = true;
 	signInError = null;
-	deviceCode = null;
-	deviceCodeCopied = false;
 	try {
-		const result = await oauth.signIn({
-			onDeviceCode: (prompt) => {
-				deviceCode = prompt;
-			},
-		});
+		const result = await oauth.signIn();
 		if (result.kind === "apiKey") {
 			// Store the OAuth-obtained key as a managed secret so validation re-runs and Save enables.
 			data.setProviderAuthField(providerId, "apiKey", result.apiKey, true);
@@ -186,7 +175,6 @@ async function handleOAuthSignIn() {
 		}
 	} finally {
 		isSigningIn = false;
-		deviceCode = null;
 	}
 }
 
@@ -217,16 +205,6 @@ function scrollManualCodeIntoView(e: FocusEvent) {
 	const target = e.currentTarget;
 	if (!(target instanceof HTMLElement)) return;
 	window.setTimeout(() => target.scrollIntoView({ block: "nearest", behavior: "smooth" }), 350);
-}
-
-async function copyDeviceCode() {
-	if (!deviceCode) return;
-	try {
-		await navigator.clipboard.writeText(deviceCode.userCode);
-		deviceCodeCopied = true;
-	} catch {
-		// Clipboard access can be refused; the code stays selectable for a manual copy.
-	}
 }
 
 function handleOAuthDisconnect() {
@@ -680,26 +658,6 @@ const canFinish = $derived(
         {/if}
       </div>
     </SettingItem>
-    {#if isSigningIn && deviceCode}
-      <!-- Device-code flow: the user approves on huggingface.co (on this or any other
-           device) and the pending sign-in finishes by itself once they do. -->
-      <SettingItem
-        name="Enter this code on {oauth.label}"
-        desc="Open the page, sign in if asked, and enter the code. This window connects automatically once you approve."
-      >
-        <div class="s2b-flex s2b-gap-2 s2b-items-center">
-          <code class="s2b-device-code">{deviceCode.userCode}</code>
-          <button
-            type="button"
-            class="clickable-icon"
-            aria-label={deviceCodeCopied ? "Copied" : "Copy code"}
-            use:icon={deviceCodeCopied ? "check" : "copy"}
-            onclick={() => void copyDeviceCode()}
-          ></button>
-          <ExternalLinkButton href={deviceCode.verificationUri} label={`Open ${oauth.label}`} />
-        </div>
-      </SettingItem>
-    {/if}
     {#if isSigningIn && oauth.submitManualCode}
       <!-- On mobile the flow is headless (no localhost/redirect): OpenRouter shows the
            authorization code in the browser and the user pastes it here. On desktop this
@@ -718,14 +676,6 @@ const canFinish = $derived(
 {/snippet}
 
 <style>
-  .s2b-device-code {
-    font-family: var(--font-monospace);
-    font-size: var(--font-ui-medium);
-    font-weight: var(--font-semibold);
-    letter-spacing: 0.08em;
-    user-select: all;
-  }
-
   .oauth-connected-label {
     display: inline-flex;
     align-items: center;

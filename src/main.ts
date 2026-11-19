@@ -42,6 +42,7 @@ import { type ExternalSettingsChange, type PluginDataStore, createData, getData 
 import { PendingChangesStore, initPendingChangesStore } from "./stores/pendingChangesStore.svelte";
 import { setPlugin } from "./stores/state.svelte";
 import { onCodexSessionChange, onHuggingFaceSessionChange } from "./stores/providerRuntime.svelte";
+import { HUGGING_FACE_PROTOCOL_ACTION, handleHuggingFaceProtocolRedirect } from "./providers/huggingfaceOAuth";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerWidgetBlocks } from "./widget/registerWidgetBlocks";
@@ -425,6 +426,12 @@ export default class SecondBrainPlugin extends Plugin {
 				}
 			}),
 		);
+		// "Sign in with Hugging Face" on mobile returns through obsidian://s2b-huggingface-auth
+		// (desktop uses a loopback server). Registered at load, not on demand, because iOS
+		// may restart Obsidian while the user is approving in Safari.
+		this.registerObsidianProtocolHandler(HUGGING_FACE_PROTOCOL_ACTION, (params) => {
+			void handleHuggingFaceProtocolRedirect(params);
+		});
 		// Sync the Logger's level to the persisted "Developer Console logging" preference.
 		applyVerboseLogging(this.pluginData.isVerbose);
 

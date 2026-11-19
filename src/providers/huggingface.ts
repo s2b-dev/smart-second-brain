@@ -6,7 +6,7 @@
  * models. Usage is billed to the user's Hugging Face account, which includes free
  * monthly credits.
  *
- * Authentication: "Sign in with Hugging Face" (device-code OAuth, see
+ * Authentication: "Sign in with Hugging Face" (OAuth with PKCE, see
  * `huggingfaceOAuth.ts`), or a pasted access token. A pasted token wins when both are
  * present, so a user can pin a fine-grained token without signing out first.
  *
@@ -109,16 +109,17 @@ export const huggingfaceProvider: BaseProviderDefinition = {
 	oauth: {
 		label: "Hugging Face",
 		icon: "log-in",
-		description: "Enter a short code on huggingface.co to connect, without creating an access token.",
-		signIn: async ({ onDeviceCode }) => {
-			await signInWithHuggingFace(onDeviceCode);
+		description: "Approve access in your browser to connect, without creating an access token.",
+		signIn: async () => {
+			await signInWithHuggingFace();
 			return { kind: "session" };
 		},
 		cancelSignIn: cancelHuggingFaceSignIn,
 		isSignedIn: () => !!getHuggingFaceSession(),
 		disconnect: clearHuggingFaceSignIn,
 		supportsApiKey: true,
-		// Device-code flow: nothing redirects back to Obsidian, so no localhost server.
+		// Mobile gets the redirect through an obsidian:// protocol handler instead of the
+		// desktop loopback server.
 		worksOnMobile: true,
 	},
 

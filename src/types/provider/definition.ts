@@ -46,24 +46,6 @@ export type AuthValidationResult = { valid: true } | { valid: false; error: stri
 type OAuthSignInResult = { kind: "apiKey"; apiKey: string } | { kind: "session" };
 
 /**
- * What a device-code flow (RFC 8628) needs the user to do: open `verificationUri` on any
- * device and enter `userCode` there. The flow keeps polling in the background until the
- * user approves, so nothing has to be pasted back into Obsidian.
- */
-export interface DeviceCodePrompt {
-	userCode: string;
-	verificationUri: string;
-	/** Epoch ms after which the code is no longer accepted. */
-	expiresAt: number;
-}
-
-/** Callbacks a sign-in flow uses to hand the modal something it must show the user. */
-export interface OAuthSignInHooks {
-	/** Device-code flows call this once the code is issued, before they start polling. */
-	onDeviceCode?: (prompt: DeviceCodePrompt) => void;
-}
-
-/**
  * Declares that a provider supports a browser-based OAuth sign-in flow, so the setup
  * modal can render a uniform sign-in UI without hard-coding per-provider branches.
  */
@@ -77,8 +59,8 @@ interface ProviderOAuthCapability {
 	/** Copy shown under the sign-in CTA. */
 	description?: string;
 
-	/** Runs the OAuth flow and returns how the result must be persisted. */
-	signIn: (hooks: OAuthSignInHooks) => Promise<OAuthSignInResult>;
+	/** Runs the browser OAuth flow and returns how the result must be persisted. */
+	signIn: () => Promise<OAuthSignInResult>;
 
 	/**
 	 * Aborts an in-progress signIn(): rejects its promise and tears down any callback
@@ -108,7 +90,7 @@ interface ProviderOAuthCapability {
 	/**
 	 * Whether this OAuth flow works on Obsidian mobile. Loopback-server flows (Codex) are
 	 * desktop-only; flows that catch the redirect via an `obsidian://` protocol handler
-	 * (OpenRouter) or need no redirect at all (device-code flows) work everywhere. The setup modal gates the sign-in CTA on
+	 * (OpenRouter, Hugging Face on mobile) work everywhere. The setup modal gates the sign-in CTA on
 	 * `Platform.isDesktopApp || worksOnMobile`. Defaults to false (desktop-only) when omitted.
 	 */
 	worksOnMobile?: boolean;

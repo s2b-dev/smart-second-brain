@@ -151,7 +151,6 @@ export { createOpenAICompatibleProvider } from "./openai-compatible";
 
 export type {
 	AuthObject,
-	DeviceCodePrompt,
 	AuthFieldDefinition,
 	BaseProviderDefinition,
 	ChatModelConfig,
