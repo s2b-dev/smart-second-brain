@@ -78,14 +78,19 @@ async function fetchModelEntries(
 	return Array.isArray(payload.data) ? payload.data : [];
 }
 
+/** How long discovery waits for `/v1/model/info` before listing models without it. */
+export const MODEL_INFO_TIMEOUT_MS = 5000;
+
 /**
  * LiteLLM's per-deployment model info, where the proxy config's `max_input_tokens` lives.
  * Best effort: any other server answers 404 (or something that isn't the expected shape),
- * which reads as "no info", never as a discovery failure.
+ * which reads as "no info", never as a discovery failure. Capped at
+ * {@link MODEL_INFO_TIMEOUT_MS}, so a server that never answers this optional route can't
+ * hold the model list back.
  */
 async function fetchLiteLLMModelInfo(auth: AuthObject, defaultBaseUrl: string): Promise<LiteLLMModelInfoEntry[]> {
 	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
-	try {
+	const lookup = (async (): Promise<LiteLLMModelInfoEntry[]> => {
 		const response = await requestUrl({
 			url: `${apiUrl}/model/info`,
 			method: "GET",
@@ -95,8 +100,15 @@ async function fetchLiteLLMModelInfo(auth: AuthObject, defaultBaseUrl: string): 
 		if (response.status < 200 || response.status >= 300) return [];
 		const data = (response.json as { data?: unknown } | null)?.data;
 		return Array.isArray(data) ? (data as LiteLLMModelInfoEntry[]) : [];
-	} catch {
-		return [];
+	})().catch((): LiteLLMModelInfoEntry[] => []);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<LiteLLMModelInfoEntry[]>((resolve) => {
+		timer = setTimeout(() => resolve([]), MODEL_INFO_TIMEOUT_MS);
+	});
+	try {
+		return await Promise.race([lookup, timeout]);
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

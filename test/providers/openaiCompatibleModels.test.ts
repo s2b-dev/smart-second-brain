@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestUrl } from "obsidian";
 import { hydrateChatModel } from "../../src/lib/modelMetadataNormalizer";
 import type { ModelsDevApiResponse } from "../../src/providers/modelsDevApi";
-import { createOpenAICompatibleProvider } from "../../src/providers/openai-compatible";
+import { createOpenAICompatibleProvider, MODEL_INFO_TIMEOUT_MS } from "../../src/providers/openai-compatible";
 import {
 	extractContextWindows,
 	getCompatibleContextWindow,
@@ -106,5 +106,22 @@ describe("openai-compatible discoverModels", () => {
 		const provider = createOpenAICompatibleProvider({ id: "plain-server", displayName: "Plain" });
 		expect(await provider.discoverModels?.(auth)).toEqual(["plain"]);
 		expect(getCompatibleContextWindow("plain-server", "plain")).toBeUndefined();
+	});
+
+	it("lists models without /v1/model/info when that request never answers", async () => {
+		vi.useFakeTimers();
+		try {
+			vi.mocked(requestUrl).mockImplementation(((req: { url: string }) =>
+				req.url.endsWith("/v1/models")
+					? Promise.resolve({ status: 200, json: { data: [{ id: "slow", max_model_len: 4096 }] } })
+					: new Promise(() => {})) as never);
+			const provider = createOpenAICompatibleProvider({ id: "slow-server", displayName: "Slow" });
+			const discovery = provider.discoverModels?.(auth);
+			await vi.advanceTimersByTimeAsync(MODEL_INFO_TIMEOUT_MS);
+			expect(await discovery).toEqual(["slow"]);
+			expect(getCompatibleContextWindow("slow-server", "slow")).toBe(4096);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
