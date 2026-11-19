@@ -709,6 +709,10 @@ function buildCheckpointMessageMappingFromGraph(
 	};
 }
 
+function summaryContentKey(msg: BaseMessage): string {
+	return typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+}
+
 /**
  * Rebuild the full visible history for a branch whose context was summarized.
  *
@@ -721,6 +725,15 @@ function buildCheckpointMessageMappingFromGraph(
  * reproduces the conversation in order with the trimmed turns restored.
  * Messages that survived into the tip keep the tip's copy, so the live window
  * renders exactly as before.
+ *
+ * Summary messages are keyed apart from ordinary ones: LangChain's
+ * `summarizationMiddleware` gives the summary the id of the first message it
+ * replaces (so `RemoveMessage`-free reducers overwrite in place), which means
+ * the summary shares an id with the conversation's first question — or, on a
+ * repeat summarization, with the previous summary. Deduplicating by id alone
+ * would render the summary in the first question's slot and drop the first
+ * turn. Each summary is identified by id + content instead, and an ordinary
+ * message never takes a summary's copy from the tip.
  *
  * Marker placement: automatic summarization runs *mid-turn* (before the model
  * answers the message that overflowed the context), so its summary message is
@@ -746,9 +759,12 @@ function recoverSummarizedHistory(
 		.filter((node): node is CheckpointNode => !!node)
 		.sort(comparePathOrder);
 
+	const isSummary = (msg: BaseMessage) =>
+		HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization";
+
 	const tipById = new Map<string, BaseMessage>();
 	for (const msg of tipMessages) {
-		if (msg.id) tipById.set(msg.id, msg);
+		if (msg.id && !isSummary(msg)) tipById.set(msg.id, msg);
 	}
 
 	const seen = new Set<string>();
@@ -760,11 +776,12 @@ function recoverSummarizedHistory(
 			// checkpoints — bail out to the plain tip rather than risk
 			// rendering duplicated turns.
 			if (!msg.id) return tipMessages;
-			if (seen.has(msg.id)) continue;
-			seen.add(msg.id);
+			const summary = isSummary(msg);
+			const key = summary ? `summary\u0000${msg.id}\u0000${summaryContentKey(msg)}` : msg.id;
+			if (seen.has(key)) continue;
+			seen.add(key);
 
-			const rendered = tipById.get(msg.id) ?? msg;
-			if (HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization") {
+			if (summary) {
 				let insertAt = display.length;
 				for (let i = display.length - 1; i >= 0; i--) {
 					if (HumanMessage.isInstance(display[i])) {
@@ -772,10 +789,10 @@ function recoverSummarizedHistory(
 						break;
 					}
 				}
-				display.splice(insertAt, 0, rendered);
+				display.splice(insertAt, 0, msg);
 				continue;
 			}
-			display.push(rendered);
+			display.push(tipById.get(msg.id) ?? msg);
 		}
 	}
 	return display;
