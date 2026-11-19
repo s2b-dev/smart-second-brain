@@ -590,6 +590,39 @@ describe("summarized history recovery", () => {
 		expect(pairs[4].assistantMessage.content).toBe("ans3");
 	});
 
+	it("keeps a repeat summarization's marker even when its summary text is identical", () => {
+		const h1 = humanMsg("q1", "h-1");
+		const a1 = aiMsg("ans1", "a-1");
+		const h2 = humanMsg("q2", "h-2");
+		const a2 = aiMsg("ans2", "a-2");
+		const h3 = humanMsg("q3", "h-3");
+		const a3 = aiMsg("ans3", "a-3");
+		// Same id and same text: only the channel reset tells the two apart.
+		const summary1 = autoSummary("h-1");
+		const summary2 = autoSummary("h-1");
+
+		const graph = buildCheckpointGraph([
+			makeCheckpoint("cp-root", -1, []),
+			makeCheckpoint("cp-h1", 0, [h1], "cp-root", "2024-01-01T00:01:00Z"),
+			makeCheckpoint("cp-a1", 1, [h1, a1], "cp-h1", "2024-01-01T00:02:00Z"),
+			makeCheckpoint("cp-h2", 2, [h1, a1, h2], "cp-a1", "2024-01-01T00:03:00Z"),
+			makeCheckpoint("cp-sum1", 3, [summary1, h2], "cp-h2", "2024-01-01T00:04:00Z"),
+			makeCheckpoint("cp-a2", 4, [summary1, h2, a2], "cp-sum1", "2024-01-01T00:05:00Z"),
+			makeCheckpoint("cp-h3", 5, [summary1, h2, a2, h3], "cp-a2", "2024-01-01T00:06:00Z"),
+			makeCheckpoint("cp-sum2", 6, [summary2, h3], "cp-h3", "2024-01-01T00:07:00Z"),
+			makeCheckpoint("cp-a3", 7, [summary2, h3, a3], "cp-sum2", "2024-01-01T00:08:00Z"),
+		]);
+
+		const pairs = deriveMessagePairsFromActiveCheckpoint(graph, "cp-a3");
+		expect(pairs.map((p) => p.transcriptEvent?.type ?? p.userMessage.content)).toEqual([
+			"q1",
+			"summarization_marker",
+			"q2",
+			"summarization_marker",
+			"q3",
+		]);
+	});
+
 	it("falls back to the tip's trimmed view when earlier checkpoints are missing", () => {
 		const h3 = humanMsg("q3", "h-3");
 		const a3 = aiMsg("ans3", "a-3");
