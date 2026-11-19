@@ -461,6 +461,9 @@ $effect(() => {
 // below is the primary signal; the header icon stays as a secondary cue.
 type ConnectionStatus = "idle" | "checking" | "connected" | "failed";
 const connectionStatus = $derived.by<ConnectionStatus>(() => {
+	// A failed sign-in is the verdict until the next attempt: the auth query would only
+	// report the generic "not signed in" of the session the sign-in never created.
+	if (signInError) return "failed";
 	if (!hasCredentials) return "idle";
 	if (query.isPending || query.isFetching) return "checking";
 	if (query.data?.success) return "connected";
@@ -468,7 +471,8 @@ const connectionStatus = $derived.by<ConnectionStatus>(() => {
 	return "idle";
 });
 const connectionError = $derived(
-	query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed",
+	signInError ??
+		(query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed"),
 );
 
 // Done must track the *commit*, not just the connection. A valid connection alone isn't
