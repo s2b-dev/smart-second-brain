@@ -114,6 +114,8 @@ const PROVIDER_ID_MAP: Record<string, string[]> = {
 	anthropic: ["anthropic"],
 	ollama: [], // Ollama models are local, not in models.dev
 	openrouter: ["openrouter"],
+	huggingface: ["huggingface"],
+	"hugging-face": ["huggingface"],
 	// Custom providers may match various providers in models.dev
 };
 

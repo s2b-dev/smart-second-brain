@@ -41,7 +41,7 @@ import { createSessionRegistry, getSessionRegistry, type SessionRegistry } from 
 import { type ExternalSettingsChange, type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
 import { PendingChangesStore, initPendingChangesStore } from "./stores/pendingChangesStore.svelte";
 import { setPlugin } from "./stores/state.svelte";
-import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
+import { onCodexSessionChange, onHuggingFaceSessionChange } from "./stores/providerRuntime.svelte";
 import { invalidateAuthState, invalidateProviderState } from "./lib/query";
 import { LexicalSearchService } from "./search/LexicalSearchService";
 import { registerWidgetBlocks } from "./widget/registerWidgetBlocks";
@@ -412,6 +412,14 @@ export default class SecondBrainPlugin extends Plugin {
 		this.register(
 			onCodexSessionChange(() => {
 				for (const providerId of this.pluginData.getProviderIdsByTemplate("openai-codex")) {
+					invalidateAuthState(providerId);
+					invalidateProviderState(providerId);
+				}
+			}),
+		);
+		this.register(
+			onHuggingFaceSessionChange(() => {
+				for (const providerId of this.pluginData.getProviderIdsByTemplate("huggingface")) {
 					invalidateAuthState(providerId);
 					invalidateProviderState(providerId);
 				}
