@@ -1,5 +1,6 @@
 import type { ToolCallStatus } from "../../stores/chatTimeline";
 import type { ToolOutputRenderModel } from "./toolOutputRenderModel";
+import { parseTodos } from "../../utils/todoList";
 
 /**
  * A compact, one-line description of a tool call: a plain-language `label` and an
@@ -75,6 +76,7 @@ type BuiltInTool =
 	| "fetch_url"
 	| "web_search"
 	| "load_skill"
+	| "write_todos"
 	| "task";
 
 const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
@@ -89,6 +91,7 @@ const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
 	"fetch_url",
 	"web_search",
 	"load_skill",
+	"write_todos",
 	"task",
 ]);
 
@@ -283,6 +286,14 @@ function summarizeLoadSkill(input: Record<string, unknown> | null | undefined): 
 	return { label, summary: "" };
 }
 
+function summarizeWriteTodos(input: Record<string, unknown> | null | undefined): RawSummary {
+	const label: Label = { verb: verb("Updating task list", "Updated task list") };
+	const todos = parseTodos(input);
+	if (!todos) return { label, summary: "" };
+	const done = todos.filter((t) => t.status === "completed").length;
+	return { label, summary: `${done} of ${todos.length} done` };
+}
+
 /* ── Generic fallback (unknown / renamed tools) ── */
 
 function summarizeGeneric(
@@ -403,6 +414,8 @@ export function buildToolSummary(
 				return summarizeWebSearch(input, model);
 			case "load_skill":
 				return summarizeLoadSkill(input);
+			case "write_todos":
+				return summarizeWriteTodos(input);
 			default:
 				return summarizeGeneric(toolName, input, model);
 		}

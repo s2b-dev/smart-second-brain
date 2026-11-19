@@ -6,6 +6,7 @@ import {
 	getToolDescription,
 	getToolDisplayName,
 	toolHasConfigurableSettings,
+	ALWAYS_ATTACHED_TOOL_IDS,
 } from "../../agent/tools/builtInToolDefaults";
 import { toExecToolId } from "../../agent/integrations/pluginIntegrations";
 import { humanizeSkillName } from "../../skills";
@@ -112,7 +113,8 @@ function openToolConfig(toolId: BuiltInToolId) {
         {#each BUILT_IN_TOOL_IDS as toolId (toolId)}
           {@const config = selectedAgent.toolsConfig[toolId]}
           {@const skills = attachingSkills.get(toolId) ?? []}
-          {@const attached = skills.length > 0}
+          {@const alwaysAttached = ALWAYS_ATTACHED_TOOL_IDS.has(toolId)}
+          {@const attached = alwaysAttached || skills.length > 0}
           {@const enabled = isToolEnabled(toolId)}
           {@const displayName = getToolDisplayName(toolId, config?.name)}
           <ManagedEntityItem
@@ -121,7 +123,9 @@ function openToolConfig(toolId: BuiltInToolId) {
             disabled={!attached}
           >
             {#snippet badges()}
-              {#if attached}
+              {#if alwaysAttached}
+                <Badge label="Built in" tone="accent" />
+              {:else if attached}
                 {#each skills as skillName (skillName)}
                   <Badge label={skillName} tone="accent" />
                 {/each}
