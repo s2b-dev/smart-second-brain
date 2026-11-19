@@ -6,6 +6,7 @@ import { MemorySaver } from "@langchain/langgraph";
 import { createAgent, summarizationMiddleware } from "langchain";
 import { describe, expect, it } from "vitest";
 import { createContextOverflowRecoveryMiddleware, isContextOverflowError } from "../../src/agent/contextOverflow";
+import { createGenerationMetadataMiddleware } from "../../src/agent/generationMetadata";
 import { SUMMARY_PREFIX, guardSummarizationFailure } from "../../src/agent/summarization";
 import { createDeltaMessagesStateSchema } from "../../src/agent/threadReplay";
 import { countMessageTokens } from "../../src/utils/tokenEstimator";
@@ -76,7 +77,9 @@ function buildAgent(model: BaseChatModel, summaryModel: BaseChatModel): TestAgen
 		systemPrompt: "You are a test agent.",
 		checkpointer: new MemorySaver(),
 		stateSchema: createDeltaMessagesStateSchema() as never,
+		// In `Agent.ts` order: the metadata stamp wraps the recovery.
 		middleware: [
+			createGenerationMetadataMiddleware(),
 			summarizer,
 			createContextOverflowRecoveryMiddleware({ summarizer: summarizer.beforeModel as never, keepTokens: 300 }),
 		] as never,
@@ -120,6 +123,20 @@ describe("createContextOverflowRecoveryMiddleware", () => {
 		// The checkpoint holds the same shortened history, so the next turn starts from it.
 		const saved = await agent.getState(config);
 		assertHistory((saved.values as { messages: BaseMessage[] }).messages);
+	});
+
+	it("keeps the agent stamp on the recovered reply, so its label survives a reload", async () => {
+		const agent = buildAgent(overflowingModel(8), new ScriptedChat(() => new AIMessage("the summary")));
+
+		await agent.invoke(
+			{ messages: longHistory(10) },
+			{ ...config, metadata: { agent_id: "agent-1", agent_name: "Default Agent" } },
+		);
+
+		const saved = (await agent.getState(config)).values as { messages: BaseMessage[] };
+		const reply = saved.messages.at(-1) as AIMessage;
+		expect(reply.content).toBe("answer");
+		expect(reply.response_metadata).toMatchObject({ agent_id: "agent-1", agent_name: "Default Agent" });
 	});
 
 	it("lets the overflow through when the retry overflows too", async () => {
