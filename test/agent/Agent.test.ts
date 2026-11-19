@@ -11,6 +11,7 @@ vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
 	createMiddleware: (config: unknown) => config,
+	modelRefusalMiddleware: () => ({ name: "modelRefusalMiddleware" }),
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -75,6 +76,8 @@ describe("Agent summarization middleware", () => {
 				middleware: [
 					expect.objectContaining({ name: "S2BGenerationMetadata" }),
 					expect.objectContaining({ kind: "summary" }),
+					expect.objectContaining({ name: "S2BContextOverflowRecovery" }),
+					expect.objectContaining({ name: "modelRefusalMiddleware" }),
 				],
 			}),
 		);
@@ -136,7 +139,11 @@ describe("Agent summarization middleware", () => {
 		expect(summarizationMiddlewareMock).not.toHaveBeenCalled();
 		expect(createAgentMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				middleware: [expect.objectContaining({ name: "S2BGenerationMetadata" })],
+				// No window → no proactive summarization and no overflow recovery.
+				middleware: [
+					expect.objectContaining({ name: "S2BGenerationMetadata" }),
+					expect.objectContaining({ name: "modelRefusalMiddleware" }),
+				],
 			}),
 		);
 	});
