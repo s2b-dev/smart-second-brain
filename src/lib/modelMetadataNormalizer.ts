@@ -9,6 +9,7 @@ import {
 	type HuggingFaceModelInfo,
 	huggingFaceDisplayName,
 } from "../providers/huggingfaceModels";
+import { getCompatibleContextWindow } from "../providers/openaiCompatibleModels";
 import type { ProviderTemplateId } from "../types/provider";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
 
@@ -153,10 +154,16 @@ export function hydrateChatModel(
 		paramSize,
 	);
 
+	// An OpenAI-compatible endpoint's own figure outranks models.dev: a custom-named model
+	// either isn't in the catalogue or matches some other model's entry there (#479).
+	const endpointWindow =
+		sourceData.templateId === "openai-compatible" ? getCompatibleContextWindow(provider, variantKey) : undefined;
+
 	const contextWindow =
 		openRouter?.context_length ||
 		ollama?.contextLength ||
 		huggingFace?.contextLength ||
+		endpointWindow ||
 		modelsDev?.limit?.context ||
 		DEFAULT_CHAT_CONTEXT_WINDOW;
 

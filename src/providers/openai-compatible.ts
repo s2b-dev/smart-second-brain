@@ -20,13 +20,18 @@ import type {
 	EmbeddingProviderDefinition,
 	ProviderSetupInstructions,
 } from "../types/provider/index";
+import {
+	type CompatibleModelEntry,
+	extractContextWindows,
+	type LiteLLMModelInfoEntry,
+	setCompatibleContextWindows,
+} from "./openaiCompatibleModels";
 
 function sanitizeBaseUrl(url: string): string {
 	return url.replace(/\/+$/, "").replace(/\/v1$/i, "");
 }
 
-interface OpenAIModelEntry {
-	id?: string;
+interface OpenAIModelEntry extends CompatibleModelEntry {
 	/** Some servers set type="embedding" on embedding models */
 	type?: string;
 	/** Alternate field name used by some servers */
@@ -41,22 +46,29 @@ function isEmbeddingEntry(entry: OpenAIModelEntry): boolean {
 	return entry.type === "embedding" || entry.object === "embedding";
 }
 
-async function fetchModelEntries(
-	auth: AuthObject,
-	providerId: string,
-	defaultBaseUrl: string,
-): Promise<OpenAIModelEntry[]> {
-	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+function requestHeaders(auth: AuthObject): Record<string, string> {
 	const headers: Record<string, string> = { "Content-Type": "application/json" };
-
 	if (auth.apiKey) {
 		headers.Authorization = `Bearer ${auth.apiKey}`;
 	}
 	if (auth.headers) {
 		Object.assign(headers, auth.headers);
 	}
+	return headers;
+}
 
-	const response = await requestUrl({ url: `${apiUrl}/models`, method: "GET", headers, throw: false });
+async function fetchModelEntries(
+	auth: AuthObject,
+	providerId: string,
+	defaultBaseUrl: string,
+): Promise<OpenAIModelEntry[]> {
+	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+	const response = await requestUrl({
+		url: `${apiUrl}/models`,
+		method: "GET",
+		headers: requestHeaders(auth),
+		throw: false,
+	});
 
 	if (response.status < 200 || response.status >= 300) {
 		throw new Error(`Model discovery failed for ${providerId}: ${response.text || `status ${response.status}`}`);
@@ -64,6 +76,28 @@ async function fetchModelEntries(
 
 	const payload = response.json as OpenAIModelResponse;
 	return Array.isArray(payload.data) ? payload.data : [];
+}
+
+/**
+ * LiteLLM's per-deployment model info, where the proxy config's `max_input_tokens` lives.
+ * Best effort: any other server answers 404 (or something that isn't the expected shape),
+ * which reads as "no info", never as a discovery failure.
+ */
+async function fetchLiteLLMModelInfo(auth: AuthObject, defaultBaseUrl: string): Promise<LiteLLMModelInfoEntry[]> {
+	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+	try {
+		const response = await requestUrl({
+			url: `${apiUrl}/model/info`,
+			method: "GET",
+			headers: requestHeaders(auth),
+			throw: false,
+		});
+		if (response.status < 200 || response.status >= 300) return [];
+		const data = (response.json as { data?: unknown } | null)?.data;
+		return Array.isArray(data) ? (data as LiteLLMModelInfoEntry[]) : [];
+	} catch {
+		return [];
+	}
 }
 
 export interface OpenAICompatibleProviderInput {
@@ -154,22 +188,10 @@ export function createOpenAICompatibleProvider(
 			const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
 
 			try {
-				const headers: Record<string, string> = {
-					"Content-Type": "application/json",
-				};
-
-				if (auth.apiKey) {
-					headers.Authorization = `Bearer ${auth.apiKey}`;
-				}
-
-				if (auth.headers) {
-					Object.assign(headers, auth.headers);
-				}
-
 				const response = await requestUrl({
 					url: `${apiUrl}/models`,
 					method: "GET",
-					headers,
+					headers: requestHeaders(auth),
 					throw: false,
 				});
 
@@ -199,7 +221,11 @@ export function createOpenAICompatibleProvider(
 			}
 		},
 		discoverModels: async (auth: AuthObject): Promise<string[]> => {
-			const entries = await fetchModelEntries(auth, config.id, defaultBaseUrl);
+			const [entries, liteLLMInfo] = await Promise.all([
+				fetchModelEntries(auth, config.id, defaultBaseUrl),
+				fetchLiteLLMModelInfo(auth, defaultBaseUrl),
+			]);
+			setCompatibleContextWindows(config.id, extractContextWindows(entries, liteLLMInfo));
 			return entries.filter((r) => r.id && !isEmbeddingEntry(r)).map((r) => r.id as string);
 		},
 	};
