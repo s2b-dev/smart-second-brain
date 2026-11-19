@@ -190,6 +190,34 @@ describe("ChatSession — answering an open question", () => {
 		expect(session.getActiveCheckpointId()).toBe("c");
 	});
 
+	it("holds a message sent while a stopped answer is still being reconciled", async () => {
+		const { session } = makeSession();
+		let releaseHistory: (items: CheckpointHistoryItem[]) => void = () => {};
+		getCheckpointHistory.mockReturnValue(
+			new Promise<CheckpointHistoryItem[]>((resolve) => {
+				releaseHistory = resolve;
+			}),
+		);
+
+		const answering = session.answerInterrupts(() => "the answer");
+		await vi.waitFor(() => expect(getCheckpointHistory).toHaveBeenCalled());
+		// The run is over and the chat reads idle, but whether the question is still
+		// open is not known yet. A send now must wait rather than start a plain turn.
+		const sending = session.sendMessage("actually, use Archive");
+		await Promise.resolve();
+		expect(resumeFromInterrupt).toHaveBeenCalledTimes(1);
+		expect(streamQuery).not.toHaveBeenCalled();
+
+		// Nothing was saved: the question is still open, so the message answers it.
+		getCheckpointHistory.mockResolvedValue(pausedHistory());
+		releaseHistory(pausedHistory());
+		await answering;
+		await sending;
+
+		expect(streamQuery).not.toHaveBeenCalled();
+		expect(resumeFromInterrupt).toHaveBeenCalledTimes(2);
+	});
+
 	it("carries the composer's context with a typed answer, apart from the reply", async () => {
 		const { session } = makeSession();
 

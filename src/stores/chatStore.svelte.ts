@@ -107,6 +107,11 @@ export class ChatSession {
 	 * `answerInterrupts`). */
 	pendingInterrupts = $state<ToolInterrupt[]>([]);
 
+	/** Set while a resumed run that did not settle is being reconciled with what the
+	 * thread saved (see `settleAfterResume`). Until it resolves, neither the graph nor
+	 * `pendingInterrupts` can be trusted, so anything that appends a turn waits on it. */
+	private resumeSettling: Promise<void> | null = null;
+
 	/** The in-flight run's identity + wall-clock start, held outside `messages` so
 	 * it survives the pair-object replacement a rebuild performs. Set when a run
 	 * starts, cleared in the run's `finally`. See `restoreLiveRunAnchor`. */
@@ -298,6 +303,10 @@ export class ChatSession {
 		selection?: SelectionRef,
 		graphNotes?: GraphNoteRef[],
 	): Promise<UUIDv7> {
+		// The run that just ended may still be finding out whether its question was
+		// answered; deciding "new turn or answer" before it knows would be a guess.
+		if (this.resumeSettling) await this.resumeSettling;
+
 		// A message sent while a question is open is the answer to it. It must go
 		// through the resume path: appended as a new turn it would leave the question's
 		// tool call without a result, which providers reject for the rest of the thread.
@@ -400,7 +409,15 @@ export class ChatSession {
 				},
 			);
 		} finally {
-			await this.settleAfterResume(checkpointId, beforeCheckpointIds);
+			// Assigned in the same tick the run released its busy flags, so no send can
+			// slip in between the two.
+			const settling = this.settleAfterResume(checkpointId, beforeCheckpointIds);
+			this.resumeSettling = settling;
+			try {
+				await settling;
+			} finally {
+				if (this.resumeSettling === settling) this.resumeSettling = null;
+			}
 		}
 	}
 
@@ -1436,6 +1453,7 @@ export class ChatSession {
 		if (this.messageState !== MessageState.idle) {
 			throw new Error("Cannot summarize while another response is in progress.");
 		}
+		if (this.resumeSettling) await this.resumeSettling;
 		if (this.pendingInterrupts.length > 0) {
 			throw new Error("Answer or dismiss the open question before summarizing.");
 		}
