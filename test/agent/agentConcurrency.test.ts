@@ -17,7 +17,6 @@ vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
 	createMiddleware: (config: unknown) => config,
-	anthropicPromptCachingMiddleware: () => ({ name: "PromptCachingMiddleware" }),
 }));
 
 vi.mock("../../src/stores/dataStore.svelte", () => ({

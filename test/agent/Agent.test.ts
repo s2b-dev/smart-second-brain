@@ -11,7 +11,6 @@ vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
 	createMiddleware: (config: unknown) => config,
-	anthropicPromptCachingMiddleware: () => ({ name: "PromptCachingMiddleware" }),
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
@@ -76,7 +75,7 @@ describe("Agent summarization middleware", () => {
 				middleware: [
 					expect.objectContaining({ name: "S2BGenerationMetadata" }),
 					expect.objectContaining({ kind: "summary" }),
-					expect.objectContaining({ name: "PromptCachingMiddleware" }),
+					expect.objectContaining({ name: "S2BPromptCaching" }),
 				],
 			}),
 		);
@@ -140,7 +139,7 @@ describe("Agent summarization middleware", () => {
 			expect.objectContaining({
 				middleware: [
 					expect.objectContaining({ name: "S2BGenerationMetadata" }),
-					expect.objectContaining({ name: "PromptCachingMiddleware" }),
+					expect.objectContaining({ name: "S2BPromptCaching" }),
 				],
 			}),
 		);

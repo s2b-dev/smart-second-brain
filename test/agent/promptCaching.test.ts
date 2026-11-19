@@ -28,7 +28,7 @@ function anthropicFetch(bodies: Record<string, unknown>[]) {
 const history = [new HumanMessage("first"), new AIMessage("reply"), new HumanMessage("second")];
 
 describe("createPromptCachingMiddleware", () => {
-	it("sends top-level cache_control through our transported ChatAnthropic", async () => {
+	it("marks the system prompt and the newest message as cache breakpoints", async () => {
 		const bodies: Record<string, unknown>[] = [];
 		const model = createTransportedChatAnthropic("anthropic", {
 			model: "claude-test",
@@ -43,10 +43,25 @@ describe("createPromptCachingMiddleware", () => {
 			middleware: [createPromptCachingMiddleware()],
 		});
 
-		await agent.invoke({ messages: history });
+		const result = await agent.invoke({ messages: history });
 
 		expect(bodies).toHaveLength(1);
-		expect(bodies[0]?.cache_control).toEqual({ type: "ephemeral", ttl: "5m" });
+		const body = bodies[0] as {
+			cache_control?: unknown;
+			system: { text: string; cache_control?: unknown }[];
+			messages: { role: string; content: string | { type: string; text?: string; cache_control?: unknown }[] }[];
+		};
+		// Block-level, not the top-level field Bedrock-backed gateways ignore.
+		expect(body.cache_control).toBeUndefined();
+		expect(body.system).toEqual([
+			{ type: "text", text: "You are a test agent.", cache_control: { type: "ephemeral" } },
+		]);
+		const last = body.messages.at(-1);
+		expect(last?.content).toEqual([{ type: "text", text: "second", cache_control: { type: "ephemeral" } }]);
+		// Only the newest message carries a breakpoint.
+		expect(JSON.stringify(body.messages.slice(0, -1))).not.toContain("cache_control");
+		// The stored history is untouched.
+		expect(result.messages.map((m) => m.content)).toEqual(["first", "reply", "second", "ok"]);
 	});
 
 	it("is a silent no-op for non-Anthropic models", async () => {
@@ -83,6 +98,23 @@ describe("createPromptCachingMiddleware", () => {
 		await agent.invoke({ messages: history });
 
 		expect(bodies).toHaveLength(1);
-		expect(bodies[0]).not.toHaveProperty("cache_control");
+		expect(JSON.stringify(bodies[0])).not.toContain("cache_control");
+	});
+});
+
+describe("withCacheBreakpoint", () => {
+	it("marks the last cacheable block and never the input array", async () => {
+		const { withCacheBreakpoint } = await import("../../src/agent/promptCaching");
+		const content = [
+			{ type: "text", text: "a" },
+			{ type: "thinking", thinking: "hmm" },
+		];
+		expect(withCacheBreakpoint(content)).toEqual([
+			{ type: "text", text: "a", cache_control: { type: "ephemeral" } },
+			{ type: "thinking", thinking: "hmm" },
+		]);
+		expect(content[0]).not.toHaveProperty("cache_control");
+		expect(withCacheBreakpoint("")).toBeNull();
+		expect(withCacheBreakpoint([{ type: "thinking", thinking: "x" }])).toBeNull();
 	});
 });
