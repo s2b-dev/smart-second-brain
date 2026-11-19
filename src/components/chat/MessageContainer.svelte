@@ -24,6 +24,7 @@ import BranchNavigator from "./BranchNavigator.svelte";
 import CollapsibleUserBubble from "./CollapsibleUserBubble.svelte";
 import UserAttachmentFiles from "./UserAttachmentFiles.svelte";
 import UserAttachmentImages from "./UserAttachmentImages.svelte";
+import AssistantStatusNotice from "./AssistantStatusNotice.svelte";
 import ToolCallsSection from "./ToolCallsSection.svelte";
 import ChatRecommendations from "./ChatRecommendations.svelte";
 import { icon } from "../../utils/utils";
@@ -361,17 +362,10 @@ function registerMessageRef(node: HTMLDivElement, id: string) {
 }
 
 function renderAssitantAnswer(assistantAnswer: AssistantMessage) {
-	if (assistantAnswer.state === AssistantState.cancelled) {
-		return "> [!Warning] stopped by user";
-	}
-	if (assistantAnswer.state === AssistantState.error) {
-		const detail = assistantAnswer.errorCode?.trim();
-		if (detail) {
-			// Indent continuation lines so multi-line messages stay inside the callout.
-			const body = detail.replace(/\n/g, "\n> ");
-			return `> [!Error] Something went wrong\n> ${body}`;
-		}
-		return "> [!Error] Something went wrong\n> The model request failed.";
+	// A stopped or failed turn has no answer text of its own; how it ended is shown
+	// by `AssistantStatusNotice` below the timeline, not as markdown content.
+	if (assistantAnswer.state === AssistantState.cancelled || assistantAnswer.state === AssistantState.error) {
+		return "";
 	}
 	return assistantAnswer.content;
 }
@@ -933,7 +927,7 @@ $effect(() => {
                   />
                 {:else}
                   <!-- Content Section: only reached for completed messages with no tool calls / timeline -->
-                  {#if messagePair.assistantMessage.content || messagePair.assistantMessage.state === AssistantState.cancelled || messagePair.assistantMessage.state === AssistantState.error}
+                  {#if messagePair.assistantMessage.content && messagePair.assistantMessage.state !== AssistantState.cancelled && messagePair.assistantMessage.state !== AssistantState.error}
                     {@const renderInfo = getRenderableAssistantContent(
                       messagePair.assistantMessage,
                     )}
@@ -947,19 +941,17 @@ $effect(() => {
                 {/if}
 
                 {#if messagePair.assistantMessage.state === AssistantState.error}
-                  <div class="s2b-flex s2b-flex-row s2b-items-center">
-                    <Button
-                      iconId="refresh-cw"
-                      buttonText="Retry"
-                      ariaLabel="Retry this request"
-                      tooltip="Re-run the failed request"
-                      onClick={() => retryLastError(messagePair.id)}
-                    />
-                  </div>
+                  <AssistantStatusNotice
+                    kind="error"
+                    detail={messagePair.assistantMessage.errorCode}
+                    onRetry={() => retryLastError(messagePair.id)}
+                  />
+                {:else if messagePair.assistantMessage.state === AssistantState.cancelled}
+                  <AssistantStatusNotice kind="cancelled" />
                 {/if}
 
                 <!-- Assistant message actions and branch navigator.
-                     Skipped for error pairs: the dedicated Retry button above is
+                     Skipped for error pairs: the Retry in the error notice above is
                      the only relevant action, and Copy/Regenerate would act on an
                      empty, non-existent response. -->
                 {#if !(messagePair.assistantMessage.state === AssistantState.streaming) && messagePair.assistantMessage.state !== AssistantState.error}
