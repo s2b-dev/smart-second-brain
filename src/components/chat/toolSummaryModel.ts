@@ -290,6 +290,7 @@ function summarizeWriteTodos(input: Record<string, unknown> | null | undefined):
 	const label: Label = { verb: verb("Updating task list", "Updated task list") };
 	const todos = parseTodos(input);
 	if (!todos) return { label, summary: "" };
+	if (todos.length === 0) return { label: { verb: verb("Clearing task list", "Cleared task list") }, summary: "" };
 	const done = todos.filter((t) => t.status === "completed").length;
 	return { label, summary: `${done} of ${todos.length} done` };
 }

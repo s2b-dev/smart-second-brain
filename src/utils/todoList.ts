@@ -22,7 +22,8 @@ const TODO_TOOL_NAME = "write_todos";
 /**
  * Reads a `write_todos` call's input into a list, dropping malformed items rather than
  * failing: the input comes from the model, and a partly-streamed call can be missing
- * fields. Returns `undefined` when there is nothing usable.
+ * fields. An empty array is a real update (the agent cleared its list) and comes back as
+ * `[]`; only input with no `todos` array at all returns `undefined`.
  */
 export function parseTodos(input: Record<string, unknown> | null | undefined): TodoItem[] | undefined {
 	const raw = input?.todos;
@@ -35,7 +36,7 @@ export function parseTodos(input: Record<string, unknown> | null | undefined): T
 		const known = (TODO_STATUSES as readonly unknown[]).includes(status);
 		todos.push({ content: content.trim(), status: known ? (status as TodoStatus) : "pending" });
 	}
-	return todos.length > 0 ? todos : undefined;
+	return todos;
 }
 
 function isTodoCall(call: ToolCallState): boolean {
@@ -69,7 +70,7 @@ export function latestTodos(pairs: readonly MessagePair[]): TodoListSnapshot | u
  * stays for the turn that finished it, so a done plan doesn't linger over the next topic.
  */
 export function shouldShowTodos(snapshot: TodoListSnapshot | undefined, pairCount: number): boolean {
-	if (!snapshot) return false;
+	if (!snapshot || snapshot.todos.length === 0) return false;
 	const unfinished = snapshot.todos.some((t) => t.status !== "completed");
 	return unfinished || snapshot.pairIndex === pairCount - 1;
 }

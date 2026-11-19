@@ -67,7 +67,9 @@ const WRITE_TODOS_DESC = `Keep a visible task list for the current request. The 
 
 Use it when a request takes several distinct steps or touches many notes: restructuring a folder, merging or splitting notes, researching a topic across the vault, a review that ends in edits. Write the list before you start, as short imperative steps, with the first one in_progress. Skip it for questions you can answer directly and for one- or two-step tasks.
 
-Each call replaces the whole list, so always send every item. Keep exactly one item in_progress while you work. Mark an item completed as soon as it is done, not in a batch at the end. Revise the list when you learn something that changes the plan: add steps, drop steps that no longer apply. Never call this tool more than once in the same turn.`;
+Each call replaces the whole list, so always send every item. Keep exactly one item in_progress while you work. Mark an item completed as soon as it is done, not in a batch at the end. Revise the list when you learn something that changes the plan: add steps, drop steps that no longer apply. Update it as you work through the request, but never call it twice in parallel within one response.
+
+If the user drops the plan or the work no longer needs one, send an empty list to clear it.`;
 
 // --- the table -----------------------------------------------------------------------------
 

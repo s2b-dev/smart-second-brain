@@ -32,9 +32,12 @@ describe("parseTodos", () => {
 		]);
 	});
 
-	it("returns undefined when nothing is usable", () => {
+	it("reads an empty array as a cleared list", () => {
+		expect(parseTodos({ todos: [] })).toEqual([]);
+	});
+
+	it("returns undefined when there is no todos array", () => {
 		expect(parseTodos(undefined)).toBeUndefined();
-		expect(parseTodos({ todos: [] })).toBeUndefined();
 		expect(parseTodos({ todos: "nope" })).toBeUndefined();
 	});
 });
@@ -71,6 +74,13 @@ describe("latestTodos", () => {
 			]),
 		];
 		expect(latestTodos(pairs)?.todos).toEqual([{ content: "kept", status: "pending" }]);
+	});
+
+	it("stops at a cleared list instead of restoring an older one", () => {
+		const pairs = [pair([todoCall([{ content: "open", status: "pending" }])]), pair([todoCall([])])];
+		const snapshot = latestTodos(pairs);
+		expect(snapshot?.todos).toEqual([]);
+		expect(shouldShowTodos(snapshot, pairs.length)).toBe(false);
 	});
 
 	it("flags a call that is still running", () => {
