@@ -141,14 +141,16 @@ const messageRefs = new Map<string, HTMLDivElement>();
 
 // Leave breathing room above the anchored message so its top isn't hidden
 // behind the container's top padding (Chat.svelte adds 44px) and fade mask.
-const NAV_TOP_OFFSET = 48;
+const ANCHOR_TOP_OFFSET = 48;
 
 // Fast custom smooth-scroll — the native `behavior: "smooth"` easing is too
-// slow for message navigation. Duration is short and capped regardless of
+// slow for in-chat jumps. Duration is short and capped regardless of
 // distance so long jumps still feel snappy.
 let scrollRafId: number | null = null;
 
-function animateScrollTo(top: number) {
+// `"bottom"` re-reads the end of the thread every frame, so a reply that keeps
+// streaming in during the animation can't leave the jump stopping short.
+function animateScrollTo(top: number | "bottom") {
 	if (!scrollContainer) return;
 	const el = scrollContainer;
 
@@ -157,15 +159,26 @@ function animateScrollTo(top: number) {
 	if (scrollRafId !== null) {
 		cancelAnimationFrame(scrollRafId);
 		scrollRafId = null;
+		el.style.overflowY = "";
 	}
 
 	const start = el.scrollTop;
-	const max = el.scrollHeight - el.clientHeight;
-	const target = Math.max(0, Math.min(top, max));
-	const delta = target - start;
-	if (Math.abs(delta) < 1) return;
+	const resolveTarget = () => {
+		const max = el.scrollHeight - el.clientHeight;
+		return Math.max(0, Math.min(top === "bottom" ? max : top, max));
+	};
+	const initialDelta = resolveTarget() - start;
+	if (Math.abs(initialDelta) < 1) return;
 
-	const duration = Math.min(260, 120 + Math.abs(delta) * 0.15);
+	// iOS: a flick keeps coasting in the scroller's own momentum, which the
+	// floating jump button doesn't stop (it isn't inside the scroller), and that
+	// momentum overwrote every frame of this animation — the jump stopped
+	// halfway. `overflow: hidden` ends the momentum; programmatic scrolling
+	// still works while it's set. Mobile only: on desktop it would hide the
+	// scrollbar and reflow the content for the duration.
+	if (onMobile) el.style.overflowY = "hidden";
+
+	const duration = Math.min(260, 120 + Math.abs(initialDelta) * 0.15);
 	let startTime: number | null = null;
 
 	const step = (now: number) => {
@@ -173,11 +186,12 @@ function animateScrollTo(top: number) {
 		const t = Math.min(1, (now - startTime) / duration);
 		// easeOutCubic
 		const eased = 1 - (1 - t) ** 3;
-		el.scrollTop = start + delta * eased;
+		el.scrollTop = start + (resolveTarget() - start) * eased;
 		if (t < 1) {
 			scrollRafId = window.requestAnimationFrame(step);
 		} else {
 			scrollRafId = null;
+			el.style.overflowY = "";
 		}
 	};
 	scrollRafId = window.requestAnimationFrame(step);
@@ -189,12 +203,15 @@ function scrollUserMessageToTop(id: UUIDv7) {
 	if (!messageElement || !scrollContainer) return;
 
 	const containerTop = scrollContainer.getBoundingClientRect().top;
-	const messageTop = messageElement.getBoundingClientRect().top;
+	// A hidden off-screen turn has no box of its own content; its wrapper starts
+	// where the user message does.
+	const anchor = messageElement.closest<HTMLElement>(".s2b-turn-offscreen") ?? messageElement;
+	const messageTop = anchor.getBoundingClientRect().top;
 	const currentScroll = scrollContainer.scrollTop;
 
 	// Place the message near the top of the container, minus a small offset so
 	// it isn't clipped by the fade mask.
-	const targetScroll = currentScroll + (messageTop - containerTop) - NAV_TOP_OFFSET;
+	const targetScroll = currentScroll + (messageTop - containerTop) - ANCHOR_TOP_OFFSET;
 
 	animateScrollTo(targetScroll);
 }
@@ -208,8 +225,8 @@ export async function scrollToLatestMessage() {
 
 // Anchor the message near the top of the view as soon as it enters edit
 // mode, so the user can see what they're changing without hunting for it in
-// the thread. Reuses `scrollUserMessageToTop` (the same function message
-// navigation uses) rather than scrolling relative to the composer: on mobile
+// the thread. Uses `scrollUserMessageToTop` rather than scrolling relative
+// to the composer: on mobile
 // the composer is portaled and repositioned live off the on-screen keyboard
 // (see Chat.svelte), which has no "finished opening" event to wait for and
 // made a composer-relative target impossible to land reliably. The
@@ -227,133 +244,111 @@ $effect(() => {
 	void tick().then(() => scrollUserMessageToTop(id));
 });
 
-// --- Message navigation (jump between user messages) ---
+// --- Jump to bottom ---
 
-// Ids of navigable user messages, in document order (skips summary markers).
-const userMessageIds = $derived.by<UUIDv7[]>(() => {
-	if (!messages) return [];
-	return messages.filter((m) => m.transcriptEvent?.type !== "summarization_marker").map((m) => m.id);
+// Past this distance from the end of the thread, the jump-to-bottom button
+// appears. Small enough that it shows as soon as the latest reply is partly out
+// of view, large enough to ignore sub-line scroll jitter.
+const JUMP_TO_BOTTOM_THRESHOLD = 120;
+
+let showJumpToBottom = $state(false);
+
+function recomputeJumpToBottom() {
+	if (!scrollContainer) return;
+	const el = scrollContainer;
+	showJumpToBottom = el.scrollHeight - el.clientHeight - el.scrollTop > JUMP_TO_BOTTOM_THRESHOLD;
+}
+
+function jumpToBottom() {
+	if (!scrollContainer) return;
+	animateScrollTo("bottom");
+}
+
+// --- Off-screen turns ---
+//
+// Obsidian mobile announces the keyboard by changing `--keyboard-height` on the
+// root. WebKit then restyles every element that declares a custom property of
+// its own — which, through core's `:root *` focus-ring rule, is every element —
+// and `content-visibility` does not spare it. In a long chat that froze an
+// iPhone for over half a second before the composer could follow the keyboard.
+// Turns well outside the view are therefore taken out of rendering: their
+// measured height is locked on the wrapper and their content set to
+// `display: none`, so the scroll geometry is unchanged. They come back 1.5
+// viewports before they can scroll into sight.
+const OFFSCREEN_TURN_MARGIN = "150% 0px";
+const turnNodes = new Set<HTMLElement>();
+let turnObserver: IntersectionObserver | null = null;
+
+function setTurnOffscreen(node: HTMLElement, offscreen: boolean) {
+	if (offscreen === node.classList.contains("s2b-turn-offscreen")) return;
+	if (offscreen) {
+		node.style.height = `${node.getBoundingClientRect().height}px`;
+		node.classList.add("s2b-turn-offscreen");
+	} else {
+		node.classList.remove("s2b-turn-offscreen");
+		node.style.height = "";
+	}
+}
+
+function offscreenTurn(node: HTMLElement) {
+	turnNodes.add(node);
+	turnObserver?.observe(node);
+	return {
+		destroy() {
+			turnNodes.delete(node);
+			turnObserver?.unobserve(node);
+		},
+	};
+}
+
+// The observer needs the scroller as its root (the viewport would ignore the
+// margin, since the scroller clips first), and `bind:this` may land after the
+// turns' actions run — so turns register in a set and are observed from here.
+$effect(() => {
+	if (!scrollContainer) return;
+	const observer = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) setTurnOffscreen(entry.target as HTMLElement, !entry.isIntersecting);
+		},
+		{ root: scrollContainer, rootMargin: OFFSCREEN_TURN_MARGIN },
+	);
+	turnObserver = observer;
+	for (const node of turnNodes) observer.observe(node);
+
+	// A hidden turn can't reflow, so its locked height goes stale when the
+	// message column's width changes (rotation, resizing a split). Once resizing
+	// settles, release every lock and re-observe: `observe` reports each turn's
+	// state afresh, so the still off-screen ones are re-measured at the new width.
+	// The column, not the scroller, is watched: it stops changing once it hits
+	// its max width. Settling first keeps a divider drag from laying out the
+	// whole chat on every step. Height changes (the keyboard) never trigger this
+	// — they don't reflow turns, and releasing then would bring back the restyle
+	// cost this avoids.
+	const column = scrollContainer.firstElementChild ?? scrollContainer;
+	let lastWidth = column.clientWidth;
+	let widthSettleTimer: number | undefined;
+	const widthObserver = new ResizeObserver(() => {
+		window.clearTimeout(widthSettleTimer);
+		widthSettleTimer = window.setTimeout(() => {
+			const width = column.clientWidth;
+			if (width === lastWidth) return;
+			lastWidth = width;
+			for (const node of turnNodes) {
+				setTurnOffscreen(node, false);
+				observer.unobserve(node);
+				observer.observe(node);
+			}
+		}, 150);
+	});
+	widthObserver.observe(column);
+	return () => {
+		window.clearTimeout(widthSettleTimer);
+		widthObserver.disconnect();
+		observer.disconnect();
+		turnObserver = null;
+		for (const node of turnNodes) setTurnOffscreen(node, false);
+	};
 });
-
-// Index of the user message currently anchored near the top of the viewport.
-// Recomputed on scroll so prev/next move relative to what the user is reading.
-let activeUserIndex = $state(0);
-
-// Whether the up/down controls should be shown. Driven by scroll position so
-// they reflect not just the turn index but where we are within a long reply.
-let prevAvailable = $state(false);
-let nextAvailable = $state(false);
-
-// The nav arrows appear while scrolling (and on hover, via CSS). After scrolling
-// stops they linger briefly, then fade out.
-let isScrolling = $state(false);
-let scrollIdleTimer: number | undefined;
-
-function handleScroll() {
-	recomputeActiveUserIndex();
-	isScrolling = true;
-	if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
-	scrollIdleTimer = window.setTimeout(() => {
-		isScrolling = false;
-	}, 900);
-}
-
-function recomputeActiveUserIndex() {
-	if (!scrollContainer || userMessageIds.length === 0) return;
-	const containerTop = scrollContainer.getBoundingClientRect().top;
-	// Anchor at the same offset navigation scrolls to, so the message that lands
-	// at the top counts as active rather than the one just above it.
-	const anchor = containerTop + NAV_TOP_OFFSET + 4;
-
-	let candidate = 0;
-	for (let i = 0; i < userMessageIds.length; i++) {
-		const el = messageRefs.get(`${userMessageIds[i]}-user`);
-		if (!el) continue;
-		if (el.getBoundingClientRect().top <= anchor) {
-			candidate = i;
-		} else {
-			break;
-		}
-	}
-	activeUserIndex = candidate;
-
-	// "Up" is available if there's an earlier turn, OR we've scrolled down inside
-	// the current turn's reply (first "up" snaps back to its user message).
-	prevAvailable = candidate > 0 || !isUserMessageAtTop(candidate);
-	nextAvailable = candidate < userMessageIds.length - 1;
-}
-
-const canNavigatePrev = $derived(prevAvailable);
-const canNavigateNext = $derived(nextAvailable);
-
-function navigateToUserMessage(index: number) {
-	if (index < 0 || index >= userMessageIds.length) return;
-	activeUserIndex = index;
-	scrollUserMessageToTop(userMessageIds[index]);
-}
-
-// True when the given user message is already anchored near the top of the
-// viewport (i.e. we're at the very start of its turn, not deep inside its reply).
-function isUserMessageAtTop(index: number): boolean {
-	const el = messageRefs.get(`${userMessageIds[index]}-user`);
-	if (!el || !scrollContainer) return false;
-	const containerTop = scrollContainer.getBoundingClientRect().top;
-	const offset = el.getBoundingClientRect().top - containerTop;
-	// Within a small band around the resting position counts as "at top".
-	return Math.abs(offset - NAV_TOP_OFFSET) <= 24;
-}
-
-function navigatePrevMessage() {
-	// If we've scrolled down into the current turn's (long) reply, the first
-	// "up" press should bring us back to that turn's own user message rather
-	// than skipping to the previous turn.
-	if (!isUserMessageAtTop(activeUserIndex)) {
-		scrollUserMessageToTop(userMessageIds[activeUserIndex]);
-		return;
-	}
-	navigateToUserMessage(activeUserIndex - 1);
-}
-
-function navigateNextMessage() {
-	navigateToUserMessage(activeUserIndex + 1);
-}
-
-// Touch devices have no Alt key, so the keyboard hint in these tooltips
-// describes a shortcut the user can't press. Drop it on mobile.
-const prevMessageTooltip = onMobile ? "Previous message" : "Previous message (Alt+↑)";
-const nextMessageTooltip = onMobile ? "Next message" : "Next message (Alt+↓)";
-
-function scrollToTop() {
-	// "Jump to top" targets the first user message, symmetric with jump-to-bottom.
-	if (userMessageIds.length === 0) {
-		animateScrollTo(0);
-		return;
-	}
-	navigateToUserMessage(0);
-}
-
-function scrollToBottom() {
-	// "Jump to bottom" targets the last user message (consistent with the rest
-	// of the navigation), not the raw end of the last assistant reply.
-	if (userMessageIds.length === 0) return;
-	navigateToUserMessage(userMessageIds.length - 1);
-}
-
-export function handleNavKeydown(event: KeyboardEvent) {
-	// Alt+Up / Alt+Down jump between user messages. Ignore when a modifier
-	// combo we don't own is pressed, or while typing in an editable field.
-	if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-	const target = event.target as HTMLElement | null;
-	if (target?.isContentEditable || target?.closest("input, textarea, .cm-editor")) return;
-
-	if (event.key === "ArrowUp") {
-		event.preventDefault();
-		navigatePrevMessage();
-	} else if (event.key === "ArrowDown") {
-		event.preventDefault();
-		navigateNextMessage();
-	}
-}
 
 // Svelte action to register message refs
 function registerMessageRef(node: HTMLDivElement, id: string) {
@@ -611,90 +606,141 @@ function toggleCollapsed(pair: MessagePair): void {
 	perTurnOverride[overrideKey(pair)] = !isCollapsed(pair);
 }
 
-// Recompute the active message + nav availability from the DOM after the thread
-// or message list changes (switching chats, new replies). This is a legitimate
-// DOM-measurement side effect, not state synchronization: `recomputeActiveUserIndex`
-// derives everything from live element positions, so a stale `activeUserIndex`
-// self-heals here and on the next scroll rather than needing an imperative clamp.
+// Re-measure when the content grows or shrinks without a scroll event: a
+// streaming reply lengthening below the fold, switching threads, a turn
+// collapsing. DOM-measurement side effect, not state synchronization.
 $effect(() => {
-	void threadPath;
-	void userMessageIds.length;
-	tick().then(() => recomputeActiveUserIndex());
+	const content = scrollContainer?.firstElementChild;
+	if (!scrollContainer || !content) return;
+	const observer = new ResizeObserver(() => recomputeJumpToBottom());
+	observer.observe(scrollContainer);
+	observer.observe(content);
+	return () => observer.disconnect();
 });
 
 $effect(() => {
 	return () => {
-		if (scrollIdleTimer) window.clearTimeout(scrollIdleTimer);
 		if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
+	};
+});
+
+// --- Drag scroll lock ---
+//
+// Chromium auto-scrolls any user-scrollable box whose edge a drag hovers near.
+// The thread's bottom edge sits directly above the composer, so dragging a file
+// into the composer crossed that band on the way and ran the thread to the
+// bottom. While a drag is in progress the scroller is made non-user-scrollable
+// (`overflow: hidden` keeps its position; the stable gutter keeps a classic
+// scrollbar's width so nothing reflows). Only drags over this chat view lock
+// it — one headed for another pane leaves the thread scrollable. A `dragover`
+// fires every ~50ms while a drag is over the view, so a gap of DRAG_IDLE_MS
+// means it left or ended (`dragleave` is too noisy to rely on). DOM side
+// effect, not state.
+const DRAG_IDLE_MS = 250;
+
+$effect(() => {
+	const el = scrollContainer;
+	if (!el) return;
+	let locked = false;
+	let idleTimer: number | undefined;
+	const release = () => {
+		window.clearTimeout(idleTimer);
+		if (!locked) return;
+		locked = false;
+		el.style.overflowY = "";
+		el.style.scrollbarGutter = "";
+	};
+	const onDragOver = () => {
+		if (!locked) {
+			locked = true;
+			el.style.scrollbarGutter = "stable";
+			el.style.overflowY = "hidden";
+		}
+		window.clearTimeout(idleTimer);
+		idleTimer = window.setTimeout(release, DRAG_IDLE_MS);
+	};
+	// The whole chat view (thread + composer), not just the scroller: the
+	// composer is where the drag is headed.
+	const view = el.closest(".s2b-chat-root") ?? el;
+	const win = el.win;
+	view.addEventListener("dragover", onDragOver, true);
+	win.addEventListener("drop", release, true);
+	win.addEventListener("dragend", release, true);
+	return () => {
+		release();
+		view.removeEventListener("dragover", onDragOver, true);
+		win.removeEventListener("drop", release, true);
+		win.removeEventListener("dragend", release, true);
 	};
 });
 </script>
 
-<div class="message-area relative flex-1 min-h-0 z-20">
+<div class="message-area s2b-relative s2b-flex-1 s2b-min-h-0 s2b-z-20">
   <!-- Scrollable messages area -->
   <div
     bind:this={scrollContainer}
-    class="scroll-container h-full overflow-y-auto overflow-x-clip px-2 pt-4 pb-8"
+    class="scroll-container s2b-h-full s2b-overflow-y-auto s2b-overflow-x-clip s2b-px-2 s2b-pt-4 s2b-pb-8"
     tabindex="-1"
-    onscroll={handleScroll}
+    onscroll={recomputeJumpToBottom}
   >
-    <!-- `min-h-full` when there are messages, NOT `h-full`: a long conversation
+    <!-- `s2b-min-h-full` when there are messages, NOT `s2b-h-full`: a long conversation
          must be allowed to grow past the scroller's content-box height, or the
          mobile `padding-bottom` (which reserves the portaled composer's height)
          gets laid out relative to a collapsed box and the last message scrolls
          under the composer. But with zero messages there's nothing to scroll
-         under anything, and `min-h-full`'s effective height doesn't reliably
+         under anything, and `s2b-min-h-full`'s effective height doesn't reliably
          resolve to 100% through this ancestor chain (percentage heights need a
          parent with a *definite* height, and `min-height: 100%` doesn't count as
-         one) — so the empty-state's own centering `h-full` collapses to its
+         one) — so the empty-state's own centering `s2b-h-full` collapses to its
          content height instead of the pane's, and "Start a new conversation"
-         renders near the top instead of vertically centred. `h-full` here (only
+         renders near the top instead of vertically centred. `s2b-h-full` here (only
          for the empty/loading branches) is a definite height and doesn't have
          that gap. -->
     <div
-      class="w-full max-w-[--file-line-width] mx-auto"
-      class:min-h-full={messages && messages.length > 0}
-      class:h-full={!messages || messages.length === 0}
+      class="s2b-w-full s2b-max-w-[--file-line-width] s2b-mx-auto"
+      class:s2b-min-h-full={messages && messages.length > 0}
+      class:s2b-h-full={!messages || messages.length === 0}
     >
       {#if registry.isLoadingSession}
         <!-- Loading skeleton -->
         <div
-          class="flex flex-col gap-4 pt-2 px-1 animate-pulse"
+          class="s2b-flex s2b-flex-col s2b-gap-4 s2b-pt-2 s2b-px-1 s2b-animate-pulse"
           data-testid="chat-loading-skeleton"
         >
-          <div class="flex justify-end">
-            <div class="h-9 w-48 rounded-2xl bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-justify-end">
+            <div class="s2b-h-9 s2b-w-48 s2b-rounded-2xl s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex flex-col gap-2">
-            <div class="h-3 w-full rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-4/5 rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-2/3 rounded bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-flex-col s2b-gap-2">
+            <div class="s2b-h-3 s2b-w-full s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-4/5 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-2/3 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex justify-end">
-            <div class="h-9 w-64 rounded-2xl bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-justify-end">
+            <div class="s2b-h-9 s2b-w-64 s2b-rounded-2xl s2b-bg-[--background-modifier-border]"></div>
           </div>
-          <div class="flex flex-col gap-2">
-            <div class="h-3 w-full rounded bg-[--background-modifier-border]"></div>
-            <div class="h-3 w-3/4 rounded bg-[--background-modifier-border]"></div>
+          <div class="s2b-flex s2b-flex-col s2b-gap-2">
+            <div class="s2b-h-3 s2b-w-full s2b-rounded s2b-bg-[--background-modifier-border]"></div>
+            <div class="s2b-h-3 s2b-w-3/4 s2b-rounded s2b-bg-[--background-modifier-border]"></div>
           </div>
         </div>
       {:else if !messages || messages.length === 0}
-        <!-- Empty state. `items-stretch`, not `items-center`: ChatRecommendations
+        <!-- Empty state. `s2b-items-stretch`, not `s2b-items-center`: ChatRecommendations
              is a single left-aligned column that centres itself via its own
              max-width + auto margins, so centring here would collapse it to its
              content width and re-ragged the left edge. -->
-        <div class="flex flex-col items-stretch justify-center h-full">
+        <div class="s2b-flex s2b-flex-col s2b-items-stretch s2b-justify-center s2b-h-full">
           <ChatRecommendations {registry} {threadPath} />
         </div>
       {:else}
         {#each messages as messagePair, index (messagePair.stableKey ?? messagePair.id)}
+          <div class="s2b-chat-turn" use:offscreenTurn>
           {#if messagePair.transcriptEvent?.type === "summarization_marker"}
             <div
-              class="summary-marker-row flex justify-center my-4"
-              class:mb-12={index === messages.length - 1}
+              class="summary-marker-row s2b-flex s2b-justify-center s2b-my-4"
+              class:s2b-mb-12={index === messages.length - 1}
             >
               <div
-                class="summary-marker inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs"
+                class="summary-marker s2b-inline-flex s2b-items-center s2b-gap-2 s2b-rounded-full s2b-px-3 s2b-py-1.5 s2b-text-xs"
                 title={messagePair.transcriptEvent.source === "manual_summarization"
                   ? "Manual conversation compaction"
                   : "Automatic conversation compaction"}
@@ -709,7 +755,7 @@ $effect(() => {
             <!-- User Message -->
             <div
               use:registerMessageRef={messagePair.id + "-user"}
-              class="group mr-2 flex flex-col items-end gap-2 mb-2"
+              class="s2b-group s2b-mr-2 s2b-flex s2b-flex-col s2b-items-end s2b-gap-2 s2b-mb-2"
             >
               {#if messagePair.userMessage.attachments?.some( (a) => a.mimeType.startsWith("image/"), )}
                   <UserAttachmentImages
@@ -726,7 +772,7 @@ $effect(() => {
                   />
                 {/if}
                 {#if messagePair.userMessage.visibleNotes?.length || messagePair.userMessage.selection || messagePair.userMessage.graphNotes?.length}
-                  <div class="visible-notes-history flex flex-row flex-wrap gap-1.5 justify-end">
+                  <div class="visible-notes-history s2b-flex s2b-flex-row s2b-flex-wrap s2b-gap-1.5 s2b-justify-end">
                     {#if messagePair.userMessage.visibleNotes?.length}
                       {#each messagePair.userMessage.visibleNotes as note (note.path)}
                         {@const noteLinkPath = linkPathForReference(
@@ -798,7 +844,7 @@ $effect(() => {
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
-                  class="flex flex-col items-end w-full s2b-user-press-target"
+                  class="s2b-flex s2b-flex-col s2b-items-end s2b-w-full s2b-user-press-target"
                   use:longPress={{
                     enabled: onMobile && !isBeingEdited,
                     onLongPress: (x, y) => openUserMessageMenu(messagePair, x, y),
@@ -808,9 +854,9 @@ $effect(() => {
                   <CollapsibleUserBubble
                     content={messagePair.userMessage.content}
                     attachments={messagePair.userMessage.attachments}
-                    class="max-w-[80%] rounded-[16px] px-4 py-2 {isBeingEdited
+                    class="s2b-max-w-[80%] s2b-rounded-[16px] s2b-px-4 s2b-py-2 {isBeingEdited
                       ? 's2b-user-bubble-editing'
-                      : 'bg-[color-mix(in_srgb,var(--color-accent)_20%,transparent)]'}"
+                      : 's2b-bg-[color-mix(in_srgb,var(--color-accent)_20%,transparent)]'}"
                   />
                 </div>
 
@@ -823,15 +869,15 @@ $effect(() => {
                    buttons and timestamp are suppressed) — removing the whole
                    row collapses its height and shifts the assistant reply
                    below it. -->
-              <div class="flex flex-row items-center gap-2">
+              <div class="s2b-flex s2b-flex-row s2b-items-center s2b-gap-2">
                 {#if !(onMobile && !messagePair.userBranchInfo)}
                   <div
-                    class="message-footer flex flex-row items-center gap-3 opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 ease-out"
+                    class="s2b-message-footer s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                   >
                     {#if !onMobile && !isBeingEdited && formatMessageTimestamp(messagePair)}
                       <span class="message-timestamp">{formatMessageTimestamp(messagePair)}</span>
                     {/if}
-                    <div class="footer-actions flex flex-row items-center gap-1.5">
+                    <div class="s2b-footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                       {#if messagePair.userBranchInfo}
                         <BranchNavigator
                           branchInfo={messagePair.userBranchInfo}
@@ -860,10 +906,10 @@ $effect(() => {
 
             <!-- Assistant Message -->
             <div
-              class:min-h-[95%]={index === messages.length - 1}
-              class:pb-12={index === messages.length - 1}
+              class:s2b-min-h-[95%]={index === messages.length - 1}
+              class:s2b-pb-12={index === messages.length - 1}
             >
-              <div class="group flex flex-col px-2 gap-3 mb-2 w-full">
+              <div class="s2b-group s2b-flex s2b-flex-col s2b-px-2 s2b-gap-3 s2b-mb-2 s2b-w-full">
                 {#if messagePair.assistantMessage.toolCalls?.length || (messagePair.assistantMessage.assistantTimeline?.length ?? 0) > 0 || messagePair.assistantMessage.state === AssistantState.idle || messagePair.assistantMessage.state === AssistantState.streaming}
                   <!-- Tools + Answer integrated in timeline (or processing dot).
                      Keep ToolCallsSection mounted during all streaming/idle states so that
@@ -894,14 +940,14 @@ $effect(() => {
                     {#if renderInfo.renderContent}
                       <MarkdownRenderer
                         content={renderInfo.content}
-                        class="message-text markdown-preview-view leading-[1.5] !p-0 !w-full !max-w-full !m-0 [&_p]:my-2 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_code]:bg-code-background [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-[--font-monospace] [&_code]:text-[0.9em] [&_pre]:bg-code-background [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:my-2 [&_pre]:text-[0.85em] [&_pre]:relative [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[1em] [&_pre_.clickable-icon]:absolute [&_pre_.clickable-icon]:top-1.5 [&_pre_.clickable-icon]:right-1.5 [&_pre_.clickable-icon]:opacity-0 [&_pre:hover_.clickable-icon]:opacity-100"
+                        class="s2b-message-text markdown-preview-view s2b-leading-[1.5] !s2b-p-0 !s2b-w-full !s2b-max-w-full !s2b-m-0 [&_p]:s2b-my-2 [&_p:first-child]:s2b-mt-0 [&_p:last-child]:s2b-mb-0 [&_strong]:s2b-font-semibold [&_code]:s2b-bg-code-background [&_code]:s2b-px-1.5 [&_code]:s2b-py-0.5 [&_code]:s2b-rounded [&_code]:s2b-font-[--font-monospace] [&_code]:s2b-text-[0.9em] [&_pre]:s2b-bg-code-background [&_pre]:s2b-p-3 [&_pre]:s2b-rounded [&_pre]:s2b-overflow-x-auto [&_pre]:s2b-my-2 [&_pre]:s2b-text-[0.85em] [&_pre]:s2b-relative [&_pre_code]:s2b-bg-transparent [&_pre_code]:s2b-p-0 [&_pre_code]:s2b-text-[1em] [&_pre_.clickable-icon]:s2b-absolute [&_pre_.clickable-icon]:s2b-top-1.5 [&_pre_.clickable-icon]:s2b-right-1.5 [&_pre_.clickable-icon]:s2b-opacity-0 [&_pre:hover_.clickable-icon]:s2b-opacity-100"
                       />
                     {/if}
                   {/if}
                 {/if}
 
                 {#if messagePair.assistantMessage.state === AssistantState.error}
-                  <div class="flex flex-row items-center">
+                  <div class="s2b-flex s2b-flex-row s2b-items-center">
                     <Button
                       iconId="refresh-cw"
                       buttonText="Retry"
@@ -920,9 +966,9 @@ $effect(() => {
                 {@const genLabel = shouldShowGenerationLabel(index) ? getGenerationLabel(messagePair) : null}
                 {@const timestamp = onMobile ? null : formatMessageTimestamp(messagePair)}
                 <div
-                  class="message-footer message-footer-assistant flex flex-row items-center gap-3 flex-nowrap opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 ease-out"
+                  class="s2b-message-footer message-footer-assistant s2b-flex s2b-flex-row s2b-items-center s2b-gap-3 s2b-flex-nowrap s2b-opacity-0 s2b-translate-y-1 group-hover:s2b-opacity-100 group-hover:s2b-translate-y-0 s2b-pointer-events-none group-hover:s2b-pointer-events-auto s2b-transition-all s2b-duration-200 s2b-ease-out"
                 >
-                  <div class="footer-actions flex flex-row items-center gap-1.5">
+                  <div class="s2b-footer-actions s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5">
                     {#if messagePair.assistantBranchInfo}
                       <BranchNavigator
                         branchInfo={messagePair.assistantBranchInfo}
@@ -944,10 +990,10 @@ $effect(() => {
                   </div>
 
                   {#if genLabel || timestamp}
-                    <div class="footer-meta flex flex-row items-center gap-2 min-w-0">
+                    <div class="footer-meta s2b-flex s2b-flex-row s2b-items-center s2b-gap-2 s2b-min-w-0">
                       {#if genLabel}
                         <span
-                          class="generation-label inline-flex items-center gap-1 min-w-0"
+                          class="generation-label s2b-inline-flex s2b-items-center s2b-gap-1 s2b-min-w-0"
                           title={[genLabel.agent, genLabel.model].filter(Boolean).join(" · ")}
                         >
                           {#if genLabel.agent}
@@ -956,13 +1002,13 @@ $effect(() => {
                                 <Icon name={genLabel.agentIcon} size="xs" />
                               </span>
                             {/if}
-                            <span class="generation-agent truncate">{genLabel.agent}</span>
+                            <span class="generation-agent s2b-truncate">{genLabel.agent}</span>
                           {/if}
                           {#if genLabel.agent && genLabel.model}
                             <span class="generation-sep" aria-hidden="true">·</span>
                           {/if}
                           {#if genLabel.model}
-                            <span class="generation-model truncate">{genLabel.model}</span>
+                            <span class="generation-model s2b-truncate">{genLabel.model}</span>
                           {/if}
                         </span>
                       {/if}
@@ -980,63 +1026,47 @@ $effect(() => {
 
             </div>
           {/if}
+          </div>
         {/each}
       {/if}
     </div>
   </div>
 
-  {#if userMessageIds.length > 1 && !onMobile}
-    <!-- Message navigation controls. The overlay mirrors the content column's
-         max-width so the cluster hugs the right edge of the messages when a wide
-         gutter opens up, while staying near the scrollbar at narrower widths.
-         Desktop only: this is a one-message-at-a-time jump/scroll shortcut
-         cluster mirroring Alt+↑/↓, which has no mobile equivalent to shortcut
-         and is redundant with plain touch scrolling — one less floating
-         overlay competing for space on a small screen. -->
-    <div class="message-nav-overlay">
-      <div class="message-nav" class:message-nav-active={isScrolling} data-testid="message-nav">
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigatePrev}>
-          <Button
-            iconId="chevrons-up"
-            iconSize="s"
-            tooltip="Jump to top"
-            dataTestId="message-nav-top"
-            onClick={scrollToTop}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigatePrev}>
-          <Button
-            iconId="chevron-up"
-            iconSize="s"
-            tooltip={prevMessageTooltip}
-            dataTestId="message-nav-prev"
-            onClick={navigatePrevMessage}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigateNext}>
-          <Button
-            iconId="chevron-down"
-            iconSize="s"
-            tooltip={nextMessageTooltip}
-            dataTestId="message-nav-next"
-            onClick={navigateNextMessage}
-          />
-        </div>
-        <div class="message-nav-slot" class:message-nav-hidden={!canNavigateNext}>
-          <Button
-            iconId="chevrons-down"
-            iconSize="s"
-            tooltip="Jump to bottom"
-            dataTestId="message-nav-bottom"
-            onClick={scrollToBottom}
-          />
-        </div>
-      </div>
+  {#if showJumpToBottom}
+    <!-- Mirrors the content column's max-width so the button stays centred on
+         the messages, not the pane, when a wide gutter opens up. -->
+    <div class="jump-to-bottom-overlay">
+      <Button
+        class="jump-to-bottom"
+        iconId="arrow-down"
+        tooltip="Jump to bottom"
+        dataTestId="jump-to-bottom"
+        onClick={jumpToBottom}
+      />
     </div>
   {/if}
 </div>
 
 <style>
+  /* `flow-root` keeps each turn's margins inside its own box, so the height
+     locked on an off-screen turn (see `offscreenTurn`) is its full footprint. */
+  .s2b-chat-turn {
+    display: flow-root;
+  }
+
+  .s2b-chat-turn:global(.s2b-turn-offscreen) > :global(*) {
+    display: none !important;
+  }
+
+  /* A Dataview result in a reply can list hundreds of notes. Dataview has no
+     paging, so cap the block and let it scroll on its own rather than
+     stretching the conversation. */
+  .s2b-chat-turn :global(.block-language-dataview),
+  .s2b-chat-turn :global(.block-language-dataviewjs) {
+    max-height: min(24rem, 60vh);
+    overflow-y: auto;
+  }
+
   /* Highlights the bubble anchored above the composer while it's being
      edited. `:global` because CollapsibleUserBubble renders its own root
      element from the `class` prop, outside this component's style scope.
@@ -1088,7 +1118,6 @@ $effect(() => {
     /* Enable native elastic/rubber-band scrolling on macOS/iOS */
     -webkit-overflow-scrolling: touch;
     /* Allow the container to have its own scroll bounce */
-    overscroll-behavior: contain;
     mask-image: linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
   }
@@ -1108,14 +1137,14 @@ $effect(() => {
      sit left in muted color and warm to normal on hover; metadata reads as a
      single subdued, consistently-sized group so it never competes with the
      message content above it. */
-  .message-footer {
+  .s2b-message-footer {
     min-height: 22px;
     font-size: 11px;
     color: var(--text-faint);
   }
 
   /* Everything below is scoped to `.message-footer-assistant`. The user
-     message reuses `.message-footer` but lays out in the OPPOSITE order
+     message reuses `.s2b-message-footer` but lays out in the OPPOSITE order
      (timestamp then actions, right-aligned) and carries no metadata group,
      so the sizing rules here actively break it: pinning its actions with
      nothing else able to yield pushes the buttons off the right edge. */
@@ -1135,7 +1164,7 @@ $effect(() => {
      annotates. With nowrap the overflow has to go somewhere, so pin the
      controls and let ONLY the metadata shrink — otherwise the browser is
      free to squeeze the icon buttons and deform the touch targets. */
-  .message-footer-assistant .footer-actions {
+  .message-footer-assistant .s2b-footer-actions {
     flex-shrink: 0;
   }
 
@@ -1235,90 +1264,61 @@ $effect(() => {
     font-variant-numeric: tabular-nums;
   }
 
-  .message-nav-overlay {
+  .jump-to-bottom-overlay {
     position: absolute;
-    inset: 0;
-    /* Full-area so the gutter math below resolves against the whole width. */
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    display: flex;
+    justify-content: center;
     pointer-events: none;
     z-index: 30;
   }
 
-  .message-nav {
-    position: absolute;
-    bottom: 12px;
-    /* Sit a fixed distance out from the content column's right edge, into the
-       gutter — a constant offset regardless of pane width, so on very wide panes
-       the arrows stay near the content instead of drifting to the middle of a
-       huge gutter. `--gutter` is the space to the right of the column; `--out` is
-       how far past the content edge to sit. Clamped so at narrow widths (small
-       gutter) the arrows rest flush at the content edge, aligned with the input. */
-    --gutter: max(0px, (100% - var(--file-line-width)) / 2);
-    --out: 16px;
-    --cluster: 20px;
-    right: clamp(2px, calc(var(--gutter) - var(--out)), var(--gutter));
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 0;
-    width: var(--cluster);
-    opacity: 0;
-    transition: opacity 160ms ease;
-    /* Container stays hoverable even when the arrows are faded out, so moving
-       into the corner reveals them. Individual buttons gate interaction via
-       their own visibility. */
+  /* On mobile the scroller is shortened by the portaled composer's height
+     (see `.scroll-container` in Chat.svelte), so lift the button above it. */
+  :global(.is-mobile) .jump-to-bottom-overlay {
+    bottom: calc(var(--s2b-composer-height, 0px) + 2px);
+  }
+
+  .jump-to-bottom-overlay :global(.jump-to-bottom) {
     pointer-events: auto;
-  }
-
-  /* Show while scrolling, when hovering the cluster, or when a nav button has
-     focus. Standalone arrows — no container chrome. */
-  .message-nav-active,
-  .message-nav:hover,
-  .message-nav:focus-within {
-    opacity: 1;
-  }
-
-  /* Fixed slots keep the cluster's height stable so a button never shifts into
-     a neighbour's position when the opposite direction is unavailable. */
-  .message-nav-slot {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: opacity 120ms ease;
-  }
-
-  .message-nav-hidden {
-    visibility: hidden;
-    pointer-events: none;
-  }
-
-  /* While faded out the cluster is still hoverable (to reveal it), but its
-     buttons shouldn't register clicks. */
-  .message-nav:not(.message-nav-active):not(:hover):not(:focus-within) :global(button) {
-    pointer-events: none;
-  }
-
-  .message-nav :global(button) {
+    /* Explicit box so the arrow has air inside the ring — core's
+       `.clickable-icon` padding is sized for borderless icons. No `iconSize`
+       on the Button: it would pin width/height inline and swallow this. */
+    padding: 6px;
+    width: auto;
+    height: auto;
+    border-radius: var(--radius-full, 999px);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    /* Flat like the composer: none of our own, and none of core's button shadow. */
+    box-shadow: none;
     color: var(--text-muted);
-    /* Override Obsidian's .clickable-icon defaults (padding, min-width, hover
-       box-shadow/background) so the arrows are a tight, chrome-free icon box.
-       The scoped `.message-nav` ancestor plus the element (0,2,1) already
-       out-specifies core's `.clickable-icon` / `.is-mobile .clickable-icon`
-       (0,2,0), and leaves the mobile touch-target rule in styles.css
-       (`body.is-mobile .message-nav button`) able to win on specificity. */
-    background: transparent;
-    box-shadow: none;
-    width: var(--icon-s);
-    height: var(--icon-s);
-    min-width: 0;
-    padding: 2px;
-    box-sizing: content-box;
-    border-radius: 4px;
   }
 
-  .message-nav :global(button:hover) {
-    color: var(--text-normal);
-    background: transparent;
+  /* 30px is too small a touch target; widen the hit area to 44px with an
+     invisible ring rather than growing the visible circle. */
+  :global(.is-mobile) .jump-to-bottom-overlay :global(.jump-to-bottom) {
+    position: relative;
+  }
+
+  :global(.is-mobile) .jump-to-bottom-overlay :global(.jump-to-bottom)::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+    border-radius: inherit;
+  }
+
+  .jump-to-bottom-overlay :global(.jump-to-bottom:hover) {
+    background: var(--background-modifier-hover);
     box-shadow: none;
+    color: var(--text-normal);
+  }
+
+  /* The flat `box-shadow: none` above outranks core's `button:focus-visible`,
+     which draws its focus ring as a box-shadow — so restore that ring here. */
+  .jump-to-bottom-overlay :global(.jump-to-bottom:focus-visible) {
+    box-shadow: 0 0 0 3px var(--background-modifier-border-focus);
   }
 </style>

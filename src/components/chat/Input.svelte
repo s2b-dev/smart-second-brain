@@ -1,6 +1,7 @@
 <script lang="ts">
 import { Notice, Platform, TFile, normalizePath } from "obsidian";
 import { selectChatModelAction, showActionNotice } from "../../utils/actionNotice";
+import { isMarkdownListLineAt } from "../../utils/markdownList";
 import { onDestroy, onMount, untrack } from "svelte";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import { EmbeddableMarkdownEditor } from "../../lib/editor";
@@ -14,11 +15,14 @@ import type { VisibleNote, VisibleNoteRef } from "../../hooks/useVisibleNotes.sv
 import type { SelectionRef } from "../../hooks/useSelection.svelte";
 import type { GraphNoteRef } from "../../stores/chatTimeline";
 import { mimeFromExtension } from "../../utils/attachments";
+import { renderPdfThumbnail } from "../../utils/pdfExtractor";
 import { extractObsidianDraggedPaths, hasObsidianFileDrag } from "../../utils/obsidianDrag";
 import { getData } from "../../stores/dataStore.svelte";
 import AgentPopover from "./AgentPopover.svelte";
 import ModelSelectButton from "./ModelSelectButton.svelte";
 import PendingChangesBar from "./PendingChangesBar.svelte";
+import TodoListBar from "./TodoListBar.svelte";
+import QuestionBar from "./QuestionBar.svelte";
 import EditingMessageBar from "./EditingMessageBar.svelte";
 import ContextTray from "./ContextTray.svelte";
 import ContextUsageCircle from "./ContextUsageCircle.svelte";
@@ -46,7 +50,6 @@ const acceptedFileTypes =
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB per file
 const MAX_TOTAL_ATTACHMENTS_BYTES = 25 * 1024 * 1024; // 25 MB per message
-const FULLSCREEN_TRANSITION_MS = 220;
 
 const {
 	registry,
@@ -64,8 +67,7 @@ const isEditing = $derived(editingPairId !== null);
 
 let editorContainer: HTMLDivElement | undefined = $state();
 let attachmentInputEl: HTMLInputElement | undefined = $state();
-/** Send shortcut hint for the send button tooltip (platform-aware). */
-const sendShortcut = Platform.isMacOS ? "⌘↵" : "Ctrl+↵";
+let cameraInputEl: HTMLInputElement | undefined = $state();
 let markdownEditor: EmbeddableMarkdownEditor | undefined = $state();
 let inputValue = $state("");
 
@@ -82,17 +84,34 @@ let isDragging = $state(false);
 let dragCounter = 0;
 let dragMessage = $state("Drop files here");
 let dragHasIssue = $state(false);
-let isFullscreen = $state(false);
 // On mobile there's no keyboard shortcut at all — Enter is always a newline
 // there (see the `onEnter` handler below) and the send button is the only
-// way to submit, so there's nothing to hint. Desktop: Enter sends when
-// collapsed; when expanded, Enter is a newline and Mod+Enter sends.
-const sendShortcutHint = $derived(isMobileUI() ? "" : isFullscreen ? sendShortcut : "↵");
-let isFullscreenVisible = $state(false);
-let fullscreenNoTransition = $state(false);
-let fullscreenTransitioning = false;
-let fullscreenPlaceholderHeight = $state(0);
+// way to submit, so there's nothing to hint. On desktop Enter sends except on a
+// list line, where it continues the list and Mod+Enter sends.
+const sendShortcutHint = isMobileUI() ? "" : `↵ · ${Platform.isMacOS ? "⌘↵" : "Ctrl+↵"} in a list`;
 let containerEl: HTMLDivElement | undefined = $state();
+// Floor for the input card when the composer runs out of pane height: its
+// controls plus one editor line. Summed from the rows around the editor, never
+// derived from the card's own height — the floor props the card open, so when
+// the tray shrank (say, an attachment removed) a self-derived floor only fell
+// by a few px per resize tick and the card visibly crept back down.
+let wrapperEl: HTMLDivElement | undefined = $state();
+let trayRowHeight = $state(0);
+let actionsRowHeight = $state(0);
+const cardMinHeight = $derived.by(() => {
+	if (!wrapperEl || !actionsRowHeight) return 0;
+	const style = getComputedStyle(wrapperEl);
+	const px = (value: string) => Number.parseFloat(value) || 0;
+	// Border-box `min-height`: the card's padding and borders, plus the two row
+	// gaps between its three in-flow children (tray, editor, actions).
+	const chrome =
+		px(style.paddingTop) +
+		px(style.paddingBottom) +
+		px(style.borderTopWidth) +
+		px(style.borderBottomWidth) +
+		2 * px(style.rowGap);
+	return trayRowHeight + actionsRowHeight + chrome + 24;
+});
 let contextTrayRef = $state<ReturnType<typeof ContextTray> | undefined>(undefined);
 // Read the tray's context outputs reactively through the instance. They're
 // getter functions over `$derived` state in ContextTray, so reading them inside
@@ -109,7 +128,7 @@ const sendButtonStyle = $derived.by(() => {
 	const disabledColor = "color-mix(in srgb, var(--text-accent) 68%, var(--background-primary) 32%)";
 
 	// Only custom properties go inline. Sizing and colour live in the
-	// `.chat-input-container button.send-message-button` rules below — an inline
+	// `.s2b-chat-input-container button.s2b-send-message-button` rules below — an inline
 	// `width`/`background` would beat every stylesheet rule, including the mobile
 	// touch-target sizes, which is what used to force `!important` everywhere.
 	return [
@@ -203,7 +222,13 @@ const hasChatModel = $derived(Boolean(selectedChatModel));
 const hasContentToSend = $derived(inputValue.trim().length > 0 || attachments.length > 0);
 const canSendMessage = $derived(hasContentToSend && hasChatModel);
 const canSummarizeNow = $derived.by(() => {
-	return Boolean(session && session.messageState === MessageState.idle && session.messages.length > 0);
+	return Boolean(
+		session &&
+			session.messageState === MessageState.idle &&
+			session.messages.length > 0 &&
+			// Summarizing appends a turn, which a thread paused on a question cannot take.
+			session.pendingInterrupts.length === 0,
+	);
 });
 // Only the composer's OWN drag state tints the composer. In `view` mode the
 // whole pane is the drop target and Chat.svelte draws one dashed frame around
@@ -279,6 +304,41 @@ let seededEditPaths = new Set<string>();
  * idiom as `assembledPromptRequestVersion` above. */
 let seedEditToken = 0;
 
+/** Width of a PDF thumbnail in CSS px: the desktop tile size. */
+const PDF_THUMBNAIL_WIDTH = 120;
+
+function hasPreview(mimeType: string): boolean {
+	return mimeType.startsWith("image/") || mimeType === "application/pdf";
+}
+
+/** Object URL for an attachment's composer tile: the image itself, or page 1 of
+ * a PDF. Undefined when a PDF won't render — the tile falls back to a file card. */
+async function createPreviewUrl(buffer: ArrayBuffer, mimeType: string): Promise<string | undefined> {
+	if (mimeType.startsWith("image/")) return URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+	try {
+		// pdfjs transfers the buffer to its worker, so hand it a copy.
+		const width = Math.round(PDF_THUMBNAIL_WIDTH * window.devicePixelRatio);
+		return URL.createObjectURL(await renderPdfThumbnail(new Uint8Array(buffer.slice(0)), width));
+	} catch {
+		return undefined;
+	}
+}
+
+let destroyed = false;
+
+/** Store a preview URL, unless its attachment was removed — or the composer
+ * destroyed — while the preview was being made (nothing would be left to
+ * revoke it). */
+function publishPreview(vaultPath: string, url: string | undefined): void {
+	if (!url) return;
+	if (destroyed || !attachments.some((a) => a.vaultPath === vaultPath)) {
+		URL.revokeObjectURL(url);
+		return;
+	}
+	previewUrls.set(vaultPath, url);
+	previewUrls = new Map(previewUrls);
+}
+
 /** Seed the edited message's attachments into the composer tray so they are
  * visible and removable during the edit — previously they rode along
  * invisibly, and anything the user attached during the edit was silently
@@ -301,17 +361,19 @@ async function seedEditAttachments(restored: ChatAttachment[]) {
 		attachmentSizes.set(att.vaultPath, file.stat.size);
 		attachmentSizes = new Map(attachmentSizes);
 		seededEditPaths.add(att.vaultPath);
-		if (att.mimeType.startsWith("image/")) {
+		if (hasPreview(att.mimeType)) {
 			try {
-				const buffer = await plugin.app.vault.readBinary(file);
+				const url = await createPreviewUrl(await plugin.app.vault.readBinary(file), att.mimeType);
 				// Re-check before publishing: the URL would leak (nothing left to
-				// revoke it) and the map write would resurrect a removed chip's
+				// revoke it) and the map write would resurrect a removed tile's
 				// preview if the edit ended during the read.
-				if (token !== seedEditToken) return;
-				previewUrls.set(att.vaultPath, URL.createObjectURL(new Blob([buffer], { type: att.mimeType })));
-				previewUrls = new Map(previewUrls);
+				if (token !== seedEditToken) {
+					if (url) URL.revokeObjectURL(url);
+					return;
+				}
+				publishPreview(att.vaultPath, url);
 			} catch {
-				// preview only — the chip still renders without it
+				// preview only — the tile still renders as a file card without it
 			}
 		}
 	}
@@ -464,6 +526,7 @@ $effect(() => {
 });
 
 onDestroy(() => {
+	destroyed = true;
 	// Stop any in-flight edit-attachment seeding; its writes would land on a
 	// dead component's state (and mint object URLs nothing revokes).
 	seedEditToken++;
@@ -501,7 +564,7 @@ function handleMobileTapFocus(event: TouchEvent) {
 
 /** A click on the composer card's empty padding focuses the editor, so the
  * whole card acts as the text target — the editor box hugs its content
- * (`min-h-[24px]`) instead of padding the card out with clickable dead space.
+ * (`s2b-min-h-[24px]`) instead of padding the card out with clickable dead space.
  * Controls and the editor itself are excluded: buttons/chips keep their own
  * behavior, and clicks inside CM must keep placing the caret. */
 function handleWrapperClick(event: MouseEvent) {
@@ -528,30 +591,33 @@ function initializeEditor() {
 		onChange: (value) => {
 			inputValue = value;
 		},
-		onEnter: (_editor, _mod, shift) => {
-			// When expanded (fullscreen), Enter always inserts a newline so long,
-			// multi-line drafts flow naturally — sending is Mod+Enter only there.
+		onEnter: (editor, _mod, shift) => {
 			// On mobile, Enter is the on-screen keyboard's only return key — there
 			// is no Shift to hold for a newline and no discoverable "hold to send"
 			// convention, so every mainstream mobile chat app (WhatsApp, iMessage,
 			// Telegram) treats it as a newline and reserves the send button as the
-			// only way to submit. Match that instead of sending on it. Otherwise
-			// (desktop, collapsed) plain Enter sends; Shift+Enter always inserts a
-			// newline. Return false to use the editor's default newline behavior.
-			if (isFullscreen || shift || isMobileUI()) {
+			// only way to submit. Match that instead of sending on it. On desktop
+			// plain Enter sends; Shift+Enter inserts a newline. Return false to use
+			// the editor's default newline behavior.
+			if (shift || isMobileUI()) {
+				return false;
+			}
+			// On a list line, hand Enter to Obsidian, which continues the list (a
+			// new bullet, number or checkbox) and ends it on an empty item — the
+			// next Enter then sends, as in Slack. Mod+Enter still sends from
+			// anywhere.
+			const { state } = editor.cm;
+			if (isMarkdownListLineAt(state.doc.toString(), state.selection.main.head)) {
 				return false;
 			}
 			attemptSend();
 			return true;
 		},
 		onSubmit: () => {
-			// Mod+Enter: send message (works in both collapsed and expanded modes)
+			// Mod+Enter: send message
 			attemptSend();
 		},
 		onEscape: () => {
-			// Fullscreen has its own Esc handling (collapse first); don't also
-			// cancel an edit on the same keypress.
-			if (isFullscreen) return;
 			cancelActiveEdit();
 		},
 		onFocus: () => {
@@ -566,64 +632,6 @@ function initializeEditor() {
 	window.requestAnimationFrame(() => {
 		markdownEditor?.focus();
 	});
-}
-
-function expandFullscreen() {
-	if (isMobileUI() || fullscreenTransitioning || isFullscreen) return;
-	fullscreenTransitioning = true;
-	setFullscreenStartInset();
-	fullscreenNoTransition = true;
-	isFullscreen = true;
-	isFullscreenVisible = false;
-	// Double rAF ensures the start geometry is fully painted before transition begins.
-	window.requestAnimationFrame(() => {
-		window.requestAnimationFrame(() => {
-			fullscreenNoTransition = false;
-			window.requestAnimationFrame(() => {
-				isFullscreenVisible = true;
-			});
-			window.setTimeout(() => {
-				fullscreenTransitioning = false;
-			}, FULLSCREEN_TRANSITION_MS);
-			markdownEditor?.focus();
-		});
-	});
-}
-
-function collapseFullscreen() {
-	if (fullscreenTransitioning || !isFullscreen) return;
-	fullscreenTransitioning = true;
-	isFullscreenVisible = false;
-	window.setTimeout(() => {
-		isFullscreen = false;
-		fullscreenNoTransition = false;
-		fullscreenPlaceholderHeight = 0;
-		fullscreenTransitioning = false;
-		window.requestAnimationFrame(() => markdownEditor?.focus());
-	}, FULLSCREEN_TRANSITION_MS);
-}
-
-function setFullscreenStartInset() {
-	if (!containerEl) return;
-	// Use offset geometry from layout engine to avoid subpixel drift during first frame.
-	const top = Math.max(0, containerEl.offsetTop);
-	const left = Math.max(0, containerEl.offsetLeft);
-	const width = Math.max(0, containerEl.offsetWidth);
-	const height = Math.max(0, containerEl.offsetHeight);
-	fullscreenPlaceholderHeight = height;
-
-	containerEl.style.setProperty("--fs-top", `${top}px`);
-	containerEl.style.setProperty("--fs-left", `${left}px`);
-	containerEl.style.setProperty("--fs-width", `${width}px`);
-	containerEl.style.setProperty("--fs-height", `${height}px`);
-}
-
-function toggleFullscreen() {
-	if (isFullscreen) {
-		collapseFullscreen();
-		return;
-	}
-	expandFullscreen();
 }
 
 function attemptSend() {
@@ -718,6 +726,12 @@ function sendMessage() {
 		new Notice("Chat is not ready yet");
 		return;
 	}
+	// A message sent while the agent's question is open is delivered as the answer to
+	// it (see ChatSession.sendMessage), and an answer is text only.
+	if (session.pendingInterrupts.length > 0 && attachments.length > 0) {
+		new Notice("Answer or dismiss the agent's question before attaching files");
+		return;
+	}
 
 	const contentToSend = inputValue.trim().length > 0 ? inputValue : "Please analyze the attached files.";
 	void session
@@ -741,9 +755,6 @@ function sendMessage() {
 	contextTrayRef?.clear();
 	inputValue = "";
 	markdownEditor?.clear();
-	if (isFullscreen) {
-		collapseFullscreen();
-	}
 	onMessageSent?.();
 }
 
@@ -886,12 +897,7 @@ async function processFiles(files: File[]) {
 			managedAttachmentPaths = new Set(managedAttachmentPaths);
 			count++;
 
-			// Create preview URL for images
-			if (mime.startsWith("image/")) {
-				const blob = new Blob([buffer], { type: mime });
-				previewUrls.set(vaultPath, URL.createObjectURL(blob));
-				previewUrls = new Map(previewUrls);
-			}
+			if (hasPreview(mime)) publishPreview(vaultPath, await createPreviewUrl(buffer, mime));
 		}
 	} catch (error) {
 		new Notice(`Failed to attach file: ${error instanceof Error ? error.message : String(error)}`);
@@ -947,11 +953,8 @@ async function attachVaultFile(file: TFile): Promise<boolean> {
 		attachmentSizes.set(file.path, size);
 		attachmentSizes = new Map(attachmentSizes);
 
-		if (mime.startsWith("image/")) {
-			const buffer = await getPlugin().app.vault.readBinary(file);
-			const blob = new Blob([buffer], { type: mime });
-			previewUrls.set(file.path, URL.createObjectURL(blob));
-			previewUrls = new Map(previewUrls);
+		if (hasPreview(mime)) {
+			publishPreview(file.path, await createPreviewUrl(await getPlugin().app.vault.readBinary(file), mime));
 		}
 
 		return true;
@@ -1235,55 +1238,37 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 }
 </script>
 
-{#if isFullscreen}
-  <div
-    class="chat-input-placeholder w-full"
-    style="height: {fullscreenPlaceholderHeight}px;"
-    aria-hidden="true"
-  ></div>
-{/if}
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={containerEl}
-  class="chat-input-container w-full flex flex-col relative isolate gap-1 {isFullscreen
-    ? `chat-input-fullscreen justify-end ${fullscreenNoTransition ? 'chat-input-fullscreen-no-transition' : ''} ${isFullscreenVisible ? 'chat-input-fullscreen-visible' : ''}`
-    : 'mx-auto max-w-[--file-line-width]'}"
+  class="s2b-chat-input-container s2b-w-full s2b-flex s2b-flex-col s2b-relative s2b-isolate s2b-gap-1 s2b-mx-auto s2b-max-w-[--file-line-width]"
   role="region"
-  onkeydown={(e) => {
-    if (isFullscreen && e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      collapseFullscreen();
-    }
-  }}
 >
   {#if selectedChatModel && models.unavailableProviders.includes(selectedChatModel.provider)}
     <button
-      class="provider-unreachable-banner flex flex-row items-center gap-1.5 text-xs cursor-pointer"
+      class="provider-unreachable-banner s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5 s2b-text-xs s2b-cursor-pointer"
       onclick={models.refetchProviders}
       title="Click to retry connection"
     >
-      <div class="h-icon-xs shrink-0" use:icon={"alert-triangle"} style="--icon-size: var(--icon-xs)"></div>
+      <div class="s2b-h-icon-xs s2b-shrink-0" use:icon={"alert-triangle"} style="--icon-size: var(--icon-xs)"></div>
       <span>Cannot connect to {selectedChatModel.provider} — click to retry</span>
     </button>
   {/if}
+  <TodoListBar {registry} {threadPath} />
   <PendingChangesBar {threadPath} />
   <EditingMessageBar {registry} {threadPath} onCancel={cancelActiveEdit} />
+  <QuestionBar {registry} {threadPath} />
   <!-- Input wrapper with glow effect.
        Transition is scoped to the two properties that actually change state
        (border-color on focus/drag, background on drag-active) rather than
-       `transition-all`, which also animated layout geometry — including the
-       reflow when the mobile keyboard opens. The fullscreen expand/collapse
-       animation is unaffected: it lives on `.chat-input-container`, which has
-       its own explicit transition list. -->
+       `s2b-transition-all`, which also animated layout geometry — including the
+       reflow when the mobile keyboard opens. -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -- the click is a
        pointer-only convenience (focus the editor from the card's padding);
        keyboard users reach the editor by Tab, so no key handler is needed. -->
   <div
-    class="chat-input-wrapper flex flex-col gap-3 border border-solid pb-2 px-3 transition-[background-color,border-color] duration-200 ease-in-out relative isolate {isFullscreen
-      ? 'flex-1 min-h-0'
-      : ''} {showDragActive
-      ? 'border-[--interactive-accent] chat-input-wrapper-drag-active'
+    class="chat-input-wrapper s2b-flex s2b-flex-col s2b-gap-3 s2b-border s2b-border-solid s2b-pb-2 s2b-px-3 s2b-transition-[background-color,border-color] s2b-duration-200 s2b-ease-in-out s2b-relative s2b-isolate {showDragActive
+      ? 's2b-border-[--interactive-accent] chat-input-wrapper-drag-active'
       : ''}"
     ondragenter={dropTargetMode === "input" ? handleDragEnter : undefined}
     ondragover={dropTargetMode === "input" ? handleDragOver : undefined}
@@ -1291,28 +1276,16 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     ondrop={dropTargetMode === "input" ? handleDrop : undefined}
     onclick={handleWrapperClick}
     role="region"
+    bind:this={wrapperEl}
+    style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}
   >
-    {#if !isMobileUI()}
-      <!-- Fullscreen toggle - top right corner. Desktop only: on mobile the
-           composer already grows with content up to `max-h-[200px]` (see the
-           editor container below), and the fullscreen panel only bought a bit
-           more room at real cost (an extra button, its own transition/keyboard
-           timing to get right) — not worth it on a screen this small. -->
-      <Button
-        styles="chat-input-icon-button fullscreen-toggle-button absolute top-1.5 right-1.5 z-10 opacity-0 transition-opacity duration-150"
-        iconId={isFullscreen ? "minimize-2" : "maximize-2"}
-        iconSize="xs"
-        style="pointer-events: auto;"
-        onClick={toggleFullscreen}
-        tooltip={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen editor"}
-      />
-    {/if}
-    <!-- `pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
-         6px below the border, matching the fullscreen toggle's `top-1.5` so
-         the two top-anchored elements sit on one line. The old `pt-2` put it
-         at 12px — a visibly large gap that also read as misaligned against
-         the button. -->
-    <div class="composer-tray-row flex flex-row flex-wrap items-start gap-1.5 pt-0.5 min-w-0">
+    <!-- `s2b-pt-0.5` (2px) on top of the wrapper's 4px `padding-top` puts the tray
+         6px below the border. The old `s2b-pt-2` put it at 12px — a visibly large
+         gap. -->
+    <div
+      class="composer-tray-row s2b-flex s2b-flex-row s2b-flex-wrap s2b-items-start s2b-gap-1.5 s2b-pt-0.5 s2b-min-w-0"
+      bind:clientHeight={trayRowHeight}
+    >
       <ContextTray
         bind:this={contextTrayRef}
         graphPaths={registry.graphSelection}
@@ -1322,24 +1295,23 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         onRemoveAttachment={removeAttachment}
         onPromoteToAttachment={promoteVisibleNoteToAttachment}
         canPromoteToAttachment={canPromoteVisibleNoteToAttachment}
+        attachmentPreviewUrls={previewUrls}
       />
       {#if savingFiles}
-        <div class="text-xs text-text-muted flex items-center">Saving...</div>
+        <div class="s2b-text-xs s2b-text-text-muted s2b-flex s2b-items-center">Saving...</div>
       {/if}
     </div>
 
     <!-- Markdown Editor Container -->
     <div
       bind:this={editorContainer}
-      class="markdown-editor-container w-full overflow-y-auto py-1 {isFullscreen
-        ? 'flex-1'
-        : 'min-h-[24px] max-h-[200px]'}"
+      class="markdown-editor-container s2b-w-full s2b-overflow-y-auto s2b-py-1 s2b-min-h-[24px]"
       id="chat-view-user-input-element"
       data-testid="message-input"
     ></div>
 
     <!-- Actions row: attachment, agent+model, send -->
-    <div class="chat-actions-row flex items-center gap-2">
+    <div class="chat-actions-row s2b-flex s2b-items-center s2b-gap-2" bind:clientHeight={actionsRowHeight}>
       <input
         bind:this={attachmentInputEl}
         type="file"
@@ -1349,13 +1321,27 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         style="display:none;"
         oninput={(event) => onFileAttachment(event)}
       />
+      <!-- `capture` sends the mobile WebView straight to the camera instead of
+           the photo library / file sheet. Desktop ignores the attribute (it
+           would just open a picker filtered to images), so the popover only
+           offers the row on a real mobile device. -->
+      <input
+        bind:this={cameraInputEl}
+        type="file"
+        id="attachment-camera"
+        accept="image/*"
+        capture="environment"
+        style="display:none;"
+        oninput={(event) => onFileAttachment(event)}
+      />
       <AttachPopover
         onFromComputer={() => attachmentInputEl?.click()}
         onFromVault={openVaultPicker}
+        onFromCamera={Platform.isMobile ? () => cameraInputEl?.click() : undefined}
       />
       <AgentPopover {threadPath} />
       <ModelSelectButton {threadPath} />
-      <div class="ml-auto flex items-center gap-2">
+      <div class="s2b-ml-auto s2b-flex s2b-items-center s2b-gap-2">
         <!-- Always on for desktop: the ring is the only place the running
              context estimate (and the Summarize action in its popover) lives,
              so it stays in view at every usage level. It used to appear only
@@ -1382,7 +1368,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
               ariaLabel="Cancel edit"
               tooltip="Cancel edit"
               onClick={cancelActiveEdit}
-              styles="chat-input-icon-button clickable-icon mr-2"
+              styles="s2b-chat-input-icon-button clickable-icon s2b-mr-2"
               iconId="x"
             />
           {/if}
@@ -1400,7 +1386,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
                   : "Send message"}
             onClick={attemptSend}
             dataTestId="send-message-button"
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200 disabled:cursor-not-allowed"
+            styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200 disabled:s2b-cursor-not-allowed"
             style={sendButtonStyle}
             iconId={isEditing ? "check" : "arrow-up"}
           />
@@ -1409,7 +1395,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
             ariaLabel="stop streaming"
             tooltip="Stop streaming"
             onClick={() => session?.stopStreaming()}
-            styles="send-message-button p-0 border-none cursor-pointer flex items-center justify-center shrink-0 transition-all duration-200"
+            styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200"
             style={sendButtonStyle}
             iconId="square"
           />
@@ -1419,12 +1405,12 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
     {#if dropTargetMode === "input" && isDragging}
       <div
-        class="absolute inset-0 z-20 rounded-[22px] pointer-events-none flex items-center justify-center gap-2 text-sm font-medium {dragHasIssue
-          ? 'text-[--text-error]'
-          : 'text-[--text-accent]'}"
+        class="s2b-absolute s2b-inset-0 s2b-z-20 s2b-rounded-[22px] s2b-pointer-events-none s2b-flex s2b-items-center s2b-justify-center s2b-gap-2 s2b-text-sm s2b-font-medium {dragHasIssue
+          ? 's2b-text-[--text-error]'
+          : 's2b-text-[--text-accent]'}"
       >
         <div
-          class="w-[--icon-s] h-[--icon-s]"
+          class="s2b-w-[--icon-s] s2b-h-[--icon-s]"
           style="--icon-size: var(--icon-s)"
           use:icon={dragHasIssue ? "alert-triangle" : "upload"}
         ></div>
@@ -1434,11 +1420,11 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
   </div>
 
   <!-- Spacer to keep the input glow from being clipped at the bottom edge -->
-  <div class="h-4" aria-hidden="true"></div>
+  <div class="s2b-h-4" aria-hidden="true"></div>
 </div>
 
 <style>
-  .chat-input-container {
+  .s2b-chat-input-container {
     background: transparent !important;
     /* Same fill as the page, everywhere. The composer is defined by its
        border, not by a contrasting slab — see `.chat-input-wrapper`. */
@@ -1475,7 +1461,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      which against a dark theme's near-black page reads as a distinctly
      lighter band with visible edges down both sides of the inset input.
      Verified on-device in dark mode: page `#000` vs wrapper `rgb(30,30,30)`. */
-  :global(.is-mobile .chat-input-container) {
+  :global(.is-mobile .s2b-chat-input-container) {
     background: linear-gradient(to bottom, transparent 0%, var(--background-primary) 24px) !important;
   }
 
@@ -1523,7 +1509,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     flex-shrink: 0;
   }
 
-  .chat-actions-row :global(.model-select-btn) {
+  .chat-actions-row :global(.s2b-model-select-btn) {
     flex-shrink: 1;
     min-width: 0;
   }
@@ -1546,7 +1532,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      with an ellipsis instead (`max-width` in ModelSelectButton) and is the
      last label standing. */
   @container chat-composer (max-width: 340px) {
-    .chat-actions-row :global(.context-usage-trigger) {
+    .chat-actions-row :global(.s2b-context-usage-trigger) {
       display: none;
     }
   }
@@ -1558,14 +1544,14 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 
     /* The 190px trigger cap exists to bound the LABEL; with the label gone it
        would just leave dead space around the icon. */
-    .chat-actions-row :global(.agent-popover-trigger) {
+    .chat-actions-row :global(.s2b-agent-popover-trigger) {
       max-width: none;
     }
   }
 
   /* Circular, matching the attach button (already `999px`) and the reference
      design. The 6px radius made it the odd one out in the action row. */
-  :global(.chat-input-container button.send-message-button) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button) {
     border-radius: 999px;
   }
 
@@ -1594,68 +1580,6 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     padding-right: 6px;
   }
 
-  .chat-input-container.chat-input-fullscreen {
-    /* Breathing room between the expanded panel and the chat pane's edges. */
-    --s2b-fs-gutter: 12px;
-    position: absolute;
-    top: var(--fs-top, 0px);
-    left: var(--fs-left, 0px);
-    width: var(--fs-width, 100%);
-    height: var(--fs-height, 100%);
-    margin: 0 !important;
-    z-index: var(--layer-popover);
-    background: var(--background-primary) !important;
-    padding: 0;
-    max-width: none;
-    opacity: 1;
-    /* Matches `.chat-input-wrapper`'s radius. With `overflow: hidden` here, a
-       tighter radius on the container clips the wrapper's rounder corners and
-       shaves off its bottom edge. */
-    border-radius: 22px;
-    overflow: hidden;
-    transition:
-      top 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      left 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      border-radius 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      opacity 220ms ease;
-    will-change: top, left, width, height, border-radius;
-  }
-
-  /* Expanded geometry. The toggle that reaches this state is desktop-only (see
-     the `{#if !isMobileUI()}` guard on the fullscreen button), so this sizes
-     against the chat pane, not the phone viewport.
-
-     `.chat-input-container` is `position: absolute` inside `.chat-root`, which
-     is `position: relative` — so percentages here resolve against the chat pane
-     and the panel stays inside it instead of escaping to the window. An earlier
-     `height: 100vh - <mobile keyboard/navbar bands>` measured the whole viewport
-     while the top offset was relative to the pane, so in any pane shorter than
-     the window the panel overhung its bottom edge and the send row was clipped —
-     the reported "cut off slightly at the bottom". */
-  .chat-input-container.chat-input-fullscreen.chat-input-fullscreen-visible {
-    opacity: 1;
-    top: var(--s2b-fs-gutter);
-    height: calc(100% - (2 * var(--s2b-fs-gutter)));
-    /* Match the collapsed composer's readable measure (`max-w-[--file-line-width]`,
-       centered) rather than stretching edge to edge: a full-width editor gives
-       lines far longer than the messages above it, so text written here does not
-       wrap where it will once sent. Centering is done with `left` + `width`
-       because `margin: 0 !important` above rules out `margin-inline: auto`. */
-    width: min(calc(100% - (2 * var(--s2b-fs-gutter))), var(--file-line-width));
-    left: max(
-      var(--s2b-fs-gutter),
-      calc((100% - min(calc(100% - (2 * var(--s2b-fs-gutter))), var(--file-line-width))) / 2)
-    );
-    /* Keep in step with the wrapper radius, as above. */
-    border-radius: 22px;
-  }
-
-  .chat-input-container.chat-input-fullscreen.chat-input-fullscreen-no-transition {
-    transition: none !important;
-  }
-
   .chat-input-wrapper:focus-within {
     border-color: var(--interactive-accent);
   }
@@ -1670,11 +1594,11 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     visibility: hidden;
   }
 
-  /* `.chat-input-container button.…` (0,2,1) out-specifies every core button
+  /* `.s2b-chat-input-container button.…` (0,2,1) out-specifies every core button
      and `.clickable-icon` rule, mobile variants included, so nothing here needs
      `!important` — which also lets the touch-target rules in styles.css win on
      specificity alone. */
-  :global(.chat-input-container button.send-message-button) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button) {
     background: var(--send-button-bg);
     color: var(--text-on-accent);
     width: 1.75rem;
@@ -1691,30 +1615,30 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
      attach button, the other icon in this row that needed the same
      correction. Applies to all three states (arrow-up / check / square), so
      the button's weight doesn't shift as it changes state. */
-  :global(.send-message-button .svg-icon) {
+  :global(.s2b-send-message-button .svg-icon) {
     stroke-width: 2.5;
   }
 
   /* Bump the send target to a comfortable touch size on mobile. */
-  :global(.is-mobile .chat-input-container button.send-message-button) {
+  :global(.is-mobile .s2b-chat-input-container button.s2b-send-message-button) {
     width: 2.75rem;
     height: 2.75rem;
     min-width: 2.75rem;
     min-height: 2.75rem;
   }
 
-  :global(.chat-input-container button.send-message-button:hover:not(:disabled)) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button:hover:not(:disabled)) {
     background: var(--send-button-bg-hover);
     color: var(--text-on-accent);
   }
 
-  :global(.chat-input-container button.send-message-button:disabled) {
+  :global(.s2b-chat-input-container button.s2b-send-message-button:disabled) {
     background: var(--send-button-bg-disabled);
     color: color-mix(in srgb, var(--text-on-accent) 82%, transparent);
     opacity: 1;
   }
 
-  :global(.chat-input-container .chat-input-icon-button.clickable-icon) {
+  :global(.s2b-chat-input-container .s2b-chat-input-icon-button.clickable-icon) {
     width: 1.75rem;
     height: 1.75rem;
     min-width: 1.75rem;
@@ -1729,26 +1653,30 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     aspect-ratio: 1;
   }
 
-  :global(.chat-input-wrapper:hover > .fullscreen-toggle-button.clickable-icon),
-  :global(.chat-input-wrapper:focus-within > .fullscreen-toggle-button.clickable-icon),
-  :global(.chat-input-fullscreen .chat-input-wrapper > .fullscreen-toggle-button.clickable-icon) {
-    opacity: 1;
+  /* `--s2b-chat-pane-height` is the chat pane's height (published in
+     Chat.svelte). The input card grows with its content up to two thirds of
+     it, after which the editor — the card's only shrinkable child — scrolls.
+
+     The whole composer is capped at the pane. When everything doesn't fit, the
+     pending-changes list gives way first (its far larger shrink factor): it is
+     its own scroller floored at its summary row (see PendingChangesBar.svelte).
+     Only then does the card shrink, down to `cardMinHeight` — its controls plus
+     one editor line — so the send row is never squeezed out. The banner,
+     editing bar and task list keep their size (the list scrolls inside a cap). */
+  .s2b-chat-input-container {
+    max-height: var(--s2b-chat-pane-height);
   }
 
-  /* The toggle is absolutely positioned over the wrapper's top-right corner,
-     outside the flow — reserve that corner in the tray row so a wrapping chip
-     can't land underneath it, where the toggle would swallow the chip's
-     clicks (its paperclip/close actions live exactly at a chip's right edge).
-     2.5rem = the 6px right offset + 1.75rem button + a 6px gap. Only the
-     row's FIRST line can collide (the toggle band ends where a second chip
-     line begins), so the over-reservation on later lines is the price of
-     doing this in CSS. Mobile never renders the toggle — no reservation. */
-  .composer-tray-row {
-    padding-right: 2.5rem;
+  .s2b-chat-input-container > :global(:not(.chat-input-wrapper, .pcb-container)) {
+    flex-shrink: 0;
   }
 
-  :global(.is-mobile) .composer-tray-row {
-    padding-right: 0;
+  .s2b-chat-input-container > :global(.pcb-container) {
+    flex-shrink: 1000;
+  }
+
+  .chat-input-wrapper {
+    max-height: calc(var(--s2b-chat-pane-height) * 2 / 3);
   }
 
   /* Markdown editor styling */

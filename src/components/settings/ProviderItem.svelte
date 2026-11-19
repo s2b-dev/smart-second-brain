@@ -133,7 +133,7 @@ async function removeProvider(purgeEmbeddings = false) {
       {#if isCheckingAuth}
         <button
           type="button"
-          class="provider-icon-button provider-status-indicator"
+          class="s2b-provider-icon-button provider-status-indicator"
           title="Checking auth"
           aria-label="Checking auth"
           disabled
@@ -143,7 +143,7 @@ async function removeProvider(purgeEmbeddings = false) {
       {:else if query.data?.auth.success}
         <button
           type="button"
-          class="provider-icon-button provider-status-indicator provider-icon-indicator-success"
+          class="s2b-provider-icon-button provider-status-indicator provider-icon-indicator-success"
           title="Authenticated. Click to retry connection"
           aria-label="Authenticated. Click to retry connection"
           onclick={refetch}
@@ -153,7 +153,7 @@ async function removeProvider(purgeEmbeddings = false) {
       {:else}
         <button
           type="button"
-          class="provider-icon-button provider-status-indicator provider-icon-indicator-error"
+          class="s2b-provider-icon-button provider-status-indicator provider-icon-indicator-error"
           title={`${authFailureMessage}. Click to retry connection`}
           aria-label={`${authFailureMessage}. Click to retry connection`}
           onclick={refetch}
@@ -226,7 +226,7 @@ async function removeProvider(purgeEmbeddings = false) {
     color: var(--text-success, #4caf50);
   }
 
-  .provider-icon-button {
+  .s2b-provider-icon-button {
     padding: 0;
     margin: 0;
     border: 0;
@@ -242,18 +242,18 @@ async function removeProvider(purgeEmbeddings = false) {
     line-height: 1;
   }
 
-  .provider-icon-button:disabled {
+  .s2b-provider-icon-button:disabled {
     cursor: default;
   }
 
   /* Touch: keep the icon visually 16px but grow the tap area to ~44px via
      padding, cancelled by negative margin so the header row layout is unchanged. */
-  :global(.is-mobile) .provider-icon-button {
+  :global(.is-mobile) .s2b-provider-icon-button {
     padding: 14px;
     margin: -14px;
   }
 
-  .provider-icon-button:not(:disabled):hover {
+  .s2b-provider-icon-button:not(:disabled):hover {
     filter: brightness(1.05);
   }
 

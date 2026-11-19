@@ -70,6 +70,13 @@ async function handleCleanupPluginData() {
 
 <!-- Maintenance -->
 <SettingGroup heading="Maintenance">
+  <SettingItem
+    name="Release notes"
+    desc={`You are on version ${plugin.manifest.version}. See what changed in recent releases.`}
+  >
+    <Button buttonText="Show release notes" onClick={() => void plugin.showReleaseNotes()} />
+  </SettingItem>
+
   <!-- Docs first, GitHub as the escalation path: the troubleshooting guide is
        organised by symptom (the agent won't respond, search returns nothing, a note
        is being withheld, …), so it answers most of what would otherwise arrive as
@@ -85,7 +92,7 @@ async function handleCleanupPluginData() {
     name="Still stuck?"
     desc="Look through existing GitHub issues to see whether the problem is already tracked. If it is not, open a new issue and include what you tried, any error messages, and steps to reproduce it."
   >
-    <div class="flex gap-2 flex-wrap">
+    <div class="s2b-flex s2b-gap-2 s2b-flex-wrap">
       <ExternalLinkButton href={githubIssuesListUrl} label="View existing issues" />
       <ExternalLinkButton href={githubIssuesNewUrl} label="Open new issue" />
     </div>

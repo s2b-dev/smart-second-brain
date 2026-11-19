@@ -34,7 +34,7 @@ import { type ShippedHistory, currentShippedVersion, fingerprint } from "../../s
  * update the literal below. The tag replay at the bottom of this file checks the recorded old
  * fingerprints against what each release actually shipped.
  */
-const CURRENT_FINGERPRINT = "4129dad19802bdb9"; // DEFAULT_AGENT_PROMPT at v4
+const CURRENT_FINGERPRINT = "e36040327476a827"; // DEFAULT_AGENT_PROMPT at v6
 
 const history: ShippedHistory = SHIPPED_AGENT_PROMPTS;
 const version = AGENT_PROMPT_VERSION;
@@ -86,11 +86,23 @@ describe("default agent prompt composition", () => {
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryFolder}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{date}}");
 		expect(DEFAULT_AGENT_PROMPT).toContain("{{memoryIndex}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultSettings}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultFolders}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultTags}}");
+		expect(DEFAULT_AGENT_PROMPT).toContain("{{vaultProperties}}");
 	});
 
-	it("orders the sections base → date → memory", () => {
+	it("orders the sections base → date → vault → memory", () => {
 		const headings = DEFAULT_AGENT_PROMPT.split("\n").filter((line) => line.startsWith("# "));
-		expect(headings).toEqual(["# Role", "# User Context", "# Tools", "# Formatting", "# Current Date", "# Memory"]);
+		expect(headings).toEqual([
+			"# Role",
+			"# User Context",
+			"# Tools",
+			"# Formatting",
+			"# Current Date",
+			"# Vault",
+			"# Memory",
+		]);
 	});
 });
 

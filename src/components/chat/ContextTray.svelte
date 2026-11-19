@@ -35,6 +35,9 @@ interface Props {
 	onPromoteToAttachment?: (note: VisibleNote) => void | Promise<void>;
 	/** Whether the active note can be promoted to a content attachment. */
 	canPromoteToAttachment?: (note: VisibleNote) => boolean;
+	/** Object URLs for image attachments, keyed by vault path. An image with a
+	 * URL renders as a thumbnail; anything else stays a chip. */
+	attachmentPreviewUrls?: ReadonlyMap<string, string>;
 }
 
 let {
@@ -45,6 +48,7 @@ let {
 	onRemoveAttachment,
 	onPromoteToAttachment,
 	canPromoteToAttachment,
+	attachmentPreviewUrls = new Map(),
 }: Props = $props();
 
 const tracker = new VisibleNotesTracker();
@@ -242,16 +246,18 @@ function clearAllGraphNotes(evt: MouseEvent): void {
 
 // --- Attachment handlers ---
 function attachmentIcon(attachment: ChatAttachment): string {
-	return attachment.mimeType.startsWith("image/") ? "image" : "paperclip";
+	if (attachment.mimeType.startsWith("image/")) return "image";
+	if (attachment.mimeType === "application/pdf") return "file-text";
+	return "file";
 }
 
-function onAttachmentClick(evt: MouseEvent, attachment: ChatAttachment): void {
-	if (Keymap.isModEvent(evt)) {
-		evt.preventDefault();
-		evt.stopPropagation();
-		openLink(attachment.vaultPath);
-		return;
-	}
+function attachmentExtension(attachment: ChatAttachment): string {
+	return /\.(\w+)$/.exec(attachment.name)?.[1]?.toUpperCase() ?? "";
+}
+
+function removeAttachment(evt: MouseEvent, attachment: ChatAttachment): void {
+	evt.preventDefault();
+	evt.stopPropagation();
 	onRemoveAttachment?.(attachment);
 }
 
@@ -274,7 +280,55 @@ onDestroy(() => {
 </script>
 
 {#if hasAny}
-  <div class="context-tray flex flex-row flex-wrap items-start gap-1.5 min-w-0 max-w-full">
+  <div class="context-tray s2b-flex s2b-flex-row s2b-flex-wrap s2b-items-start s2b-gap-1.5 s2b-min-w-0 s2b-max-w-full">
+    <!-- Attachments: tiles on their own row, so what's being sent is visible
+         at a glance rather than hidden behind a filename. Images and PDFs show
+         a thumbnail; anything without one shows a file card. -->
+    {#if attachments.length > 0}
+      <div class="attachment-tiles">
+        {#each attachments as attachment (attachment.vaultPath)}
+          {@const url = attachmentPreviewUrls.get(attachment.vaultPath)}
+          {@const ext = attachmentExtension(attachment)}
+          <div
+            class="attachment-tile"
+            class:has-preview={url}
+            class:is-document={!attachment.mimeType.startsWith("image/")}
+          >
+            <button
+              type="button"
+              class="attachment-tile-body"
+              title={`${attachment.vaultPath} (click to open)`}
+              onclick={() => openLink(attachment.vaultPath)}
+              onmouseover={(evt) => previewLink(evt, attachment.vaultPath)}
+              onfocus={(evt) => previewLink(evt, attachment.vaultPath)}
+            >
+              {#if url}
+                <img src={url} alt={attachment.name} draggable="false" />
+                {#if !attachment.mimeType.startsWith("image/") && ext}
+                  <span class="attachment-tile-badge">{ext}</span>
+                {/if}
+              {:else}
+                <div class="attachment-card-icon" use:icon={attachmentIcon(attachment)} style="--icon-size: 16px"></div>
+                <span class="attachment-card-name">{attachment.name}</span>
+                {#if ext}
+                  <span class="attachment-card-ext">{ext}</span>
+                {/if}
+              {/if}
+            </button>
+            <button
+              type="button"
+              class="attachment-tile-remove"
+              title="Remove attachment"
+              aria-label={`Remove ${attachment.name}`}
+              onclick={(evt) => removeAttachment(evt, attachment)}
+            >
+              <div class="chip-icon" use:icon={"x"} style="--icon-size: 10px"></div>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     <!-- Visible notes (auto references) -->
     {#each visibleNotes as note (note.file.path)}
       {@const deactivated = deactivatedPaths.has(note.file.path)}
@@ -378,24 +432,147 @@ onDestroy(() => {
       </button>
     {/if}
 
-    <!-- Content attachments -->
-    {#each attachments as attachment (attachment.vaultPath)}
-      <button
-        type="button"
-        class="s2b-chip s2b-pill s2b-pill--interactive attachment"
-        title={`${attachment.vaultPath} (click to remove attachment)`}
-        onclick={(evt) => onAttachmentClick(evt, attachment)}
-        onmouseover={(evt) => previewLink(evt, attachment.vaultPath)}
-        onfocus={(evt) => previewLink(evt, attachment.vaultPath)}
-      >
-        <div class="chip-icon" use:icon={attachmentIcon(attachment)} style="--icon-size: 12px"></div>
-        <span class="chip-label">{attachment.name}</span>
-      </button>
-    {/each}
   </div>
 {/if}
 
 <style>
+  /* `flex-basis: 100%` puts the tiles on a row of their own above the chips;
+     the tray itself is a wrapping row. Tiles are 120px on desktop, 56px on a
+     phone where the composer is narrow. */
+  .attachment-tiles {
+    --s2b-tile-size: 120px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-basis: 100%;
+    min-width: 0;
+    /* Room for the remove buttons, which overhang the tiles' top edge. */
+    padding-top: 4px;
+  }
+
+  :global(body.is-phone) .attachment-tiles {
+    --s2b-tile-size: 56px;
+    gap: 6px;
+  }
+
+  .attachment-tile {
+    position: relative;
+    height: var(--s2b-tile-size);
+    width: calc(var(--s2b-tile-size) * 1.75);
+    /* A narrow sidebar composer can be slimmer than a file card. */
+    max-width: 100%;
+    flex: none;
+  }
+
+  .attachment-tile.has-preview {
+    width: var(--s2b-tile-size);
+  }
+
+  button.attachment-tile-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2px;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    overflow: hidden;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    box-shadow: none;
+    text-align: left;
+    white-space: normal;
+    cursor: var(--cursor);
+  }
+
+  .has-preview button.attachment-tile-body {
+    padding: 0;
+    background: var(--background-modifier-hover);
+  }
+
+  button.attachment-tile-body img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* PDFs render page 1 at the top of the tile rather than centred, so the
+     title area is what shows. */
+  .is-document button.attachment-tile-body img {
+    object-position: top;
+  }
+
+  .attachment-tile-badge {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    padding: 0 4px;
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    line-height: 1.5;
+  }
+
+  .attachment-card-icon {
+    display: flex;
+    color: var(--text-muted);
+  }
+
+  .attachment-card-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.3;
+  }
+
+  .attachment-card-ext {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+  }
+
+  /* On a phone the card is too short for icon + two lines + extension. */
+  :global(body.is-phone) .attachment-card-icon,
+  :global(body.is-phone) .attachment-card-ext {
+    display: none;
+  }
+
+  /* Always visible, not revealed on hover: mobile has no hover, and an
+     opacity-0 reveal there turns every remove into a double tap. */
+  button.attachment-tile-remove {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    box-shadow: none;
+    cursor: var(--cursor);
+  }
+
+  button.attachment-tile-remove:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+  }
+
   .s2b-chip {
     display: inline-flex;
     align-items: center;
@@ -418,19 +595,11 @@ onDestroy(() => {
      and tool cards green is DIFF-ADD semantics, so a green chip implied a
      pending mutation rather than "this file rides along with the message".
 
-     The two chip families are separated by WEIGHT within that one hue, not by
-     colour (see the `.attachment` override below). A hollow chip reads as a
-     pointer to something; a filled chip reads as containing something — which
-     is exactly the difference: a reference sends a path the model may choose
-     to read, an attachment inlines the file's bytes into the message. It also
-     tracks how each is created: references appear on their own as you move
-     around the vault (ambient, so quiet), attachments are a deliberate act
-     (louder). And promoting one to the other visibly fills the chip, so the
-     paperclip action shows its own result.
-
-     This carries real weight: the reference/attachment distinction drives
-     token cost and what reaches an untrusted provider, and it was previously
-     encoded only in a 12px icon plus a hover tooltip that mobile never shows. */
+     Attachments aren't chips at all: they render as tiles on their own row
+     (thumbnail or file card), which separates "a path the model may choose to
+     read" from "bytes inlined into the message" far more plainly than a fill
+     weight could. That distinction drives token cost and what reaches an
+     untrusted provider, so it has to be visible without a hover tooltip. */
   /* Compact variant of the shared pill: inside the composer card the default
      4px vertical padding reads oversized next to the single text line below.
      Scoped to the tray so search-modal / history pills keep their size. */
@@ -450,16 +619,6 @@ onDestroy(() => {
     --s2b-pill-color: var(--text-normal);
     --s2b-pill-bg-hover: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary));
     --s2b-pill-border-hover: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
-  }
-
-  /* Filled: attachments carry content, so they carry pigment. 12% is enough
-     to read as solid next to a hollow chip at 11px without competing with the
-     accent border of the focused composer around it. */
-  .context-tray :global(.s2b-chip.attachment) {
-    --s2b-pill-bg: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
-    --s2b-pill-border: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-modifier-border));
-    --s2b-pill-bg-hover: color-mix(in srgb, var(--interactive-accent) 17%, var(--background-primary));
-    --s2b-pill-border-hover: color-mix(in srgb, var(--interactive-accent) 32%, var(--background-modifier-border));
   }
 
   /* Now that an ACTIVE reference chip is also page-filled (ghost), fill no

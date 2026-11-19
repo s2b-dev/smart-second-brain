@@ -1,0 +1,339 @@
+# Changelog
+
+User-facing release notes, newest first. This file is the single source for
+them: the plugin bundles it and shows the new sections in a "What's new" tab
+after an update, and the release workflow copies a version's section into the
+GitHub release body. Write the section before tagging a stable release; the
+workflow refuses a stable tag without one. Pre-releases (`2.3.0-beta.1`) need no
+section.
+
+Each version is a `## X.Y.Z (YYYY-MM-DD)` heading (the date is the release
+day; leave it off until you know it). Under it, a one-line lede, then up to
+three sections in this order, skipping any that would be empty:
+
+- `### New`: things a user can newly do. Most readers stop here.
+- `### Improvements`: existing things that got better.
+- `### Fixes`: things that were broken.
+
+Chores (refactors, CI, scripts, internal cleanup) are not listed; a release
+with nothing else gets only the lede. Lead each bullet with a bold summary,
+prefixed with the area when it helps (`**Chat: …**`). PR references like
+`(#505)` become links in the plugin.
+
+## 2.5.0 (2026-11-18)
+
+Your agent now knows how your vault is organized, so new notes land in the right place with the right names and tags.
+
+### New
+- **Agents: a live overview of your vault in every conversation.** The system prompt has a new `# Vault` section with your vault settings from Obsidian (daily notes folder and date format, templates folder, where new notes go, wikilinks or Markdown links) and the folders, tags and properties already in use. The agent files new notes in the folder that fits, names them like their neighbours, and reuses your tags instead of inventing new ones, without calling a tool first. Notes that are private for the agent's model are left out. Like the other sections, it lives in the agent's note, so you can delete it to opt out (#565, #567).
+
+### Improvements
+- **Memory: always-loaded notes are never cut short.** They used to share a fixed 3,000-character budget and were truncated past it. Now each one is sent whole, up to a quarter of the model's context window; a note too large for a small model is listed for the agent to read instead, and you get a notice (#565).
+- **Chat: long Dataview lists stay manageable.** A Dataview result in a reply now scrolls on its own instead of stretching the conversation, and for a large set the agent shows the first 100 notes with the total and offers to narrow it (#568).
+- **Agents: better Dataview queries.** The agent takes tag and property names from the vault overview, filters dates on the property your notes actually use, leaves its own skill and memory notes out of results, and no longer caps note lists at 10 (#565, #568).
+
+### Fixes
+- **Chat: the skill card shows which skill was loaded.** It always said "Loaded a skill" (#566).
+
+## 2.4.4 (2026-11-18)
+
+The plugin loads on iPhone and iPad again.
+
+### Fixes
+- **Mobile: the plugin failed to load on iOS and iPadOS.** Since 2.4.3, turning the plugin on did nothing on iPhone and iPad, even in a new vault. A library added in that release needed a Node feature that Obsidian's mobile app doesn't have. The plugin now loads normally on mobile; desktop was never affected (#563, #564).
+
+## 2.4.3 (2026-11-17)
+
+Long chats open faster and use less memory.
+
+### Improvements
+- **Chat: long conversations stay fast.** Each saved step in a chat used to store the whole conversation again, so a chat's file, opening time and memory grew with every turn. Each step now stores only the messages it added, plus a full copy every 50 steps. On a chat with about 2,000 steps, the file is about 6x smaller, and opening and saving it are about 3x faster. Existing chats keep working as they are; only their new turns are stored the new way (#540, #562).
+
+## 2.4.2 (2026-11-17)
+
+Indexing with a local embedding server no longer stops on long notes, and the plugin's styles can no longer affect other plugins.
+
+### Fixes
+- **Indexing: local embedding servers no longer time out.** With a slower local server (such as a small model on oMLX), indexing often stopped with "embedding provider is not reachable" even though the server was running. Long notes are now split into smaller pieces, a request that times out is retried in smaller parts instead of resent whole, and large requests get more time. Notes that were indexed before keep their old pieces until you edit them or rebuild the index (#561).
+- **Styles: the plugin's styles stay inside its own views.** Every style rule the plugin ships is now scoped to the plugin's own elements, so none can change how another plugin or Obsidian's own views look. On phones, this also stops the plugin enlarging the buttons in Obsidian's core graph view (#560).
+
+## 2.4.1 (2026-11-17)
+
+Excalidraw drawings display again while Smart Second Brain is enabled.
+
+### Fixes
+- **Excalidraw drawings no longer go blank.** A generic style rule in the plugin's stylesheet moved Excalidraw's drawing canvas out of place, so drawings looked empty until the plugin was disabled. The plugin no longer ships that rule or similar unused ones that could affect other plugins (#559).
+
+## 2.4.0 (2026-11-16)
+
+You choose which files have their contents indexed, web search gains a second keyless provider, and long chats keep their older history when they are summarized.
+
+### New
+- **Search: choose what gets indexed.** A new Indexed content group under Settings → Search switches PDFs, chats, and data files (CSV, JSON, YAML) on or off. All three now start off: such files are still found by title and path, and the agent can still open them, but their contents stay out of search and embeddings until you switch the group on. Notes, canvases, and widgets are always indexed (#557).
+- **Web search: Keenable.** Keenable joins Firecrawl, Brave and Tavily as a web search provider and, like Firecrawl, works without an API key. A key is optional (#551, by @KGKallasmaa).
+- **Agents: set the context window.** The Agent editor has a Context window field under Chat model, so you can match it to your model (for example an Ollama `num_ctx`) without editing `data.json` (#547).
+
+### Improvements
+- **Search: PDF indexing shows its own progress.** PDFs are indexed after your notes, and the progress notice now counts them separately (*then 20 PDFs*, then *PDFs 3/20*) with a time estimate of their own. A long PDF is indexed up to roughly its first 80 pages (#557).
+- **Chat: the context meter matches when summarization starts.** The meter and the summarization trigger now count tokens the same way, tool results included, so "Auto-compacts at …" is accurate. Small context windows are summarized before they overflow (#547, #548).
+
+### Fixes
+- **Chat: summarizing a long chat no longer drops older history.** The summary now covers everything it replaces. A failed or empty summary is rejected, and repeated failures show a notice (#548).
+- **Agents: re-picking the same model keeps your context window** instead of resetting it to the provider's value (#547).
+- **Settings: changes from another device are picked up.** When Obsidian Sync or a hand edit changes the plugin's settings file while Obsidian runs, the plugin reloads it instead of overwriting it on the next save (#556).
+- **Search: Excalidraw drawings are no longer re-embedded on every autosave.** Drawings are re-indexed once you stop drawing, and blank drawings are skipped (#549).
+- **Search: embedding no longer times out on shared endpoints.** Embedding requests are capped in size, and a rate limit pauses indexing with a single notice instead of one per note (#553, by @lxsm).
+
+**Thanks** to @KGKallasmaa for the Keenable provider and @lxsm for the embedding fix.
+
+## 2.3.0 (2026-09-28)
+
+A reworked chat composer, especially on mobile, agents that keep their memory and skills up to date, and release notes inside the plugin.
+
+### New
+- **Chat: attachments as preview tiles.** Images show a thumbnail and PDFs their first page; other files show a card. Click a tile to open the file, or use its corner × to remove it (#526).
+- **Chat: Take photo on mobile.** The attach menu has a Take photo row that goes straight to the camera (#520).
+- **Chat: one jump-to-bottom button** replaces the message-navigation arrows. It appears once you scroll away from the end, including while a reply streams below the fold (#522, #523, #527, #528).
+- **What's new, in the plugin.** After an update, a notice opens a What's new tab with the notes for every release since the one you last saw. The Show release notes command and a row in Settings → Troubleshooting open it any time (#533).
+- **Update notices.** Once a day the plugin asks GitHub whether a newer version exists and says so, with a link to Community plugins. It sends nothing about you or your vault, stays quiet while Obsidian's own automatic update check is on, and can be turned off under Settings → General → Privacy (#534).
+
+### Improvements
+- **Chat: the composer grows as you type.** It expands up to two thirds of the chat pane before it scrolls, so the separate fullscreen editor is gone. Enter on a list line continues the list; Enter on an empty item ends it (#521).
+- **Chat: the mobile composer keeps up with the keyboard**, even in very large chats. It now slides with the keyboard as it opens and closes, and Obsidian's formatting toolbar is hidden while you type in the chat (#524, #525).
+- **Agents: memory in view.** The system prompt now carries an index of your memory notes (each note's `description`, or the whole note when it's marked `always: true`), so the agent knows what it remembers without searching. Guidance now routes user facts to memory and task lessons into the skill that was used (#514).
+- **Agents: skills are revised in place.** `manage_skills` gains a `patch` operation that changes one passage instead of rewriting the whole skill, and it only edits a skill the agent has loaded in that chat (#515).
+- **Agents: skill writing is on by default.** `manage_skills` now ships enabled, so the agent can put what it learned into the skill it used; turn it off per agent in the Tools modal (#517).
+- **Agents: skills are deleted only when you ask.** The agent removes a skill only when you ask for that skill to be deleted, whoever wrote it, and never to tidy up on its own. Core skills can't be deleted (#536).
+- **Agents: fewer narrating sentences.** The agent explains a tool call only when that tells you something new, and skips it for a single obvious lookup (#518, #519).
+- **Agents: lighter vault listings.** `list_directory` at the root returns a folder overview with file counts instead of every file, and every listing stays within a size budget. The explore-vault and Dataview skills now lean on tags, properties and queries first (#513).
+- **Settings: the prompt comparison dialog only compares.** It shows your version against the default, with Open note and Use default; you edit the real note (#529).
+
+### Fixes
+- **Chat: chats whose first turn failed get a proper title.** They are named `New Chat (failed)` and titled on their next successful turn, so new chats stop piling up as `New Chat (2)`, `(3)`, … (#530).
+- **Chat: stream start-up failures fall back gracefully, and very large tool outputs are capped in their preview** instead of stalling the chat (#510, by @AdamsGH).
+- **Settings: the prompt "Review" notice clears** as soon as you choose Use default, instead of staying until a reload (#529).
+
+**Thanks** to @AdamsGH for the first correct diagnosis of the cross-realm `AbortSignal` failure and for #510.
+
+## 2.2.0 (2026-09-18)
+
+Adds widgets: ask the agent for a chart, a table or a dashboard and it draws one in the chat, live from your notes.
+
+### Widgets
+- **Rendered in the chat, from a fence.** The agent writes a `s2b-widget` block and it renders in place as a sandboxed frame with no network access. Named Dataview queries in the block's frontmatter are run by the plugin and re-run as the vault changes, so the widget stays live. Plotly is bundled, so a widget can be a full interactive plot, including 3D surfaces and scatter clouds you can rotate, for studying a function or a dataset from your notes (#505).
+- **Standalone `.widget` files.** Save a widget from its toolbar and it becomes a file with its own pane, embeddable in any note with `![[Name.widget]]`, searchable by title and description, and previewable on hover. Note links inside a widget open and preview like any other link. Each widget can set its own tab icon (#506).
+- **Chat first, files on request.** The agent shows a widget in the reply before it ever writes a file, and does not wrap a saved widget in extra notes. Rename and Edit source live in the widget tab's menu (#507).
+- **Review edits as the rendered widget.** When the agent revises a saved widget, the pending-changes bar and the widget's pane show the proposed widget itself, with the source diff a click away, and Accept applies it (#508).
+
+Requires the Dataview plugin for query-backed widgets; without it the agent says so and still renders static ones.
+
+## 2.1.2 (2026-09-15)
+
+Fixes the whole-app stutter while a long reply streams (#482).
+
+### Chat
+- **Streaming replies render incrementally.** The message used to be torn down and re-parsed on every frame, so a long reply pinned the main thread and the entire app stuttered until it finished. Finished blocks now stay in place and only the block being written is re-rendered. On a 6000-word reply, long tasks dropped from 60 to 2 and the stream itself no longer stalls (#503).
+
+## 2.1.1 (2026-09-14)
+
+Stability release for the Obsidian 1.13 installer (Electron 43) and for long chats: no more renderer crash or connection error on the first send, `.chat` files stop growing by megabytes per turn, and the whole app stays responsive while a reply streams.
+
+### Chat
+- **Renderer no longer crashes on the first send under installer 1.13.x** (#492, fixes #478, #481). Electron 43 ships Node 24, whose `AsyncLocalStorage` shares a V8 slot with Blink's task scheduler; the plugin now runs its own `async_hooks`-based implementation on desktop.
+- **"Connection error." on the first send under installer 1.13.x is fixed** (#501, fixes #472). The abort signal no longer crosses into Electron's main-process fetch, where Node 24 rejected it; cancellation is handled on the renderer side, including mid-stream.
+- **The UI no longer stalls while a reply streams** (#484, by @Direct-Launch). Markdown is re-rendered at most once per animation frame instead of once per token.
+- **`.chat` files shrink dramatically** (#483, by @Direct-Launch). Runtime callbacks were being persisted into every checkpoint; one 66 MB chat dropped to about 90 KB. Existing files shrink the next time they are saved.
+
+### Search and indexing
+- **Ollama embedding errors stop retrying for minutes** and chunks are sized to the server's `num_ctx` (#487).
+- **Fresh index builds no longer race startup validation**, and the id counter survives a missing metadata record (#491, #493).
+- **Note counts stay current** during and after interrupted builds (#490).
+- **Stale-note detection on both indexers**, no dropped edits during builds, lighter search hits (#495, #497).
+- **One transaction per note**, dirty-set graph saves, and renames without re-embedding (#498). A renamed provider keeps its indexes (#499).
+- **The graph index opens when the graph view asks for it**, not at boot (#500).
+
+### Models
+- **Model lookup no longer fuzzy-matches** against models.dev (#486).
+
+**Thanks** to @RoiArthurB, whose crash dump in #481 pinned the renderer crash to Electron 43's Node 24, to @dingsmart (#478) and @samuelueluel for the Windows and Fedora reports that confirmed it was installer-wide, to @Paxassin for the exact `AbortSignal` error in #472, and to @Direct-Launch for diagnosing and fixing #482 in #483 and #484.
+
+## 2.1.0 (2026-09-11)
+
+Tags are now also respected in the smart graph
+
+### Smart graph
+
+- **Tags as nodes.** A new Scope → Tags toggle draws each tag as a node linked to every note that carries it, matching Obsidian's own graph with its Tags filter on. Tag nodes use the theme's tag colour, size by how many notes carry them, and clicking one opens Obsidian's search on that tag. Nested tags are their own nodes. (#473)
+- **Tags shape topics.** Tag edges feed topic detection alongside wiki links, in both fused and link-only mode, so a vault organised by tags no longer reads as "nothing is linked". Each tag edge is damped by the tag's breadth (`1/√n` over the notes carrying it): a topical tag on a dozen notes binds them firmly, while a status tag on hundreds can't drag unrelated notes into one topic. Tags are never topic *members*: they carry no cluster of their own, don't count toward topic size, and don't fold into collapsed bubbles. (#474)
+- **A topic's own tags sit inside it.** Tags that live in a topic (at least half of their notes are members) are drawn within its region, pulled to its centre, and can anchor its label. (#476)
+- **Inferred links need an index, and the switch says so.** With no graph embedding index selected (or a selection whose index was removed), the Inferred links and Highlight inferred links toggles are disabled with a hint pointing at the Graph settings. The stored preference is kept, so they come alive as soon as an index is picked. (#475)
+- **Changing the graph index rebuilds the graph.** Picking or clearing the index in settings previously left the old inferred edges on screen, still shaping topics, until an unrelated setting forced a rebuild. It now rebuilds on the spot; switching back to a previously used index is served from cache. (#475)
+
+## 2.0.5 (2026-09-05)
+
+One stylesheet cleanup, no user-facing changes intended.
+
+### Plugin review
+
+- **The shared stylesheet no longer uses `!important` anywhere.** Every override is written as a more specific selector instead. Most of them were fighting the plugin's own component styles or an inline style on the send button rather than a theme; the one real theme conflict (Cupertino pinning the phone modal's close-button `top`) is sidestepped by offsetting the button with `translate`. (#471)
+- Fixing that inline style also fixes a real bug: the send button was meant to grow to 44 px on mobile and never did. It does now. (#471)
+- The search modal's filter chips sit in a plain flex box instead of `display: contents`, and the two `text-indent` resets are gone (no core or theme rule sets it). (#471)
+
+### Still flagged, by design
+
+Vault enumeration (indexing needs it), clipboard access (the copy-message button), and the declarative settings API (`getSettingDefinitions()`), which is planned separately.
+
+## 2.0.4 (2026-09-05)
+
+Dependency updates and the last round of plugin-review follow-ups. No user-facing changes intended.
+
+### Dependencies
+
+- **Every dependency advisory is cleared** (`bun audit`: 91 → 0). Dependencies moved within their declared ranges (LangChain 1.5.x / core 1.2.x patches, deepagents 1.13, Pixi 8.20, Svelte 5.57, Vite 7.3.6, Vitest 4.1), and the transitive packages whose ranges still admitted vulnerable versions are pinned through `overrides` — all dev tooling or server-side halves of the MCP SDK that never reach the bundle. (#469)
+- The build guard added in 2.0.3 did its job on the way: Pixi renamed one of its eval-based generators and the Anthropic SDK now ships its own browser stub for its local toolset, and the build refused to ship until both were accounted for. The bundle still contains no process spawning or dynamic code execution. (#469)
+
+### Plugin review
+
+- The stylesheet no longer uses the `@tailwind` at-rules (same output, plain CSS to any linter), an unused import is gone, and several `!important` overrides that only had to beat core's specificity are replaced with specific selectors. One of them uncovered a bug from 2.0.3: the search modal's glow border was targeting a class its element never carries; it works now. (#470)
+
+### Still flagged, by design
+
+Vault enumeration (indexing needs it) and clipboard access (the copy-message button). The remaining `!important` declarations override theme rules that are themselves `!important`, or raise mobile touch-target sizes.
+
+## 2.0.3 (2026-09-05)
+
+The Obsidian plugin-review pass, and MCP goes HTTP-only. Cleanup and a removal, no new features.
+
+### MCP servers
+
+- **The stdio (local command) transport is gone.** Smart Second Brain now connects to MCP servers over HTTP only (Streamable HTTP, with SSE fallback), the same on desktop and mobile. Any saved stdio server is removed by a data migration on first load. A server that only speaks stdio can still be used behind an HTTP bridge such as `mcp-proxy` or `supergateway` — see the [MCP docs](https://smartsecondbrain.dev/agents/mcp/). This is what removes the plugin's ability to launch processes; see below. (#467)
+- **The server dialog checks the connection for you.** No more *Test connection* button: like the provider setup modal, the connection is probed when you leave the URL or headers field, the verdict sits in the footer (checking / connected with the tool count and a list of the tools / the failure cause), and *Add Server* / *Save* unlock once the server has actually connected. Editing a server without touching its URL or headers can still be saved while the server happens to be unreachable. (#467)
+- Probes never run mid-keystroke, and when editing a server that has headers, a URL on a different host than the saved one puts the probe on hold with an explicit *check now* — so stored credentials are never sent to a new host as a side effect of retyping a URL. (#467)
+- The dialog's footer no longer leaves a gap above the buttons, and the confirm buttons stay together on one line. (#467)
+
+### Obsidian plugin review
+
+Obsidian's automated review had flagged the plugin. Everything in that report that lives in our own code is resolved, and the two behaviour findings that came from bundled dependencies are resolved too:
+
+- **No process spawning or dynamic code execution in the bundle.** The MCP SDK's stdio transport and `ajv` validator, the Anthropic SDK's local agent toolset, and Pixi's code generators are swapped for shims at build time; Pixi runs on its supported eval-free path and the MCP SDK validates tool results with its own interpreter-based provider. The build fails if any of these ever reappear. (#467)
+- Language detection uses Obsidian's `getLanguage()`, and the bulk-indexing crash marker persists through Obsidian's vault-scoped storage instead of raw `localStorage`. (#465)
+- Deprecated Obsidian and LangChain APIs replaced, DOM built through Obsidian's helpers, inline styles moved to CSS classes, promise handling made explicit, and IndexedDB failures always surface as real `Error`s. No user-visible change intended; the graph, search modal, diff action bars, indexing notice and phone-sheet modals were checked live. (#465)
+- INFO-level plugin logging now goes to the console's *Verbose* level, per Obsidian's guidelines. Turn on Verbose in the developer console to see it. (#465)
+
+### Still flagged, by design
+
+Vault enumeration (indexing needs it) and clipboard access (the copy-message button).
+
+## 2.0.2 (2026-09-03)
+
+Two rounds of bug fixes since 2.0.1, plus clearer feedback when connecting a provider.
+
+### Provider setup
+
+- **You can now tell when a provider actually connected.** The Setup Provider modal has no
+  submit button — credentials autosave and the provider commits itself once validation
+  passes — so a successful setup looked identical to an untouched form. The only signal was
+  a small check in the title bar, easy to miss and in some cases not rendered at all. There
+  is now a connection status row in the modal itself (checking / connected / the actual
+  error message) and an explicit **Done** button. This was especially confusing during
+  onboarding, where nothing told you the provider had been added or that you could close the
+  dialog. (#461)
+- Providers configured with a stored API-key secret previously got no in-modal confirmation
+  at all — the old success styling only ever applied to plain text fields. (#461)
+- Fixed a race where finishing setup could leave the provider's ID and its displayed name
+  disagreeing, or report a spurious "Provider not found" on a provider that had connected
+  fine. (#463)
+
+### Fixes
+
+- Popout windows: timers and DOM globals are now scoped to the correct window, so features
+  used in a popped-out pane behave the same as in the main window. (#462)
+- Assorted correctness fixes across chat, graph, search, and the vector store found during a
+  review pass. (#462)
+
+## 2.0.1 (2026-09-03)
+
+A patch release fixing a skill-editor bug that could destroy a customized skill, plus signed build provenance for the release assets.
+
+### Fixed
+
+- **Skill diff compared against the wrong baseline.** Opening "Diff with default" on a skill compared its `SKILL.md` against the *agent system prompt* instead of the skill's shipped body — two unrelated documents, so the whole pane highlighted and the default side appeared to be missing its frontmatter. **"Use default" shared that value**, so pressing it would have overwritten your skill with the agent base prompt. Both surfaces now use the skill's own bundled body.
+
+### Added
+
+- **Build provenance attestations** for `main.js` and `styles.css`. You can verify a downloaded asset came from this repository and workflow:
+
+  ```
+  gh attestation verify main.js --repo s2b-dev/smart-second-brain
+  ```
+
+  This is the first release with attestations; 2.0.0's assets predate them.
+
+### Changed
+
+- README leads with Features before Install.
+- Internal: vendor logos are cached as elements rather than reparsed markup, and `package.json` now carries the real version (it still said `0.1.0`).
+
+### Upgrading
+
+No action needed. No settings, vault files, or index formats change, and `minAppVersion` stays at 1.11.4.
+
+## 2.0.0 (2026-09-03)
+
+The first stable release since 1.3.0. Smart Second Brain has grown from a chat-with-your-notes plugin into three features that each work on their own: search, a graph that groups your notes into topics, and an agent that can read and edit your vault with your approval.
+
+Full feature documentation is at [smartsecondbrain.dev](https://smartsecondbrain.dev).
+
+### 🔍 Search
+
+- Full-text search with fuzzy matching, tag and folder filter chips, and recency-aware ranking.
+- PDF content is indexed, so results turn up files Obsidian's own search cannot find.
+- Semantic search: press Tab to run the same query by meaning. Requires an embedding model, which can run locally through Ollama.
+- A search that finds nothing can be handed to the agent as a question, or turned into a new note without leaving the box.
+
+### 🕸️ Smart Graph
+
+- Notes are grouped into topics automatically with Leiden community detection, drawn as tinted regions with name pills.
+- Granularity moves between a few broad topics and many narrow ones; the levels nest, so a topic at one level is always part of one topic at the level below.
+- Immerse: select a topic and the graph rebuilds around just those notes, revealing the finer topics inside it.
+- Bridge notes and orphans are highlighted. With an embedding model, the graph also draws inferred edges between notes that are about the same thing but never link to each other.
+- Rendering goes through PixiJS, with clustering, projection and the neighbour scan in web workers.
+
+### 🧠 Agents
+
+- Tool-using agents that search and read your vault before answering, and cite what they used as wikilinks.
+- Every note edit is staged for review as an inline diff. Nothing is written to disk until you accept it, per hunk or all at once.
+- Skills: capability is defined by folders holding a `SKILL.md`, in the open [Agent Skills](https://agentskills.io/specification) format. Four core skills ship with the plugin; agents can also write their own.
+- Memory: plain notes under `Agents/Memories/`, readable and editable like anything else in the vault.
+- Chats are notes: conversations are `.chat` files, indexed and searchable, with branching history, and embeddable in a note with `![[Conversation.chat]]`.
+- Integrations with Dataview, Tasks, TaskNotes, Canvas and Bases, plus auto-discovery of any plugin exposing an `api`.
+- MCP servers per agent, over HTTP and stdio.
+- Multiple agents on different models running in parallel, subagents, and image and PDF attachments.
+
+### 🔒 Privacy
+
+- Vault-wide private by default or public by default, refined per note or per folder.
+- Local providers (Ollama, oMLX) are trusted; cloud providers are untrusted and blocked from reading, embedding, or being sent a private note. The block is enforced in the plugin.
+- Search and the graph never send anything anywhere. No telemetry.
+
+### 🔌 Providers
+
+Ollama, oMLX, OpenAI, Anthropic, OpenRouter, and any OpenAI-compatible endpoint.
+
+### 📱 Platform
+
+Desktop and mobile. Requires Obsidian 1.11.4 or later.
+
+### ⬆️ Upgrading from 1.x
+
+The plugin migrates its data on first run: agent context is consolidated under the `Agents/` folder, and the bundled core skills are seeded into your vault. Chats from 1.x are converted to the `.chat` format on load.
+
+Because the retrieval stack changed, the vector index is rebuilt on first launch. It runs in the background with progress in the status bar and is incremental after that.
+
+If you sync your vault, exclude `.obsidian/plugins/smart-second-brain/` from sync to avoid version-history bloat from the index.
+
+### 💬 Feedback
+
+This is a big release, and the surest way it gets better is hearing how it goes in your vault. Bug reports and feature requests belong in [issues](https://github.com/s2b-dev/smart-second-brain/issues/new/choose), questions in [Q&A](https://github.com/s2b-dev/smart-second-brain/discussions/categories/q-a), and if you build a skill or an agent you like, we'd genuinely love to see it in [Show and tell](https://github.com/s2b-dev/smart-second-brain/discussions/categories/show-and-tell).
+
+We started this as a university project. That finished a long time ago — we keep building it because we use it every day. Thanks for trying it.

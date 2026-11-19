@@ -106,7 +106,7 @@ let dropdownOptions = $derived([
 let selectedValue = $derived(secrets.includes(value) ? value : "");
 </script>
 
-<div class="flex items-center gap-2">
+<div class="s2b-flex s2b-items-center s2b-gap-2">
   <Tooltip.Provider>
     <Tooltip.Root delayDuration={300}>
       <Tooltip.Trigger class="clickable-icon" onclick={handleAddSecret}>
@@ -129,7 +129,7 @@ let selectedValue = $derived(secrets.includes(value) ? value : "");
         <Tooltip.Content
           side="top"
           sideOffset={5}
-          class="z-50 rounded bg-[--background-modifier-hover] px-2 py-1 text-xs shadow-md"
+          class="s2b-z-50 s2b-rounded s2b-bg-[--background-modifier-hover] s2b-px-2 s2b-py-1 s2b-text-xs s2b-shadow-md"
         >
           Add new secret
         </Tooltip.Content>
@@ -143,7 +143,7 @@ let selectedValue = $derived(secrets.includes(value) ? value : "");
       dropdown={dropdownOptions}
       selected={selectedValue}
       onchange={handleSelect}
-      class="flex-1"
+      class="s2b-flex-1"
     />
   {/key}
 </div>

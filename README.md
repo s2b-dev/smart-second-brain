@@ -33,7 +33,7 @@ Install **Smart Second Brain** from Obsidian's community plugins and enable it. 
 
 Add an embedding model and pick it for search and for the graph to unlock semantic search and topics that read what your notes say, not just how they link; add an AI provider to enable the agent. See the [getting started guide](https://smartsecondbrain.dev/start/installation/).
 
-Out of the box, nothing leaves your machine. The only network requests are to the providers you configure, and there is no telemetry — see [privacy](https://smartsecondbrain.dev/privacy/model/).
+Out of the box, none of your data leaves your machine. Your notes only go to the providers you configure, and there is no telemetry — see [privacy](https://smartsecondbrain.dev/privacy/model/). The one other network request is a daily update check that fetches this plugin's `manifest.json` from GitHub and sends nothing about you; turn it off under Settings → General → Check for updates.
 
 ## Contributing
 

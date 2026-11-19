@@ -3,6 +3,12 @@ import type { ProviderInstanceMeta } from "../types/provider/index";
 import type { UUIDv7 } from "../utils/uuid7Validator";
 import type { SmartGraphSettings } from "./graph";
 
+/** The optional file groups whose contents can be indexed. See `contentGroupOf` in `utils/fileFiltering.ts`. */
+export type ContentGroup = "pdfs" | "chats" | "data";
+
+/** Per-group switch: true indexes the group's contents, false indexes title and path only. */
+export type ContentIndexingSettings = Record<ContentGroup, boolean>;
+
 /**
  * Retrieval strategy.
  *
@@ -28,29 +34,6 @@ export type SearchAlgorithm = "lexical" | "semantic" | "hybrid";
 export interface RecentNoteEntry {
 	path: string;
 	lastOpenedAt: number;
-}
-
-/**
- * How a skill has been used, stored in plugin data (never in the SKILL.md: a counter in
- * frontmatter would turn every load into a vault write, break the bundled skills'
- * shipped-history fingerprint, and diverge across synced devices). Advisory only — a missed
- * bump costs nothing — and per device, since plugin data is.
- *
- * A list rather than a record keyed by name, like `recentNotes`: skill names are free-form
- * ("constructor" is a valid one), and Svelte's `$state` proxy silently drops a write to a key
- * that exists on the prototype chain, so a name-keyed object could never store such a skill.
- */
-export interface SkillUsageEntry {
-	/** The skill's frontmatter name. */
-	name: string;
-	/** Times `load_skill` returned this skill's body. */
-	loadCount: number;
-	/** Epoch ms of the most recent load, or null when never loaded. */
-	lastLoadedAt: number | null;
-	/** Times `manage_skills` patched or rewrote this skill. */
-	revisionCount: number;
-	/** Epoch ms of the most recent revision, or null when never revised. */
-	lastRevisedAt: number | null;
 }
 
 /**
@@ -102,6 +85,12 @@ export interface EmbeddingIndexConfig {
 	 * that mtime changes; absent when nothing failed.
 	 */
 	failedNotes?: Record<string, number>;
+	/**
+	 * Notes with no text to embed (a blank note, a drawing with nothing on the back
+	 * of the note), keyed by path with the mtime they were read at. Same lifecycle
+	 * as `failedNotes`; absent when there are none.
+	 */
+	emptyNotes?: Record<string, number>;
 }
 
 // ============================================================================
@@ -168,6 +157,7 @@ export const BUILT_IN_TOOL_IDS = [
 	"fetch_url",
 	"web_search",
 	"manage_skills",
+	"write_todos",
 	"ask_question",
 ] as const;
 
@@ -324,10 +314,6 @@ export interface SkillDisplayInfo {
 	linkedPluginId?: string;
 	/** Linked core plugin ID (if any) */
 	corePluginId?: string;
-	/** `metadata.author` from the frontmatter: `S2B` for bundled skills, `agent` for agent-created ones. */
-	author?: string;
-	/** Usage counters from plugin data, when the skill has ever been loaded or revised. */
-	usage?: SkillUsageEntry;
 }
 
 // ============================================================================
@@ -457,12 +443,6 @@ export interface AgentConfig {
 	 * own `subAgentIds` are ignored.
 	 */
 	subAgentIds?: string[];
-	/**
-	 * The post-turn review: after a turn busy enough to cross the tool-call threshold, a side
-	 * run asks a model whether the conversation taught something worth routing into memory or
-	 * a skill. Off by default; see `agent/postTurnReview.ts`.
-	 */
-	postTurnReview?: import("../agent/postTurnReview").PostTurnReviewConfig;
 	// NOTE: whether an agent uses memory is no longer config either. The memory machinery
 	// (auto-applied writes in `Agents/Memories/`, that folder's `list_directory` visibility) is
 	// always on; participation is decided by the `# Memory` section of the agent's own AGENT.md,
@@ -555,6 +535,17 @@ export interface PluginData {
 	privacyFilter: import("./viewFilter").ViewFilter;
 
 	// ============================================================================
+	// Indexing
+	// ============================================================================
+
+	/**
+	 * Which optional file groups have their *contents* indexed (search and
+	 * embeddings). Notes are always indexed; a group switched off is still found
+	 * by title and path, and the agent can still read its files on demand.
+	 */
+	contentIndexing: ContentIndexingSettings;
+
+	// ============================================================================
 	// UI State
 	// ============================================================================
 
@@ -564,6 +555,17 @@ export interface PluginData {
 	onboardingComplete: boolean;
 	/** Whether the onboarding splash intro animation has already played (so it plays only once). */
 	onboardingSplashSeen: boolean;
+	/** Once a day, fetch the plugin's manifest from GitHub and announce a newer version. */
+	checkForUpdates: boolean;
+	/** When the update check last ran (ms since epoch), successful or not. */
+	lastUpdateCheckAt: number | null;
+	/** Newest version already announced by the update check, so each is announced once. */
+	lastNotifiedUpdateVersion: string | null;
+	/**
+	 * Last stable plugin version whose release notes were announced (or that was
+	 * installed fresh). Null for data written before release notes existed.
+	 */
+	lastSeenVersion: string | null;
 	/** IDs of new-chat recommendations the user has dismissed. Includes the well-known block id to dismiss the whole surface. */
 	dismissedRecommendations: string[];
 	/**
@@ -599,7 +601,7 @@ export interface PluginData {
 	// Web Search
 	// ============================================================================
 
-	/** Selected web search provider ("firecrawl" | "brave" | "tavily" | "") */
+	/** Selected web search provider: an id from `WEB_SEARCH_PROVIDERS` in agent/tools/webSearch.ts, or "". */
 	webSearchProvider: string;
 	/**
 	 * Secret IDs for web search API keys, keyed by provider id. Per-provider so a key
@@ -642,8 +644,6 @@ export interface PluginData {
 	searchShowMatchContext: boolean;
 	searchShowKeyboardHints: boolean;
 	recentNotes: RecentNoteEntry[];
-	/** Per-skill load and revision counters (see {@link SkillUsageEntry}); one entry per skill name. */
-	skillUsage: SkillUsageEntry[];
 
 	/**
 	 * Registry of all known embedding indexes.

@@ -306,24 +306,24 @@ onDestroy(() => {
   data-testid="note-context-root"
   onkeydown={(e) => canvasComponent?.handleKeyDown(e)}
 >
-  <div class="note-context__surface">
-    <div class="note-context__overlay">
+  <div class="s2b-note-context__surface">
+    <div class="s2b-note-context__overlay">
       {#if isLoadingSemantic}
-        <div class="note-context__status">
-          <div class="note-context__loading" data-testid="note-context-loading">
+        <div class="s2b-note-context__status">
+          <div class="s2b-note-context__loading" data-testid="note-context-loading">
             <LoadingAnimation />
             <span>Updating…</span>
           </div>
         </div>
       {/if}
 
-      <div class="note-context__overlay-actions">
+      <div class="s2b-note-context__overlay-actions">
         {#if viewMode === "graph" && showFitButton}
           <Button
             iconId="scan-search"
             ariaLabel="Fit graph to view"
             tooltip="Fit graph to view"
-            class="note-context__floating-button"
+            class="s2b-note-context__floating-button"
             dataTestId="note-context-fit"
             onClick={() => {
               canvasComponent?.fitToView();
@@ -336,10 +336,10 @@ onDestroy(() => {
         <PickerPopover
           bind:open={controlsOpen}
           triggerStyles="clickable-icon"
-          triggerClass="note-context__floating-button note-context__floating-button--quiet"
+          triggerClass="s2b-note-context__floating-button s2b-note-context__floating-button--quiet"
           tooltip="Note Context options"
           dataTestId="note-context-controls"
-          contentClass="note-context__menu"
+          contentClass="s2b-note-context__menu"
           side="bottom"
           align="end"
           sideOffset={-24}
@@ -348,54 +348,54 @@ onDestroy(() => {
             <Icon name={open ? "x" : "sliders-horizontal"} size="xs" />
           {/snippet}
 
-          <div class="note-context__menu-section" data-testid="note-context-view-mode">
-            <div class="note-context__menu-section-header">
-              <span class="note-context__menu-label">View</span>
+          <div class="s2b-note-context__menu-section" data-testid="note-context-view-mode">
+            <div class="s2b-note-context__menu-section-header">
+              <span class="s2b-note-context__menu-label">View</span>
               <Button
                 iconId="x"
                 ariaLabel="Close Note Context options"
                 tooltip="Close"
-                class="note-context__menu-close"
+                class="s2b-note-context__menu-close"
                 dataTestId="note-context-controls-close"
                 onClick={() => {
                   controlsOpen = false;
                 }}
               />
             </div>
-            <div class="note-context__menu-buttons">
+            <div class="s2b-note-context__menu-buttons">
               <Button
                 buttonText="Graph"
                 cta={viewMode === "graph"}
-                class="note-context__button"
+                class="s2b-note-context__button"
                 dataTestId="note-context-mode-graph"
                 onClick={() => setViewMode("graph")}
               />
               <Button
                 buttonText="List"
                 cta={viewMode === "list"}
-                class="note-context__button"
+                class="s2b-note-context__button"
                 dataTestId="note-context-mode-list"
                 onClick={() => setViewMode("list")}
               />
             </div>
           </div>
 
-          <div class="picker-popover-separator menu-separator"></div>
+          <div class="s2b-picker-popover-separator menu-separator"></div>
 
-          <div class="note-context__menu-section" data-testid="note-context-relationship-mode">
-            <span class="note-context__menu-label">Show</span>
-            <div class="note-context__menu-buttons">
+          <div class="s2b-note-context__menu-section" data-testid="note-context-relationship-mode">
+            <span class="s2b-note-context__menu-label">Show</span>
+            <div class="s2b-note-context__menu-buttons">
               <Button
                 buttonText="Linked"
                 cta={relationshipMode === "linked"}
-                class="note-context__button"
+                class="s2b-note-context__button"
                 dataTestId="note-context-mode-linked"
                 onClick={() => setRelationshipMode("linked")}
               />
               <Button
                 buttonText="Semantic"
                 cta={relationshipMode === "semantic"}
-                class={`note-context__button ${!hasSemanticIndex ? "note-context__button--unavailable" : ""}`}
+                class={`s2b-note-context__button ${!hasSemanticIndex ? "s2b-note-context__button--unavailable" : ""}`}
                 dataTestId="note-context-mode-semantic"
                 tooltip={!hasSemanticIndex ? semanticHint : undefined}
                 onClick={() => setRelationshipMode("semantic")}
@@ -403,7 +403,7 @@ onDestroy(() => {
               <Button
                 buttonText="Both"
                 cta={relationshipMode === "both"}
-                class={`note-context__button ${!hasSemanticIndex ? "note-context__button--unavailable" : ""}`}
+                class={`s2b-note-context__button ${!hasSemanticIndex ? "s2b-note-context__button--unavailable" : ""}`}
                 dataTestId="note-context-mode-both"
                 tooltip={!hasSemanticIndex ? semanticHint : undefined}
                 onClick={() => setRelationshipMode("both")}
@@ -411,12 +411,12 @@ onDestroy(() => {
             </div>
           </div>
 
-          <div class="picker-popover-separator menu-separator"></div>
+          <div class="s2b-picker-popover-separator menu-separator"></div>
 
-          <div class="note-context__menu-section" data-testid="note-context-display-settings">
-            <span class="note-context__menu-label">Display</span>
-            <div class="note-context__toggle-row">
-              <span class="note-context__toggle-label">Direction arrows</span>
+          <div class="s2b-note-context__menu-section" data-testid="note-context-display-settings">
+            <span class="s2b-note-context__menu-label">Display</span>
+            <div class="s2b-note-context__toggle-row">
+              <span class="s2b-note-context__toggle-label">Direction arrows</span>
               <Toggle
                 checked={data.smartGraphSettings.directedWikiEdges}
                 onchange={setDirectedWikiEdges}
@@ -431,7 +431,7 @@ onDestroy(() => {
       {#if viewMode === "graph"}
         <GraphCanvas
           bind:this={canvasComponent}
-          class="note-context__graph"
+          class="s2b-note-context__graph"
           alwaysRefitOnDataChange={true}
           directedWikiEdges={data.smartGraphSettings.directedWikiEdges}
           graphData={visibleGraphData}
@@ -448,28 +448,28 @@ onDestroy(() => {
           onHoverPreview={handleHoverPreview}
         />
       {:else}
-        <div class="note-context__list" data-testid="note-context-list">
+        <div class="s2b-note-context__list" data-testid="note-context-list">
           {#each visibleNeighborRows as row (row.path)}
             <button
-              class="note-context__list-row"
+              class="s2b-note-context__list-row"
               type="button"
               data-href={row.path}
               onclick={() => handleNodeClick(row.path)}
               onmouseover={(event) => handleListRowHover(event, row.path)}
               onfocus={(event) => handleListRowFocus(event, row.path)}
             >
-              <div class="note-context__list-main">
-                <span class="note-context__list-title">{row.label}</span>
+              <div class="s2b-note-context__list-main">
+                <span class="s2b-note-context__list-title">{row.label}</span>
               </div>
 
-              <div class="note-context__list-meta">
+              <div class="s2b-note-context__list-meta">
                 {#if row.directionLabel}
-                  <span class={`note-context__badge note-context__badge--${row.direction}`}
+                  <span class={`s2b-note-context__badge s2b-note-context__badge--${row.direction}`}
                     >{row.directionLabel}</span
                   >
                 {/if}
                 {#if row.semanticScore != null}
-                  <span class="note-context__score">{Math.round(row.semanticScore * 100)}%</span>
+                  <span class="s2b-note-context__score">{Math.round(row.semanticScore * 100)}%</span>
                 {/if}
               </div>
             </button>
@@ -477,7 +477,7 @@ onDestroy(() => {
         </div>
       {/if}
     {:else}
-      <div class="note-context__empty" data-testid="note-context-empty">
+      <div class="s2b-note-context__empty" data-testid="note-context-empty">
         {#if activePath}
           No neighbors.
         {:else}
@@ -497,14 +497,14 @@ onDestroy(() => {
     padding: 0;
   }
 
-  .note-context__surface {
+  .s2b-note-context__surface {
     display: flex;
     flex: 1;
     min-height: 0;
     position: relative;
   }
 
-  .note-context__overlay {
+  .s2b-note-context__overlay {
     position: absolute;
     top: 8px;
     left: 8px;
@@ -517,7 +517,7 @@ onDestroy(() => {
     pointer-events: none;
   }
 
-  .note-context__overlay-actions {
+  .s2b-note-context__overlay-actions {
     margin-left: auto;
     display: inline-flex;
     align-items: center;
@@ -525,15 +525,15 @@ onDestroy(() => {
     pointer-events: auto;
   }
 
-  .note-context__status {
+  .s2b-note-context__status {
     pointer-events: auto;
   }
 
-  :global(.note-context__button) {
+  :global(.s2b-note-context__button) {
     white-space: nowrap;
   }
 
-  :global(.note-context__floating-button) {
+  :global(.s2b-note-context__floating-button) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -545,25 +545,25 @@ onDestroy(() => {
     box-shadow: var(--shadow-xs);
   }
 
-  :global(.note-context__floating-button--quiet) {
+  :global(.s2b-note-context__floating-button--quiet) {
     background: transparent;
     backdrop-filter: none;
     box-shadow: none;
   }
 
-  :global(.note-context__floating-button--quiet:hover),
-  :global(.note-context__floating-button--quiet:focus-visible) {
+  :global(.s2b-note-context__floating-button--quiet:hover),
+  :global(.s2b-note-context__floating-button--quiet:focus-visible) {
     background: color-mix(in srgb, var(--background-primary) 88%, transparent);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow-xs);
   }
 
-  :global(.note-context__button--unavailable) {
+  :global(.s2b-note-context__button--unavailable) {
     opacity: 0.55;
     cursor: not-allowed;
   }
 
-  .note-context__loading {
+  .s2b-note-context__loading {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -576,11 +576,11 @@ onDestroy(() => {
     font-size: 0.8rem;
   }
 
-  :global(.note-context__menu) {
+  :global(.s2b-note-context__menu) {
     width: 228px;
   }
 
-  .note-context__menu-header {
+  .s2b-note-context__menu-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -588,14 +588,14 @@ onDestroy(() => {
     padding: 2px 2px 0;
   }
 
-  .note-context__menu-title {
+  .s2b-note-context__menu-title {
     padding-left: 6px;
     color: var(--text-normal);
     font-size: 0.78rem;
     font-weight: 600;
   }
 
-  :global(.note-context__menu-close) {
+  :global(.s2b-note-context__menu-close) {
     width: 24px;
     height: 24px;
     min-width: 24px;
@@ -603,20 +603,20 @@ onDestroy(() => {
     border-radius: 999px;
   }
 
-  .note-context__menu-section {
+  .s2b-note-context__menu-section {
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
 
-  .note-context__menu-section-header {
+  .s2b-note-context__menu-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
 
-  .note-context__menu-label {
+  .s2b-note-context__menu-label {
     padding: 2px 6px 0;
     color: var(--text-muted);
     font-size: 0.72rem;
@@ -625,13 +625,13 @@ onDestroy(() => {
     text-transform: uppercase;
   }
 
-  .note-context__menu-buttons {
+  .s2b-note-context__menu-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
   }
 
-  .note-context__toggle-row {
+  .s2b-note-context__toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -639,12 +639,12 @@ onDestroy(() => {
     padding: 0 6px;
   }
 
-  .note-context__toggle-label {
+  .s2b-note-context__toggle-label {
     color: var(--text-normal);
     font-size: var(--font-ui-small);
   }
 
-  :global(.note-context__graph) {
+  :global(.s2b-note-context__graph) {
     position: relative;
     flex: 1;
     min-height: 0;
@@ -659,14 +659,14 @@ onDestroy(() => {
       var(--background-primary);
   }
 
-  :global(.note-context__graph:focus),
-  :global(.note-context__graph:focus-visible) {
+  :global(.s2b-note-context__graph:focus),
+  :global(.s2b-note-context__graph:focus-visible) {
     outline: none;
     box-shadow: none;
     border-color: var(--background-modifier-border);
   }
 
-  .note-context__empty {
+  .s2b-note-context__empty {
     display: grid;
     flex: 1;
     min-height: 0;
@@ -676,7 +676,7 @@ onDestroy(() => {
     color: var(--text-muted);
   }
 
-  .note-context__list {
+  .s2b-note-context__list {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -685,7 +685,7 @@ onDestroy(() => {
     overflow: auto;
   }
 
-  .note-context__list-row {
+  .s2b-note-context__list-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
@@ -700,14 +700,14 @@ onDestroy(() => {
     color: inherit;
   }
 
-  .note-context__list-main {
+  .s2b-note-context__list-main {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
   }
 
-  .note-context__list-title {
+  .s2b-note-context__list-title {
     font-weight: 600;
     color: var(--text-normal);
     min-width: 0;
@@ -716,7 +716,7 @@ onDestroy(() => {
     white-space: nowrap;
   }
 
-  .note-context__list-meta {
+  .s2b-note-context__list-meta {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -724,8 +724,8 @@ onDestroy(() => {
     justify-content: flex-end;
   }
 
-  .note-context__badge,
-  .note-context__score {
+  .s2b-note-context__badge,
+  .s2b-note-context__score {
     display: inline-flex;
     align-items: center;
     height: 24px;
@@ -735,37 +735,37 @@ onDestroy(() => {
     line-height: 1;
   }
 
-  .note-context__badge {
+  .s2b-note-context__badge {
     color: var(--text-normal);
     border: 1px solid transparent;
   }
 
-  .note-context__badge--incoming {
+  .s2b-note-context__badge--incoming {
     background: color-mix(in srgb, #3b82f6 16%, transparent);
     border-color: color-mix(in srgb, #3b82f6 34%, transparent);
   }
 
-  .note-context__badge--outgoing {
+  .s2b-note-context__badge--outgoing {
     background: color-mix(in srgb, #f59e0b 16%, transparent);
     border-color: color-mix(in srgb, #f59e0b 34%, transparent);
   }
 
-  .note-context__badge--both {
+  .s2b-note-context__badge--both {
     background: color-mix(in srgb, #10b981 16%, transparent);
     border-color: color-mix(in srgb, #10b981 34%, transparent);
   }
 
-  .note-context__score {
+  .s2b-note-context__score {
     background: color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
     color: var(--text-muted);
   }
 
   @media (max-width: 720px) {
-    .note-context__list-row {
+    .s2b-note-context__list-row {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .note-context__list-meta {
+    .s2b-note-context__list-meta {
       width: 100%;
       justify-content: flex-start;
       flex-wrap: wrap;

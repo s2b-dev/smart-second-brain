@@ -33,13 +33,11 @@ import {
 	toExecToolId,
 } from "../../agent/integrations/pluginIntegrations";
 import { DEFAULT_AGENT_PROMPT } from "../../agent/prompts";
-import { DEFAULT_POST_TURN_REVIEW } from "../../agent/postTurnReview";
 import { normalizeShipped } from "../../utils/shippedDefaults";
 import { agentDefinitionPath, agentDir } from "../../utils/agentPaths";
 import { Logger } from "../../utils/logging";
 import { extractErrorMessage } from "../../utils/errorMessage";
 import { humanizeSkillName } from "../../skills";
-import { skillUsageSummary } from "../../skills/usageSummary";
 import {
 	DEFAULT_AGENT_ICON,
 	type AgentConfig,
@@ -189,6 +187,29 @@ function openModelSelectionModal() {
 	}).open();
 }
 
+// The window is filled from provider metadata when a model is picked; this lets the user
+// override it (e.g. to match an Ollama num_ctx their hardware can hold). Re-picking the same
+// model keeps the override — see buildPersistedChatModel (#542).
+// Bumped on a rejected edit to remount the field, which otherwise keeps showing the invalid
+// value it bound locally.
+let contextWindowFieldKey = $state(0);
+
+function updateChatContextWindow(value: number) {
+	const chatModel = selectedAgent?.chatModel;
+	if (!chatModel) return;
+	const contextWindow = Math.round(value);
+	if (!Number.isFinite(contextWindow) || contextWindow < 1) {
+		new Notice("Context window must be a positive number of tokens.");
+		contextWindowFieldKey++;
+		return;
+	}
+	if (contextWindow === chatModel.modelConfig?.contextWindow) return;
+	pluginData.updateAgent(agentId, {
+		chatModel: { ...chatModel, modelConfig: { ...chatModel.modelConfig, contextWindow } },
+	});
+	void applyChanges();
+}
+
 function openSummarizationModelSelectionModal() {
 	const currentSelection = selectedAgent?.summarizationModel
 		? {
@@ -235,46 +256,6 @@ function resetTitleModel() {
 	void applyChanges();
 }
 
-// --- Post-turn review ---
-
-const postTurnReview = $derived(selectedAgent?.postTurnReview ?? DEFAULT_POST_TURN_REVIEW);
-
-const currentReviewModelDisplay = $derived.by(() => {
-	if (!postTurnReview.model) return null;
-	const providerDef = getProviderDefinition(postTurnReview.model.provider, pluginData.getAllProviderMeta());
-	return {
-		model: postTurnReview.model.model,
-		logo: providerDef && "logo" in providerDef && providerDef.logo ? providerDef.logo : GenericAIIcon,
-	};
-});
-
-function setPostTurnReviewEnabled(enabled: boolean) {
-	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, enabled } });
-}
-
-function openReviewModelSelectionModal() {
-	const currentSelection = postTurnReview.model
-		? { provider: postTurnReview.model.provider, model: postTurnReview.model.model }
-		: null;
-	new ModelSelectionModal(plugin, "chat", currentSelection, (selected) => {
-		if (!selected) return;
-		pluginData.updateAgent(agentId, {
-			postTurnReview: {
-				...postTurnReview,
-				model: buildPersistedChatModel(selected.provider, selected.model, postTurnReview.model),
-			},
-		});
-	}).open();
-}
-
-function resetReviewModel() {
-	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, model: null } });
-}
-
-function setPostTurnReviewOnMobile(onMobile: boolean) {
-	pluginData.updateAgent(agentId, { postTurnReview: { ...postTurnReview, onMobile } });
-}
-
 function openAgentNote() {
 	if (!selectedAgent) return;
 	const path = normalizePath(agentDefinitionPath(agentId));
@@ -288,12 +269,10 @@ function openAgentNote() {
 }
 
 // Whether this agent's definition note has drifted from the shipped default. Reads the
-// prompt-file cache (kept fresh by the vault-change handler); `promptDriftTick` lets us
-// force a re-check after opening the diff modal. When false, we hide the "Diff with default"
-// button — matching the skill guidance behaviour (diff only shown when drifted).
-let promptDriftTick = $state(0);
+// prompt-file cache, which is reactive (kept fresh by writes and the vault-change handler), so
+// "Use default" in the diff modal hides the button again. When false, we hide the "Diff with
+// default" button — matching the skill guidance behaviour (diff only shown when drifted).
 const promptDrifted = $derived.by(() => {
-	void promptDriftTick;
 	if (!selectedAgent) return false;
 	const content = plugin.promptFilesService?.getAgentPrompt(agentId) ?? DEFAULT_AGENT_PROMPT;
 	// Same normalization the shipped-default check uses, so a file that differs only by
@@ -307,8 +286,6 @@ function openPromptDiff() {
 	// (invalidate caches on success, surface a Notice on failure), and duplicating it was
 	// how this call site ended up silently swallowing write errors.
 	plugin.agentManager?.openSystemPromptDiff(agentId);
-	// The diff modal can reset/realign the file; re-check drift when we return to this modal.
-	promptDriftTick++;
 }
 
 function openRenderedSystemPromptModal() {
@@ -344,8 +321,6 @@ const skills = $derived.by(() => {
 			category: metadata.category ?? "custom",
 			corePluginId: metadata.corePluginId,
 			linkedPluginId: metadata.linkedPluginId,
-			author: metadata.frontmatter.metadata?.author,
-			usage: pluginData.getSkillUsage(skillName),
 		});
 	}
 	return result;
@@ -756,8 +731,8 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         <SettingItem name="Name" desc="This agent's display name and icon">
           <PickerPopover
             bind:open={isAgentIconPickerOpen}
-            triggerClass="agent-icon-trigger"
-            contentClass="agent-icon-popover"
+            triggerClass="s2b-agent-icon-trigger"
+            contentClass="s2b-agent-icon-popover"
             tooltip="Change icon"
             side="bottom"
             align="start"
@@ -811,7 +786,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 
           <Text
             inputType="text"
-            class="agent-overview-name-input"
+            class="s2b-agent-overview-name-input"
             placeholder="Agent name"
             value={selectedAgent.name}
             onblur={(value: string) => updateAgentName(value)}
@@ -832,6 +807,21 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           />
         </SettingItem>
 
+        {#if selectedAgent.chatModel}
+          <SettingItem
+            name="Context window"
+            desc="Tokens the chat model can take in. Decides when older history is summarized, and for Ollama it is also the num_ctx sent with each request. Filled in from the provider when you pick a model."
+          >
+            {#key contextWindowFieldKey}
+              <Text
+                inputType="number"
+                value={selectedAgent.chatModel.modelConfig?.contextWindow ?? 128000}
+                onchange={updateChatContextWindow}
+              />
+            {/key}
+          </SettingItem>
+        {/if}
+
         <!-- The agent's whole definition is one note: base instructions, the current-date
              section, and the memory section, with live values written as placeholders that
              assembly substitutes. There is no memory toggle — an agent participates in memory
@@ -842,7 +832,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           name="System prompt"
           desc="This agent's instructions, including how it uses memory, stored as its own AGENT.md note in your vault"
         >
-          <div class="flex items-center gap-2 justify-end">
+          <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-justify-end">
             <Button
               iconId="pencil"
               ariaLabel="Open agent note"
@@ -893,7 +883,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onSecondary={selectedAgent.summarizationModel ? resetSummarizationModel : undefined}
             />
             {#if summarizationContextWindowWarning}
-              <div class="agent-model-warning text-sm">{summarizationContextWindowWarning}</div>
+              <div class="agent-model-warning s2b-text-sm">{summarizationContextWindowWarning}</div>
             {/if}
           </div>
         </SettingItem>
@@ -958,43 +948,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               onchange={() => void toggleSkill(ext.id, !ext.enabled)}
             />
           </SettingItem>
-          {#if ext.id === "canvas"}
-            <SettingItem
-              name="Ask question"
-              desc="Allow the agent to ask multiple-choice questions in chat to clarify requirements or solicit preferences."
-            >
-              {#snippet namePrefix()}
-                <Icon name="help-circle" size="s" />
-              {/snippet}
-              <Toggle
-                checked={selectedAgent.toolsConfig.ask_question?.enabled ?? true}
-                onchange={() => {
-                  const current = selectedAgent.toolsConfig.ask_question?.enabled ?? true;
-                  pluginData.updateAgentToolConfig(agentId, "ask_question", { enabled: !current });
-                  void applyChanges();
-                }}
-              />
-            </SettingItem>
-          {/if}
         {/each}
-        {#if !coreSkills.some((s) => s.id === "canvas")}
-          <SettingItem
-            name="Ask question"
-            desc="Allow the agent to ask multiple-choice questions in chat to clarify requirements or solicit preferences."
-          >
-            {#snippet namePrefix()}
-              <Icon name="help-circle" size="s" />
-            {/snippet}
-            <Toggle
-              checked={selectedAgent.toolsConfig.ask_question?.enabled ?? true}
-              onchange={() => {
-                const current = selectedAgent.toolsConfig.ask_question?.enabled ?? true;
-                pluginData.updateAgentToolConfig(agentId, "ask_question", { enabled: !current });
-                void applyChanges();
-              }}
-            />
-          </SettingItem>
-        {/if}
       </SettingGroup>
 
       <SettingGroup heading="Integrations">
@@ -1081,50 +1035,6 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {/each}
       </SettingGroup>
 
-      <SettingGroup heading="Self-improvement">
-        <div class="setting-item agent-section-intro">
-          <div class="setting-item-info">
-            <div class="setting-item-description">
-              After a busy turn, a short side run reviews the conversation and keeps what it
-              taught: a durable fact about you goes to memory, a lesson about how a task is done
-              goes into the skill that was used. It runs right after the answer, once the turns
-              since the last review add up to {postTurnReview.toolCallThreshold} tool calls, not
-              counting skill loads (the count is kept with the chat). A notice names what was
-              saved; most reviews save nothing.
-            </div>
-          </div>
-        </div>
-        <SettingItem name="Review after busy turns" desc="Off by default. Each review costs one extra model call over the conversation.">
-          <Toggle checked={postTurnReview.enabled} onchange={() => setPostTurnReviewEnabled(!postTurnReview.enabled)} />
-        </SettingItem>
-        {#if postTurnReview.enabled}
-          <SettingItem name="Review model" desc="A cheaper model is fine here; the review reads and writes short notes.">
-            <ModelSettingControl
-              available={models.hasProviders && models.hasModels}
-              loading={models.hasProviders && models.isLoadingModels}
-              configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
-              unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
-              onConfigure={() => models.openSettings(() => modal.close())}
-              placeholder="Auto (same as chat model)"
-              selectedLabel={currentReviewModelDisplay?.model ?? null}
-              selectedLogo={currentReviewModelDisplay?.logo ?? null}
-              onSelect={openReviewModelSelectionModal}
-              secondaryLabel={postTurnReview.model ? "Reset" : undefined}
-              onSecondary={postTurnReview.model ? resetReviewModel : undefined}
-            />
-          </SettingItem>
-          <SettingItem
-            name="Also on mobile"
-            desc="Off by default: a review on a phone spends battery and data on work you are not watching."
-          >
-            <Toggle
-              checked={postTurnReview.onMobile}
-              onchange={() => setPostTurnReviewOnMobile(!postTurnReview.onMobile)}
-            />
-          </SettingItem>
-        {/if}
-      </SettingGroup>
-
       <SettingGroup heading="Subagents">
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
@@ -1174,10 +1084,9 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         </SettingContainer>
         {#each customSkills as ext (ext.id)}
           <ManagedEntityItem
-            class="skill-entity"
+            class="s2b-skill-entity"
             name={ext.displayName}
             desc={ext.description}
-            meta={skillUsageSummary(ext.author, ext.usage)}
           >
             {#snippet actions()}
               <Button
@@ -1220,7 +1129,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               {@const toolsState = getServerToolsState(serverId)}
               {@const isExpanded = expandedServerId === serverId}
               <ManagedEntityItem
-                class="mcp-entity"
+                class="s2b-mcp-entity"
                 name={config.displayName}
                 desc={config.url}
                 meta="Remote HTTP MCP server"
@@ -1230,7 +1139,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                   <Badge
                     interactive
                     onclick={() => toggleToolsList(serverId)}
-                    class={`mcp-tools-badge ${toolsState?.error ? "error" : ""} ${toolsState?.tools && toolsState.tools.length > 0 ? "has-tools" : ""}`}
+                    class={`s2b-mcp-tools-badge ${toolsState?.error ? "error" : ""} ${toolsState?.tools && toolsState.tools.length > 0 ? "has-tools" : ""}`}
                   >
                     {#if toolsState?.loading}
                       <Icon name="loader" size="xs" />
@@ -1325,13 +1234,13 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 
   /* `:global` because the class is handed to `Text.svelte` as a prop, so this component's
      scope hash never reaches the rendered input. */
-  :global(.agent-overview-name-input) {
+  :global(.s2b-agent-overview-name-input) {
     font-size: var(--font-ui-medium);
   }
 
   /* Icon-only trigger sitting immediately left of the name input, sized to match the
      input's height so the pair reads as one control. */
-  :global(.agent-icon-trigger) {
+  :global(.s2b-agent-icon-trigger) {
     min-width: 0;
     justify-content: center;
     padding: 0;
@@ -1345,12 +1254,12 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
      min-content. Pin the trigger to its square and give the freed space back to
      the input. `!important` because core's `.is-phone .modal .setting-item-control`
      rules out-specify these single-class selectors. */
-  :global(.is-phone .modal .setting-item-control button.agent-icon-trigger) {
+  :global(.is-phone .modal .setting-item-control button.s2b-agent-icon-trigger) {
     width: var(--input-height) !important;
     flex: 0 0 auto !important;
   }
 
-  :global(.is-phone .modal .setting-item-control input.agent-overview-name-input) {
+  :global(.is-phone .modal .setting-item-control input.s2b-agent-overview-name-input) {
     flex: 1 1 auto !important;
     width: auto !important;
     min-width: 0;
@@ -1363,7 +1272,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
     flex-shrink: 0;
   }
 
-  :global(.agent-icon-popover) {
+  :global(.s2b-agent-icon-popover) {
     width: min(380px, calc(100vw - 48px));
     max-width: min(380px, calc(100vw - 48px));
     z-index: calc(var(--layer-popover) + 20);
@@ -1459,7 +1368,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
   /* Muted text like `ManagedEntitySection`'s empty state. Aligns with the
      "Skills" / "MCP servers" heading rows above it rather than the card edge:
      the message stands in for the whole list block, so it should line up with
-     that block's heading. (The `.skill-entity` / `.mcp-entity` rows zero their
+     that block's heading. (The `.s2b-skill-entity` / `.s2b-mcp-entity` rows zero their
      own side padding because they carry their own internal inset — an empty
      paragraph has none, so matching them would outdent it.) */
   .skill-empty-state,
@@ -1467,20 +1376,20 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
     margin: 0;
     padding: 8px 16px;
   }
-  :global(.skill-entity),
-  :global(.mcp-entity) {
+  :global(.s2b-skill-entity),
+  :global(.s2b-mcp-entity) {
     padding-left: 0;
     padding-right: 0;
   }
-  :global(.mcp-tools-badge) {
+  :global(.s2b-mcp-tools-badge) {
     min-height: 22px;
   }
-  :global(.mcp-tools-badge.has-tools) {
+  :global(.s2b-mcp-tools-badge.has-tools) {
     background: rgba(var(--color-green-rgb, 76, 175, 80), 0.15);
     border-color: var(--text-success, #4caf50);
     color: var(--text-success, #4caf50);
   }
-  :global(.mcp-tools-badge.error) {
+  :global(.s2b-mcp-tools-badge.error) {
     background: rgba(var(--color-red-rgb, 244, 67, 54), 0.15);
     border-color: var(--text-error, #f44336);
     color: var(--text-error, #f44336);

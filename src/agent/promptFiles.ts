@@ -1,4 +1,5 @@
 import type { App, FileManager, Vault } from "obsidian";
+import { SvelteMap } from "svelte/reactivity";
 import type { AgentsConfig, PromptFileReader, PromptFileSnapshot } from "../types/plugin";
 import { agentDefinitionPath, agentDir, agentRootDir } from "../utils/agentPaths";
 import { Logger as Log } from "../utils/logging";
@@ -109,8 +110,15 @@ export class PromptFilesService {
 	private vault: Vault;
 	private fileManager: FileManager;
 
-	/** agentId → parsed note. An absent key means "file missing, use the default". */
-	private cache = new Map<string, PromptFileSnapshot>();
+	/**
+	 * agentId → parsed note. An absent key means "file missing, use the default".
+	 *
+	 * Reactive, and mutated in place rather than reassigned: the data store's `staleGuidance`
+	 * getter and the Agent editor's drift check read it inside `$derived`s, so a write (e.g.
+	 * "Use default" in the diff modal) must re-run them. With a plain Map the update notice
+	 * outlived the fix until reload, and clicking it again opened a diff with nothing in it.
+	 */
+	private readonly cache = new SvelteMap<string, PromptFileSnapshot>();
 
 	constructor(app: App) {
 		this.vault = app.vault;
@@ -194,7 +202,9 @@ export class PromptFilesService {
 				Log.error(`Failed to read agent prompt for ${agentId}:`, error);
 			}
 		}
-		this.cache = next;
+		// Swap in one synchronous step, so readers never observe a half-refreshed cache.
+		this.cache.clear();
+		for (const [agentId, snapshot] of next) this.cache.set(agentId, snapshot);
 	}
 
 	/**

@@ -5,51 +5,6 @@
 @import "tailwindcss/components.css";
 @import "tailwindcss/utilities.css";
 
-/* Hide scrollbar utility */
-.scrollbar-hide {
-	scrollbar-width: none; /* Firefox */
-	-ms-overflow-style: none; /* IE/Edge */
-}
-.scrollbar-hide::-webkit-scrollbar {
-	display: none; /* Chrome/Safari/Opera */
-}
-
-:root {
-	--icon-xs: 0.75rem;
-	--icon-sm: 1rem;
-	--icon-md: 1.25rem;
-	--icon-lg: 1.5rem;
-	--icon-xl: 2rem;
-}
-
-.obsidian-border {
-	border-bottom: 1px solid var(--background-modifier-border);
-}
-
-/* Obsidian border-solid fix utilities
-   In Obsidian, border-solid creates borders on all sides by default.
-   These utilities reset unwanted borders to 0. Use with border-solid + border-[color] */
-@layer utilities {
-	.ob-border-b {
-		border-top-width: 0;
-		border-left-width: 0;
-		border-right-width: 0;
-	}
-	.ob-border-t {
-		border-bottom-width: 0;
-		border-left-width: 0;
-		border-right-width: 0;
-	}
-	.ob-border-x {
-		border-top-width: 0;
-		border-bottom-width: 0;
-	}
-	.ob-border-y {
-		border-left-width: 0;
-		border-right-width: 0;
-	}
-}
-
 /* Note access policy modal — the title carries the same shield-check mark, in
    the same accent colour, as the settings row that opens it. Lives here rather
    than in the Svelte component because the title element belongs to Obsidian's
@@ -473,8 +428,8 @@ button.s2b-pill--interactive:hover {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: var(--icon-sm);
-	height: var(--icon-sm);
+	width: 1rem;
+	height: 1rem;
 	flex-shrink: 0;
 	color: var(--text-muted);
 	overflow: hidden;
@@ -484,8 +439,8 @@ button.s2b-pill--interactive:hover {
 .s2b-search-result-note-icon svg,
 .s2b-path-icon .svg-icon,
 .s2b-path-icon svg {
-	width: var(--icon-sm);
-	height: var(--icon-sm);
+	width: 1rem;
+	height: 1rem;
 	display: block;
 }
 
@@ -707,15 +662,15 @@ button.s2b-pill--interactive:hover {
 /* Smart Graph View. The container IS the leaf's `.view-content`; naming the
    ancestor out-specifies core's `.workspace-leaf-content .view-content`
    padding without `!important`. */
-.workspace-leaf-content .view-content.smart-graph-container,
-.smart-graph-container {
+.workspace-leaf-content .view-content.s2b-smart-graph-container,
+.s2b-smart-graph-container {
 	overflow: hidden;
 }
-.workspace-leaf-content .view-content.smart-graph-container {
+.workspace-leaf-content .view-content.s2b-smart-graph-container {
 	padding: 0;
 }
 
-.smart-graph-container .view-content {
+.s2b-smart-graph-container .view-content {
 	padding: 0;
 }
 /* Inline diff decorations — word-level (edit view) */
@@ -1017,7 +972,7 @@ button.s2b-pill--interactive:hover {
 /* Stale entry: the accept is guaranteed to fail its conflict check, so the
    in-note bars disable it with an explanatory title (parity with the chat bar).
    Kept visible but clearly inert, and pointer-events stay on so the title
-   tooltip still explains why — matching `.pcb-action-icon[disabled]`. */
+   tooltip still explains why — matching `.s2b-pcb-action-icon[disabled]`. */
 .s2b-diff-actions-bar .s2b-diff-accept-btn[disabled],
 .s2b-diff-action-bar-widget .s2b-diff-accept-btn[disabled] {
 	opacity: 0.35;
@@ -1126,7 +1081,7 @@ button.s2b-pill--interactive:hover {
 	   group-hover:pointer-events-auto` — override to always-visible on touch. */
 	/* `body` is the extra weight that beats the Tailwind utilities on the element
 	   (each a single class); `translate-y-*` writes `transform`, so reset that too. */
-	body .message-footer {
+	body .s2b-message-footer {
 		opacity: 1;
 		transform: none;
 		pointer-events: auto;
@@ -1146,15 +1101,15 @@ button.s2b-pill--interactive:hover {
 	/* Code-block copy button lives in `<pre>` and is revealed on `pre:hover`.
 	   Show it persistently on touch so code is copyable. Code blocks appear in
 	   chat messages and in tool-call output, so cover both containers. */
-	body .message-text pre .clickable-icon,
-	body .tool-output-content pre .clickable-icon {
+	body .s2b-message-text pre .clickable-icon,
+	body .s2b-tool-output-content pre .clickable-icon {
 		opacity: 1;
 	}
 
 	/* Shared picker-row trailing action (PickerOptionRow) — revealed on
 	   :hover/:focus-within; always show on touch. The row ancestor plus `body`
-	   out-specifies the component's scoped `.picker-option-action` rule. */
-	body .picker-option-row .picker-option-action {
+	   out-specifies the component's scoped `.s2b-picker-option-action` rule. */
+	body .s2b-picker-option-row .s2b-picker-option-action {
 		opacity: 1;
 	}
 
@@ -1468,7 +1423,7 @@ body.is-mobile .s2b-model-grid {
    (16–28px), below the ~44px comfortable touch target. Bump them on mobile.
    Obsidian already touch-sizes bare .clickable-icon, so we target only the
    custom-sized ones here. */
-.is-mobile .branch-nav-btn,
+.is-mobile .s2b-branch-nav-btn,
 .is-mobile .s2b-model-favorite {
 	min-width: 40px;
 	min-height: 40px;
@@ -1481,13 +1436,13 @@ body.is-mobile .s2b-model-grid {
    the component rules use, so it out-specifies them without `!important`.
    Padding (not width/height) does the growing, so the glyph keeps its size
    and only the tappable box expands. */
-body.is-mobile .footer-actions button,
-body.is-mobile .attach-context-button.clickable-icon,
-body.is-mobile .chat-input-container .chat-input-icon-button.clickable-icon,
-body.is-mobile .graph-controls .clickable-icon,
+body.is-mobile .s2b-footer-actions button,
+body.is-mobile .s2b-attach-context-button.clickable-icon,
+body.is-mobile .s2b-chat-input-container .s2b-chat-input-icon-button.clickable-icon,
+body.is-mobile .s2b-graph-controls .clickable-icon,
 body.is-mobile .s2b-bottom-sheet .clickable-icon,
-body.is-mobile .provider-icon-button.clickable-icon,
-body.is-mobile .pcb-action-icon,
+body.is-mobile .s2b-provider-icon-button.clickable-icon,
+body.is-mobile .s2b-pcb-action-icon,
 body.is-mobile .s2b-diff-nav-btn,
 body.is-mobile .s2b-diff-toggle-btn {
 	min-width: 44px;
@@ -1514,48 +1469,35 @@ body.is-mobile .s2b-diff-reject-btn {
    touch floor above, 999px makes them full circles, which felt too far from
    the input's own softer 22px corner. Squircle them down instead of going
    fully square, so they still read as buttons rather than tiles. */
-body.is-mobile .attach-context-button.clickable-icon,
-body.is-mobile .chat-input-container button.send-message-button {
+body.is-mobile .s2b-attach-context-button.clickable-icon,
+body.is-mobile .s2b-chat-input-container button.s2b-send-message-button {
 	border-radius: 20px;
 }
 
 /* The model/agent pills are text buttons rather than icon boxes — give them
    the vertical floor without forcing a square, so the label still sets width. */
-body.is-mobile .model-select-btn.clickable-icon {
+body.is-mobile .s2b-model-select-btn.clickable-icon {
 	min-height: 44px;
 	padding-block: 8px;
 }
 
-/* The message-nav cluster (jump/step through messages) stacks four 22px
-   buttons vertically in a floating overlay. A full 44px box each would make
-   the stack ~176px tall and cover the conversation, so widen to 44px for the
-   horizontal grab area but keep the rows at 36px — still a comfortable target
-   in the dominant (vertical) axis of a stacked list. The code-copy button sits
-   inside `<pre>` and gets the full square. */
-body.is-mobile .message-nav button {
-	min-width: 44px;
-	min-height: 36px;
-	padding: 6px;
-	box-sizing: border-box;
-}
-
 /* Code blocks render in chat messages AND in tool-call output
-   (`.tool-output-content`), so key off `pre` rather than a single container. */
-body.is-mobile .message-text pre .clickable-icon,
-body.is-mobile .tool-output-content pre .clickable-icon {
+   (`.s2b-tool-output-content`), so key off `pre` rather than a single container. */
+body.is-mobile .s2b-message-text pre .clickable-icon,
+body.is-mobile .s2b-tool-output-content pre .clickable-icon {
 	min-width: 44px;
 	min-height: 44px;
 	padding: 10px;
 	box-sizing: border-box;
 }
 
-/* Chat markdown tables. `.message-text` is `!w-full !max-w-full`, so a table
+/* Chat markdown tables. `.s2b-message-text` is `!s2b-w-full !s2b-max-w-full`, so a table
    wider than the bubble gets crushed rather than scrolled: on a 402px phone a
    3-column table squeezes its prose column to ~112px and wraps one or two
    words per line. Scope the horizontal scroll to the table itself (not the
    whole message) so prose/code around it stays put; `-webkit-overflow-scrolling`
    keeps the scroll momentum native on iOS. */
-.is-mobile .message-text table {
+.is-mobile .s2b-message-text table {
 	display: block;
 	width: max-content;
 	max-width: 100%;
@@ -1564,8 +1506,8 @@ body.is-mobile .tool-output-content pre .clickable-icon {
 	table-layout: auto;
 }
 
-.is-mobile .message-text table th,
-.is-mobile .message-text table td {
+.is-mobile .s2b-message-text table th,
+.is-mobile .s2b-message-text table td {
 	min-width: 8ch;
 	/* Long wikilinks/paths in table cells otherwise break mid-token and stack
 	   into an unreadable column. */

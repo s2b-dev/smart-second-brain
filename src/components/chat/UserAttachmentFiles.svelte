@@ -41,10 +41,10 @@ function onAttachmentHover(evt: Event, attachment: ChatAttachment): void {
 </script>
 
 {#if attachments.length > 0}
-  <div class="flex flex-wrap gap-2 justify-end">
+  <div class="s2b-flex s2b-flex-wrap s2b-gap-2 s2b-justify-end">
     {#each attachments as attachment (attachment.vaultPath)}
       <a
-        class="internal-link flex items-center gap-1 rounded-lg bg-[--background-modifier-hover] px-3 py-2 text-xs text-[--text-muted] no-underline hover:text-[--text-accent]"
+        class="internal-link s2b-flex s2b-items-center s2b-gap-1 s2b-rounded-lg s2b-bg-[--background-modifier-hover] s2b-px-3 s2b-py-2 s2b-text-xs s2b-text-[--text-muted] s2b-no-underline hover:s2b-text-[--text-accent]"
         href={attachment.vaultPath}
         data-href={attachment.vaultPath}
         onclick={(evt) => onAttachmentClick(evt, attachment)}

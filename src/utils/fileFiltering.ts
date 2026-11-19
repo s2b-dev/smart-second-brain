@@ -1,9 +1,16 @@
 import { Platform, type TFile, type Vault } from "obsidian";
+import type { ContentGroup, ContentIndexingSettings } from "../types/plugin";
 import { stripWidgetFences } from "../widget/widgetFences";
 import { widgetIndexText } from "../widget/widgetSpec";
 import { getAgentPathSource } from "./agentPathSource";
 import { agentRootDir } from "./agentPaths";
-import { THREAD_DATA_DEDUP_VERSION, inflateThreadData, sniffThreadDataVersion } from "../agent/threadDataCodec";
+import {
+	THREAD_DATA_DEDUP_VERSION,
+	type ThreadData,
+	inflateThreadData,
+	sniffThreadDataVersion,
+} from "../agent/threadDataCodec";
+import { replayPathMessages } from "../agent/threadReplay";
 import { gunzipPrefixToString, gunzipToString } from "./gzip";
 import { extractTextFromPdf } from "./pdfExtractor";
 
@@ -56,17 +63,22 @@ const MOBILE_CHAT_MAX_EXTRACT_BYTES = 2 * 1024 * 1024;
  * completely), while extracted/structured text (PDFs, chat logs, canvas/CSV/
  * JSON) gets 10K — about four PDF pages — enough to find a document by its
  * opening content, with title/path/tag search unaffected. Desktop has no
- * memory ceiling and indexes up to 1M everywhere.
+ * memory ceiling, but embedding time does scale with length: a 400-page PDF
+ * at the old uniform 1M cap became hundreds of chunks and minutes of provider
+ * calls for a document mostly irrelevant to any query. So desktop also caps by
+ * provenance, just higher: 1M for notes, 200K (~80 PDF pages) for the rest.
  */
-const MAX_INDEXED_TEXT_CHARS_DESKTOP = 1_000_000;
+const MAX_INDEXED_TEXT_CHARS_DESKTOP_NOTES = 1_000_000;
+const MAX_INDEXED_TEXT_CHARS_DESKTOP_EXTRACTED = 200_000;
 const MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES = 100_000;
 const MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED = 10_000;
 
 function maxIndexedTextChars(file: TFile): number {
-	if (!Platform.isMobile) return MAX_INDEXED_TEXT_CHARS_DESKTOP;
-	return file.extension === "md" || file.extension === "txt"
-		? MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES
-		: MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED;
+	const authored = file.extension === "md" || file.extension === "txt";
+	if (!Platform.isMobile) {
+		return authored ? MAX_INDEXED_TEXT_CHARS_DESKTOP_NOTES : MAX_INDEXED_TEXT_CHARS_DESKTOP_EXTRACTED;
+	}
+	return authored ? MOBILE_MAX_INDEXED_TEXT_CHARS_NOTES : MOBILE_MAX_INDEXED_TEXT_CHARS_EXTRACTED;
 }
 
 function normalizePattern(pattern: string): string {
@@ -130,9 +142,13 @@ const BINARY_TEXT_EXTENSIONS = new Set(["pdf"]);
  *   - images: no text to extract. Embedding them would require a multimodal
  *     embedding model and a separate image pipeline; until that exists they are
  *     pure noise rather than a missing feature.
+ *   - `excalidraw`: a bare Excalidraw scene — JSON shapes, no prose. (The
+ *     `.excalidraw.md` form is a markdown note and is decided by its content:
+ *     see {@link readIndexableContent}.)
  */
 const NON_EMBEDDABLE_EXTENSIONS = new Set([
 	"base",
+	"excalidraw",
 	"png",
 	"jpg",
 	"jpeg",
@@ -165,6 +181,74 @@ export function isTextIndexableFile(file: TFile): boolean {
 /** Returns `true` when the file's text must be extracted from a binary container. */
 export function isBinaryTextFile(file: TFile): boolean {
 	return BINARY_TEXT_EXTENSIONS.has(file.extension.toLowerCase());
+}
+
+// ---------------------------------------------------------------------------
+// Content groups (which files have their contents indexed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extensions in each optional content group. Anything not listed is a note
+ * (md, txt, canvas, widget, …) and always has its contents indexed.
+ *
+ *   - `pdfs`: large, slow to extract, mostly reference material the user did
+ *     not write.
+ *   - `chats`: past conversations are mostly the model's own answers; indexed,
+ *     retrieval can return them as if they were sources.
+ *   - `data`: structured exports embed poorly (keys and numbers carry little
+ *     meaning), and one dump can become thousands of chunks.
+ */
+const CONTENT_GROUP_EXTENSIONS: Record<ContentGroup, ReadonlySet<string>> = {
+	pdfs: new Set(["pdf"]),
+	chats: new Set(["chat"]),
+	data: new Set(["csv", "json", "yaml", "yml"]),
+};
+
+export const CONTENT_GROUPS = Object.keys(CONTENT_GROUP_EXTENSIONS) as ContentGroup[];
+
+/** Every optional group off: a fresh install indexes the contents of notes only. */
+export const DEFAULT_CONTENT_INDEXING: ContentIndexingSettings = { pdfs: false, chats: false, data: false };
+
+/** The optional content group `file` belongs to, or null for a note (always indexed). */
+export function contentGroupOf(file: Pick<TFile, "extension" | "path">): ContentGroup | null {
+	// Same path fallback as `isEmbeddableFile`: some call sites pass file-like
+	// objects without `extension`.
+	const extension = (file.extension ?? file.path.split(".").pop() ?? "").toLowerCase();
+	for (const group of CONTENT_GROUPS) {
+		if (CONTENT_GROUP_EXTENSIONS[group].has(extension)) return group;
+	}
+	return null;
+}
+
+/**
+ * Where the content-group switches are read from. Installed by the data store on
+ * construction, for the same reason as `agentPathSource`: the store imports this
+ * module, so this module must not import the store.
+ */
+let contentIndexingSource: (() => ContentIndexingSettings) | null = null;
+
+export function installContentIndexingSource(source: (() => ContentIndexingSettings) | null): void {
+	contentIndexingSource = source;
+}
+
+/** The current switches; the defaults until the data store has been constructed. */
+export function getContentIndexing(): ContentIndexingSettings {
+	return contentIndexingSource?.() ?? DEFAULT_CONTENT_INDEXING;
+}
+
+/** Whether `file`'s contents (not just its title and path) are indexed. */
+export function isContentIndexed(file: Pick<TFile, "extension" | "path">): boolean {
+	const group = contentGroupOf(file);
+	return group === null || getContentIndexing()[group];
+}
+
+/**
+ * Whether indexing `file` means extracting text from a binary container — the
+ * expensive tail of a bulk run, which goes last and gets its own progress phase.
+ * A PDF whose contents are not indexed is read as title-only and costs nothing.
+ */
+export function needsExtraction(file: TFile): boolean {
+	return isBinaryTextFile(file) && isContentIndexed(file);
 }
 
 /**
@@ -218,12 +302,33 @@ export function isIndexableFile(file: TFile): boolean {
  */
 export function isEmbeddableFile(file: TFile): boolean {
 	if (!isIndexableFile(file)) return false;
+	// A group whose contents are off would embed as a title-only vector: the same
+	// noise-floor problem as the extensions below.
+	if (!isContentIndexed(file)) return false;
 	// Fall back to the path suffix: `extension` is absent on some call sites'
 	// file-like objects, and treating that as "no extension" would silently
 	// re-admit every excluded type.
 	const extension = (file.extension ?? file.path.split(".").pop() ?? "").toLowerCase();
 	return !NON_EMBEDDABLE_EXTENSIONS.has(extension);
 }
+
+/** Returns `true` for an Excalidraw drawing, in either its `.excalidraw.md` or bare `.excalidraw` form. */
+export function isExcalidrawPath(path: string): boolean {
+	const lower = path.toLowerCase();
+	return lower.endsWith(".excalidraw.md") || lower.endsWith(".excalidraw");
+}
+
+/**
+ * Debounce before re-indexing a modified Excalidraw drawing.
+ *
+ * Excalidraw autosaves every few seconds while the user draws, and each save
+ * rewrites the whole file — the scene JSON included. The indexers' normal
+ * debounce (a couple of seconds) fell between those saves, so every one of them
+ * re-read the full file on the main thread mid-stroke (#541). What a drawing
+ * contributes to search — its title and the text on the back of the note — rarely
+ * changes while drawing, so it is picked up once the drawing has been left alone.
+ */
+export const DRAWING_MODIFY_DEBOUNCE_MS = 30_000;
 
 /**
  * Enumerate all vault files eligible for indexing (replaces
@@ -245,8 +350,8 @@ export function getEmbeddableVaultFiles(vault: Vault): TFile[] {
  *   - `.chat` files: extracts only human/AI message content (not LangChain metadata)
  *   - `.pdf` files: extracts the document text via pdfjs, so a PDF is chunked and
  *     embedded like any other long document rather than reduced to its filename
- *   - `.excalidraw.md` files: extracts the "back of the note" and text elements,
- *     stripping the huge embedded JSON drawing data
+ *   - `.excalidraw.md` files: extracts the frontmatter and the user-written "back
+ *     of the note", stripping Excalidraw's banner and the huge drawing data.
  *
  * The caller is responsible for filtering via `isIndexableFile`
  * before calling this helper.
@@ -263,6 +368,10 @@ export async function readIndexableContent(vault: Vault, file: TFile): Promise<s
 }
 
 async function readIndexableContentRaw(vault: Vault, file: TFile): Promise<string> {
+	// A content group switched off is indexed by title and path only — and never
+	// read, so an excluded PDF costs no extraction at all.
+	if (!isContentIndexed(file)) return "";
+
 	// Size gates come before any read: the cost of reading an oversized file is
 	// paid before truncation could help.
 	if (Platform.isMobile && file.stat.size > MOBILE_MAX_READ_BYTES) {
@@ -321,6 +430,26 @@ async function readIndexableContentRaw(vault: Vault, file: TFile): Promise<strin
 	}
 
 	return raw;
+}
+
+/**
+ * Whether `content`, as {@link readIndexableContent} returned it for `file`, means
+ * the file has nothing worth embedding — so it is left out rather than stored as a
+ * title-only vector at the similarity noise floor.
+ *
+ * Only a successful plain-text read can say so. An empty extraction from a
+ * container (a PDF, a `.chat` thread) or a file over the mobile size gate may be a
+ * failed or skipped read, and is not a verdict on the file. A drawing's
+ * frontmatter is plugin bookkeeping (`excalidraw-plugin: parsed`) and does not
+ * count as text — every drawing has it, so with it a blank drawing never read as
+ * empty (#541). A plain note's frontmatter does: a TaskNotes task keeps
+ * everything in it.
+ */
+export function hasNoEmbeddableText(file: TFile, content: string): boolean {
+	if (!isTextIndexableFile(file) || file.extension === "chat") return false;
+	if (Platform.isMobile && file.stat.size > MOBILE_MAX_READ_BYTES) return false;
+	const text = isExcalidrawPath(file.path) ? content.replace(RE_LEADING_FRONTMATTER, "") : content;
+	return text.trim() === "";
 }
 
 /**
@@ -440,7 +569,8 @@ function hasToolCalls(msg: unknown): boolean {
  * usable before `AgentManager` has initialized. Verified to agree with the UI on all
  * 49 threads in the test vault by comparing against `metadata.lastMessagePreview`.
  */
-function selectActiveMessages(checkpoints: Record<string, unknown>): unknown[] {
+function selectActiveMessages(data: ThreadData): unknown[] {
+	const checkpoints = data.checkpoints as unknown as Record<string, unknown>;
 	const nodes = new Map<string, { id: string; ts: string; step: number; entry: unknown; children: string[] }>();
 	for (const [id, entry] of Object.entries(checkpoints)) {
 		const record = entry as Record<string, unknown>;
@@ -500,7 +630,12 @@ function selectActiveMessages(checkpoints: Record<string, unknown>): unknown[] {
 		current = next;
 	}
 
-	return getNestedMessages(nodes.get(current)?.entry);
+	const tip = nodes.get(current)?.entry;
+	const stored = getNestedMessages(tip);
+	if (stored.length > 0 || !current) return stored;
+	// Delta-stored step: rebuild from the nearest snapshot plus the writes since,
+	// serialized back to the stored shape the helpers below read.
+	return replayPathMessages(data, current).map((message) => message.toJSON());
 }
 
 /**
@@ -544,7 +679,7 @@ function extractChatContent(raw: string): string {
 				answer = "";
 			};
 
-			for (const msg of selectActiveMessages(checkpoints)) {
+			for (const msg of selectActiveMessages(data)) {
 				// An unrecognised shape has no class to check; indexing it risks
 				// re-admitting tool output, so skip it.
 				const messageClass = getMessageClass(msg);
@@ -662,22 +797,25 @@ function extractMessageContent(msg: unknown): string {
  */
 const RE_EXCALIDRAW_DATA_START = /^#+ (?:Excalidraw Data|Text Elements|Drawing)\s*$/m;
 
+/** A leading frontmatter block. */
+const RE_LEADING_FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+
 /**
- * Extract the user-authored "back of the note" from an `.excalidraw.md` file.
- * Strips the frontmatter-tagged Excalidraw sections and the huge JSON drawing.
+ * The "==⚠ Switch to EXCALIDRAW VIEW … ⚠==" warning Excalidraw writes into every
+ * drawing for readers who open it as markdown — the same boilerplate in each file.
  */
-function extractExcalidrawContent(raw: string): string {
+const RE_EXCALIDRAW_BANNER = /^==⚠.*$/gm;
+
+/**
+ * Extract the frontmatter and the user-authored "back of the note" from an
+ * `.excalidraw.md` file, stripping the banner and everything from the drawing
+ * data on. The frontmatter stays for lexical search, which reads `aliases` from
+ * it; {@link hasNoEmbeddableText} looks past it. Exported for tests.
+ */
+export function extractExcalidrawContent(raw: string): string {
 	const match = RE_EXCALIDRAW_DATA_START.exec(raw);
-	if (!match) {
-		// No Excalidraw markers found — treat the whole file as content
-		return raw;
-	}
-
-	// Everything before the first Excalidraw section header
-	let content = raw.substring(0, match.index);
-
+	// Without the data section it is not a drawing in the format we know; keep it all.
+	const content = (match ? raw.substring(0, match.index) : raw).replace(RE_EXCALIDRAW_BANNER, "");
 	// Strip Obsidian comment markers that Excalidraw uses as section fences
-	content = content.replace(/%%\s*$/g, "").trim();
-
-	return content;
+	return content.replace(/%%\s*$/g, "").trim();
 }

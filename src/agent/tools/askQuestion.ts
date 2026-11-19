@@ -1,85 +1,63 @@
 import { tool } from "@langchain/core/tools";
-import type { RunnableConfig } from "@langchain/core/runnables";
 import { z } from "zod";
-import { DEFAULT_TOOLS_CONFIG } from "./builtInToolDefaults";
+import { MAX_OPTIONS, MAX_QUESTIONS } from "../../utils/askQuestion";
+import { PAUSES_FOR_USER } from "../toolInterrupts";
+import { BUILT_IN_TOOL_DEFAULTS } from "./builtInToolDefaults";
 import { resolveToolAgent } from "./toolAgentContext";
-import { getPendingQuestionStore, type QuestionItem } from "../../stores/pendingQuestionStore.svelte";
-import { genUUIDv7 } from "../../utils/uuid7Validator";
-import { Logger } from "../../utils/logging";
 
-const questionItemSchema = z.object({
-	id: z
-		.string()
-		.optional()
-		.describe("Optional unique identifier for this question (e.g. 'choice_format' or 'framework')"),
-	question: z.string().describe("The question text to present to the user"),
-	options: z.array(z.string()).min(2).describe("Selectable options for the user to choose from"),
-	is_multi_select: z
-		.boolean()
-		.optional()
-		.describe("Allow user to select multiple options. Default is false (single choice)."),
-	allow_custom: z.boolean().optional().describe("Allow user to type in a custom write-in response. Default is true."),
+const askQuestionSchema = z.object({
+	questions: z
+		.array(
+			z.object({
+				question: z.string().describe("The full question, ending in a question mark."),
+				header: z
+					.string()
+					.optional()
+					.describe('One to three words naming what the question is about, e.g. "Folder" or "Date format".'),
+				options: z
+					.array(
+						z.object({
+							label: z.string().describe("The choice, in a few words."),
+							description: z
+								.string()
+								.optional()
+								.describe("One short line on what picking this choice means."),
+						}),
+					)
+					.min(2)
+					.max(MAX_OPTIONS)
+					.describe(
+						`2 to ${MAX_OPTIONS} distinct choices. Put the one you recommend first. Never add an "Other" choice: the user can always type their own answer.`,
+					),
+				multiSelect: z
+					.boolean()
+					.optional()
+					.describe("true when several choices can apply at once. Default false: the user picks one."),
+			}),
+		)
+		.min(1)
+		.max(MAX_QUESTIONS)
+		.describe(`1 to ${MAX_QUESTIONS} questions, shown to the user together.`),
 });
 
-export const askQuestionSchema = z.object({
-	questions: z.array(questionItemSchema).min(1).describe("List of multiple-choice questions to ask the user"),
-});
-
-export type AskQuestionInput = z.infer<typeof askQuestionSchema>;
-
-function getAskQuestionToolConfig(agentId: string) {
-	const defaultConfig = DEFAULT_TOOLS_CONFIG.ask_question;
-	if (!agentId) return defaultConfig;
-	const agent = resolveToolAgent(agentId);
-	return agent?.toolsConfig?.ask_question ?? defaultConfig;
-}
-
-function resolveThreadIdFromConfig(config: RunnableConfig | undefined): string {
-	const threadId = config?.configurable?.thread_id;
-	if (typeof threadId === "string" && threadId.length > 0) {
-		return threadId;
-	}
-	return "default_thread";
-}
-
+/**
+ * Lets the agent stop mid-turn and ask the user. The tool body never runs in a chat: the
+ * human-in-the-loop middleware (see `toolInterrupts.ts`) pauses every call to a tool
+ * marked {@link PAUSES_FOR_USER} before it executes, and the user's answer is written as
+ * the tool result. The body only answers for a run with no one to ask.
+ */
 export function createAskQuestionTool(agentId = "") {
-	const toolConfig = getAskQuestionToolConfig(agentId);
+	const toolConfig = resolveToolAgent(agentId).toolsConfig.ask_question;
+	const fallback = BUILT_IN_TOOL_DEFAULTS.ask_question.config;
 
 	return tool(
-		async ({ questions }: AskQuestionInput, config: RunnableConfig & { runId?: string }) => {
-			const threadId = resolveThreadIdFromConfig(config);
-			const toolCallId = (config as { toolCallId?: string })?.toolCallId ?? config?.runId ?? genUUIDv7();
-
-			Logger.log("[ask_question] Prompting user with questions:", {
-				threadId,
-				toolCallId,
-				count: questions.length,
-			});
-
-			const formattedQuestions: QuestionItem[] = questions.map((q, index) => ({
-				id: q.id?.trim() || `q_${index + 1}`,
-				question: q.question,
-				options: q.options,
-				isMultiSelect: q.is_multi_select ?? false,
-				allowCustom: q.allow_custom ?? true,
-			}));
-
-			const store = getPendingQuestionStore();
-			const answers = await store.ask(threadId, toolCallId, formattedQuestions, config?.signal);
-
-			return JSON.stringify(
-				{
-					status: "answered",
-					answers,
-				},
-				null,
-				2,
-			);
-		},
+		async (): Promise<string> =>
+			"No user is available to answer in this run. Continue with your best judgement and state the assumption you made.",
 		{
-			name: toolConfig?.name ?? DEFAULT_TOOLS_CONFIG.ask_question.name,
-			description: toolConfig?.description ?? DEFAULT_TOOLS_CONFIG.ask_question.description,
+			name: toolConfig?.name ?? fallback.name,
+			description: toolConfig?.description ?? fallback.description,
 			schema: askQuestionSchema,
+			metadata: { [PAUSES_FOR_USER]: true },
 		},
 	);
 }

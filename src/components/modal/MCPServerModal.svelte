@@ -505,7 +505,7 @@ async function probeConnection(key: string, target: string, headerText: string):
   {/if}
 
   <!-- One card, one idiom: every field is a native settings row. Wide controls
-       (URL, textareas) opt into `mcp-row--stacked`, which drops the control onto
+       (URL, textareas) opt into `s2b-mcp-row--stacked`, which drops the control onto
        its own full-width line under the label instead of squeezing it into the
        right-hand column — the reason the old markup reached for ModalField,
        whose larger label weight made those fields read as headings. -->
@@ -524,7 +524,7 @@ async function probeConnection(key: string, target: string, headerText: string):
            ⌘V into any field already does it, so a button would occupy permanent
            space to duplicate a shortcut people reach for by reflex. -->
       <SettingContainer
-        class="mcp-row--stacked"
+        class="s2b-mcp-row--stacked"
         name="Server URL"
         desc="The URL of the MCP server — or paste the server's JSON config to fill this form"
       >
@@ -541,13 +541,13 @@ async function probeConnection(key: string, target: string, headerText: string):
       </SettingContainer>
 
       <SettingContainer
-        class="mcp-row--stacked"
+        class="s2b-mcp-row--stacked"
         name="Headers"
         desc="Optional — one per line, Header-Name: value"
       >
         <TextArea
           id="mcp-server-headers"
-          class="mcp-textarea"
+          class="s2b-mcp-textarea"
           bind:value={headers}
           onblur={(v) => (probeHeaders = v)}
           placeholder={"Authorization: Bearer token\nX-Custom-Header: value"}
@@ -678,13 +678,13 @@ async function probeConnection(key: string, target: string, headerText: string):
      the control take the full width on its own line beneath it. Obsidian already
      does exactly this on phones; this opts specific desktop rows into the same
      shape so a URL or textarea isn't crushed into the right-hand column. */
-  :global(.mcp-row--stacked) {
+  :global(.s2b-mcp-row--stacked) {
     display: block;
   }
 
   /* Fully global: `.setting-item-control` belongs to SettingContainer's scope,
      so a scoped descendant selector here would never match it. */
-  :global(.mcp-row--stacked .setting-item-control) {
+  :global(.s2b-mcp-row--stacked .setting-item-control) {
     width: 100%;
     justify-content: flex-start;
     margin-top: 8px;
@@ -692,11 +692,11 @@ async function probeConnection(key: string, target: string, headerText: string):
   }
 
   /* Inputs default to their intrinsic width, which is what truncated the URL. */
-  :global(.mcp-row--stacked .setting-item-control input[type="text"]) {
+  :global(.s2b-mcp-row--stacked .setting-item-control input[type="text"]) {
     width: 100%;
   }
 
-  :global(.mcp-textarea) {
+  :global(.s2b-mcp-textarea) {
     width: 100%;
     min-height: 80px;
     padding: 8px 12px;
@@ -709,7 +709,7 @@ async function probeConnection(key: string, target: string, headerText: string):
     resize: vertical;
   }
 
-  :global(.mcp-textarea):focus {
+  :global(.s2b-mcp-textarea):focus {
     outline: none;
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 1px var(--interactive-accent);

@@ -1,5 +1,5 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { Checkpoint, CheckpointMetadata, PendingWrite } from "@langchain/langgraph-checkpoint";
+import type { Checkpoint, CheckpointMetadata } from "@langchain/langgraph-checkpoint";
 
 /**
  * On-disk codec for `.chat` thread files.
@@ -40,8 +40,14 @@ import type { Checkpoint, CheckpointMetadata, PendingWrite } from "@langchain/la
  * outside the table always means "table entry n". A change that can't keep
  * those invariants must use *new* key names (e.g. a differently named marker
  * or table) so v2 decoding degrades to partial display instead of misreading.
+ *
+ * v3: writes are full {@link StoredWrite} records (task id and path kept) so
+ * the `messages` channel can be stored as per-step deltas (LangGraph
+ * `DeltaChannel`). Checkpoints between snapshots then carry no `messages` at
+ * all; a v2 reader shows those as empty, which is the partial display the
+ * contract allows.
  */
-export const THREAD_DATA_VERSION = 2;
+export const THREAD_DATA_VERSION = 3;
 
 /**
  * First version with content-addressed message dedup. Files at or above this
@@ -50,6 +56,19 @@ export const THREAD_DATA_VERSION = 2;
  * compare against this constant, not {@link THREAD_DATA_VERSION}.
  */
 export const THREAD_DATA_DEDUP_VERSION = 2;
+
+/**
+ * One pending write as stored in a thread file (v3+):
+ * `[taskId, channel, value, taskPath, idx]`.
+ *
+ * Everything LangGraph needs to replay a `DeltaChannel` is kept: the task id
+ * and path plus the write's index form the `writesSortKey` that orders a
+ * superstep's writes, and the channel picks which writes feed which channel.
+ * v2 and older files stored only `[channel, value]`; {@link inflateThreadData}
+ * upgrades those with an empty task id and path, which sorts them first, the
+ * same place LangGraph puts writes that carry no path.
+ */
+export type StoredWrite = [taskId: string, channel: string, value: unknown, taskPath: string, idx: number];
 
 export interface CheckpointEntry {
 	checkpoint: Checkpoint;
@@ -69,7 +88,8 @@ export interface ThreadData {
 
 	// Checkpoint data
 	checkpoints: Record<string, CheckpointEntry>;
-	writes: Record<string, PendingWrite[]>; // checkpoint_id -> writes
+	/** checkpoint_id -> the writes of the tasks that ran from that checkpoint. */
+	writes: Record<string, StoredWrite[]>;
 
 	/** v2+: deduplicated message objects referenced via `{"$msg": n}` markers. Present only on disk. */
 	messageTable?: unknown[];
@@ -251,6 +271,7 @@ export function sniffThreadDataVersion(jsonPrefix: string): number {
  * misread.
  */
 export function inflateThreadData(data: ThreadData): ThreadData {
+	upgradeLegacyWrites(data);
 	if ((data.version ?? 0) < THREAD_DATA_DEDUP_VERSION) return data;
 
 	const table = Array.isArray(data.messageTable) ? data.messageTable : [];
@@ -267,6 +288,23 @@ export function inflateThreadData(data: ThreadData): ThreadData {
 
 	data.messageTable = undefined;
 	return data;
+}
+
+/**
+ * Bring pre-v3 writes (`[channel, value]`) up to the v3 {@link StoredWrite}
+ * record, in place. The missing task path is `""` and the index is the write's position,
+ * so a legacy batch keeps its stored order. v3 records pass through untouched.
+ */
+function upgradeLegacyWrites(data: ThreadData): void {
+	if (!isRecord(data.writes)) return;
+	for (const checkpointWrites of Object.values(data.writes)) {
+		if (!Array.isArray(checkpointWrites)) continue;
+		for (let i = 0; i < checkpointWrites.length; i++) {
+			const write = checkpointWrites[i] as unknown[];
+			if (!Array.isArray(write) || write.length !== 2) continue;
+			checkpointWrites[i] = ["", write[0] as string, write[1], "", i];
+		}
+	}
 }
 
 function getCheckpointMessages(checkpoint: unknown): unknown[] | undefined {

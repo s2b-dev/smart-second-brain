@@ -1,4 +1,15 @@
-import { type EventRef, MarkdownView, Menu, Notice, Plugin, TFile, WorkspaceLeaf, debounce } from "obsidian";
+import {
+	type EventRef,
+	MarkdownView,
+	Menu,
+	Notice,
+	Plugin,
+	TFile,
+	WorkspaceLeaf,
+	apiVersion,
+	debounce,
+	requestUrl,
+} from "obsidian";
 import { mount, unmount } from "svelte";
 import "./lib/i18n";
 import "./lib/langgraphContext";
@@ -8,6 +19,8 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { planUpdateAnnouncement } from "./utils/releaseNotes";
+import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
 import { persistStartupRecord, recordStartupEnvironment } from "./utils/startupTimingsStore";
 import "./styles.css";
@@ -25,7 +38,7 @@ import { promptText } from "./components/modal/PromptModal";
 import { getQueryClient } from "./lib/query";
 import { SkillsService } from "./skills";
 import { createSessionRegistry, getSessionRegistry, type SessionRegistry } from "./stores/chatStore.svelte";
-import { type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
+import { type ExternalSettingsChange, type PluginDataStore, createData, getData } from "./stores/dataStore.svelte";
 import { PendingChangesStore, initPendingChangesStore } from "./stores/pendingChangesStore.svelte";
 import { setPlugin } from "./stores/state.svelte";
 import { onCodexSessionChange } from "./stores/providerRuntime.svelte";
@@ -44,6 +57,12 @@ import RunningIndicator from "./components/chat/RunningIndicator.svelte";
 // DISABLED FOR INITIAL RELEASE — Note Context view; see the registerView block in onload().
 // import { NoteContextView, VIEW_TYPE_NOTE_CONTEXT } from "./views/note-context/NoteContextView";
 import { OnboardingView, VIEW_TYPE_ONBOARDING } from "./views/onboarding/OnboardingView";
+import {
+	BUNDLED_RELEASE_NOTES,
+	ReleaseNotesView,
+	type ReleaseNotesViewState,
+	VIEW_TYPE_RELEASE_NOTES,
+} from "./views/releaseNotes/ReleaseNotesView";
 import { SmartGraphView, VIEW_TYPE_SMART_GRAPH } from "./views/smart-graph/SmartGraphView";
 import SettingsTab from "./views/settings/Settings";
 import { VectorStoreService, waitForVectorStore } from "./vectorstore";
@@ -77,6 +96,8 @@ export default class SecondBrainPlugin extends Plugin {
 	/** `performance.now()` when `onload` finished; -1 until then. Used to attribute the
 	 *  Obsidian pre-layout gap (onload:end → onLayoutReady). */
 	private onloadEndAt = -1;
+	/** Set in onunload, so async work that outlives the plugin (the update check) stays quiet. */
+	private unloaded = false;
 	/** Mounted status-bar running-agent indicator (unmounted on plugin unload). */
 	private runningIndicator: ReturnType<typeof mount> | null = null;
 
@@ -486,6 +507,7 @@ export default class SecondBrainPlugin extends Plugin {
 		// });
 		// this.registerView(VIEW_TYPE_NOTE_CONTEXT, (leaf) => new NoteContextView(leaf, this));
 		this.registerView(VIEW_TYPE_ONBOARDING, (leaf) => new OnboardingView(leaf, this));
+		this.registerView(VIEW_TYPE_RELEASE_NOTES, (leaf) => new ReleaseNotesView(leaf, this));
 		// `.widget` files: a standalone widget as its own leaf, plus `![[x.widget]]` embeds and
 		// hover previews (see views/widget/). Torn down in onunload with the chat's.
 		this.registerView(VIEW_TYPE_WIDGET, (leaf) => new WidgetView(leaf, this));
@@ -564,6 +586,13 @@ export default class SecondBrainPlugin extends Plugin {
 			name: "Show welcome",
 			icon: "zap",
 			callback: () => this.activateOnboardingView(),
+		});
+
+		this.addCommand({
+			id: "show-release-notes",
+			name: "Show release notes",
+			icon: "scroll-text",
+			callback: () => void this.showReleaseNotes(),
 		});
 
 		this.addCommand({
@@ -671,6 +700,15 @@ export default class SecondBrainPlugin extends Plugin {
 			if (!this.pluginData.onboardingComplete && this.pluginData.getConfiguredProviders().length === 0) {
 				void this.activateOnboardingView();
 			}
+
+			this.announceUpdate();
+
+			// Update check: a while after startup so it never competes with init, then
+			// hourly re-evaluation for sessions left open for days. Each run only
+			// fetches once the daily interval has passed.
+			const startUpdateCheck = window.setTimeout(() => void this.checkForUpdate(), 30_000);
+			this.register(() => window.clearTimeout(startUpdateCheck));
+			this.registerInterval(window.setInterval(() => void this.checkForUpdate(), 60 * 60 * 1000));
 
 			// Agents whose customized prompt/guidance couldn't be auto-updated after a
 			// default changed are surfaced in the new-chat recommendations view
@@ -878,6 +916,7 @@ export default class SecondBrainPlugin extends Plugin {
 	}
 
 	onunload() {
+		this.unloaded = true;
 		Log.info("Unloading plugin");
 		// The model store's module state survives a disable/enable cycle. Without this
 		// reset, its QueryObservers keep fetching with the unloaded plugin's credentials
@@ -909,6 +948,46 @@ export default class SecondBrainPlugin extends Plugin {
 		).viewRegistry?.unregisterExtensions?.(["chat", WIDGET_FILE_EXTENSION]);
 		unregisterChatEmbed(this);
 		unregisterWidgetEmbed(this);
+	}
+
+	/** Serializes external-change reloads; Sync can deliver several in quick succession. */
+	private externalSettingsReload: Promise<void> = Promise.resolve();
+
+	/**
+	 * Obsidian calls this when `data.json` changed on disk from outside the plugin (Obsidian
+	 * Sync from another device, a hand edit). Without it the change is ignored and then
+	 * overwritten by the stale in-memory copy on the next save of any setting (#542).
+	 */
+	async onExternalSettingsChange(): Promise<void> {
+		const run = this.externalSettingsReload.then(() => this.reloadExternalSettings());
+		this.externalSettingsReload = run.catch(() => {});
+		await run;
+	}
+
+	private async reloadExternalSettings(): Promise<void> {
+		if (this.unloaded || !this.pluginData) return;
+		let change: ExternalSettingsChange | null;
+		try {
+			change = await this.pluginData.reloadFromDisk();
+		} catch (error) {
+			Log.error("Failed to reload settings changed on disk:", error);
+			return;
+		}
+		if (!change || this.unloaded) return;
+		Log.info("Reloaded settings changed on disk");
+
+		for (const providerId of change.changedProviderIds) {
+			invalidateAuthState(providerId);
+			invalidateProviderState(providerId);
+		}
+		if (change.agentFolderChanged) {
+			await this.reinitAgentFolder();
+		} else if (change.agentsChanged) {
+			await this.promptFilesService?.refresh(this.pluginData.agents);
+		}
+		// Runnables are cached per config signature, so most edits would rebuild anyway; drop
+		// them all so nothing built from the replaced settings survives.
+		this.agentManager?.invalidateSystemPromptCaches();
 	}
 
 	async createNewChat() {
@@ -990,6 +1069,113 @@ export default class SecondBrainPlugin extends Plugin {
 	//
 	// 	workspace.revealLeaf(leaf);
 	// }
+
+	/**
+	 * Fetch the plugin's manifest from GitHub (at most daily, unless disabled in
+	 * settings) and show a notice once per newer version Obsidian would install.
+	 * Failures are silent: offline is normal, and the next run retries.
+	 *
+	 * Steps aside entirely while Obsidian's own "Automatically check for plugin
+	 * updates" (Community plugins, off by default) is on: that already announces
+	 * updates, and a second notice would just be noise.
+	 */
+	private async checkForUpdate() {
+		const data = this.pluginData;
+		await runUpdateCheck({
+			isEnabled: () => data.checkForUpdates,
+			obsidianChecksUpdates: () => this.obsidianChecksPluginUpdates(),
+			isActive: () => !this.unloaded,
+			now: () => Date.now(),
+			currentVersion: this.manifest.version,
+			appVersion: apiVersion,
+			getLastCheckAt: () => data.lastUpdateCheckAt,
+			setLastCheckAt: (at) => {
+				data.lastUpdateCheckAt = at;
+			},
+			getLastNotified: () => data.lastNotifiedUpdateVersion,
+			setLastNotified: (version) => {
+				data.lastNotifiedUpdateVersion = version;
+			},
+			fetchManifest: async () => {
+				const response = await requestUrl({ url: UPDATE_MANIFEST_URL, throw: false });
+				return response.status === 200 ? response.json : null;
+			},
+			notify: (version) => {
+				const message = createFragment((frag) => {
+					frag.appendText(`Smart Second Brain ${version} is available. `);
+					const link = frag.createEl("a", { text: "Update", href: "#" });
+					link.addEventListener("click", (event) => {
+						event.preventDefault();
+						this.openCommunityPluginSettings();
+					});
+				});
+				new Notice(message, 15_000);
+			},
+		});
+	}
+
+	/** Obsidian's own periodic plugin-update check (internal API; false if it ever moves). */
+	private obsidianChecksPluginUpdates(): boolean {
+		const plugins = (this.app as typeof this.app & { plugins?: { autoCheckForUpdates?: unknown } }).plugins;
+		return plugins?.autoCheckForUpdates === true;
+	}
+
+	/**
+	 * Settings → Community plugins, where "Check for updates" and the per-plugin
+	 * Update button live. app.setting is undocumented internal API, so every hop is
+	 * optional; if its shape changes, fall back to the `obsidian://show-plugin` URI.
+	 */
+	private openCommunityPluginSettings() {
+		const setting = (
+			this.app as typeof this.app & { setting?: { open?: () => void; openTabById?: (id: string) => unknown } }
+		).setting;
+		try {
+			if (setting?.open && setting.openTabById) {
+				setting.open();
+				setting.openTabById("community-plugins");
+				return;
+			}
+		} catch (error) {
+			Log.debug("[UpdateCheck] Could not open Community plugins settings:", error);
+		}
+		window.open(COMMUNITY_PLUGIN_URL);
+	}
+
+	/**
+	 * Open (or focus) the "What's new" tab with the `expanded` newest releases open:
+	 * just the latest from the command and settings, every announced one after an update.
+	 */
+	async showReleaseNotes(expanded = 1) {
+		const { workspace } = this.app;
+		const state: ReleaseNotesViewState = { expanded };
+		const leaf = workspace.getLeavesOfType(VIEW_TYPE_RELEASE_NOTES)[0] ?? workspace.getLeaf("tab");
+		await leaf.setViewState({ type: VIEW_TYPE_RELEASE_NOTES, active: true, state });
+		await workspace.revealLeaf(leaf);
+	}
+
+	/**
+	 * After an update, offer the release notes for every version since the one last
+	 * seen. A notice rather than a modal, so a launch is never blocked by it.
+	 */
+	private announceUpdate() {
+		const current = this.manifest.version;
+		const { sections, record } = planUpdateAnnouncement(
+			this.pluginData.lastSeenVersion,
+			current,
+			BUNDLED_RELEASE_NOTES,
+		);
+		if (record !== null) this.pluginData.lastSeenVersion = record;
+		if (sections.length === 0) return;
+		const message = createFragment((frag) => {
+			frag.appendText(`Smart Second Brain updated to ${current}. `);
+			const link = frag.createEl("a", { text: "See what's new", href: "#" });
+			link.addEventListener("click", (event) => {
+				event.preventDefault();
+				void this.showReleaseNotes(sections.length);
+			});
+		});
+		new Notice(message, 15_000);
+	}
 
 	async activateOnboardingView() {
 		// Enabling the plugin from Settings → Community plugins fires onLayoutReady

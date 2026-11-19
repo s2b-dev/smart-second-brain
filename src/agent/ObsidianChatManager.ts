@@ -4,34 +4,41 @@ import {
 	type Checkpoint,
 	type CheckpointListOptions,
 	type CheckpointMetadata,
+	type CheckpointPendingWrite,
 	type CheckpointTuple,
+	type DeltaChannelHistory,
 	type PendingWrite,
+	WRITES_IDX_MAP,
 } from "@langchain/langgraph-checkpoint";
 import { type DataAdapter, TFile, debounce, normalizePath } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import type { CheckpointHistoryItem } from "./Agent";
-import { normalizeMessages } from "./messageNormalization";
+import { INTERRUPT_CHANNEL, parseToolInterrupts } from "./toolInterrupts";
 import type { ThreadSnapshot, ThreadStore } from "./memory/ThreadStore";
 import { Logger } from "../utils/logging";
 import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { gunzipToString, gzipString, toArrayBuffer } from "../utils/gzip";
+import { isDefaultChatTitle } from "../utils/chatTitle";
 import type { ChatAttachment } from "../types/shared";
 import {
 	type CheckpointEntry,
+	type StoredWrite,
 	THREAD_DATA_VERSION,
 	type ThreadData,
 	adoptEqualMessages,
 	deflateThreadData,
 	inflateThreadData,
 } from "./threadDataCodec";
-
-interface GenerationMetadata {
-	agentId?: string;
-	agentName?: string;
-	provider?: string;
-	model?: string;
-}
+import {
+	MESSAGES_CHANNEL,
+	messageListOf,
+	orderedStoredWrites,
+	parentCheckpointIdOf,
+	replayPathMessages,
+	replayThreadMessages,
+	reviveMessagesValue,
+} from "./threadReplay";
 
 export class ObsidianChatManager extends BaseCheckpointSaver {
 	private plugin: SecondBrainPlugin;
@@ -162,12 +169,28 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 	}
 
 	private stripBase64FromWriteValue(value: unknown): void {
-		if (Array.isArray(value)) {
-			this.stripBase64FromMessages(value);
+		const list = messageListOf(value);
+		if (list) {
+			this.stripBase64FromMessages(list);
 		} else if (value && typeof value === "object") {
 			const msgs = (value as Record<string, unknown>).messages;
 			if (Array.isArray(msgs)) this.stripBase64FromMessages(msgs);
 		}
+	}
+
+	/**
+	 * Turn a stored `messages` value back into what LangGraph wrote: a deep copy
+	 * (callers may mutate it), base64 attachments rehydrated from the vault, and
+	 * serialized messages revived as `BaseMessage` instances. Handles every shape
+	 * the channel stores: a full list (legacy checkpoints), a `DeltaSnapshot`, an
+	 * `Overwrite`, a single message, or a per-step write list.
+	 */
+	private async materializeMessagesValue(value: unknown, rehydrate = true): Promise<unknown> {
+		if (value === undefined || value === null) return value;
+		const copy = JSON.parse(JSON.stringify(value)) as unknown;
+		const list = messageListOf(copy);
+		if (list && rehydrate) await this.rehydrateBase64InMessages(list);
+		return reviveMessagesValue(copy);
 	}
 
 	private stripBase64FromMessages(messages: unknown[]): void {
@@ -407,26 +430,34 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 	 * produces — so read-only consumers (e.g. the `.chat` embed preview) can build
 	 * the branch graph without spinning up a live agent/session.
 	 *
-	 * Messages are normalized to `BaseMessage` instances via the shared normalizer.
-	 * Base64 blobs are NOT rehydrated (embeds render text only), keeping this cheap.
+	 * Messages are rebuilt by `threadReplay` (delta-stored checkpoints included) as
+	 * `BaseMessage` instances shared across checkpoints. Base64 blobs are NOT
+	 * rehydrated (history views render attachments from their metadata), keeping
+	 * this cheap.
 	 */
 	async readCheckpointHistory(path: string): Promise<CheckpointHistoryItem[]> {
 		const data = await this.ensureThreadLoaded(normalizePath(path));
 		if (!data) return [];
 
+		// Replay rebuilds delta-stored checkpoints and normalizes each distinct
+		// message once, instead of once per checkpoint that holds it.
+		const replayed = replayThreadMessages(data);
 		const results: CheckpointHistoryItem[] = [];
 		for (const [checkpointId, entry] of Object.entries(data.checkpoints)) {
-			const rawMessages = this.getCheckpointMessages(entry.checkpoint);
-			const messages = normalizeMessages(rawMessages);
+			const messages = replayed.get(checkpointId) ?? [];
 			const step = typeof entry.metadata?.step === "number" ? entry.metadata.step : 0;
 			const parentCheckpointId = entry.parentConfig?.configurable?.checkpoint_id as string | undefined;
 			const ts = (entry.checkpoint as { ts?: unknown })?.ts;
+			const interrupts = (data.writes[checkpointId] ?? [])
+				.filter((write) => write[1] === INTERRUPT_CHANNEL)
+				.flatMap((write) => parseToolInterrupts(write[2]));
 			results.push({
 				checkpointId,
 				messages,
 				step,
 				parentCheckpointId,
 				ts: typeof ts === "string" ? ts : undefined,
+				...(interrupts.length > 0 ? { interrupts } : {}),
 			});
 		}
 		return results;
@@ -466,13 +497,7 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 	async findEmptyNewChatThread(): Promise<string | undefined> {
 		const threads = await this.listThreads();
 		for (const thread of threads) {
-			const basename =
-				thread.threadId
-					.split("/")
-					.pop()
-					?.replace(/\.chat$/, "") ?? "";
-			// Match "New Chat" and any auto-deduped variant like "New Chat (2)".
-			if (!/^New Chat( \(\d+\))?$/.test(basename)) continue;
+			if (!isDefaultChatTitle(thread.threadId)) continue;
 
 			const data = await this.ensureThreadLoaded(thread.threadId);
 			if (data && Object.keys(data.checkpoints).length === 0) {
@@ -649,17 +674,15 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			const entry = threadData.checkpoints[checkpointId];
 			if (!entry) return undefined;
 
-			const pendingWrites = this.collectWritesWithErrors(threadData, checkpointId);
-			const checkpoint = JSON.parse(JSON.stringify(entry.checkpoint));
-			const messages = checkpoint.channel_values?.messages;
-			if (Array.isArray(messages)) await this.rehydrateBase64InMessages(messages);
+			const pendingWrites = await this.collectWritesWithErrors(threadData, checkpointId);
+			const checkpoint = await this.materializeCheckpoint(entry.checkpoint);
 
 			return {
 				config,
 				checkpoint,
 				metadata: entry.metadata,
 				parentConfig: entry.parentConfig,
-				pendingWrites: pendingWrites as unknown as CheckpointTuple["pendingWrites"],
+				pendingWrites,
 			};
 		}
 
@@ -671,10 +694,8 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		if (!latestId) return undefined;
 		const entry = threadData.checkpoints[latestId];
 
-		const pendingWrites = this.collectWritesWithErrors(threadData, latestId);
-		const checkpoint = JSON.parse(JSON.stringify(entry.checkpoint));
-		const messages = checkpoint.channel_values?.messages;
-		if (Array.isArray(messages)) await this.rehydrateBase64InMessages(messages);
+		const pendingWrites = await this.collectWritesWithErrors(threadData, latestId);
+		const checkpoint = await this.materializeCheckpoint(entry.checkpoint);
 
 		return {
 			config: {
@@ -684,20 +705,51 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			checkpoint,
 			metadata: entry.metadata,
 			parentConfig: entry.parentConfig,
-			pendingWrites: pendingWrites as unknown as CheckpointTuple["pendingWrites"],
+			pendingWrites,
 		};
+	}
+
+	/**
+	 * A deep copy of a stored checkpoint with its `messages` channel value
+	 * materialized (see {@link materializeMessagesValue}); other channels are
+	 * plain JSON, as before.
+	 */
+	private async materializeCheckpoint(stored: Checkpoint, rehydrate = true): Promise<Checkpoint> {
+		const checkpoint = JSON.parse(JSON.stringify(stored)) as Checkpoint;
+		const values = checkpoint.channel_values as Record<string, unknown> | undefined;
+		if (values && Object.prototype.hasOwnProperty.call(values, MESSAGES_CHANNEL)) {
+			values[MESSAGES_CHANNEL] = await this.materializeMessagesValue(values[MESSAGES_CHANNEL], rehydrate);
+		}
+		return checkpoint;
+	}
+
+	private orderedWrites(threadData: ThreadData, checkpointId: string): StoredWrite[] {
+		return orderedStoredWrites(threadData, checkpointId);
+	}
+
+	/** A stored write as LangGraph's `[taskId, channel, value]`, `messages` values materialized. */
+	private async toPendingWrite(write: StoredWrite, rehydrate = true): Promise<CheckpointPendingWrite> {
+		const [taskId, channel, value] = write;
+		return [
+			taskId,
+			channel,
+			channel === MESSAGES_CHANNEL ? await this.materializeMessagesValue(value, rehydrate) : value,
+		];
 	}
 
 	/**
 	 * Collects pending writes for a checkpoint, including error writes from child checkpoints.
 	 * This is needed because errors are written to a child checkpoint that may not exist in the checkpoints map.
 	 */
-	private collectWritesWithErrors(threadData: ThreadData, checkpointId: string): PendingWrite[] {
-		const writes: PendingWrite[] = [];
+	private async collectWritesWithErrors(
+		threadData: ThreadData,
+		checkpointId: string,
+	): Promise<CheckpointPendingWrite[]> {
+		const writes: CheckpointPendingWrite[] = [];
 
-		// Add writes from the specific checkpoint
-		if (threadData.writes[checkpointId]) {
-			writes.push(...threadData.writes[checkpointId]);
+		// Add writes from the specific checkpoint, in replay order
+		for (const write of this.orderedWrites(threadData, checkpointId)) {
+			writes.push(await this.toPendingWrite(write));
 		}
 
 		// Collect ALL error writes from the entire thread
@@ -707,11 +759,8 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			// Skip the checkpoint we already added
 			if (writeKey === checkpointId) continue;
 
-			const checkpointWrites = threadData.writes[writeKey];
-			for (const write of checkpointWrites) {
-				if (Array.isArray(write) && (write[0] === "__error__" || write[1] === "__error__")) {
-					writes.push(write);
-				}
+			for (const write of threadData.writes[writeKey]) {
+				if (write[1] === "__error__") writes.push([write[0], write[1], write[2]]);
 			}
 		}
 
@@ -740,17 +789,22 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 
 		for (const key of keysToIterate) {
 			const entry = threadData.checkpoints[key];
+			// Listing is for history views: revive messages but skip the vault reads
+			// that rehydrating attachments would cost on every checkpoint.
+			const pendingWrites: CheckpointPendingWrite[] = [];
+			for (const write of this.orderedWrites(threadData, key)) {
+				pendingWrites.push(await this.toPendingWrite(write, false));
+			}
 
 			yield {
 				config: {
 					...config,
 					configurable: { ...config.configurable, checkpoint_id: key },
 				},
-				checkpoint: entry.checkpoint,
+				checkpoint: await this.materializeCheckpoint(entry.checkpoint, false),
 				metadata: entry.metadata,
 				parentConfig: entry.parentConfig,
-				// Type assertion needed due to LangGraph checkpoint type variance
-				pendingWrites: (threadData.writes[key] || []) as unknown as CheckpointTuple["pendingWrites"],
+				pendingWrites,
 			};
 
 			if (options?.limit && --options.limit <= 0) break;
@@ -759,38 +813,6 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 
 	private isRecord(value: unknown): value is Record<string, unknown> {
 		return typeof value === "object" && value !== null && !Array.isArray(value);
-	}
-
-	private readString(record: Record<string, unknown>, key: string): string | undefined {
-		const value = record[key];
-		return typeof value === "string" && value.length > 0 ? value : undefined;
-	}
-
-	private extractGenerationMetadata(metadata: unknown): GenerationMetadata {
-		if (!this.isRecord(metadata)) return {};
-		return {
-			agentId: this.readString(metadata, "agent_id"),
-			agentName: this.readString(metadata, "agent_name"),
-			provider: this.readString(metadata, "model_provider"),
-			model: this.readString(metadata, "model"),
-		};
-	}
-
-	private getCheckpointMessages(checkpoint: unknown): unknown[] {
-		if (!this.isRecord(checkpoint)) return [];
-		const channelValues = checkpoint.channel_values;
-		if (!this.isRecord(channelValues)) return [];
-		const messages = channelValues.messages;
-		return Array.isArray(messages) ? messages : [];
-	}
-
-	private getParentMessageCount(threadData: ThreadData, config: RunnableConfig): number {
-		const parentCheckpointId = config.configurable?.checkpoint_id;
-		if (typeof parentCheckpointId !== "string" || parentCheckpointId.length === 0) {
-			return 0;
-		}
-		const parentCheckpoint = threadData.checkpoints[parentCheckpointId]?.checkpoint;
-		return this.getCheckpointMessages(parentCheckpoint).length;
 	}
 
 	private isAiSerializedMessage(message: Record<string, unknown>): boolean {
@@ -863,6 +885,22 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		return false;
 	}
 
+	/**
+	 * The last AI message the reader would accept as the answer: non-empty
+	 * content, and no tool calls (which mark a dispatch or a subagent turn
+	 * rather than the final answer). Works on stored (serialized) messages.
+	 */
+	private findAnswerMessage(messages: unknown[]): Record<string, unknown> | undefined {
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const message = messages[i];
+			if (!this.isRecord(message) || !this.isAiSerializedMessage(message)) continue;
+			if (this.hasSerializedToolCalls(message)) continue;
+			if (!this.hasSerializedTextContent(message)) continue;
+			return message;
+		}
+		return undefined;
+	}
+
 	private getOrCreateResponseMetadata(message: Record<string, unknown>): Record<string, unknown> | undefined {
 		if (this.isRecord(message.kwargs)) {
 			const kwargs = message.kwargs;
@@ -884,45 +922,6 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			message.response_metadata = {};
 		}
 		return this.isRecord(message.response_metadata) ? message.response_metadata : undefined;
-	}
-
-	private annotateCheckpointMessagesWithGeneration(
-		checkpoint: unknown,
-		parentMessageCount: number,
-		generation: GenerationMetadata,
-	): void {
-		const messages = this.getCheckpointMessages(checkpoint);
-		if (messages.length === 0) return;
-		const startIndex = Math.max(0, Math.min(parentMessageCount, messages.length));
-		const hasMetadata =
-			Boolean(generation.agentId) ||
-			Boolean(generation.agentName) ||
-			Boolean(generation.provider) ||
-			Boolean(generation.model);
-		if (!hasMetadata) return;
-
-		for (let i = startIndex; i < messages.length; i++) {
-			const message = messages[i];
-			if (!this.isRecord(message) || !this.isAiSerializedMessage(message)) {
-				continue;
-			}
-
-			const responseMetadata = this.getOrCreateResponseMetadata(message);
-			if (!responseMetadata) continue;
-
-			if (generation.agentId) {
-				responseMetadata.agent_id = generation.agentId;
-			}
-			if (generation.agentName) {
-				responseMetadata.agent_name = generation.agentName;
-			}
-			if (!this.readString(responseMetadata, "model_provider") && generation.provider) {
-				responseMetadata.model_provider = generation.provider;
-			}
-			if (!this.readString(responseMetadata, "model") && generation.model) {
-				responseMetadata.model = generation.model;
-			}
-		}
 	}
 
 	/**
@@ -956,26 +955,57 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		const entry = threadData?.checkpoints[checkpointId];
 		if (!entry) return;
 
-		const messages = this.getCheckpointMessages(entry.checkpoint);
-		// Walk backwards for the last AI message the reader would accept as the
-		// answer: non-empty content, and no tool calls (which mark a dispatch or a
-		// subagent turn rather than the final answer).
-		let target: Record<string, unknown> | undefined;
-		for (let i = messages.length - 1; i >= 0; i--) {
-			const message = messages[i];
-			if (!this.isRecord(message) || !this.isAiSerializedMessage(message)) continue;
-			if (this.hasSerializedToolCalls(message)) continue;
-			if (!this.hasSerializedTextContent(message)) continue;
-			target = message;
-			break;
+		// A checkpoint that stores its own full list (every checkpoint before
+		// `messages` became a delta channel) is stamped directly.
+		const ownValues = entry.checkpoint.channel_values as Record<string, unknown> | undefined;
+		const ownList = Array.isArray(ownValues?.[MESSAGES_CHANNEL])
+			? (ownValues[MESSAGES_CHANNEL] as unknown[])
+			: undefined;
+		let changed = false;
+		const stampRaw = (raw: Record<string, unknown>) => {
+			const responseMetadata = this.getOrCreateResponseMetadata(raw);
+			if (!responseMetadata || responseMetadata.thinking_duration_ms === durationMs) return;
+			responseMetadata.thinking_duration_ms = durationMs;
+			changed = true;
+		};
+
+		if (ownList) {
+			const target = this.findAnswerMessage(ownList);
+			if (target) stampRaw(target);
+		} else {
+			// A delta step stores no messages: find the answer in the replayed list,
+			// then stamp every stored copy of it the branch reads from — the
+			// `messages` writes along the path and the snapshot the path starts
+			// from. Later snapshots are taken from state loaded through these
+			// copies, so they carry the stamp too.
+			const replayed = replayPathMessages(threadData, checkpointId);
+			const serialized = replayed.map((message) => message.toJSON() as unknown);
+			const answer = this.findAnswerMessage(serialized);
+			const targetId = answer ? replayed[serialized.indexOf(answer)]?.id : undefined;
+			if (!targetId) return;
+			const stampCopy = (raw: unknown) => {
+				if (this.isRecord(raw) && storedMessageId(raw) === targetId) stampRaw(raw);
+			};
+			const visited = new Set<string>();
+			let cursor: string | undefined = checkpointId;
+			while (cursor && !visited.has(cursor)) {
+				visited.add(cursor);
+				const current: CheckpointEntry | undefined = threadData.checkpoints[cursor];
+				if (!current) break;
+				const values = current.checkpoint.channel_values as Record<string, unknown> | undefined;
+				if (values && values[MESSAGES_CHANNEL] !== undefined) {
+					for (const raw of messageListOf(values[MESSAGES_CHANNEL]) ?? []) stampCopy(raw);
+					break;
+				}
+				const parentId = parentCheckpointIdOf(current);
+				for (const write of parentId ? (threadData.writes[parentId] ?? []) : []) {
+					if (write[1] === MESSAGES_CHANNEL) for (const raw of messageListOf(write[2]) ?? []) stampCopy(raw);
+				}
+				cursor = parentId;
+			}
 		}
-		if (!target) return;
+		if (!changed) return;
 
-		const responseMetadata = this.getOrCreateResponseMetadata(target);
-		if (!responseMetadata) return;
-		if (responseMetadata.thinking_duration_ms === durationMs) return; // no-op if unchanged
-
-		responseMetadata.thinking_duration_ms = durationMs;
 		this.markThreadDirty(threadId);
 		this.saveDebounced(threadId);
 	}
@@ -999,9 +1029,6 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		// Sanitize to plain JSON
 		const plainCheckpoint = JSON.parse(JSON.stringify(checkpoint));
 		const plainMetadata = JSON.parse(JSON.stringify(metadata));
-		const parentMessageCount = this.getParentMessageCount(threadData, config);
-		const generation = this.extractGenerationMetadata(config.metadata);
-		this.annotateCheckpointMessagesWithGeneration(plainCheckpoint, parentMessageCount, generation);
 		this.stripBase64FromChannelValues(plainCheckpoint.channel_values);
 
 		// Share unchanged history with the parent checkpoint so a live session
@@ -1011,10 +1038,16 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			adoptEqualMessages(plainCheckpoint, threadData.checkpoints[parentCheckpointId]?.checkpoint);
 		}
 
+		// A thread's first checkpoint has no parent. Storing the id-less run config
+		// as its parent would make `getTuple(parentConfig)` resolve to the latest
+		// checkpoint, so a walk up the ancestors (LangGraph's own delta replay
+		// included) would loop back down another branch.
 		threadData.checkpoints[checkpointId] = {
 			checkpoint: plainCheckpoint,
 			metadata: plainMetadata,
-			parentConfig: config,
+			...(typeof parentCheckpointId === "string" && parentCheckpointId.length > 0
+				? { parentConfig: config }
+				: {}),
 		};
 
 		threadData.updatedAt = Date.now();
@@ -1046,7 +1079,14 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 		};
 	}
 
-	async putWrites(config: RunnableConfig, writes: PendingWrite[], _taskId: string): Promise<void> {
+	/**
+	 * Store a task's writes on the checkpoint it ran from, keyed like LangGraph's
+	 * own savers: `(taskId, idx)`, where special channels (error, interrupt,
+	 * resume, scheduled) take a fixed negative index and replace an earlier write
+	 * of the same kind, and a regular write is never stored twice. The task path
+	 * is kept for `writesSortKey` ordering.
+	 */
+	async putWrites(config: RunnableConfig, writes: PendingWrite[], taskId: string, taskPath?: string): Promise<void> {
 		const threadId = config.configurable?.thread_id;
 		const checkpointId = config.configurable?.checkpoint_id;
 
@@ -1062,11 +1102,17 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			threadData.writes[checkpointId] = [];
 		}
 
+		const stored = threadData.writes[checkpointId];
 		const plainWrites = JSON.parse(JSON.stringify(writes)) as PendingWrite[];
-		for (const write of plainWrites) {
-			this.stripBase64FromWriteValue(write[1]);
-		}
-		threadData.writes[checkpointId].push(...plainWrites);
+		plainWrites.forEach(([channel, value], position) => {
+			const idx = WRITES_IDX_MAP[channel] ?? position;
+			const existing = stored.findIndex((write) => write[0] === taskId && write[4] === idx);
+			if (existing >= 0 && idx >= 0) return;
+			this.stripBase64FromWriteValue(value);
+			const record: StoredWrite = [taskId, channel, value, taskPath ?? "", idx];
+			if (existing >= 0) stored[existing] = record;
+			else stored.push(record);
+		});
 		threadData.updatedAt = Date.now();
 		this.markThreadDirty(threadId);
 		this.saveDebounced(threadId);
@@ -1076,6 +1122,70 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			if (!snapshot) return;
 			snapshot.updatedAt = threadData.updatedAt;
 		}
+	}
+
+	/**
+	 * Rebuild `DeltaChannel` inputs straight from the loaded thread: walk the
+	 * parent chain of the target checkpoint once, collecting each ancestor's
+	 * writes for the requested channels until a checkpoint that stores the
+	 * channel's value (a `DeltaSnapshot`, or a full list in a pre-delta
+	 * checkpoint) seeds it. Same contract as the base implementation, which
+	 * would deep-copy every ancestor through `getTuple` instead.
+	 */
+	override async getDeltaChannelHistory(options: {
+		config: RunnableConfig;
+		channels: string[];
+	}): Promise<Record<string, DeltaChannelHistory>> {
+		const { config, channels } = options;
+		const result: Record<string, DeltaChannelHistory> = {};
+		if (channels.length === 0) return result;
+		for (const channel of channels) result[channel] = { writes: [] };
+
+		const threadId = config.configurable?.thread_id;
+		const threadData = threadId ? await this.ensureThreadLoaded(threadId) : undefined;
+		if (!threadData) return result;
+
+		const configuredId = config.configurable?.checkpoint_id;
+		const targetId = typeof configuredId === "string" ? configuredId : this.getSortedCheckpointIds(threadData)[0];
+		if (!targetId) return result;
+
+		const collected: Record<string, CheckpointPendingWrite[]> = {};
+		for (const channel of channels) collected[channel] = [];
+		const remaining = new Set(channels);
+		const visited = new Set<string>();
+		let cursor = parentCheckpointIdOf(threadData.checkpoints[targetId]);
+
+		while (cursor && remaining.size > 0 && !visited.has(cursor)) {
+			visited.add(cursor);
+			const entry = threadData.checkpoints[cursor];
+			if (!entry) break;
+
+			const ordered = this.orderedWrites(threadData, cursor);
+			for (let i = ordered.length - 1; i >= 0; i--) {
+				const write = ordered[i];
+				if (remaining.has(write[1])) collected[write[1]].push(await this.toPendingWrite(write));
+			}
+
+			const values = entry.checkpoint.channel_values as Record<string, unknown> | undefined;
+			for (const channel of [...remaining]) {
+				if (
+					!values ||
+					!Object.prototype.hasOwnProperty.call(values, channel) ||
+					values[channel] === undefined
+				) {
+					continue;
+				}
+				result[channel].seed =
+					channel === MESSAGES_CHANNEL
+						? await this.materializeMessagesValue(values[channel])
+						: JSON.parse(JSON.stringify(values[channel]));
+				remaining.delete(channel);
+			}
+			cursor = parentCheckpointIdOf(entry);
+		}
+
+		for (const channel of channels) result[channel].writes = collected[channel].reverse();
+		return result;
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
@@ -1186,4 +1296,10 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			return undefined;
 		}
 	}
+}
+
+/** A stored (serialized) message's id: `kwargs.id` / `data.id` / top-level `id` when it is a string. */
+function storedMessageId(message: Record<string, unknown>): string | undefined {
+	const payload = (message.kwargs ?? message.data ?? message) as Record<string, unknown>;
+	return typeof payload.id === "string" ? payload.id : undefined;
 }

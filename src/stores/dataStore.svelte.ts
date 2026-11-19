@@ -7,7 +7,7 @@ import {
 	rewriteViewFilterForRename,
 } from "../lib/views";
 import { getSecret, listSecrets, removeSecret, setSecret } from "../lib/secretStorage";
-import { isAgentFilePath } from "../utils/fileFiltering";
+import { DEFAULT_CONTENT_INDEXING, installContentIndexingSource, isAgentFilePath } from "../utils/fileFiltering";
 import { sanitizeAgentFileName } from "../utils/agentPaths";
 import { installAgentPathSource } from "../utils/agentPathSource";
 import { DEFAULT_AGENT_ID, createDefaultAgent, createDefaultAgentConfig, normalizeAgents } from "./agentDefaults";
@@ -21,6 +21,8 @@ import type {
 	BuiltInToolId,
 	DefaultEmbedModel,
 	ChatOpenLocation,
+	ContentGroup,
+	ContentIndexingSettings,
 	DiffViewMode,
 	EmbeddingIndexConfig,
 	MCPServerConfig,
@@ -29,7 +31,6 @@ import type {
 	PrivacyMode,
 	PromptFileReader,
 	RecentNoteEntry,
-	SkillUsageEntry,
 	StaleGuidance,
 	ToolConfig,
 } from "../types/plugin";
@@ -225,6 +226,9 @@ export const DEFAULT_SETTINGS: PluginData = {
 	privacyMode: "private-by-default",
 	privacyFilter: createEmptyPrivacyFilter(),
 
+	// Indexing
+	contentIndexing: { ...DEFAULT_CONTENT_INDEXING },
+
 	// UI state
 	isVerbose: false,
 	showToolIODetails: false,
@@ -232,6 +236,10 @@ export const DEFAULT_SETTINGS: PluginData = {
 	lastActiveChatId: null,
 	onboardingComplete: false,
 	onboardingSplashSeen: false,
+	checkForUpdates: true,
+	lastUpdateCheckAt: null,
+	lastNotifiedUpdateVersion: null,
+	lastSeenVersion: null,
 	dismissedRecommendations: [],
 	thinkingProcessExpanded: true,
 	showActiveAgentsInStatusBar: true,
@@ -255,7 +263,6 @@ export const DEFAULT_SETTINGS: PluginData = {
 	searchShowMatchContext: true,
 	searchShowKeyboardHints: true,
 	recentNotes: [],
-	skillUsage: [],
 	embeddingIndexes: [],
 	searchEmbedIndex: null,
 	graphEmbedIndex: null,
@@ -269,6 +276,16 @@ export const DEFAULT_SETTINGS: PluginData = {
 
 	vaultSlug: null,
 };
+
+/** What a {@link PluginDataStore.reloadFromDisk} changed, for refreshing state kept outside the store. */
+export interface ExternalSettingsChange {
+	/** Providers added, removed, or with edited config/meta. The registry is already resynced. */
+	changedProviderIds: string[];
+	/** Any agent added, removed, or edited (their AGENT.md cache may need refreshing). */
+	agentsChanged: boolean;
+	/** The agent context root moved; the caller must re-seed and re-discover under it. */
+	agentFolderChanged: boolean;
+}
 
 export class PluginDataStore {
 	#data: PluginData;
@@ -304,11 +321,24 @@ export class PluginDataStore {
 		this.#staleSkills = [...skillNames];
 	}
 
-	constructor(plugin: SecondBrainPlugin, initialData: PluginData) {
+	/**
+	 * `data.json` as this store last saw it on disk — the raw file at load, then each
+	 * snapshot we successfully wrote. `reloadFromDisk` compares the file against it, so
+	 * Obsidian echoing our own write back as an "external" change is a no-op.
+	 */
+	#lastDiskContent: string | null;
+	/** Saves started but not yet settled; a reload waits for them before reading. */
+	readonly #pendingSaves = new Set<Promise<void>>();
+	/** Bumped on every save start; a reload that sees it move knows the file changed under it. */
+	#saveGeneration = 0;
+
+	constructor(plugin: SecondBrainPlugin, initialData: PluginData, diskContent: string | null = null) {
+		this.#lastDiskContent = diskContent;
 		installAgentPathSource({
 			agentFolder: () => this.agentFolder,
 			agentName: (agentId) => this.agents[agentId]?.name,
 		});
+		installContentIndexingSource(() => this.#data.contentIndexing);
 		this._plugin = plugin;
 		this.#data = $state(initialData);
 
@@ -364,7 +394,99 @@ export class PluginDataStore {
 	/** Persist and propagate failure, for callers that must observe a failed write. */
 	private async saveSettingsOrThrow(): Promise<void> {
 		const snap = $state.snapshot(this.#data);
-		await this._plugin.saveData(snap);
+		const content = JSON.stringify(snap);
+		this.#saveGeneration++;
+		const write = this._plugin.saveData(snap).then(() => {
+			this.#lastDiskContent = content;
+		});
+		const tracked = write.finally(() => this.#pendingSaves.delete(tracked));
+		// Keep the tracked promise from surfacing as an unhandled rejection; the caller
+		// awaits `write` and handles (or propagates) the failure itself.
+		tracked.catch(() => {});
+		this.#pendingSaves.add(tracked);
+		await write;
+	}
+
+	/**
+	 * Re-read `data.json` after it changed on disk (Obsidian Sync, a hand edit) and apply it
+	 * in place, so the change is picked up instead of being overwritten by the stale
+	 * in-memory copy on the next save. Runs the same defaults + migrations + normalization
+	 * as startup.
+	 *
+	 * The store object is kept (components and services hold references to it); only its
+	 * reactive data is swapped, so every getter-driven view re-renders with the new values.
+	 *
+	 * Our own writes are guarded two ways: in-flight saves are awaited before reading, and a
+	 * file whose content equals what we last wrote is skipped as an echo. If a save starts
+	 * while the file is being read, the read is retried — that save has just overwritten
+	 * the file with our in-memory state, which is what the next read will see.
+	 *
+	 * Returns what changed so the caller can refresh state derived outside the store, or
+	 * `null` when nothing was applied.
+	 */
+	async reloadFromDisk(): Promise<ExternalSettingsChange | null> {
+		for (let attempt = 0; attempt < 3; attempt++) {
+			const generation = this.#saveGeneration;
+			await Promise.allSettled([...this.#pendingSaves]);
+			const rawData: Partial<PluginData> | null = await this._plugin.loadData();
+			if (generation !== this.#saveGeneration) continue;
+			// A missing or emptied file is not a settings change worth wiping everything for;
+			// keep what we have (the next save rewrites it).
+			if (!rawData) return null;
+
+			const content = JSON.stringify(rawData);
+			if (content === this.#lastDiskContent) return null;
+
+			const next = await normalizeLoadedData(this._plugin, rawData, this.#data.vaultSlug);
+			if (generation !== this.#saveGeneration) continue;
+
+			const previous = $state.snapshot(this.#data) as PluginData;
+			this.#data = next;
+			this.#lastDiskContent = content;
+			return this.applyExternalChange(previous, next);
+		}
+		Logger.warn("Skipped reloading settings changed on disk: the plugin kept saving while reading them.");
+		return null;
+	}
+
+	/** Refresh store-owned side effects of a reload and report what changed. */
+	private applyExternalChange(previous: PluginData, next: PluginData): ExternalSettingsChange {
+		const changedProviderIds = [
+			...new Set([
+				...Object.keys(previous.providerConfig),
+				...Object.keys(next.providerConfig),
+				...Object.keys(previous.providerMeta),
+				...Object.keys(next.providerMeta),
+			]),
+		].filter(
+			(id) =>
+				JSON.stringify(previous.providerConfig[id]) !== JSON.stringify(next.providerConfig[id]) ||
+				JSON.stringify(previous.providerMeta[id]) !== JSON.stringify(next.providerMeta[id]),
+		);
+		if (changedProviderIds.length > 0) syncAllProviders(this);
+
+		const privacyChanged =
+			previous.privacyMode !== next.privacyMode ||
+			JSON.stringify(previous.privacyFilter) !== JSON.stringify(next.privacyFilter) ||
+			changedProviderIds.some(
+				(id) =>
+					previous.providerConfig[id]?.trustedForPrivateData !==
+					next.providerConfig[id]?.trustedForPrivateData,
+			);
+		if (privacyChanged) this.notifyPrivacyRulesChanged();
+
+		// Another device switched a content group on or off: the indexes follow.
+		if (JSON.stringify(previous.contentIndexing) !== JSON.stringify(next.contentIndexing)) {
+			this.notifyContentIndexingChanged();
+		}
+
+		if (previous.isVerbose !== next.isVerbose) applyVerboseLogging(next.isVerbose);
+
+		return {
+			changedProviderIds,
+			agentsChanged: JSON.stringify(previous.agents) !== JSON.stringify(next.agents),
+			agentFolderChanged: previous.agentFolder !== next.agentFolder,
+		};
 	}
 
 	/**
@@ -465,6 +587,39 @@ export class PluginDataStore {
 		for (const listener of this.#privacyListeners) listener();
 	}
 
+	// ============================================================================
+	// Content indexing
+	// ============================================================================
+
+	get contentIndexing(): Readonly<ContentIndexingSettings> {
+		return this.#data.contentIndexing;
+	}
+
+	setContentIndexed(group: ContentGroup, enabled: boolean): void {
+		if (this.#data.contentIndexing[group] === enabled) return;
+		this.#data.contentIndexing = { ...this.#data.contentIndexing, [group]: enabled };
+		void this.saveSettings();
+		this.notifyContentIndexingChanged();
+	}
+
+	/**
+	 * Listeners for a change to which file groups have their contents indexed.
+	 * Both indexers subscribe: the embedding indexes re-validate (a group switched
+	 * off leaves as orphans, one switched on is embedded as missing), the search
+	 * index re-reads the affected files.
+	 */
+	readonly #contentIndexingListeners = new Set<() => void>();
+
+	/** Subscribe to content-indexing changes; returns the unsubscribe. */
+	onContentIndexingChange(listener: () => void): () => void {
+		this.#contentIndexingListeners.add(listener);
+		return () => this.#contentIndexingListeners.delete(listener);
+	}
+
+	private notifyContentIndexingChanged(): void {
+		for (const listener of this.#contentIndexingListeners) listener();
+	}
+
 	/**
 	 * Listeners for a provider rename, awaited by `renameProvider` before it
 	 * resolves. Embedding indexes are keyed `provider:model`, and so are their
@@ -486,6 +641,23 @@ export class PluginDataStore {
 			return !listed;
 		}
 		return listed;
+	}
+
+	/**
+	 * A predicate answering {@link isFilePrivate}, with an advanced filter resolved once rather
+	 * than per call. For callers that check every file in the vault (the prompt's vault
+	 * overview), where the per-call form re-resolves the filter for each file.
+	 */
+	privacyPredicate(): (filePath: string) => boolean {
+		const parsed = parsePrivacyMembershipFilter(this.#data.privacyFilter);
+		let listed: (filePath: string) => boolean;
+		if (parsed.isAdvanced) {
+			const paths = resolveViewFilter(this._plugin.app, this.#data.privacyFilter, this.getAllVaultPaths()).paths;
+			listed = (filePath) => paths.has(filePath);
+		} else {
+			listed = (filePath) => matchesPrivacyMembershipDraftPath(this._plugin.app, parsed.draft, filePath);
+		}
+		return this.#data.privacyMode === "private-by-default" ? (filePath) => !listed(filePath) : listed;
 	}
 
 	private isFileListedInPrivacyFilter(filePath: string): boolean {
@@ -1235,6 +1407,38 @@ export class PluginDataStore {
 		void this.saveSettings();
 	}
 
+	get checkForUpdates() {
+		return this.#data.checkForUpdates ?? true;
+	}
+	set checkForUpdates(val: boolean) {
+		this.#data.checkForUpdates = val;
+		void this.saveSettings();
+	}
+
+	get lastUpdateCheckAt() {
+		return this.#data.lastUpdateCheckAt ?? null;
+	}
+	set lastUpdateCheckAt(val: number | null) {
+		this.#data.lastUpdateCheckAt = val;
+		void this.saveSettings();
+	}
+
+	get lastNotifiedUpdateVersion() {
+		return this.#data.lastNotifiedUpdateVersion ?? null;
+	}
+	set lastNotifiedUpdateVersion(val: string | null) {
+		this.#data.lastNotifiedUpdateVersion = val;
+		void this.saveSettings();
+	}
+
+	get lastSeenVersion() {
+		return this.#data.lastSeenVersion ?? null;
+	}
+	set lastSeenVersion(val: string | null) {
+		this.#data.lastSeenVersion = val;
+		void this.saveSettings();
+	}
+
 	get dismissedRecommendations() {
 		return this.#data.dismissedRecommendations;
 	}
@@ -1313,62 +1517,6 @@ export class PluginDataStore {
 			(entry) => entry.path !== normalizedPath && now - entry.lastOpenedAt < RECENT_NOTE_WINDOW_MS,
 		);
 		this.#data.recentNotes = [{ path: normalizedPath, lastOpenedAt: now }, ...existing].slice(0, MAX_RECENT_NOTES);
-		void this.saveSettings();
-	}
-
-	// --- Skill usage ---
-
-	/**
-	 * The usage list, healed to an empty list when the field is absent or not a list (a data
-	 * file from before the field existed, or one written while the shape was still changing).
-	 */
-	private usageList(): SkillUsageEntry[] {
-		if (!Array.isArray(this.#data.skillUsage)) this.#data.skillUsage = [];
-		return this.#data.skillUsage;
-	}
-
-	/** Usage counters for a skill, or undefined when it has never been loaded or revised. */
-	getSkillUsage(skillName: string): SkillUsageEntry | undefined {
-		return this.usageList().find((entry) => entry.name === skillName);
-	}
-
-	/** All usage counters. */
-	get skillUsage(): readonly SkillUsageEntry[] {
-		return this.usageList();
-	}
-
-	private bumpSkillUsage(skillName: string, mutate: (entry: SkillUsageEntry) => void): void {
-		const usage = this.usageList();
-		let entry = usage.find((candidate) => candidate.name === skillName);
-		if (!entry) {
-			entry = { name: skillName, loadCount: 0, lastLoadedAt: null, revisionCount: 0, lastRevisedAt: null };
-			usage.push(entry);
-		}
-		mutate(entry);
-		void this.saveSettings();
-	}
-
-	/** `load_skill` returned this skill's body. */
-	recordSkillLoad(skillName: string): void {
-		this.bumpSkillUsage(skillName, (entry) => {
-			entry.loadCount += 1;
-			entry.lastLoadedAt = Date.now();
-		});
-	}
-
-	/** `manage_skills` patched or rewrote this skill. */
-	recordSkillRevision(skillName: string): void {
-		this.bumpSkillUsage(skillName, (entry) => {
-			entry.revisionCount += 1;
-			entry.lastRevisedAt = Date.now();
-		});
-	}
-
-	/** The skill is gone; a later skill of the same name starts from zero. */
-	forgetSkillUsage(skillName: string): void {
-		const usage = this.usageList();
-		if (!usage.some((entry) => entry.name === skillName)) return;
-		this.#data.skillUsage = usage.filter((entry) => entry.name !== skillName);
 		void this.saveSettings();
 	}
 
@@ -1471,6 +1619,7 @@ export class PluginDataStore {
 			documentCount?: number;
 			dimensions?: number;
 			failedNotes?: Record<string, number>;
+			emptyNotes?: Record<string, number>;
 		},
 	): void {
 		const config = this.#data.embeddingIndexes.find((i) => i.id === indexId);
@@ -1497,6 +1646,13 @@ export class PluginDataStore {
 			const next = Object.keys(stats.failedNotes).length > 0 ? stats.failedNotes : undefined;
 			if (next !== undefined || config.failedNotes !== undefined) {
 				config.failedNotes = next;
+				changed = true;
+			}
+		}
+		if (stats.emptyNotes !== undefined) {
+			const next = Object.keys(stats.emptyNotes).length > 0 ? stats.emptyNotes : undefined;
+			if (next !== undefined || config.emptyNotes !== undefined) {
+				config.emptyNotes = next;
 				changed = true;
 			}
 		}
@@ -2237,13 +2393,44 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 	if (_pluginDataStore) return _pluginDataStore;
 
 	const rawData = await plugin.loadData();
+	// Stringify before normalizing: the merge is shallow, so normalization mutates the raw
+	// file's nested objects in place.
+	const diskContent = rawData ? JSON.stringify(rawData) : null;
+	const mergedData = await normalizeLoadedData(plugin, rawData, null);
 
+	// A fresh install has nothing to catch up on: record the running version so the
+	// first update announces only what changed since.
+	if (!rawData) mergedData.lastSeenVersion = plugin.manifest.version;
+
+	_pluginDataStore = new PluginDataStore(plugin, mergedData, diskContent);
+
+	return _pluginDataStore;
+}
+
+/**
+ * Turn a raw `data.json` payload into a usable `PluginData`: defaults for missing keys,
+ * migrations, agent normalization, vault slug. Shared by startup (`createData`) and the
+ * external-change reload (`PluginDataStore.reloadFromDisk`) so a file edited while
+ * Obsidian runs goes through exactly the path it would on the next launch.
+ *
+ * `currentVaultSlug` is the slug already in use (null at startup); a reload always keeps it.
+ */
+async function normalizeLoadedData(
+	plugin: SecondBrainPlugin,
+	rawData: Partial<PluginData> | null | undefined,
+	currentVaultSlug: string | null,
+): Promise<PluginData> {
+	// Clone the defaults: the spread is shallow, so without it the nested default objects
+	// would be shared with (and mutated through) the live store.
 	const mergedData: PluginData = {
-		...DEFAULT_SETTINGS,
+		...structuredClone(DEFAULT_SETTINGS),
 		...rawData,
 	};
 
 	runMigrations(mergedData);
+	// Nested, so the shallow merge above would drop a group added after this data
+	// was saved.
+	mergedData.contentIndexing = { ...DEFAULT_CONTENT_INDEXING, ...mergedData.contentIndexing };
 
 	// If the data was written by a newer plugin, skip normalizeAgents() too — it
 	// would rewrite prompt fields using this plugin's older defaults and those
@@ -2265,14 +2452,17 @@ export async function createData(plugin: SecondBrainPlugin): Promise<PluginDataS
 		normalizeAgents(mergedData);
 	}
 
-	// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
-	if (!mergedData.vaultSlug) {
+	// A reload always keeps the slug in use: the search and vector stores opened their
+	// IndexedDB databases under it, and those databases are local to this device, so a
+	// different slug arriving from another device's data.json must not move them.
+	if (currentVaultSlug) {
+		mergedData.vaultSlug = currentVaultSlug;
+	} else if (!mergedData.vaultSlug) {
+		// Resolve vault slug once on first load; persisted so vault renames don't orphan indexes
 		mergedData.vaultSlug = await resolveVaultSlug(plugin.app.vault.getName());
 	}
 
-	_pluginDataStore = new PluginDataStore(plugin, mergedData);
-
-	return _pluginDataStore;
+	return mergedData;
 }
 
 export function getData(): PluginDataStore {

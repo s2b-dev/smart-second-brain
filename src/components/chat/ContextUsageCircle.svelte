@@ -75,11 +75,10 @@ const usageRows = $derived.by(() => {
 });
 
 // Where automatic compaction kicks in, as a position on the bar. Omitted when the
-// trigger is not inside the bar (unknown limit, or a window so small that the 12k
-// floor exceeds it).
+// limit is unknown.
 const compactionTickPercent = $derived.by(() => {
 	const trigger = getSummarizationTriggerTokens(limit);
-	if (trigger === null || limit === undefined || trigger >= limit) return null;
+	if (trigger === null || limit === undefined) return null;
 	return (trigger / limit) * 100;
 });
 
@@ -112,8 +111,7 @@ const usageLine = $derived.by(() => {
 	return `${formatNumber(breakdown.totalTokens)} of ${formatNumber(limit)} tokens`;
 });
 
-// The real trigger, not a rounded "about 80%": it is max(80% of the window, 12k),
-// so on a small window the number is the only honest thing to show. The footer
+// The trigger as a token count beside its share of the window. The footer
 // carries the short form beside the Summarize button (the note and the button are
 // the same concern: automatic vs manual); the full sentence is its tooltip.
 const compaction = $derived.by(() => {
@@ -124,8 +122,7 @@ const compaction = $derived.by(() => {
 			long: "Automatic summarization needs a model with a known context limit.",
 		};
 	}
-	const percent = Math.round((trigger / limit) * 100);
-	const withPercent = percent <= 100 ? ` (${percent}%)` : "";
+	const withPercent = ` (${Math.round((trigger / limit) * 100)}%)`;
 	return {
 		short: `Auto-compacts at ${formatCompact(trigger)}${withPercent}`,
 		long: `Older messages are summarized automatically at ${formatNumber(trigger)} tokens${withPercent}.`,
@@ -138,20 +135,20 @@ function formatCompact(value: number): string {
 </script>
 
 <PickerPopover
-  triggerStyles="context-usage-trigger"
-  triggerClass="group relative w-9 h-9 flex items-center justify-center rounded-md p-0 appearance-none"
-  contentClass="context-usage-popover"
+  triggerStyles="s2b-context-usage-trigger"
+  triggerClass="s2b-group s2b-relative s2b-w-9 s2b-h-9 s2b-flex s2b-items-center s2b-justify-center s2b-rounded-md s2b-p-0 s2b-appearance-none"
+  contentClass="s2b-context-usage-popover"
   tooltip={tooltipText}
   align="end"
   sideOffset={6}
 >
   {#snippet trigger()}
-    <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100" aria-label="Open context token distribution">
+    <svg class="s2b-w-full s2b-h-full -s2b-rotate-90" viewBox="0 0 100 100" aria-label="Open context token distribution">
       <!-- Track -->
       <circle class="s2b-context-ring-track" fill="none" stroke-width={strokeWidth} cx="50" cy="50" r={radius} />
       <!-- Usage arc -->
       <circle
-        class="s2b-context-ring-arc transition-all duration-300 {arcClass}"
+        class="s2b-context-ring-arc s2b-transition-all s2b-duration-300 {arcClass}"
         fill="none"
         stroke-width={strokeWidth}
         stroke-linecap="round"
@@ -166,7 +163,7 @@ function formatCompact(value: number): string {
          rather than a decoration, and at this size a quiet muted label costs
          nothing visually. Brightens on hover with the rest of the control. -->
     <div
-      class="s2b-context-ring-label absolute font-semibold tabular-nums transition-colors duration-150"
+      class="s2b-context-ring-label s2b-absolute s2b-font-semibold s2b-tabular-nums s2b-transition-colors s2b-duration-150"
       class:s2b-context-ring-label-wide={centerLabel.length > 3}
     >
       {centerLabel}
@@ -217,12 +214,12 @@ function formatCompact(value: number): string {
 </PickerPopover>
 
 <style>
-  :global(.context-usage-trigger),
-  :global(.context-usage-trigger:hover),
-  :global(.context-usage-trigger:active),
-  :global(.context-usage-trigger:focus),
-  :global(.context-usage-trigger:focus-visible),
-  :global(.context-usage-trigger[data-state="open"]) {
+  :global(.s2b-context-usage-trigger),
+  :global(.s2b-context-usage-trigger:hover),
+  :global(.s2b-context-usage-trigger:active),
+  :global(.s2b-context-usage-trigger:focus),
+  :global(.s2b-context-usage-trigger:focus-visible),
+  :global(.s2b-context-usage-trigger[data-state="open"]) {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
@@ -264,12 +261,12 @@ function formatCompact(value: number): string {
     letter-spacing: -0.05em;
   }
 
-  :global(.context-usage-trigger:hover) .s2b-context-ring-label,
-  :global(.context-usage-trigger[data-state="open"]) .s2b-context-ring-label {
+  :global(.s2b-context-usage-trigger:hover) .s2b-context-ring-label,
+  :global(.s2b-context-usage-trigger[data-state="open"]) .s2b-context-ring-label {
     color: var(--text-normal);
   }
 
-  :global(.context-usage-popover) {
+  :global(.s2b-context-usage-popover) {
     min-width: 0;
     width: max-content;
   }

@@ -37,6 +37,9 @@ export default defineConfig({
 
 	// Resolve aliases (match your existing vite config if any)
 	resolve: {
+		// Resolve Svelte to its client build so component tests can `mount()` under jsdom;
+		// without this Vitest picks the server entry, where `mount` throws.
+		conditions: ["browser"],
 		alias: {
 			// Mock obsidian for tests - the module is only available at runtime in Obsidian
 			obsidian: new URL("./test/__mocks__/obsidian.ts", import.meta.url).pathname,

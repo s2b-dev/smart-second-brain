@@ -29,7 +29,7 @@ let {
 }: Props = $props();
 </script>
 
-<div class="picker-option-row" class:is-active={active} class:is-muted={muted}>
+<div class="s2b-picker-option-row" class:is-active={active} class:is-muted={muted}>
   <button type="button" class="picker-option" onclick={onClick}>
     {#if leading}
       <span class="picker-option-leading menu-item-icon">
@@ -59,7 +59,7 @@ let {
   {#if action}
     <button
       type="button"
-      class="picker-option-action clickable-icon"
+      class="s2b-picker-option-action clickable-icon"
       title={actionTitle}
       onclick={onActionClick}
     >
@@ -69,25 +69,25 @@ let {
 </div>
 
 <style>
-  .picker-option-row {
+  .s2b-picker-option-row {
     display: flex;
     align-items: center;
     min-width: 0;
   }
 
-  .picker-option-row.is-active {
+  .s2b-picker-option-row.is-active {
     background: var(--background-modifier-hover);
   }
 
   /* Touch devices keep a sticky :hover on the last-tapped element, which would
      leave rows looking permanently highlighted. Only real pointers get hover. */
   @media (hover: hover) and (pointer: fine) {
-    .picker-option-row:hover {
+    .s2b-picker-option-row:hover {
       background: var(--background-modifier-hover);
     }
   }
 
-  .picker-option-row.is-muted {
+  .s2b-picker-option-row.is-muted {
     color: var(--text-muted);
   }
 
@@ -111,11 +111,11 @@ let {
     outline-offset: 1px;
   }
 
-  .picker-option-row.is-muted .picker-option {
+  .s2b-picker-option-row.is-muted .picker-option {
     color: var(--text-muted);
   }
 
-  .picker-option-row.is-active .picker-option {
+  .s2b-picker-option-row.is-active .picker-option {
     color: var(--text-normal);
   }
 
@@ -149,7 +149,7 @@ let {
     padding-inline-start: 0.1rem;
   }
 
-  .picker-option-action {
+  .s2b-picker-option-action {
     flex-shrink: 0;
     align-self: stretch;
     display: inline-flex;
@@ -167,26 +167,26 @@ let {
       color 0.12s ease;
   }
 
-  .picker-option-row:focus-within .picker-option-action {
+  .s2b-picker-option-row:focus-within .s2b-picker-option-action {
     opacity: 0.92;
   }
 
-  .picker-option-row.is-active .picker-option-action {
+  .s2b-picker-option-row.is-active .s2b-picker-option-action {
     opacity: 0.6;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .picker-option-row:hover .picker-option-action {
+    .s2b-picker-option-row:hover .s2b-picker-option-action {
       opacity: 0.92;
     }
 
-    .picker-option-action:hover {
+    .s2b-picker-option-action:hover {
       background: color-mix(in srgb, var(--background-primary) 55%, transparent);
       color: var(--text-normal);
     }
   }
 
-  .picker-option-action:focus-visible {
+  .s2b-picker-option-action:focus-visible {
     outline: 2px solid var(--background-modifier-border-focus);
     outline-offset: 1px;
   }

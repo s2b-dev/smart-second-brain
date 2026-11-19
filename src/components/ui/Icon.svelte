@@ -25,7 +25,7 @@ const sizeVar = $derived(sizeMap[size as IconSize] ?? size);
 
 <div
   use:iconDirective={name}
-  class="icon flex items-center justify-center {className}"
+  class="icon s2b-flex s2b-items-center s2b-justify-center {className}"
   style:--icon-size={sizeVar}
   style:width={sizeVar}
   style:height={sizeVar}

@@ -187,7 +187,7 @@ async function handleImport() {
 
     {#if error}
       <div class="setting-item">
-        <div class="text-[--text-error] text-sm">{error}</div>
+        <div class="s2b-text-[--text-error] s2b-text-sm">{error}</div>
       </div>
     {/if}
   </div>

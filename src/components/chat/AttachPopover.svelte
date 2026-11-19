@@ -8,9 +8,12 @@ interface Props {
 	onFromComputer: () => void;
 	/** Attach files from the vault (opens the search modal in picker mode). */
 	onFromVault: () => void;
+	/** Take a photo with the device camera. Omitted where there is no camera
+	 * to open (desktop), and the row is hidden with it. */
+	onFromCamera?: () => void;
 }
 
-const { onFromComputer, onFromVault }: Props = $props();
+const { onFromComputer, onFromVault, onFromCamera }: Props = $props();
 
 let isOpen = $state(false);
 let anchor: HTMLButtonElement | undefined = $state();
@@ -26,8 +29,8 @@ function pick(action: () => void) {
   bind:element={anchor}
   tooltip="Add context"
   dataTestId="attach-context-button"
-  triggerStyles="clickable-icon attach-context-button"
-  contentClass="attach-context-popover"
+  triggerStyles="clickable-icon s2b-attach-context-button"
+  contentClass="s2b-attach-context-popover"
   side="top"
   align="start"
   sideOffset={8}
@@ -45,6 +48,17 @@ function pick(action: () => void) {
     {/snippet}
   </PickerOptionRow>
 
+  {#if onFromCamera}
+    <PickerOptionRow onClick={() => pick(onFromCamera)}>
+      {#snippet leading()}
+        <Icon name="camera" size="xs" />
+      {/snippet}
+      {#snippet content()}
+        Take photo
+      {/snippet}
+    </PickerOptionRow>
+  {/if}
+
   <PickerOptionRow onClick={() => pick(onFromVault)}>
     {#snippet leading()}
       <Icon name="vault" size="xs" />
@@ -56,8 +70,8 @@ function pick(action: () => void) {
 </PickerPopover>
 
 <style>
-  /* The two attach options are short; don't inherit the picker's wide min-width. */
-  :global(.attach-context-popover) {
+  /* The attach options are short; don't inherit the picker's wide min-width. */
+  :global(.s2b-attach-context-popover) {
     min-width: 0;
     width: max-content;
   }
@@ -67,7 +81,7 @@ function pick(action: () => void) {
      `.clickable-icon`'s default padding, which is wider than tall — that
      rendered this as an oval next to send's true circle. The tint mixes with
      `--background-primary`, the fill the composer actually has. */
-  :global(.attach-context-button.clickable-icon) {
+  :global(.s2b-attach-context-button.clickable-icon) {
     background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
     color: var(--interactive-accent);
     border-radius: 999px;
@@ -78,17 +92,17 @@ function pick(action: () => void) {
   }
 
   /* Same touch-size bump the send button gets on mobile. */
-  :global(.is-mobile .attach-context-button.clickable-icon) {
+  :global(.is-mobile .s2b-attach-context-button.clickable-icon) {
     width: 2.75rem;
     height: 2.75rem;
   }
 
-  :global(.attach-context-button.clickable-icon:hover) {
+  :global(.s2b-attach-context-button.clickable-icon:hover) {
     background: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-primary));
     color: var(--interactive-accent);
   }
 
-  :global(.attach-context-button.clickable-icon .svg-icon) {
+  :global(.s2b-attach-context-button.clickable-icon .svg-icon) {
     stroke-width: 2.5;
   }
 </style>

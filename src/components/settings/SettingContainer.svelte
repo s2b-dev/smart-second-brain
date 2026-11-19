@@ -31,7 +31,7 @@ const isRowDisabled = $derived(disabled || isDisabled);
 
 <div
   class="setting-item s2b-setting-item {isHeading ? 'setting-item-heading' : ''} {isRowDisabled
-    ? 'opacity-50 pointer-events-none'
+    ? 's2b-opacity-50 s2b-pointer-events-none'
     : ''} {compact ? 'setting-item--compact' : ''} {className}"
 >
   <div class="setting-item-info">

@@ -23,8 +23,42 @@ import { Logger } from "../utils/logging";
  * retry internally (the OpenAI client does several attempts with backoff), so an
  * unreachable host can still take a multiple of this before the caller sees an
  * error. That is the SDK's budget to spend, not ours to shorten here.
+ *
+ * This is the floor; `requestTimeoutMs` adds time for large request bodies.
  */
 const REQUEST_TIMEOUT_MS = 60_000;
+
+/**
+ * Extra time for a large request body, on top of `REQUEST_TIMEOUT_MS`: one
+ * second per `BODY_CHARS_PER_EXTRA_SECOND` characters.
+ *
+ * The timer runs until the response headers arrive, and for a non-streamed
+ * request that is the whole server-side computation, which grows with the
+ * input. The 12 s worst case above came from hosted APIs; a 0.6B embedding
+ * model on a laptop (oMLX) needed more than 60 s for one full ~120k-char
+ * embedding batch, so every large batch timed out against a server that was
+ * merely busy (#544). 1 s per 2,000 chars doubles the budget for that batch
+ * and leaves small requests (where a hang is the likelier explanation) on the
+ * 60 s floor.
+ */
+const BODY_CHARS_PER_EXTRA_SECOND = 2_000;
+
+/** Ceiling on the scaled timeout, so a huge body cannot leave a hung request waiting forever. */
+const MAX_REQUEST_TIMEOUT_MS = 5 * 60_000;
+
+/** Approximate size of a request body: string length, or byte length for binary bodies. */
+function bodySize(body: RequestInit["body"]): number {
+	if (typeof body === "string") return body.length;
+	if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength;
+	if (body instanceof Blob) return body.size;
+	return 0;
+}
+
+/** The timeout for one request: the 60 s floor plus time for the body, capped. */
+export function requestTimeoutMs(body: RequestInit["body"]): number {
+	const scaled = REQUEST_TIMEOUT_MS + Math.floor(bodySize(body) / BODY_CHARS_PER_EXTRA_SECOND) * 1_000;
+	return Math.min(MAX_REQUEST_TIMEOUT_MS, scaled);
+}
 
 /**
  * Reject when `signal` aborts, so a hung request can lose a race against it.
@@ -83,12 +117,11 @@ export function createObsidianFetch(
 		// directly; `requestUrl` cannot be aborted at all, so it is *raced* against
 		// it instead — the request keeps running in the background but stops holding
 		// the caller hostage.
+		const timeoutMs = requestTimeoutMs(init?.body);
 		const timeoutController = new AbortController();
 		const timeoutId = window.setTimeout(() => {
-			timeoutController.abort(
-				new DOMException(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`, "TimeoutError"),
-			);
-		}, REQUEST_TIMEOUT_MS);
+			timeoutController.abort(new DOMException(`Request timed out after ${timeoutMs}ms`, "TimeoutError"));
+		}, timeoutMs);
 		const callerSignal = init?.signal;
 		const onCallerAbort = () => timeoutController.abort();
 		// Check `aborted` before subscribing: a signal that is *already* aborted
@@ -106,7 +139,7 @@ export function createObsidianFetch(
 		};
 
 		try {
-			return await requestWithFallback(input, init, url, settled, originalFetch);
+			return await requestWithFallback(input, init, url, settled, timeoutMs, originalFetch);
 		} finally {
 			cleanup();
 		}
@@ -123,6 +156,7 @@ async function requestWithFallback(
 	init: RequestInit | undefined,
 	url: string,
 	settled: AbortSignal,
+	timeoutMs: number,
 	originalFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 ): Promise<Response> {
 	const toPlainArrayBuffer = (view: ArrayBufferView): ArrayBuffer => {
@@ -268,7 +302,7 @@ async function requestWithFallback(
 		// and a frozen progress notice), which gave no hint that the endpoint was
 		// simply unreachable.
 		if (settled.aborted) {
-			Logger.error(`Obsidian fetch timed out or was aborted after ${REQUEST_TIMEOUT_MS}ms: ${url}`);
+			Logger.error(`Obsidian fetch timed out or was aborted after ${timeoutMs}ms: ${url}`);
 		} else {
 			Logger.error("Obsidian fetch proxy error:", error);
 		}

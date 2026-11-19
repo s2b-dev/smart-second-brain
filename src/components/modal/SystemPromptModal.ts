@@ -3,33 +3,34 @@ import { SvelteModal } from "./SvelteModal";
 import SystemPromptModalComponent from "./SystemPromptModal.svelte";
 
 /**
- * Custom accessors for agent-specific system prompt editing
+ * Accessors for the prompt modal. It has two modes: a read-only preview, and a two-pane diff of
+ * a vault note's body against the version we ship. Editing always happens in the note itself —
+ * the diff only shows what moved and offers to replace the body with the default.
  */
 export interface SystemPromptAccessors {
 	getPrompt: () => string | Promise<string>;
+	/** Writes the body back; the diff only ever calls it with `defaultPrompt` ("Use default"). */
 	setPrompt?: (prompt: string) => void;
-	viewFinalPrompt?: () => void;
 	/**
-	 * Baseline the "Diff with default" pane compares against and that "Reset to default" /
-	 * "Use default" restore to.
+	 * Baseline the diff compares against and that "Use default" restores to.
 	 *
-	 * Required whenever `setPrompt` is present, because both of those are destructive: this
+	 * Required whenever `setPrompt` is present, because "Use default" is destructive: this
 	 * used to be optional with a `DEFAULT_AGENT_PROMPT` fallback, and `openSkillDiff` silently
 	 * relied on it — diffing a skill body against the agent base prompt and offering to
-	 * overwrite the skill with it. Making the two fields co-required means a new editable
-	 * surface cannot repeat that by omission.
-	 *
-	 * Read-only previews (no `setPrompt`) have nothing to diff or reset, so they omit it.
+	 * overwrite the skill with it. Making the two fields co-required means a new diff surface
+	 * cannot repeat that by omission.
 	 */
 	defaultPrompt?: string;
+	/** Vault path of the note being diffed, so the user can merge changes by hand there. */
+	notePath?: string;
 }
 
-/** Editable surfaces must name the baseline they diff and reset against. */
-export type EditableSystemPromptAccessors = SystemPromptAccessors &
-	Required<Pick<SystemPromptAccessors, "setPrompt" | "defaultPrompt">>;
+/** Diff surfaces must name the baseline they compare and reset against. */
+export type DiffSystemPromptAccessors = SystemPromptAccessors &
+	Required<Pick<SystemPromptAccessors, "setPrompt" | "defaultPrompt" | "notePath">>;
 
-/** Read-only previews have nothing to save, diff, or reset. */
-export type ReadOnlySystemPromptAccessors = Omit<SystemPromptAccessors, "setPrompt" | "defaultPrompt">;
+/** Read-only previews have nothing to diff or reset. */
+export type ReadOnlySystemPromptAccessors = Pick<SystemPromptAccessors, "getPrompt">;
 
 export class SystemPromptModal extends SvelteModal {
 	private plugin: SecondBrainPlugin;
@@ -37,33 +38,32 @@ export class SystemPromptModal extends SvelteModal {
 	private readonly titleText: string;
 	private readonly descriptionText: string;
 	private readonly readOnly: boolean;
-	private readonly showDiff: boolean;
 
-	// Overloads pair each accessor shape with its options: an editable modal must supply a
-	// `defaultPrompt` (see EditableSystemPromptAccessors), a read-only one must set
-	// `readOnly: true` and cannot diff.
+	// Overloads pair each accessor shape with its options: a diff modal must supply a
+	// `defaultPrompt` (see DiffSystemPromptAccessors), a read-only one must set `readOnly: true`.
 	constructor(
 		plugin: SecondBrainPlugin,
-		accessors: EditableSystemPromptAccessors,
-		options?: { title?: string; description?: string; readOnly?: false; showDiff?: boolean },
+		accessors: DiffSystemPromptAccessors,
+		options?: { title?: string; description?: string; readOnly?: false },
 	);
 	constructor(
 		plugin: SecondBrainPlugin,
 		accessors: ReadOnlySystemPromptAccessors,
-		options: { title?: string; description?: string; readOnly: true; showDiff?: false },
+		options: { title?: string; description?: string; readOnly: true },
 	);
 	constructor(
 		plugin: SecondBrainPlugin,
 		accessors: SystemPromptAccessors,
-		options?: { title?: string; description?: string; readOnly?: boolean; showDiff?: boolean },
+		options?: { title?: string; description?: string; readOnly?: boolean },
 	) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.accessors = accessors;
 		this.titleText = options?.title ?? "System Prompt";
-		this.descriptionText = options?.description ?? "Customize the system instructions used for every chat.";
+		this.descriptionText =
+			options?.description ??
+			"Your version compared with the current default. Edit the note to merge changes by hand, or replace it with the default.";
 		this.readOnly = options?.readOnly ?? false;
-		this.showDiff = options?.showDiff ?? false;
 		this.setTitle(this.titleText);
 	}
 
@@ -76,7 +76,6 @@ export class SystemPromptModal extends SvelteModal {
 				accessors: this.accessors,
 				description: this.descriptionText,
 				readOnly: this.readOnly,
-				showDiff: this.showDiff,
 			},
 			{
 				fullScreenOnPhone: true,

@@ -24,13 +24,28 @@ import {
 	orderForBulkIndexing,
 	scheduleBulkRun,
 } from "../search/bulkPacing";
+import { describeBulkProgress } from "../search/bulkProgress";
 import { ensureProviderRegistered } from "../providers/registrySync";
 import { getData } from "../stores/dataStore.svelte";
 import { chunkText } from "../utils/chunkText";
-import { getEmbeddableVaultFiles, isEmbeddableFile, readIndexableContent } from "../utils/fileFiltering";
+import {
+	DRAWING_MODIFY_DEBOUNCE_MS,
+	getEmbeddableVaultFiles,
+	hasNoEmbeddableText,
+	isEmbeddableFile,
+	needsExtraction,
+	isExcalidrawPath,
+	readIndexableContent,
+} from "../utils/fileFiltering";
 import { Logger } from "../utils/logging";
 import { matchesPathPrefix } from "../utils/pathUtils";
-import { isConnectionRefusedError, isDocumentRejectionError, isProviderUnreachableError } from "../lib/transportErrors";
+import {
+	isConnectionRefusedError,
+	isDocumentRejectionError,
+	isProviderUnreachableError,
+	isRateLimitError,
+	isRequestTimeoutError,
+} from "../lib/transportErrors";
 import {
 	configureEmbedIndexAction,
 	settingsAction,
@@ -38,7 +53,12 @@ import {
 	showSettingsLinkNotice,
 } from "../utils/actionNotice";
 import { StartupProfiler } from "../utils/startupProfiler";
-import { getDefaultEmbeddingBatchSize, normalizeEmbeddingBatchSize } from "./batchSize";
+import {
+	getDefaultEmbeddingBatchSize,
+	hasFullEmbeddingBatch,
+	normalizeEmbeddingBatchSize,
+	takeEmbeddingBatch,
+} from "./batchSize";
 import { aggregateChunksToNotes } from "./chunkAggregation";
 import { formatRetrievalQuery } from "./queryInstruction";
 import { createVectorStore } from "./storeFactory";
@@ -153,6 +173,20 @@ const MODIFY_DEBOUNCE_MS = 5_000;
 const CHARS_PER_TOKEN = 3;
 
 /**
+ * Ceiling on one document chunk, in tokens, whatever the model's input window.
+ *
+ * The window says how much a model *can* take, not how much a chunk *should*
+ * hold. Sizing chunks to it meant a ~24k-char chunk for every 8191-token model
+ * (and the fallback for any model with no metadata), which hurt twice: a vector
+ * averaged over that much text matches no specific query well, and a local
+ * server embedding a batch of them (a 0.6B MLX model behind oMLX) blew through
+ * the request timeout on every batch until indexing stopped as "unreachable"
+ * (#543, #544). 2048 tokens is still roomy for a section; models with smaller
+ * windows keep their own, smaller limit.
+ */
+const MAX_EMBED_CHUNK_TOKENS = 2048;
+
+/**
  * Over-fetch factor for semantic search. A note is stored as one vector per
  * section, so several of a note's chunks can occupy adjacent result slots; we
  * request more raw neighbors than `topK` and aggregate to distinct notes
@@ -263,11 +297,23 @@ interface IndexInstance {
 	 * `clearStore` drops it, so a rebuild tries everything again.
 	 */
 	failedNotes: Map<string, number>;
+	/**
+	 * Notes with no text to embed, keyed by path with the mtime they were read
+	 * at. Embedding one would store a title-only vector — noise-floor similarity
+	 * against any query — so it is left out, and remembered like `failedNotes`
+	 * so validation does not re-read it on every launch. That matters for
+	 * Excalidraw drawings: most never get text beside the drawing, and reading
+	 * one means reading its whole scene (#541). Mirrored in
+	 * `EmbeddingIndexConfig.emptyNotes`.
+	 */
+	emptyNotes: Map<string, number>;
 	progress: IndexingProgress;
 	/** Timestamp (ms) when the current indexing run started, for ETA estimation */
 	indexingStartedAt: number | null;
 	/** `indexed` count when the current run started, so ETA measures only this run's rate */
 	indexingStartCount: number;
+	/** Timestamp (ms) the run entered its extraction tail; the ETA then measures that phase alone. */
+	extractionStartedAt: number | null;
 	abortController: AbortController | null;
 	maxInputTokensCache: {
 		provider: string;
@@ -287,23 +333,6 @@ interface IndexInstance {
 export function formatIndexBuildStatus(lastBuiltAt: number | null | undefined, documentCount: number): string {
 	if (lastBuiltAt) return new Date(lastBuiltAt).toLocaleDateString();
 	return documentCount > 0 ? "Build incomplete" : "Never built";
-}
-
-/**
- * Format an estimated-time-remaining duration (in ms) as a short human string,
- * e.g. "45s", "3m", "1h 12m". Rounds up so the estimate never reads as "0s"
- * while work is still in flight.
- */
-export function formatEta(ms: number): string {
-	const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
-	if (totalSeconds < 60) return `${totalSeconds}s`;
-
-	const totalMinutes = Math.ceil(totalSeconds / 60);
-	if (totalMinutes < 60) return `${totalMinutes}m`;
-
-	const hours = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
-	return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 /**
@@ -435,6 +464,7 @@ export class VectorStoreService {
 	/** Promise tracking initialization, awaited by cleanup to avoid closing mid-init. */
 	private initPromise: Promise<void> | null = null;
 	private unsubscribePrivacy: (() => void) | null = null;
+	private unsubscribeContentIndexing: (() => void) | null = null;
 	private unsubscribeRename: (() => void) | null = null;
 
 	/**
@@ -509,6 +539,7 @@ export class VectorStoreService {
 			buildPromise: null,
 			activeBulkRun: null,
 			failedNotes: new Map(Object.entries(getData().getEmbeddingIndex(indexId)?.failedNotes ?? {})),
+			emptyNotes: new Map(Object.entries(getData().getEmbeddingIndex(indexId)?.emptyNotes ?? {})),
 			progress: {
 				isIndexing: false,
 				total: 0,
@@ -520,6 +551,7 @@ export class VectorStoreService {
 			},
 			indexingStartedAt: null,
 			indexingStartCount: 0,
+			extractionStartedAt: null,
 			abortController: null,
 			maxInputTokensCache: null,
 			report: null,
@@ -637,6 +669,8 @@ export class VectorStoreService {
 			// provider's trust; when either changes, every open index is out of
 			// date in both directions (notes to drop, notes now allowed in).
 			this.unsubscribePrivacy = data.onPrivacyRulesChange(() => this.revalidateAll());
+			// The same holds for which file groups have their contents indexed.
+			this.unsubscribeContentIndexing = data.onContentIndexingChange(() => this.revalidateAll());
 			this.unsubscribeRename = data.onProviderRenamed((oldId, newId) => this.adoptRenamedIndexes(oldId, newId));
 
 			this.isInitialized = true;
@@ -826,6 +860,15 @@ export class VectorStoreService {
 		return maxInputTokens * CHARS_PER_TOKEN;
 	}
 
+	/** Upper bound on one document chunk: the model window, capped at `MAX_EMBED_CHUNK_TOKENS`. */
+	private async getMaxEmbeddingChunkLength(
+		inst: IndexInstance,
+		defaultModel: DefaultEmbedModel | null,
+	): Promise<number> {
+		const maxInputTokens = await this.getEmbeddingMaxInputTokens(inst, defaultModel);
+		return Math.min(maxInputTokens, MAX_EMBED_CHUNK_TOKENS) * CHARS_PER_TOKEN;
+	}
+
 	/**
 	 * Validate the index against the vault on startup.
 	 */
@@ -962,9 +1005,9 @@ export class VectorStoreService {
 			vaultPaths.add(file.path);
 			const indexed = indexedMap.get(file.path);
 			if (!indexed) {
-				// A note the provider rejected at this very mtime is not retried;
-				// an edit (any mtime change) puts it back in play.
-				if (inst.failedNotes.get(file.path) === file.stat.mtime) {
+				// A note the provider rejected, or found empty, at this very mtime
+				// is not retried; an edit (any mtime change) puts it back in play.
+				if (this.rememberedSkip(inst, file)) {
 					failedSkipped++;
 					continue;
 				}
@@ -986,9 +1029,7 @@ export class VectorStoreService {
 		// dead weight; drop them here rather than carrying them for good.
 		this.pruneFailedNotes(inst, vaultFiles);
 		if (failedSkipped > 0) {
-			Logger.log(
-				`[VectorStore] ${inst.indexId}: leaving ${failedSkipped} note(s) the provider rejected unchanged`,
-			);
+			Logger.log(`[VectorStore] ${inst.indexId}: leaving ${failedSkipped} rejected or empty note(s) unchanged`);
 		}
 
 		const totalUpdates = missingFiles.length + staleFiles.length + orphanedPaths.length;
@@ -1102,10 +1143,15 @@ export class VectorStoreService {
 	private registerEvents(): void {
 		const { vault } = this.plugin.app;
 
+		// A new file is debounced like an edit. It is usually created empty and
+		// written to right away — a new note while the user types its first
+		// line, a new drawing as Excalidraw saves its first strokes — and
+		// embedding it on the spot cost a provider round trip for content that
+		// was stale within seconds (#541).
 		this.plugin.registerEvent(
-			vault.on("create", async (file) => {
+			vault.on("create", (file) => {
 				if (file instanceof TFile && isEmbeddableFile(file)) {
-					await this.handleFileCreate(file);
+					this.handleFileModify(file);
 				}
 			}),
 		);
@@ -1178,20 +1224,9 @@ export class VectorStoreService {
 	}
 
 	/**
-	 * Handle new file creation — forward to active instances only.
-	 * Inactive instances are marked for re-validation on next use.
-	 */
-	private async handleFileCreate(file: TFile): Promise<void> {
-		for (const inst of this.instances.values()) {
-			if (!this.canApplyEvent(inst)) continue;
-			await this.indexDocumentForInstance(inst, file);
-			void this.notifyStatsChanged(inst);
-		}
-	}
-
-	/**
-	 * Handle file modification — debounce re-embedding until 10s of inactivity.
-	 * Inactive instances are marked for re-validation on next use.
+	 * Handle file creation or modification — debounce re-embedding until
+	 * `MODIFY_DEBOUNCE_MS` of inactivity (`DRAWING_MODIFY_DEBOUNCE_MS` for a
+	 * drawing). Inactive instances are marked for re-validation on next use.
 	 */
 	private handleFileModify(file: TFile): void {
 		const existing = this.modifyTimers.get(file.path);
@@ -1199,10 +1234,13 @@ export class VectorStoreService {
 
 		this.modifyTimers.set(
 			file.path,
-			window.setTimeout(() => {
-				this.modifyTimers.delete(file.path);
-				void this.reindexModifiedFile(file);
-			}, MODIFY_DEBOUNCE_MS),
+			window.setTimeout(
+				() => {
+					this.modifyTimers.delete(file.path);
+					void this.reindexModifiedFile(file);
+				},
+				isExcalidrawPath(file.path) ? DRAWING_MODIFY_DEBOUNCE_MS : MODIFY_DEBOUNCE_MS,
+			),
 		);
 	}
 
@@ -1494,6 +1532,23 @@ export class VectorStoreService {
 	}
 
 	/**
+	 * Stop a bulk run on HTTP 429. Returns false for any other error. The notes
+	 * stay unindexed (not failed), so the next validation picks them up again.
+	 */
+	private abortForRateLimit(inst: IndexInstance, error: unknown): boolean {
+		if (!isRateLimitError(error)) return false;
+		const reason = error instanceof Error ? error.message : String(error);
+		Logger.error(`[VectorStore] Stopping indexing for ${inst.indexId}: rate limited by the provider — ${reason}`);
+		showActionNotice(
+			"Indexing paused — the embedding provider's rate limit was reached. It resumes on the next start, or resume it from the search settings later.",
+			settingsAction("search", "Open search settings"),
+			10_000,
+		);
+		inst.abortController?.abort();
+		return true;
+	}
+
+	/**
 	 * Get the configured batch size for an index, falling back to provider defaults.
 	 */
 	private getBatchSize(indexId: string, providerId: string): number {
@@ -1538,17 +1593,15 @@ export class VectorStoreService {
 		const { vault } = this.plugin.app;
 		const allFiles = getEmbeddableVaultFiles(vault);
 
-		// Categorize files by skip reason. A note the provider rejected at this
-		// very mtime is skipped here as it is by validation: a store emptied by
-		// such rejections takes this path on every launch, and would retry them.
+		// Categorize files by skip reason. A note the provider rejected, or found
+		// empty, at this very mtime is skipped here as it is by validation: a store
+		// emptied by such notes takes this path on every launch, and would retry them.
 		const files: TFile[] = [];
 		const skippedFiles: SkippedFile[] = [];
 		for (const file of allFiles) {
-			const reason = this.getFileSkipReason(file, model.provider);
+			const reason = this.getFileSkipReason(file, model.provider) ?? this.rememberedSkip(inst, file);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
-			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
-				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				files.push(file);
 			}
@@ -1694,9 +1747,29 @@ export class VectorStoreService {
 	): Promise<BulkEmbedOutcome> {
 		const { vault } = this.plugin.app;
 		const { notice, report } = options;
-		const batchSize = this.getBatchSize(inst.indexId, model.provider);
-		const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
+		// Lowered for the rest of the run when a batch times out and has to be
+		// split (see `embedBatch`), so later batches do not repeat the timeout.
+		let batchSize = this.getBatchSize(inst.indexId, model.provider);
+		const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
 		const ordered = orderForBulkIndexing(files);
+		// The extraction tail (PDFs, last in `ordered`) gets its own progress phase.
+		const extractionPaths = new Set(ordered.filter(needsExtraction).map((file) => file.path));
+		const extractionTotal = extractionPaths.size;
+		const extractionDone = new Set<string>();
+		const extractionSettled = (path: string) => {
+			if (!extractionPaths.has(path) || extractionDone.has(path)) return;
+			extractionDone.add(path);
+			this.updateInstanceProgress(inst, {
+				extraction: {
+					done: extractionDone.size,
+					total: extractionTotal,
+					active: inst.extractionStartedAt !== null,
+				},
+			});
+		};
+		if (extractionTotal > 0) {
+			this.updateInstanceProgress(inst, { extraction: { done: 0, total: extractionTotal, active: false } });
+		}
 
 		// Progress is tracked in files (matching `total`), not chunks: a note is
 		// counted once its final chunk is written, so a multi-chunk note advances
@@ -1713,6 +1786,7 @@ export class VectorStoreService {
 			report?.indexedFiles.push(path);
 			notesSinceCheckpoint++;
 			this.updateInstanceProgress(inst, { indexed: options.startingIndexedCount + indexedPaths.size });
+			extractionSettled(path);
 		};
 		const noteSkipped = (path: string, reason: SkipReason) => {
 			report?.skippedFiles.push({ path, reason });
@@ -1724,6 +1798,7 @@ export class VectorStoreService {
 				skipped: options.preFilterSkipped + skippedPaths.size,
 				total: Math.max(0, inst.progress.total - 1),
 			});
+			extractionSettled(path);
 		};
 		const refreshNotice = () => {
 			if (notice) this.updateNotice(notice, inst.progress);
@@ -1793,9 +1868,12 @@ export class VectorStoreService {
 			const batch = queued.filter((entry) => !failedPaths.has(entry.file.path));
 			if (batch.length === 0) return true;
 			batchNumber++;
-			this.updateInstanceProgress(inst, {
-				currentFile: batch.length === 1 ? batch[0].file.path : `Embedding batch ${batchNumber}...`,
-			});
+			// In the extraction tail the notice names the PDF being read instead.
+			if (!inst.progress.extraction?.active) {
+				this.updateInstanceProgress(inst, {
+					currentFile: batch.length === 1 ? batch[0].file.path : `Embedding batch ${batchNumber}...`,
+				});
+			}
 			refreshNotice();
 
 			try {
@@ -1827,6 +1905,36 @@ export class VectorStoreService {
 				// below: that would re-issue every request in the batch against a
 				// provider the user just asked us to stop talking to.
 				if (this.isUserCancellation(error)) return false;
+				// Rate limiting applies to every remaining request alike; retrying
+				// entry by entry would only spend more of the quota and raise one
+				// "failed to embed" notice per note. Stop and let the next run resume.
+				if (this.abortForRateLimit(inst, error)) return false;
+				// A timeout on a multi-chunk batch says the request was too big for
+				// the server to answer in time, not that the server is gone: the
+				// same server embeds a smaller request fine. Resending the identical
+				// batch (the transport retry below) just times out again, queued
+				// behind the abandoned request the server is still computing, and
+				// the second failure stopped the run as "unreachable" (#544). Split
+				// it instead and keep the smaller size for the rest of the run;
+				// only a timeout on a single chunk goes on to the unreachable path.
+				if (isRequestTimeoutError(error) && batch.length > 1) {
+					const half = Math.ceil(batch.length / 2);
+					batchSize = Math.min(batchSize, half);
+					Logger.warn(
+						`[VectorStore] Batch ${batchNumber} (${batch.length} chunks) timed out; retrying in batches of ${half}`,
+					);
+					await bulkPause(this.UNREACHABLE_RETRY_PAUSE_MS);
+					if (aborted()) return false;
+					batchNumber--;
+					// Drain at the *current* size, read afresh per piece: a nested
+					// split inside the first half lowers it further, and the rest
+					// must not go out at a size that already timed out.
+					const remaining = [...batch];
+					while (remaining.length > 0) {
+						if (!(await embedBatch(remaining.splice(0, batchSize)))) return false;
+					}
+					return true;
+				}
 				Logger.warn(`[VectorStore] Batch ${batchNumber} failed, falling back to sequential:`, error);
 				// A transport failure will hit every remaining chunk the same way,
 				// so retrying this batch entry-by-entry is pure waste. Give the
@@ -1858,6 +1966,7 @@ export class VectorStoreService {
 						// aborting mid-batch fires one error Notice per remaining
 						// file and buries the "cancelled" message under them.
 						if (this.isUserCancellation(entryError)) return false;
+						if (this.abortForRateLimit(inst, entryError)) return false;
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
 						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
@@ -1877,11 +1986,20 @@ export class VectorStoreService {
 			}
 		};
 
+		// Empty-note verdicts found by this run, not yet in the plugin settings.
+		let emptiesUnsaved = false;
+		const saveEmpties = () => {
+			if (!emptiesUnsaved) return;
+			emptiesUnsaved = false;
+			this.persistFailedNotes(inst);
+		};
+
 		/** Pacing after a batch: a checkpoint every interval of notes, a GC pause otherwise. */
 		const afterBatch = async (): Promise<void> => {
 			refreshNotice();
 			if (notesSinceCheckpoint >= BULK_CHECKPOINT_INTERVAL) {
 				notesSinceCheckpoint = 0;
+				saveEmpties();
 				await inst.store.flush();
 				// The notes just flushed are searchable now, so the count the
 				// settings row shows must say so — not only once the run ends,
@@ -1901,6 +2019,7 @@ export class VectorStoreService {
 		// Mark the attempt before the first read; cleared below only when the run
 		// survives. See BulkAttemptMarker for why this drives the start backoff.
 		this.bulkAttempts.markAttempt();
+		const embedTextOf = (entry: ChunkEntry) => entry.embedText;
 		let pending: ChunkEntry[] = [];
 		let stopped = false;
 
@@ -1910,8 +2029,28 @@ export class VectorStoreService {
 				break;
 			}
 			try {
+				if (extractionPaths.has(file.path)) {
+					// Extraction is the slow part and happens here, at read time, so
+					// name the file now rather than when its batch is sent.
+					if (inst.extractionStartedAt === null) {
+						inst.extractionStartedAt = Date.now();
+						this.updateInstanceProgress(inst, {
+							extraction: { done: extractionDone.size, total: extractionTotal, active: true },
+						});
+					}
+					this.updateInstanceProgress(inst, { currentFile: file.path });
+					refreshNotice();
+				}
 				const mtime = stampForRead(file);
 				const content = await readIndexableContent(vault, file);
+				if (hasNoEmbeddableText(file, content)) {
+					noteSkipped(file.path, "empty");
+					// Saved at the next checkpoint: a vault of blank drawings would
+					// otherwise rewrite the plugin settings once per drawing.
+					await this.markNoteEmpty(inst, file.path, mtime, false);
+					emptiesUnsaved = true;
+					continue;
+				}
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				pendingNotes.set(file.path, { mtime, expected: chunks.length, vectors: new Map() });
 				for (const chunk of chunks) {
@@ -1928,12 +2067,12 @@ export class VectorStoreService {
 				continue;
 			}
 
-			while (pending.length >= batchSize) {
+			while (hasFullEmbeddingBatch(pending, batchSize, embedTextOf)) {
 				if (aborted()) {
 					stopped = true;
 					break;
 				}
-				const batch = pending.splice(0, batchSize);
+				const batch = takeEmbeddingBatch(pending, batchSize, embedTextOf);
 				if (!(await embedBatch(batch))) {
 					stopped = true;
 					break;
@@ -1943,13 +2082,19 @@ export class VectorStoreService {
 			if (stopped) break;
 		}
 
-		if (!stopped && pending.length > 0) {
-			if (await embedBatch(pending)) await afterBatch();
+		// The tail can still exceed the character budget, so drain it batch by batch.
+		while (!stopped && pending.length > 0) {
+			if (aborted() || !(await embedBatch(takeEmbeddingBatch(pending, batchSize, embedTextOf)))) {
+				stopped = true;
+				break;
+			}
+			await afterBatch();
 		}
 		pending = [];
 		// Notes whose chunks were not all embedded (a stopped run) were never
 		// written; the next validation finds them missing.
 		pendingNotes.clear();
+		saveEmpties();
 
 		const cancelled = aborted();
 		if (stopped && !cancelled) {
@@ -1982,9 +2127,14 @@ export class VectorStoreService {
 	 * Update the indexing notice with current progress.
 	 */
 	private updateNotice(notice: Notice, progress: IndexingProgress): void {
-		const { indexed, skipped, total, percentage, etaMs } = progress;
-		const skippedText = skipped > 0 ? ` (${skipped} skipped)` : "";
-		const etaText = etaMs !== null ? ` (~${formatEta(etaMs)} left)` : "";
+		const { status, percentage } = describeBulkProgress({
+			processed: progress.indexed,
+			total: progress.total,
+			skipped: progress.skipped,
+			etaMs: progress.etaMs,
+			extraction: progress.extraction,
+			currentFile: progress.currentFile,
+		});
 
 		const el = notice.messageEl;
 		el.empty();
@@ -1993,7 +2143,7 @@ export class VectorStoreService {
 
 		container.createDiv({
 			cls: "s2b-indexing-status",
-			text: `Indexing: ${indexed}/${total}${skippedText}${etaText}`,
+			text: `Indexing: ${status}`,
 		});
 
 		const progressContainer = container.createDiv({ cls: "s2b-indexing-progress" });
@@ -2054,7 +2204,11 @@ export class VectorStoreService {
 		let chunks: ReturnType<typeof chunkText>;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
-			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
+			if (hasNoEmbeddableText(file, content)) {
+				await this.markNoteEmpty(inst, file.path, mtime);
+				return;
+			}
+			const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
 			chunks = chunkText(content, file.basename, maxContentLength);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to read ${file.path} (${inst.indexId}):`, error);
@@ -2126,32 +2280,64 @@ export class VectorStoreService {
 		}
 	}
 
+	/**
+	 * The note has no text to embed at this mtime. Record it, and drop what the
+	 * store holds for the path — an earlier version that did have text must not
+	 * keep the note searchable by content it no longer has.
+	 */
+	private async markNoteEmpty(inst: IndexInstance, path: string, mtime: number, persist = true): Promise<void> {
+		const hadFailure = inst.failedNotes.delete(path);
+		if (inst.emptyNotes.get(path) !== mtime || hadFailure) {
+			inst.emptyNotes.set(path, mtime);
+			if (persist) this.persistFailedNotes(inst);
+		}
+		try {
+			await inst.store.remove(path);
+		} catch (error) {
+			Logger.warn(`[VectorStore] Could not drop the stored rows of empty note ${path}:`, error);
+		}
+	}
+
+	/** Why a not-yet-indexed note is left out at its current mtime, if it was rejected or found empty. */
+	private rememberedSkip(inst: IndexInstance, file: TFile): SkipReason | null {
+		if (inst.failedNotes.get(file.path) === file.stat.mtime) return "embed-error";
+		if (inst.emptyNotes.get(file.path) === file.stat.mtime) return "empty";
+		return null;
+	}
+
 	private recordNoteFailure(inst: IndexInstance, path: string, mtime: number): void {
 		if (inst.failedNotes.get(path) === mtime) return;
 		inst.failedNotes.set(path, mtime);
+		inst.emptyNotes.delete(path);
 		this.persistFailedNotes(inst);
 	}
 
 	private clearNoteFailure(inst: IndexInstance, path: string): void {
-		if (!inst.failedNotes.delete(path)) return;
-		this.persistFailedNotes(inst);
+		const hadFailure = inst.failedNotes.delete(path);
+		const wasEmpty = inst.emptyNotes.delete(path);
+		if (hadFailure || wasEmpty) this.persistFailedNotes(inst);
 	}
 
-	/** Forget failures of notes that are gone from the vault or have changed since. */
+	/** Forget failed and empty verdicts of notes that are gone from the vault or have changed since. */
 	private pruneFailedNotes(inst: IndexInstance, vaultFiles: TFile[]): void {
-		if (inst.failedNotes.size === 0) return;
+		if (inst.failedNotes.size === 0 && inst.emptyNotes.size === 0) return;
 		const current = new Map(vaultFiles.map((file) => [file.path, file.stat.mtime]));
 		let changed = false;
-		for (const [path, mtime] of inst.failedNotes) {
-			if (current.get(path) === mtime) continue;
-			inst.failedNotes.delete(path);
-			changed = true;
+		for (const verdicts of [inst.failedNotes, inst.emptyNotes]) {
+			for (const [path, mtime] of verdicts) {
+				if (current.get(path) === mtime) continue;
+				verdicts.delete(path);
+				changed = true;
+			}
 		}
 		if (changed) this.persistFailedNotes(inst);
 	}
 
 	private persistFailedNotes(inst: IndexInstance): void {
-		getData().updateEmbeddingIndexStats(inst.indexId, { failedNotes: Object.fromEntries(inst.failedNotes) });
+		getData().updateEmbeddingIndexStats(inst.indexId, {
+			failedNotes: Object.fromEntries(inst.failedNotes),
+			emptyNotes: Object.fromEntries(inst.emptyNotes),
+		});
 	}
 
 	/**
@@ -2429,11 +2615,9 @@ export class VectorStoreService {
 		for (const file of allFiles) {
 			if (indexedPaths.has(file.path)) continue;
 
-			const reason = this.getFileSkipReason(file, provider);
+			const reason = this.getFileSkipReason(file, provider) ?? this.rememberedSkip(inst, file);
 			if (reason) {
 				skippedFiles.push({ path: file.path, reason });
-			} else if (inst.failedNotes.get(file.path) === file.stat.mtime) {
-				skippedFiles.push({ path: file.path, reason: "embed-error" });
 			} else {
 				// File passed filters but isn't indexed yet
 				skippedFiles.push({ path: file.path, reason: "not-indexed" });
@@ -2523,6 +2707,8 @@ export class VectorStoreService {
 		} else if (!inst.progress.isIndexing) {
 			inst.indexingStartedAt = null;
 			inst.indexingStartCount = 0;
+			inst.extractionStartedAt = null;
+			inst.progress.extraction = null;
 		}
 
 		if (inst.progress.total > 0) {
@@ -2544,11 +2730,21 @@ export class VectorStoreService {
 	 * made to produce a stable estimate.
 	 */
 	private estimateEtaMs(inst: IndexInstance): number | null {
-		const { isIndexing, indexed, total } = inst.progress;
+		const { isIndexing, indexed, total, extraction } = inst.progress;
 		if (!isIndexing || inst.indexingStartedAt === null || total <= 0) return null;
 
+		// One PDF costs what hundreds of notes do, so a rate measured on one phase
+		// says nothing about the other. In the extraction tail, measure that phase
+		// alone; before it, estimate the notes left (the notice says PDFs follow).
+		if (extraction?.active && inst.extractionStartedAt !== null) {
+			const remainingExtraction = extraction.total - extraction.done;
+			if (extraction.done <= 0 || remainingExtraction <= 0) return null;
+			const phaseElapsed = Date.now() - inst.extractionStartedAt;
+			return phaseElapsed > 0 ? Math.round((phaseElapsed / extraction.done) * remainingExtraction) : null;
+		}
+
 		const doneThisRun = indexed - inst.indexingStartCount;
-		const remaining = total - indexed;
+		const remaining = total - indexed - (extraction ? extraction.total - extraction.done : 0);
 		if (doneThisRun <= 0 || remaining <= 0) return null;
 
 		const elapsed = Date.now() - inst.indexingStartedAt;
@@ -2577,7 +2773,13 @@ export class VectorStoreService {
 	private async clearStore(inst: IndexInstance): Promise<void> {
 		await inst.store.clear();
 		inst.failedNotes.clear();
-		getData().updateEmbeddingIndexStats(inst.indexId, { lastBuiltAt: null, documentCount: 0, failedNotes: {} });
+		inst.emptyNotes.clear();
+		getData().updateEmbeddingIndexStats(inst.indexId, {
+			lastBuiltAt: null,
+			documentCount: 0,
+			failedNotes: {},
+			emptyNotes: {},
+		});
 	}
 
 	/**
@@ -2815,6 +3017,8 @@ export class VectorStoreService {
 			this.modifyTimers.clear();
 			this.unsubscribePrivacy?.();
 			this.unsubscribePrivacy = null;
+			this.unsubscribeContentIndexing?.();
+			this.unsubscribeContentIndexing = null;
 			this.unsubscribeRename?.();
 			this.unsubscribeRename = null;
 			// Wait for any in-progress initialization before cleaning up

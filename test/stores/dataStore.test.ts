@@ -1113,86 +1113,235 @@ describe("PluginDataStore graph index availability", () => {
 	});
 });
 
-describe("PluginDataStore – skill usage", () => {
+describe("reloadFromDisk (onExternalSettingsChange)", () => {
 	beforeEach(() => {
 		__resetPluginDataStoreForTests();
 	});
 
-	async function freshStore() {
+	/** A plugin whose `loadData` returns whatever `saveData` last wrote, like a real data.json. */
+	function createDiskBackedPlugin(initial: Record<string, unknown>) {
+		let disk: unknown = structuredClone(initial);
 		const plugin = {
 			...createMockPlugin(),
-			loadData: vi.fn().mockResolvedValue(structuredClone(DEFAULT_SETTINGS)),
+			loadData: vi.fn(async () => structuredClone(disk)),
+			saveData: vi.fn(async (data: unknown) => {
+				disk = structuredClone(data);
+			}),
 		};
-		return { store: await createData(plugin as never), plugin };
+		return {
+			plugin,
+			/** Simulate Sync / a hand edit replacing the file. */
+			writeExternally(data: unknown) {
+				disk = structuredClone(data);
+			},
+			readDisk: () => structuredClone(disk) as Record<string, unknown>,
+		};
 	}
 
-	it("starts with no usage for an unknown skill", async () => {
-		const { store } = await freshStore();
-		expect(store.getSkillUsage("weekly-review")).toBeUndefined();
+	function agentWithContextWindow(contextWindow: number) {
+		return {
+			...createDefaultAgentConfig(DEFAULT_AGENT_ID, "S2B Agent"),
+			chatModel: { provider: "openai", model: "gpt-test", modelConfig: { contextWindow } },
+		};
+	}
+
+	function initialSettings() {
+		return {
+			...structuredClone(DEFAULT_SETTINGS),
+			vaultSlug: "test-vault",
+			agents: { [DEFAULT_AGENT_ID]: agentWithContextWindow(128000) },
+		};
+	}
+
+	it("skips a file identical to what was loaded", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		expect(await store.reloadFromDisk()).toBeNull();
 	});
 
-	it("counts loads and revisions separately, with timestamps", async () => {
-		const { store, plugin } = await freshStore();
-		const before = Date.now();
+	it("skips the echo of the store's own save", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
 
-		store.recordSkillLoad("weekly-review");
-		store.recordSkillLoad("weekly-review");
-		store.recordSkillRevision("weekly-review");
+		store.isVerbose = true;
+		const change = await store.reloadFromDisk();
 
-		const usage = store.getSkillUsage("weekly-review")!;
-		expect(usage.loadCount).toBe(2);
-		expect(usage.revisionCount).toBe(1);
-		expect(usage.lastLoadedAt).toBeGreaterThanOrEqual(before);
-		expect(usage.lastRevisedAt).toBeGreaterThanOrEqual(before);
-		// Persisted, not just held in memory.
-		expect(plugin.saveData).toHaveBeenCalled();
-		const saved = plugin.saveData.mock.calls.at(-1)![0];
-		expect(saved.skillUsage.find((entry: { name: string }) => entry.name === "weekly-review").loadCount).toBe(2);
+		expect(change).toBeNull();
+		expect(store.isVerbose).toBe(true);
 	});
 
-	it("a revision on a never-loaded skill leaves the load side empty", async () => {
-		const { store } = await freshStore();
-		store.recordSkillRevision("weekly-review");
-		expect(store.getSkillUsage("weekly-review")).toMatchObject({
-			loadCount: 0,
-			lastLoadedAt: null,
-			revisionCount: 1,
+	it("applies a changed agent config in place, and the next save keeps it", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		const agentsBefore = store.agents;
+
+		const edited = disk.readDisk();
+		edited.agents = { [DEFAULT_AGENT_ID]: agentWithContextWindow(32000) };
+		disk.writeExternally(edited);
+
+		const change = await store.reloadFromDisk();
+
+		expect(change?.agentsChanged).toBe(true);
+		expect(change?.agentFolderChanged).toBe(false);
+		expect(change?.changedProviderIds).toEqual([]);
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(32000);
+		expect(store.agents).not.toBe(agentsBefore);
+
+		// The bug this guards against: an unrelated setter used to write the stale copy back.
+		store.isVerbose = true;
+		await vi.waitFor(() => expect(disk.plugin.saveData).toHaveBeenCalled());
+		const saved = disk.readDisk() as { agents: Record<string, { chatModel: { modelConfig: object } }> };
+		expect(saved.agents[DEFAULT_AGENT_ID]?.chatModel.modelConfig).toEqual({ contextWindow: 32000 });
+	});
+
+	it("runs migrations on a file from an older schema", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		disk.writeExternally({
+			...structuredClone(DEFAULT_SETTINGS),
+			vaultSlug: "test-vault",
+			schemaVersion: 4,
+			agents: {
+				[DEFAULT_AGENT_ID]: {
+					id: DEFAULT_AGENT_ID,
+					name: "S2B Agent",
+					chatModel: null,
+					systemPrompt: "MY CUSTOM PROMPT",
+					skills: {},
+					toolsConfig: structuredClone(DEFAULT_TOOLS_CONFIG),
+					mcpServers: {},
+				},
+			},
 		});
+
+		const change = await store.reloadFromDisk();
+
+		expect(change).not.toBeNull();
+		const agent = store.getAgent(DEFAULT_AGENT_ID) as unknown as { systemPrompt?: unknown };
+		expect(agent.systemPrompt).toBeUndefined();
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.summarizationModel).toBeNull();
 	});
 
-	it("forgets a skill so a later one of the same name starts from zero", async () => {
-		const { store } = await freshStore();
-		store.recordSkillLoad("weekly-review");
-		store.forgetSkillUsage("weekly-review");
-		expect(store.getSkillUsage("weekly-review")).toBeUndefined();
-		expect(store.skillUsage).toEqual([]);
+	it("waits for an in-flight save and treats the resulting file as its own echo", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		let releaseSave!: () => void;
+		const realSave = disk.plugin.saveData.getMockImplementation()!;
+		disk.plugin.saveData.mockImplementationOnce(async (data: unknown) => {
+			await new Promise<void>((resolve) => {
+				releaseSave = resolve;
+			});
+			await realSave(data);
+		});
+
+		disk.plugin.loadData.mockClear();
+		store.isVerbose = true;
+		const reload = store.reloadFromDisk();
+		await Promise.resolve();
+		expect(disk.plugin.loadData).not.toHaveBeenCalled();
+
+		releaseSave();
+		expect(await reload).toBeNull();
+		expect(store.isVerbose).toBe(true);
 	});
 
-	// Data written before this field existed has no `skillUsage` key at all.
-	it("tolerates saved data without a skillUsage field, or with a non-list one", async () => {
+	it("re-reads when the store saves while the file is being read", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.agents = { [DEFAULT_AGENT_ID]: agentWithContextWindow(32000) };
+		disk.writeExternally(edited);
+
+		// A setter fires mid-read: its save overwrites the external edit with the in-memory
+		// state, so the edit is gone and applying the stale read would be wrong.
+		const realLoad = disk.plugin.loadData.getMockImplementation()!;
+		disk.plugin.loadData.mockImplementationOnce(async () => {
+			const raw = await realLoad();
+			store.isVerbose = true;
+			return raw;
+		});
+
+		expect(await store.reloadFromDisk()).toBeNull();
+		expect(store.isVerbose).toBe(true);
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(128000);
+	});
+
+	it("keeps the current settings when the file is missing", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		disk.writeExternally(null);
+
+		expect(await store.reloadFromDisk()).toBeNull();
+		expect(store.getAgent(DEFAULT_AGENT_ID)?.chatModel?.modelConfig.contextWindow).toBe(128000);
+	});
+
+	it("keeps the vault slug in use when the file carries another one", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.vaultSlug = "other-device-slug";
+		edited.isVerbose = true;
+		disk.writeExternally(edited);
+
+		expect(await store.reloadFromDisk()).not.toBeNull();
+		expect(store.isVerbose).toBe(true);
+		expect(store.vaultSlug).toBe("test-vault");
+	});
+
+	it("reports changed providers", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+
+		const edited = disk.readDisk();
+		edited.providerConfig = {
+			...(edited.providerConfig as object),
+			ollama: createProviderState({ isConfigured: false }),
+		};
+		disk.writeExternally(edited);
+
+		const change = await store.reloadFromDisk();
+		expect(change?.changedProviderIds).toEqual(["ollama"]);
+		expect(store.getAllProviderIds()).toContain("ollama");
+	});
+
+	it("a content group switched on another device re-validates the indexes", async () => {
+		const disk = createDiskBackedPlugin(initialSettings());
+		const store = await createData(disk.plugin as never);
+		const listener = vi.fn();
+		store.onContentIndexingChange(listener);
+
+		const edited = disk.readDisk();
+		edited.contentIndexing = { pdfs: true };
+		disk.writeExternally(edited);
+		await store.reloadFromDisk();
+
+		// A partial record is filled from the defaults, like at startup.
+		expect(store.contentIndexing).toEqual({ pdfs: true, chats: false, data: false });
+		expect(listener).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("content indexing", () => {
+	beforeEach(() => {
 		__resetPluginDataStoreForTests();
-		const data = structuredClone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
-		data.skillUsage = { "weekly-review": { loadCount: 9 } }; // a shape that never shipped
-		const plugin = { ...createMockPlugin(), loadData: vi.fn().mockResolvedValue(data) };
-		const store = await createData(plugin as never);
-		expect(store.getSkillUsage("x")).toBeUndefined();
-		store.recordSkillLoad("x");
-		expect(store.getSkillUsage("x")?.loadCount).toBe(1);
 	});
 
-	// "constructor" and "toString" are valid skill names. With a name-keyed object Svelte's
-	// $state proxy silently dropped the write (the key exists on the prototype chain), which
-	// is why the counters are a list; this pins that such names round-trip.
-	it("stores a skill named like an Object.prototype member", async () => {
-		const { store } = await freshStore();
-		expect(store.getSkillUsage("constructor")).toBeUndefined();
-		expect(store.getSkillUsage("toString")).toBeUndefined();
+	it("defaults to notes only, and notifies only on a real change", async () => {
+		const plugin = { ...createMockPlugin(), loadData: vi.fn(async () => null) };
+		const store = await createData(plugin as never);
+		expect(store.contentIndexing).toEqual({ pdfs: false, chats: false, data: false });
 
-		store.recordSkillLoad("constructor");
-		expect(store.getSkillUsage("constructor")).toMatchObject({ loadCount: 1, revisionCount: 0 });
-
-		store.forgetSkillUsage("toString"); // must be a no-op, not a delete of the prototype
-		store.forgetSkillUsage("constructor");
-		expect(store.getSkillUsage("constructor")).toBeUndefined();
+		const listener = vi.fn();
+		store.onContentIndexingChange(listener);
+		store.setContentIndexed("chats", false);
+		expect(listener).not.toHaveBeenCalled();
+		store.setContentIndexed("chats", true);
+		expect(store.contentIndexing.chats).toBe(true);
+		expect(listener).toHaveBeenCalledTimes(1);
 	});
 });

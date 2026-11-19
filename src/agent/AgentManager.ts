@@ -1,10 +1,7 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { HumanMessage } from "@langchain/core/messages";
-import { createAgent } from "langchain";
-import { Notice, normalizePath, Platform, TFile, type WorkspaceLeaf } from "obsidian";
+import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
-import { createAiTransportContext, runWithAiTransportContext } from "../lib/aiTransport";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
 import type { ChatModel } from "../stores/chatTimeline";
@@ -36,6 +33,7 @@ import type { ChatAttachment, ReviewStatusRef } from "../types/shared";
 import { gzipString, toArrayBuffer } from "../utils/gzip";
 import { Logger } from "../utils/logging";
 import { agentDefinitionPath, memoriesDir } from "../utils/agentPaths";
+import { isAgentFilePath } from "../utils/fileFiltering";
 import {
 	editProviderAction,
 	openNoteAction,
@@ -63,29 +61,22 @@ import {
 	currentDateValue,
 	localIsoDate,
 	substitutePromptPlaceholders,
+	usesVaultOverview,
 } from "./prompts";
-import { collectMemoryIndex, renderMemoryIndex } from "./memoryNotes";
 import {
-	type TurnActivity,
-	buildReviewSystemPrompt,
-	buildReviewUserMessage,
-	noteTurnForReview,
-	readCallsSinceReview,
-	readReviewGeneration,
-	renderTranscript,
-	summarizeReviewActions,
-	REVIEW_GENERATION_KEY,
-	TOOL_CALLS_SINCE_REVIEW_KEY,
-} from "./postTurnReview";
-import { createSaveMemoryTool } from "./tools/saveMemory";
-
-/** The agent's own tools a reviewer may hold as they are: reading and skill loading. Skill revision is added separately, without delete. */
-const REVIEWER_TOOL_NAMES = new Set(["read_content", "list_directory", "grep_notes", "load_skill"]);
-/** A review is a handful of reads and at most a few writes; anything longer is the model looping. */
-const REVIEWER_RECURSION_LIMIT = 40;
+	type MemoryIndexEntry,
+	collectMemoryIndex,
+	memoryAlwaysBudget,
+	renderMemoryIndex,
+	selectAlwaysLoaded,
+} from "./memoryNotes";
+import { type VaultOverviewText, collectVaultOverview, renderVaultOverview } from "./vaultOverview";
+import { collectVaultSettings, redactVaultSettings, renderVaultSettings, windowMomentFormatter } from "./vaultSettings";
+import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
+import type { InterruptResponse } from "./toolInterrupts";
 import { createAskQuestionTool } from "./tools/askQuestion";
 import { createExecuteJavaScriptTool } from "./tools/executeJavaScript";
 import { createPluginApiExecTool } from "./tools/executePluginApi";
@@ -95,6 +86,8 @@ import { createWebSearchTool } from "./tools/webSearch";
 import { createGetPropertiesTool } from "./tools/getProperties";
 import { createGrepNotesTool } from "./tools/grepNotes";
 import { createLoadSkillTool } from "./tools/loadSkill";
+import { createWriteTodosTool } from "./tools/writeTodos";
+import { ALWAYS_ATTACHED_TOOL_IDS } from "./tools/builtInToolDefaults";
 import { createListDirectoryTool } from "./tools/listDirectory";
 import { createManageNotesTool } from "./tools/manageNotes";
 import { createManageSkillsTool } from "./tools/manageSkills";
@@ -117,6 +110,7 @@ import {
 
 import { getRegistry } from "../providers/registry";
 import { ensureProviderRegistered } from "../providers/registrySync";
+import { DEFAULT_CHAT_TITLE, FAILED_CHAT_TITLE } from "../utils/chatTitle";
 
 import type { StructuredToolInterface } from "@langchain/core/tools";
 
@@ -398,6 +392,74 @@ export class AgentManager {
 	 */
 	private memoryIndexSnapshot = "";
 
+	/**
+	 * The memory entries collected by the last {@link assembleSystemPrompt}. Subagents run on
+	 * their own model, so `resolveSubAgentSpecs` re-renders the index from these against each
+	 * child's context window instead of reusing the parent's rendering.
+	 */
+	private memoryEntriesSnapshot: MemoryIndexEntry[] = [];
+
+	/**
+	 * Always-loaded memory notes the last notice was about, so the user hears once that a note
+	 * was too large for the model, not on every assembly. Reset when every note fits again.
+	 */
+	private omittedMemoryNoticeSignature = "";
+
+	/**
+	 * The vault overview substituted for the `# Vault` placeholders, as the agent's provider may
+	 * see it: files private for that provider are left out, exactly as the read tools leave them
+	 * out. Read from the metadata cache, so it is cheap enough to build per assembly. Bodies that
+	 * carry none of the placeholders skip the scan.
+	 */
+	private buildVaultOverview(agentCfg: AgentConfig, body: string): VaultOverviewText & { vaultSettings: string } {
+		if (!usesVaultOverview(body)) return { vaultSettings: "", folders: "", tags: "", properties: "" };
+		const data = getData();
+		const store = getPendingChangesStore();
+		const provider = agentCfg.chatModel?.provider;
+		const isPrivate = provider && !data.isProviderTrusted(provider) ? data.privacyPredicate() : () => false;
+		const overviewData = collectVaultOverview(this.plugin.app, {
+			isExcluded: (path) => isAgentFilePath(path) || !store.isPathAllowed(path),
+			isPrivate,
+		});
+		// The configured folders and files are names too: a folder is hidden only when it holds
+		// private files and none this model can see. A missing or empty folder has nothing private
+		// to reveal, and is just where the first note should go.
+		const visibleFolders = new Set(overviewData.folders);
+		const isFolderVisible = (folder: string) => {
+			if (visibleFolders.has(folder)) return true;
+			const prefix = `${normalizePath(folder)}/`;
+			return !this.plugin.app.vault
+				.getFiles()
+				.some((file) => file.path.startsWith(prefix) && isPrivate(file.path));
+		};
+		const vaultSettings = renderVaultSettings(
+			redactVaultSettings(collectVaultSettings(this.plugin.app, windowMomentFormatter()), {
+				isFolderVisible,
+				isPrivate,
+			}),
+		);
+		return { vaultSettings, ...renderVaultOverview(overviewData) };
+	}
+
+	/**
+	 * Tell the user when always-loaded memory notes were too large to load for this agent's model.
+	 * The model still sees them listed and reads them on demand; the notice is for the user, who
+	 * otherwise has no way to learn why the agent seems to have forgotten a note.
+	 */
+	private noticeOmittedMemory(omittedPaths: string[], contextWindow: number | undefined): void {
+		const signature = omittedPaths.join("\n");
+		if (signature === this.omittedMemoryNoticeSignature) return;
+		this.omittedMemoryNoticeSignature = signature;
+		if (omittedPaths.length === 0) return;
+		const names = omittedPaths.map((path) => path.split("/").pop()?.replace(/\.md$/i, "") ?? path).join(", ");
+		const window = contextWindow ? ` (${Math.round(contextWindow / 1000)}k tokens)` : "";
+		showActionNotice(
+			`Memory too large for this model${window}: ${names} ${omittedPaths.length === 1 ? "is" : "are"} no longer loaded into every message. The agent reads ${omittedPaths.length === 1 ? "it" : "them"} only when needed. Shorten the note or use a model with a larger context window.`,
+			openNoteAction(omittedPaths[0], "Open note"),
+			15000,
+		);
+	}
+
 	async assembleSystemPrompt(agent?: AgentConfig): Promise<string> {
 		const pluginData = getData();
 		const selectedAgent = agent ?? pluginData.getSelectedAgent();
@@ -416,7 +478,23 @@ export class AgentManager {
 		// the agent folder — memory notes included — invalidates every cached runnable (see the
 		// vault watcher in main.ts), so the next turn re-assembles and the model sees the note
 		// it just wrote.
-		this.memoryIndexSnapshot = renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder));
+		//
+		// Always-loaded notes go in whole; the only limit is a share of this agent's context
+		// window (see memoryNotes.memoryAlwaysBudget), so a small local model is not swamped.
+		const memoryEntries = await collectMemoryIndex(this.plugin.app, memoryFolder);
+		this.memoryEntriesSnapshot = memoryEntries;
+		const contextWindow = selectedAgent.chatModel?.modelConfig?.contextWindow;
+		const alwaysBudget = memoryAlwaysBudget(contextWindow);
+		this.memoryIndexSnapshot = renderMemoryIndex(memoryEntries, alwaysBudget);
+		if (body.includes(MEMORY_FOLDER_PLACEHOLDER)) {
+			const { omitted } = selectAlwaysLoaded(memoryEntries, alwaysBudget);
+			this.noticeOmittedMemory(
+				omitted.map((entry) => entry.path),
+				contextWindow,
+			);
+		}
+
+		const vault = this.buildVaultOverview(selectedAgent, body);
 
 		// The model has no reliable notion of "now", and the memory folder is user-configurable;
 		// both are written into the note as placeholders and substituted here, so nothing stale
@@ -426,6 +504,10 @@ export class AgentManager {
 			memoryFolder,
 			date: currentDateValue(),
 			memoryIndex: this.memoryIndexSnapshot,
+			vaultSettings: vault.vaultSettings,
+			vaultFolders: vault.folders,
+			vaultTags: vault.tags,
+			vaultProperties: vault.properties,
 		});
 
 		// Best-effort ensure the memory folder exists so list_directory has somewhere to look
@@ -516,7 +598,8 @@ export class AgentManager {
 	}
 
 	/**
-	 * Two-way diff (yours vs the current default) over the agent's AGENT.md body, with reset.
+	 * Two-way diff (yours vs the current default) over the agent's AGENT.md body, with reset
+	 * and a link to the note for merging by hand.
 	 * Lives here rather than only in AgentEditorModal so the stale-guidance notice can open it
 	 * directly from the chat recommendations surface.
 	 */
@@ -531,10 +614,10 @@ export class AgentManager {
 				getPrompt: () => promptFiles?.getAgentPrompt(agentId) ?? DEFAULT_AGENT_PROMPT,
 				// The factory default this agent's AGENT.md body was written from.
 				defaultPrompt: DEFAULT_AGENT_PROMPT,
-				// The modal closes synchronously after this, so a rejected write would read as
-				// a successful save (and leave an unhandled rejection). The edit only exists
-				// in the closed editor at that point — say so rather than letting the user
-				// believe it landed. Same contract as `openSkillDiff`.
+				notePath: agentDefinitionPath(agentId),
+				// The modal closes synchronously after "Use default", so a rejected write would
+				// read as a success (and leave an unhandled rejection) — say so rather than
+				// letting the user believe it landed. Same contract as `openSkillDiff`.
 				setPrompt: (prompt: string) => {
 					void promptFiles
 						?.writeAgentPrompt(agentId, prompt)
@@ -543,8 +626,7 @@ export class AgentManager {
 						})
 						.catch((error) => {
 							Logger.error(`Failed to save the system prompt for ${agent.name}:`, error);
-							// The edit is gone with the closed editor; the link shows what is
-							// actually on disk so the user can redo it against the real content.
+							// The link shows what is actually on disk.
 							showActionNotice(
 								`Could not save the system prompt: ${extractErrorMessage(error)}`,
 								openNoteAction(agentDefinitionPath(agentId), "Open the agent note"),
@@ -552,18 +634,19 @@ export class AgentManager {
 						});
 				},
 			},
-			{ title: `System Prompt — ${agent.name}`, showDiff: true },
+			{ title: `System Prompt — ${agent.name}` },
 		).open();
 	}
 
 	/**
 	 * Diff a bundled skill's on-disk body against the version we currently ship, so a user
-	 * whose customization blocked the auto-update can see what moved and merge it by hand.
+	 * whose customization blocked the auto-update can see what moved and merge it by hand in
+	 * the note (or replace it with the default).
 	 *
 	 * The prompt surfaces get this from their factory constants; a skill's "default" is the
 	 * bundled `SKILL.md` content, which is available at runtime for exactly this reason.
-	 * Saving writes the file back and re-discovers, so the edited body reaches the next
-	 * agent run without a reload. Returns false when the skill isn't bundled (user-created
+	 * "Use default" writes the file back and re-discovers, so the body reaches the next agent
+	 * run without a reload. Returns false when the skill isn't bundled (user-created
 	 * skills have no shipped default to diff against) so the caller can fall back to just
 	 * opening the note.
 	 */
@@ -589,10 +672,10 @@ export class AgentManager {
 				// — two unrelated documents, so the whole pane highlights and "Use default"
 				// would overwrite the skill with the base prompt.
 				defaultPrompt: bundled.content,
-				// The modal closes synchronously after calling this, so a rejected write would
-				// otherwise read as a successful save (and leave an unhandled rejection). The
-				// edit only exists in the closed editor at that point, so say so explicitly
-				// rather than letting the user believe it landed.
+				notePath: `${skills.getSkillsDir()}/${skillName}/SKILL.md`,
+				// The modal closes synchronously after "Use default", so a rejected write would
+				// otherwise read as a success (and leave an unhandled rejection) — say so
+				// explicitly rather than letting the user believe it landed.
 				setPrompt: (text: string) => {
 					void skills
 						.writeSkillFile(skillName, text)
@@ -608,7 +691,7 @@ export class AgentManager {
 						});
 				},
 			},
-			{ title: `Skill — ${skillName}`, showDiff: true },
+			{ title: `Skill — ${skillName}` },
 		).open();
 		return true;
 	}
@@ -790,11 +873,12 @@ export class AgentManager {
 	 * The set of built-in tool ids an agent may use, derived from its *enabled* skills'
 	 * `allowed-tools` frontmatter. A built-in tool is only bound if some enabled skill
 	 * attaches it — this is what makes `allowed-tools` load-bearing (a "core skill" is a
-	 * skill that carries tools). Unknown tool ids (not built-in) are ignored. `load_skill`
+	 * skill that carries tools). Unknown tool ids (not built-in) are ignored. The
+	 * {@link ALWAYS_ATTACHED_TOOL_IDS} start out attached without a skill. `load_skill`
 	 * is never attached this way — it is bound unconditionally when any skill exists.
 	 */
 	private attachedToolIds(agentCfg: AgentConfig): Set<BuiltInToolId> {
-		const attached = new Set<BuiltInToolId>();
+		const attached = new Set<BuiltInToolId>(ALWAYS_ATTACHED_TOOL_IDS);
 		const cache = this.plugin.skillsService?.getCachedSkills();
 		if (!cache) return attached;
 		const builtIn = new Set<string>(BUILT_IN_TOOL_IDS);
@@ -868,10 +952,7 @@ export class AgentManager {
 	 * reading `toolsConfig[id].enabled` alone, which is only half the condition.
 	 */
 	isToolBound(agentCfg: AgentConfig, toolId: BuiltInToolId): boolean {
-		return (
-			(this.attachedToolIds(agentCfg).has(toolId) || toolId === "ask_question") &&
-			(agentCfg.toolsConfig[toolId]?.enabled ?? true)
-		);
+		return this.attachedToolIds(agentCfg).has(toolId) && (agentCfg.toolsConfig[toolId]?.enabled ?? true);
 	}
 
 	/**
@@ -880,17 +961,20 @@ export class AgentManager {
 	 * override in `toolsConfig` hasn't disabled it (default enabled). Shared between the
 	 * main agent (bindBuiltInTools) and subagent resolution (resolveSubAgentSpecs).
 	 */
-	private buildToolsForAgent(agentCfg: AgentConfig): StructuredToolInterface[] {
+	private buildToolsForAgent(agentCfg: AgentConfig, { forSubAgent = false } = {}): StructuredToolInterface[] {
 		const tools: StructuredToolInterface[] = [];
 
 		// A tool must be attached by an enabled skill AND not vetoed by its per-tool override.
 		// Resolved once here rather than via isToolBound per tool, so the skill cache is only
 		// walked a single time while building the whole tool list.
 		const attached = this.attachedToolIds(agentCfg);
+		// A subagent gets no task list and cannot ask the user: its run is one scoped step of
+		// the parent's work, and only the top-level run can pause on the chat.
+		if (forSubAgent) {
+			for (const id of ALWAYS_ATTACHED_TOOL_IDS) attached.delete(id);
+		}
 		const isToolEnabled = (toolId: BuiltInToolId): boolean => {
-			return (
-				(attached.has(toolId) || toolId === "ask_question") && (agentCfg.toolsConfig[toolId]?.enabled ?? true)
-			);
+			return attached.has(toolId) && (agentCfg.toolsConfig[toolId]?.enabled ?? true);
 		};
 
 		// Instantiate vision processor models for read_content.
@@ -958,6 +1042,7 @@ export class AgentManager {
 			["fetch_url", () => createFetchUrlTool()],
 			["web_search", () => createWebSearchTool(agentCfg.id)],
 			["manage_skills", () => createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id)],
+			["write_todos", () => createWriteTodosTool(agentCfg.id)],
 			["ask_question", () => createAskQuestionTool(agentCfg.id)],
 		];
 
@@ -1008,7 +1093,6 @@ export class AgentManager {
 				tools.push(
 					createLoadSkillTool(this.plugin.skillsService, {
 						skillNames: loadableSkills,
-						recordUsage: (name) => getData().recordSkillLoad(name),
 						isToolAvailable: (toolId) => {
 							if (BUILT_IN_TOOL_IDS.includes(toolId as BuiltInToolId)) {
 								return boundBuiltInTools.has(toolId);
@@ -1197,7 +1281,7 @@ export class AgentManager {
 					ref.chatModel.model,
 					ref.chatModel.modelConfig,
 				);
-				const tools = this.buildToolsForAgent(ref);
+				const tools = this.buildToolsForAgent(ref, { forSubAgent: true });
 				const isSelf = ref.id === parentAgent.id;
 				// A self-reference exposes an isolated-context copy of this agent.
 				// Give it a distinct selector name so it never collides with a
@@ -1205,15 +1289,38 @@ export class AgentManager {
 				const name = isSelf ? `${ref.name} (isolated)` : ref.name;
 				// Substituted up front so neither the delegated prompt nor the hint below (which
 				// the parent model reads as the tool's description) ever shows a raw placeholder.
-				const refBasePrompt = substitutePromptPlaceholders(
-					this.plugin.promptFilesService?.getAgentPrompt(ref.id) ?? DEFAULT_AGENT_PROMPT,
-					{
-						memoryFolder: normalizePath(memoriesDir()),
-						date: currentDateValue(),
-						memoryIndex: this.memoryIndexSnapshot,
-					},
-				);
-				const promptHint = refBasePrompt.trim().replace(/\s+/g, " ").slice(0, 160);
+				const refBody = this.plugin.promptFilesService?.getAgentPrompt(ref.id) ?? DEFAULT_AGENT_PROMPT;
+				// The subagent runs on its own model, so its vault overview honours its own
+				// provider's privacy trust, not the parent's.
+				const refVault = this.buildVaultOverview(ref, refBody);
+				const refValues = {
+					memoryFolder: normalizePath(memoriesDir()),
+					date: currentDateValue(),
+					// Rendered against the child's own context window: a parent with a large window
+					// may load a note whole that would swamp a small child model.
+					memoryIndex: renderMemoryIndex(
+						this.memoryEntriesSnapshot,
+						memoryAlwaysBudget(ref.chatModel.modelConfig?.contextWindow),
+					),
+					vaultSettings: refVault.vaultSettings,
+					vaultFolders: refVault.folders,
+					vaultTags: refVault.tags,
+					vaultProperties: refVault.properties,
+				};
+				const refBasePrompt = substitutePromptPlaceholders(refBody, refValues);
+				// The hint goes to the PARENT's model as the tool description, so it must not carry
+				// the child's vault overview: that is filtered by the child's provider trust, and a
+				// trusted child would otherwise leak private names to an untrusted parent.
+				const promptHint = substitutePromptPlaceholders(refBody, {
+					...refValues,
+					vaultSettings: "",
+					vaultFolders: "",
+					vaultTags: "",
+					vaultProperties: "",
+				})
+					.trim()
+					.replace(/\s+/g, " ")
+					.slice(0, 160);
 				let description: string;
 				if (isSelf) {
 					description = `Delegate a subtask to a fresh isolated-context copy of yourself ("${ref.name}"). Use this to keep the main conversation's context clean while handling a self-contained subtask.`;
@@ -1560,7 +1667,13 @@ export class AgentManager {
 		});
 	}
 
-	private buildRunnableCacheKey(agent: AgentConfig, chatModel: ChatModel, summarizationModel: ChatModel): string {
+	private buildRunnableCacheKey(
+		agent: AgentConfig,
+		chatModel: ChatModel,
+		summarizationModel: ChatModel,
+		systemPrompt: string,
+		subAgents: readonly SubAgentSpec[],
+	): string {
 		return JSON.stringify({
 			provider: chatModel.provider,
 			model: chatModel.model,
@@ -1584,6 +1697,14 @@ export class AgentManager {
 			// session left open overnight would keep telling the model yesterday's date.
 			// Costs at most one rebuild per day per config.
 			today: localIsoDate(),
+			// The assembled prompt itself. The vault overview changes with notes outside the
+			// agent folder — a new folder, tag or property — which no invalidation hook sees, so
+			// without this a cached runnable would keep showing the model a stale overview.
+			// Covers the date and memory index too; the terms above stay for what they document.
+			prompt: fingerprint(systemPrompt),
+			// Each subagent's assembled prompt and description too: a child can keep the vault
+			// placeholders its parent dropped, and its overview must not go stale either.
+			subPrompts: subAgents.map((spec) => fingerprint(`${spec.description}\n${spec.systemPrompt}`)),
 		});
 	}
 
@@ -1625,7 +1746,13 @@ export class AgentManager {
 		const systemPrompt = await this.assembleSystemPrompt(selectedAgent);
 		const tools = await this.assembleToolsForAgent(selectedAgent);
 		const subAgents = this.resolveSubAgentSpecs(selectedAgent);
-		const cacheKey = this.buildRunnableCacheKey(selectedAgent, chatModel, summarizationModel);
+		const cacheKey = this.buildRunnableCacheKey(
+			selectedAgent,
+			chatModel,
+			summarizationModel,
+			systemPrompt,
+			subAgents,
+		);
 
 		// Self-heal before resolving: the registry is normally kept in step by the data
 		// store's provider mutations, but a run can still reach a provider that isn't
@@ -1765,6 +1892,36 @@ export class AgentManager {
 		);
 	}
 
+	/**
+	 * Continue a turn that paused on tool calls waiting for the user (an `ask_question`
+	 * card), handing each call its answer. Continues the same turn: no new user message.
+	 */
+	async *resumeFromInterrupt(
+		threadId: string,
+		agentId: string,
+		checkpointId: string,
+		responses: InterruptResponse[],
+		signal?: AbortSignal,
+	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
+		const resolvedThreadId = this.normalizeThreadId(threadId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+
+		yield* this.dispatchStream(
+			agent.resumeFromInterrupt({
+				resolved,
+				threadId: resolvedThreadId,
+				checkpointId,
+				responses,
+				metadata: runMetadata,
+				configurable: { agent_id: resolvedAgentId },
+				signal,
+			}),
+			signal,
+			chatModel,
+			"Error continuing after your answer",
+		);
+	}
+
 	async getThreadHistory(threadId: string): Promise<ThreadHistory | null> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
 		try {
@@ -1866,6 +2023,20 @@ export class AgentManager {
 		return this.chatManager.renameChatFile(this.normalizeThreadId(threadId), title);
 	}
 
+	/**
+	 * Rename a thread whose turn failed to "New Chat (failed)", freeing the "New Chat"
+	 * placeholder. Only once the thread has checkpoints: a run that failed before
+	 * checkpointing anything (e.g. no chat model configured) left the chat empty, and
+	 * an empty "New Chat" is reused by the next new chat, so renaming it would only
+	 * strand an empty file. Returns the new vault path, or `undefined` if not renamed.
+	 */
+	async markThreadFailed(threadId: string): Promise<string | undefined> {
+		const normalized = this.normalizeThreadId(threadId);
+		const data = await this.chatManager.ensureThreadLoaded(normalized);
+		if (!data || Object.keys(data.checkpoints).length === 0) return undefined;
+		return this.chatManager.renameChatFile(normalized, FAILED_CHAT_TITLE);
+	}
+
 	async setLastViewedCheckpoint(threadId: string, checkpointId: string): Promise<void> {
 		await this.patchThreadMetadata(threadId, (metadata) =>
 			metadata.lastViewedCheckpointId === checkpointId
@@ -1879,7 +2050,7 @@ export class AgentManager {
 
 	/**
 	 * Read-modify-write a thread's metadata, serialized per thread: every writer that patches
-	 * metadata after the run (the last-viewed checkpoint, the review counter) goes through
+	 * metadata after the run (today the last-viewed checkpoint) goes through
 	 * here, so two of them landing together cannot each rebuild the object from a stale read
 	 * and discard the other's change. The patch sees the freshest snapshot and returns the new
 	 * metadata, or null to leave the thread untouched.
@@ -1909,148 +2080,6 @@ export class AgentManager {
 			next.catch(() => undefined),
 		);
 		return next;
-	}
-
-	// --- post-turn review -------------------------------------------------------------------
-
-	/** Threads with a review in flight; a second busy turn while one runs is simply skipped. */
-	private reviewsInFlight = new Set<string>();
-
-	/**
-	 * Called by the chat store after every successful turn. Decides whether the turn earned a
-	 * review (see `noteTurnForReview`) and, if so, runs one detached. Never throws.
-	 */
-	async maybeRunPostTurnReview(threadId: string, agentId: string, activity: TurnActivity): Promise<void> {
-		try {
-			const agentCfg = agentId ? getData().getAgent(agentId) : getData().getSelectedAgent();
-			const config = agentCfg?.postTurnReview;
-			if (!agentCfg || !config?.enabled) return;
-			if (Platform.isMobile && !config.onMobile) return;
-			const resolvedThreadId = this.normalizeThreadId(threadId);
-
-			// The count lives in the thread's own metadata (see TOOL_CALLS_SINCE_REVIEW_KEY).
-			// Fold this turn in and persist the running total; it is consumed only below, once
-			// a review has actually run, so a skipped or failed review keeps the trigger.
-			let due = false;
-			let consumed = 0;
-			let generation = 0;
-			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
-				const before = readCallsSinceReview(metadata);
-				generation = readReviewGeneration(metadata);
-				const step = noteTurnForReview(before, activity, config.toolCallThreshold);
-				due = step.due;
-				const total = step.due ? before + activity.toolCalls : step.callsSinceReview;
-				consumed = step.due ? total : 0;
-				// A reset by a skill-revising turn starts a new generation (see
-				// REVIEW_GENERATION_KEY), so a review still running cannot consume from it.
-				const next: Record<string, unknown> = { ...metadata, [TOOL_CALLS_SINCE_REVIEW_KEY]: total };
-				if (activity.revisedSkills && before > 0) next[REVIEW_GENERATION_KEY] = generation + 1;
-				return total === before ? null : next;
-			});
-			if (!due) return;
-			// Another review of this thread is running: keep the count and let the next turn
-			// trigger again once it is done.
-			if (this.reviewsInFlight.has(resolvedThreadId)) return;
-
-			this.reviewsInFlight.add(resolvedThreadId);
-			let ran = false;
-			try {
-				ran = await this.runPostTurnReview(threadId, agentCfg);
-			} finally {
-				this.reviewsInFlight.delete(resolvedThreadId);
-			}
-			if (!ran) return;
-			// Consume what this review covered. Calls a turn added while it was running stay,
-			// since that turn was not in the transcript it reviewed; and if a skill-revising turn
-			// reset the count meanwhile, this review's share is already gone with it.
-			await this.patchThreadMetadata(resolvedThreadId, (metadata) => {
-				if (readReviewGeneration(metadata) !== generation) return null;
-				return {
-					...metadata,
-					[TOOL_CALLS_SINCE_REVIEW_KEY]: Math.max(0, readCallsSinceReview(metadata) - consumed),
-				};
-			});
-		} catch (error) {
-			Logger.error("[AgentManager] Post-turn review failed:", error);
-		}
-	}
-
-	/**
-	 * One side run over the finished thread with a reviewer prompt and a read-and-revise tool
-	 * set: the agent's own gated tools filtered to reading, skill loading and `manage_skills`,
-	 * plus `save_memory` as the only memory write path. No checkpointer — the review is not
-	 * part of the conversation and leaves no trace in it; what it changes is in the vault.
-	 */
-	private async runPostTurnReview(threadId: string, agentCfg: AgentConfig): Promise<boolean> {
-		const agent = await this.ensureAgent();
-		const history = await agent.getThreadHistory(threadId);
-		if (!history || history.messages.length === 0) return false;
-
-		const chatModel = agentCfg.postTurnReview?.model ?? agentCfg.chatModel;
-		if (!chatModel) return false;
-		ensureProviderRegistered(getData(), chatModel.provider);
-		const params = await toChooseModelParams(chatModel);
-		const model = getRegistry().createChatInstance(params.provider, params.chatModel, params.options);
-
-		const body = this.plugin.promptFilesService?.getAgentPrompt(agentCfg.id) ?? DEFAULT_AGENT_PROMPT;
-		const canRemember = body.includes(MEMORY_FOLDER_PLACEHOLDER);
-		const canRevise = this.isToolBound(agentCfg, "manage_skills");
-		if (!canRemember && !canRevise) return false;
-
-		const memoryFolder = normalizePath(memoriesDir());
-		const reviewerTools = this.buildToolsForAgent(agentCfg).filter((tool) =>
-			REVIEWER_TOOL_NAMES.has((tool as { name: string }).name),
-		);
-		if (canRevise) {
-			reviewerTools.push(
-				createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id, { allowDelete: false }),
-			);
-		}
-		if (canRemember) reviewerTools.push(createSaveMemoryTool(this.plugin.app, memoryFolder));
-
-		const skillsService = this.plugin.skillsService;
-		let skillsXml = "";
-		if (canRevise && skillsService?.isDiscovered()) {
-			const enableState: Record<string, boolean> = {};
-			for (const [name, meta] of skillsService.getCachedSkills()) {
-				enableState[name] =
-					(agentCfg.skills[name]?.enabled ?? true) && this.skillHasUsableTools(agentCfg, meta);
-			}
-			skillsXml = skillsService.generateContextXml(
-				enableState,
-				(id) => this.isPluginEnabled(id),
-				(id) => this.isInternalPluginEnabled(id),
-			);
-		}
-		const memoryIndex = canRemember
-			? renderMemoryIndex(await collectMemoryIndex(this.plugin.app, memoryFolder))
-			: "";
-
-		const systemPrompt = buildReviewSystemPrompt({ memoryIndex, memoryFolder, skillsXml, canRevise, canRemember });
-		const reviewer = createAgent({ model, tools: reviewerTools, systemPrompt });
-		const transcript = renderTranscript(history.messages);
-
-		Logger.log(`[AgentManager] Post-turn review of ${threadId} with ${params.provider}:${params.chatModel}`);
-		// Buffered transport, like title generation: a non-streaming side call that must
-		// never disturb a concurrent chat stream's transport context.
-		const transportContext = createAiTransportContext("buffered", `postTurnReview:${threadId}`);
-		const result = await runWithAiTransportContext(transportContext, () =>
-			reviewer.invoke(
-				{ messages: [new HumanMessage(buildReviewUserMessage(transcript))] },
-				// The thread id is what lets manage_skills accept a skill the conversation
-				// already loaded (the load registry is keyed by it).
-				{ configurable: { thread_id: threadId }, recursionLimit: REVIEWER_RECURSION_LIMIT },
-			),
-		);
-		const messages = (result as { messages?: BaseMessage[] }).messages ?? [];
-		const actions = summarizeReviewActions(messages);
-		if (actions.length === 0) {
-			Logger.log("[AgentManager] Post-turn review: nothing to save");
-			return true;
-		}
-		Logger.log(`[AgentManager] Post-turn review: ${actions.join("; ")}`);
-		new Notice(`${agentCfg.name} learned: ${actions.join("; ")}`, 8000);
-		return true;
 	}
 
 	/**
@@ -2125,7 +2154,7 @@ export class AgentManager {
 			// Reuse a tab already showing this exact thread instead of always opening a
 			// fresh one — otherwise every reopen of a backgrounded chat (running-indicator
 			// tap, "Ask agent", openLatestChat) stacks a new leaf on top of the old one.
-			// That leaves a stale, unmounted-but-still-registered .chat-root leaf behind,
+			// That leaves a stale, unmounted-but-still-registered .s2b-chat-root leaf behind,
 			// which corrupts touch hit-testing on mobile (double-tap bug). On mobile there's
 			// effectively one active pane, so getLeaf("tab") duplicating is especially costly.
 			leaf = workspace
@@ -2175,7 +2204,7 @@ export class AgentManager {
 			await this.plugin.app.vault.createFolder(folder);
 		}
 
-		const { path } = await this.chatManager.getUniqueTitlePath(folder, "New Chat", "");
+		const { path } = await this.chatManager.getUniqueTitlePath(folder, DEFAULT_CHAT_TITLE, "");
 
 		const initialData = {
 			threadId: path,

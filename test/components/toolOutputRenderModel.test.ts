@@ -1,7 +1,89 @@
 import { describe, expect, it } from "vitest";
-import { buildToolOutputRenderModel } from "../../src/components/chat/toolOutputRenderModel";
+import {
+	buildToolOutputRenderModel,
+	MAX_RENDERED_TOOL_OUTPUT_CHARS,
+} from "../../src/components/chat/toolOutputRenderModel";
 
 describe("buildToolOutputRenderModel", () => {
+	it.each([MAX_RENDERED_TOOL_OUTPUT_CHARS - 1, MAX_RENDERED_TOOL_OUTPUT_CHARS, MAX_RENDERED_TOOL_OUTPUT_CHARS + 1])(
+		"caps string previews at 20k characters plus a truncation notice, length %s",
+		(length) => {
+			const output = "x".repeat(length);
+			const model = buildToolOutputRenderModel("mcp_tool", output);
+			const expected =
+				length <= MAX_RENDERED_TOOL_OUTPUT_CHARS
+					? output
+					: `${output.slice(0, MAX_RENDERED_TOOL_OUTPUT_CHARS)}\n\n[UI preview truncated: 1 characters omitted]`;
+			expect(model).toEqual({ kind: "markdown", markdown: expected, rawText: expected });
+		},
+	);
+
+	it.each([
+		'Content of "Large.md"',
+		'Content of PDF "Large.pdf"',
+		'Content of Excalidraw drawing "Large.excalidraw"',
+	])("marks large read_content previews as truncated: %s", (header) => {
+		const output = { type: "text", text: `${header}:\n\n${"x".repeat(MAX_RENDERED_TOOL_OUTPUT_CHARS * 8)}` };
+		const original = output.text;
+		const model = buildToolOutputRenderModel("read_content", output);
+		expect(model.kind).toBe("read_content");
+		if (model.kind !== "read_content") return;
+		expect(model.payload.truncated).toBe(true);
+		expect(model.payload.content).toContain("[UI preview truncated:");
+		expect(model.rawText.length).toBeLessThan(MAX_RENDERED_TOOL_OUTPUT_CHARS + 100);
+		expect(output.text).toBe(original);
+	});
+
+	it.each(['Content of "Note.md"', 'Content of PDF "Note.pdf"', 'Content of Excalidraw drawing "Note.excalidraw"'])(
+		"does not treat literal UI markers as truncation: %s",
+		(header) => {
+			const content = "Example notice:\n\n[UI preview truncated: 123 characters omitted]";
+			const model = buildToolOutputRenderModel("read_content", `${header}:\n\n${content}`);
+			expect(model).toMatchObject({ kind: "read_content", payload: { content, truncated: false } });
+
+			const toolTruncated = buildToolOutputRenderModel(
+				"read_content",
+				`${header}:\n\n[Content truncated at 100 characters]`,
+			);
+			expect(toolTruncated).toMatchObject({ kind: "read_content", payload: { truncated: true } });
+		},
+	);
+
+	it("parses JSON outputs over the preview cap into their specialized cards", () => {
+		const files = Array.from({ length: 900 }, (_, i) => `Note ${i} about an ordinary topic.md`);
+		const listing = JSON.stringify({ root: "/", tree: { folders: { Projects: { files } } } });
+		const results = Array.from({ length: 25 }, (_, i) => ({
+			rank: i + 1,
+			name: `Note ${i}`,
+			path: "x".repeat(1000),
+		}));
+		const search = JSON.stringify({ query: "q", totalResults: 25, returnedResults: 25, results });
+		expect(listing.length).toBeGreaterThan(MAX_RENDERED_TOOL_OUTPUT_CHARS);
+		expect(search.length).toBeGreaterThan(MAX_RENDERED_TOOL_OUTPUT_CHARS);
+
+		const listModel = buildToolOutputRenderModel("list_directory", listing);
+		expect(listModel.kind).toBe("list_directory");
+		if (listModel.kind !== "list_directory") return;
+		expect(listModel.payload.tree?.folders?.Projects?.files).toHaveLength(900);
+
+		const searchModel = buildToolOutputRenderModel("search_notes", search);
+		expect(searchModel.kind).toBe("search_notes");
+		if (searchModel.kind !== "search_notes") return;
+		expect(searchModel.payload.results).toHaveLength(25);
+	});
+
+	it("caps the displayed JSON of large generic structured outputs", () => {
+		const output = JSON.stringify({ status: "ok", items: Array.from({ length: 2000 }, (_, i) => ({ id: i })) });
+		const model = buildToolOutputRenderModel("mcp_tool", output);
+		expect(model.kind).toBe("structured");
+		if (model.kind !== "structured") return;
+		expect(model.summaryEntries).toEqual([{ key: "status", value: "ok" }]);
+		for (const json of [model.json, ...model.sections.map((section) => section.json)]) {
+			expect(json.length).toBeLessThan(MAX_RENDERED_TOOL_OUTPUT_CHARS + 100);
+			expect(json).toContain("[UI preview truncated:");
+		}
+	});
+
 	it("renders search_notes payloads as a specialized model", () => {
 		const model = buildToolOutputRenderModel(
 			"search_notes",

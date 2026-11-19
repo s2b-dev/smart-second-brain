@@ -28,7 +28,7 @@ let {
 	onTriggerClick,
 	tooltip = undefined,
 	dataTestId = undefined,
-	triggerStyles = "picker-popover-trigger",
+	triggerStyles = "s2b-picker-popover-trigger",
 	triggerClass = "",
 	contentClass = "",
 	side = "bottom",
@@ -62,7 +62,7 @@ function handleTriggerClick() {
 <Popover.Root bind:open>
   <Popover.Portal>
     <Popover.Content
-      class={`picker-popover-content ${contentClass}`.trim()}
+      class={`s2b-picker-popover-content ${contentClass}`.trim()}
       customAnchor={element}
       {sideOffset}
       {side}
@@ -76,7 +76,7 @@ function handleTriggerClick() {
 </Popover.Root>
 
 <style>
-  :global(.picker-popover-trigger) {
+  :global(.s2b-picker-popover-trigger) {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
@@ -98,18 +98,18 @@ function handleTriggerClick() {
 
   /* Guarded so a tap doesn't leave the trigger stuck in its hover state. */
   @media (hover: hover) and (pointer: fine) {
-    :global(.picker-popover-trigger:hover) {
+    :global(.s2b-picker-popover-trigger:hover) {
       background: var(--interactive-hover);
       border-color: color-mix(in srgb, var(--background-modifier-border) 72%, var(--text-muted) 28%);
     }
   }
 
-  :global(.picker-popover-trigger:focus-visible) {
+  :global(.s2b-picker-popover-trigger:focus-visible) {
     outline: 2px solid color-mix(in srgb, var(--interactive-accent) 55%, transparent);
     outline-offset: 2px;
   }
 
-  :global(.picker-popover-content) {
+  :global(.s2b-picker-popover-content) {
     min-width: min(236px, calc(100vw - 24px));
     max-width: min(340px, calc(100vw - 24px));
     background: var(--background-primary);
@@ -126,7 +126,7 @@ function handleTriggerClick() {
     padding: var(--size-4-1);
   }
 
-  :global(.picker-popover-separator) {
+  :global(.s2b-picker-popover-separator) {
     height: 1px;
     margin: var(--size-4-1) 0;
     background: var(--background-modifier-border);

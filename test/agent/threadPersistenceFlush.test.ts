@@ -24,6 +24,8 @@ const { createAgentMock, summarizationMiddlewareMock } = vi.hoisted(() => ({
 vi.mock("langchain", () => ({
 	createAgent: createAgentMock,
 	summarizationMiddleware: summarizationMiddlewareMock,
+	createMiddleware: (config: unknown) => config,
+	modelRefusalMiddleware: () => ({ name: "modelRefusalMiddleware" }),
 }));
 
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";

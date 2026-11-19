@@ -9,6 +9,7 @@
  */
 import { AIMessage, type BaseMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import type { CheckpointHistoryItem } from "../agent/Agent";
+import type { ToolInterrupt } from "../agent/toolInterrupts";
 import type { ChatModelConfig } from "../providers/index";
 import type { ChatAttachment, ReviewStatusRef } from "../types/shared";
 import { type UUIDv7, genUUIDv7 } from "../utils/uuid7Validator";
@@ -241,6 +242,8 @@ export interface CheckpointNode {
 	messages: BaseMessage[];
 	children: string[];
 	ts?: string;
+	/** Tool calls this checkpoint's run paused on (see `pendingToolInterrupts`). */
+	interrupts?: ToolInterrupt[];
 }
 
 export interface CheckpointGraphState {
@@ -417,6 +420,7 @@ export function buildCheckpointGraph(checkpoints: CheckpointHistoryItem[]): Chec
 			messages: checkpoint.messages,
 			children: [],
 			ts: checkpoint.ts,
+			interrupts: checkpoint.interrupts,
 		});
 	}
 
@@ -458,6 +462,30 @@ export function buildCheckpointGraph(checkpoints: CheckpointHistoryItem[]): Chec
 		nodes,
 		rootCheckpointId,
 	};
+}
+
+/**
+ * The tool calls the active branch is paused on, waiting for the user.
+ *
+ * A pause is a property of the branch tip: LangGraph records the interrupt on the
+ * checkpoint the run stopped at, and continuing writes that checkpoint's children. So an
+ * interrupt still waits iff its checkpoint is the active one, nothing descends from it,
+ * and its call has no result in the transcript yet. Derived from the graph alone, which
+ * is why a question survives reloads and comes back when its branch is selected again.
+ */
+export function pendingToolInterrupts(graph: CheckpointGraphState): ToolInterrupt[] {
+	const active = graph.activeCheckpointId ? graph.nodes.get(graph.activeCheckpointId) : undefined;
+	if (!active?.interrupts?.length || active.children.length > 0) return [];
+	const answered = new Set<string>();
+	for (const message of active.messages) {
+		if (ToolMessage.isInstance(message) && message.tool_call_id) answered.add(message.tool_call_id);
+	}
+	const seen = new Set<string>();
+	return active.interrupts.filter((interrupt) => {
+		if (answered.has(interrupt.toolCallId) || seen.has(interrupt.id)) return false;
+		seen.add(interrupt.id);
+		return true;
+	});
 }
 
 function resolveFallbackCheckpoint(graph: CheckpointGraphState, fromCheckpointId?: string): string | undefined {
@@ -722,6 +750,17 @@ function buildCheckpointMessageMappingFromGraph(
  * Messages that survived into the tip keep the tip's copy, so the live window
  * renders exactly as before.
  *
+ * Summary messages are tracked apart from ordinary ones: LangChain's
+ * `summarizationMiddleware` gives the summary the id of the first message it
+ * replaces, so the summary shares an id with the conversation's first
+ * question — or, on a repeat summarization, with the previous summary.
+ * Deduplicating by id alone would render the summary in the first question's
+ * slot and drop the first turn. Instead, a summary counts as new whenever it
+ * appears in a checkpoint that reset the channel (its ids don't extend the
+ * previous checkpoint's — only summarization does that); later checkpoints
+ * that merely carry it forward are skipped. An ordinary message never takes a
+ * summary's copy from the tip.
+ *
  * Marker placement: automatic summarization runs *mid-turn* (before the model
  * answers the message that overflowed the context), so its summary message is
  * moved in front of that turn's human message — otherwise the badge would
@@ -746,25 +785,36 @@ function recoverSummarizedHistory(
 		.filter((node): node is CheckpointNode => !!node)
 		.sort(comparePathOrder);
 
+	const isSummary = (msg: BaseMessage) =>
+		HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization";
+
 	const tipById = new Map<string, BaseMessage>();
 	for (const msg of tipMessages) {
-		if (msg.id) tipById.set(msg.id, msg);
+		if (msg.id && !isSummary(msg)) tipById.set(msg.id, msg);
 	}
 
 	const seen = new Set<string>();
+	// Summary ids rendered since the last channel reset; a reset starts a new
+	// summarization event even when its summary repeats an id (and text).
+	const carriedSummaries = new Set<string>();
+	let prevIds: (string | undefined)[] = [];
 	const display: BaseMessage[] = [];
 	for (const node of path) {
+		const ids = node.messages.map((msg) => msg.id);
+		const extendsPrev = prevIds.length <= ids.length && prevIds.every((id, i) => ids[i] === id);
+		if (!extendsPrev) carriedSummaries.clear();
+		prevIds = ids;
+
 		for (const msg of node.messages) {
 			// Every message that went through LangGraph's reducer carries an id.
 			// If one doesn't, occurrences can't be deduplicated across
 			// checkpoints — bail out to the plain tip rather than risk
 			// rendering duplicated turns.
 			if (!msg.id) return tipMessages;
-			if (seen.has(msg.id)) continue;
-			seen.add(msg.id);
 
-			const rendered = tipById.get(msg.id) ?? msg;
-			if (HumanMessage.isInstance(msg) && msg.additional_kwargs?.lc_source === "summarization") {
+			if (isSummary(msg)) {
+				if (carriedSummaries.has(msg.id)) continue;
+				carriedSummaries.add(msg.id);
 				let insertAt = display.length;
 				for (let i = display.length - 1; i >= 0; i--) {
 					if (HumanMessage.isInstance(display[i])) {
@@ -772,10 +822,13 @@ function recoverSummarizedHistory(
 						break;
 					}
 				}
-				display.splice(insertAt, 0, rendered);
+				display.splice(insertAt, 0, msg);
 				continue;
 			}
-			display.push(rendered);
+
+			if (seen.has(msg.id)) continue;
+			seen.add(msg.id);
+			display.push(tipById.get(msg.id) ?? msg);
 		}
 	}
 	return display;

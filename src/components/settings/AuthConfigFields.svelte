@@ -109,7 +109,9 @@ function getFieldStyles(fieldKey: string): string {
 	if (isCheckingAuth || !query.data) {
 		return "";
 	}
-	return query.data.success ? "!border-[--background-modifier-success]" : "!border-[--background-modifier-error]";
+	return query.data.success
+		? "!s2b-border-[--background-modifier-success]"
+		: "!s2b-border-[--background-modifier-error]";
 }
 </script>
 
@@ -127,7 +129,7 @@ function getFieldStyles(fieldKey: string): string {
         <!-- Textarea field (e.g., headers JSON) -->
         <SettingItem name={field.label} desc={field.description}>
             <textarea
-                class="setting-textarea w-full min-h-[80px] p-2 font-mono text-sm resize-y {getFieldStyles(
+                class="setting-textarea s2b-w-full s2b-min-h-[80px] s2b-p-2 s2b-font-mono s2b-text-sm s2b-resize-y {getFieldStyles(
                     fieldKey,
                 )}"
                 placeholder={field.placeholder ?? ""}

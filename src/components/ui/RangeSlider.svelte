@@ -88,9 +88,9 @@ const fillRatio = $derived.by(() => {
 });
 </script>
 
-<div class="s2b-range-row flex items-center gap-2 {className}">
+<div class="s2b-range-row s2b-flex s2b-items-center s2b-gap-2 {className}">
 	{#if showValue}
-		<output class="text-ui-small text-text-muted w-8 text-right">{value}</output>
+		<output class="s2b-text-ui-small s2b-text-text-muted s2b-w-8 s2b-text-right">{value}</output>
 	{/if}
 	<!-- `slider` is Obsidian's own class: it is what opts this input into the
 	     native filled track (and the theme's thumb sizing) rather than the bare
@@ -98,7 +98,7 @@ const fillRatio = $derived.by(() => {
 	<input
 		use:claimTouchGestures
 		type="range"
-		class="slider s2b-range w-full cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+		class="slider s2b-range s2b-w-full s2b-cursor-pointer disabled:s2b-opacity-50 disabled:s2b-cursor-not-allowed"
 		style="--slider-fill-ratio: {fillRatio};"
 		{value}
 		{min}

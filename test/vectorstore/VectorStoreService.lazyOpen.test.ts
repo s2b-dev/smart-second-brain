@@ -127,6 +127,8 @@ const stores = new Map<string, FakeStore>();
 let vaultFiles: FakeFile[] = [];
 /** Paths whose `readIndexableContent` throws. */
 let readFailures = new Set<string>();
+/** Paths whose extracted content is empty (a blank note, a drawing with nothing beside it). */
+let emptyPaths = new Set<string>();
 /** Content served for `long.md`, when a test needs a multi-chunk note. */
 let longContent = "";
 const embedDocuments = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
@@ -136,6 +138,15 @@ const indexStats: Record<string, unknown> = {};
 let providerTrusted = true;
 let privatePaths = new Set<string>();
 const privacyListeners = new Set<() => void>();
+/** Whether PDFs' contents are indexed (the one content group these tests exercise). */
+let pdfContent = false;
+const contentIndexingListeners = new Set<() => void>();
+function pdfEmbeddable(f: FakeFile): boolean {
+	return f.extension !== "pdf" || pdfContent;
+}
+
+/** The index's configured batch size; most tests rely on 2. */
+let configuredBatchSize = 2;
 
 /** Configured index ids; a test that renames a provider swaps the entry. */
 let indexIds = [INDEX];
@@ -155,10 +166,11 @@ const fakeData = {
 			id,
 			provider,
 			model,
-			batchSize: 2,
+			batchSize: configuredBatchSize,
 			// Mirror the stats the service wrote, as the real config would.
 			lastBuiltAt: (indexStats.lastBuiltAt as number | undefined) ?? null,
 			failedNotes: indexStats.failedNotes as Record<string, number> | undefined,
+			emptyNotes: indexStats.emptyNotes as Record<string, number> | undefined,
 		};
 	},
 	onProviderRenamed: (listener: (oldId: string, newId: string) => Promise<void> | void) => {
@@ -172,6 +184,10 @@ const fakeData = {
 	onPrivacyRulesChange: (listener: () => void) => {
 		privacyListeners.add(listener);
 		return () => privacyListeners.delete(listener);
+	},
+	onContentIndexingChange: (listener: () => void) => {
+		contentIndexingListeners.add(listener);
+		return () => contentIndexingListeners.delete(listener);
 	},
 	getResolvedProviderAuth: () => null,
 };
@@ -210,11 +226,16 @@ vi.mock("../../src/lib/modelMetadataNormalizer", () => ({
 	hydrateEmbeddingModel: () => ({ maxInputTokens: 8191 }),
 }));
 vi.mock("../../src/utils/fileFiltering", () => ({
-	getEmbeddableVaultFiles: () => vaultFiles,
-	isEmbeddableFile: () => true,
+	DRAWING_MODIFY_DEBOUNCE_MS: 30_000,
+	isExcalidrawPath: (path: string) => path.endsWith(".excalidraw.md"),
+	getEmbeddableVaultFiles: () => vaultFiles.filter((f) => pdfEmbeddable(f)),
+	hasNoEmbeddableText: (_f: FakeFile, content: string) => content.trim() === "",
+	isEmbeddableFile: (f: FakeFile) => pdfEmbeddable(f),
 	isBinaryTextFile: (f: FakeFile) => f.extension === "pdf",
+	needsExtraction: (f: FakeFile) => f.extension === "pdf" && pdfContent,
 	readIndexableContent: async (_vault: unknown, f: FakeFile) => {
 		if (readFailures.has(f.path)) throw new Error(`cannot read ${f.path}`);
+		if (emptyPaths.has(f.path)) return "";
 		if (f.path === "long.md" && longContent) return longContent;
 		return `content of ${f.path}`;
 	},
@@ -265,13 +286,17 @@ beforeEach(() => {
 	stores.clear();
 	vaultFiles = [];
 	readFailures = new Set();
+	emptyPaths = new Set();
 	longContent = "";
+	configuredBatchSize = 2;
 	indexIds = [INDEX];
 	fakeData.searchEmbedIndex = INDEX;
 	renameListeners.clear();
 	providerTrusted = true;
 	privatePaths = new Set();
 	privacyListeners.clear();
+	pdfContent = false;
+	contentIndexingListeners.clear();
 	showActionNotice.mockClear();
 	embedDocuments.mockClear();
 	embedQuery.mockClear();
@@ -657,7 +682,8 @@ describe("bulk embed run", () => {
 /** The service's private per-file hooks, reached directly: the fake vault registers no events. */
 type EventHooks = {
 	handleFileModify(file: FakeFile): void;
-	handleFileCreate(file: FakeFile): Promise<void>;
+	/** What a create or modify event runs once its debounce elapses. */
+	reindexModifiedFile(file: FakeFile): Promise<void>;
 	handleFileRename(file: FakeFile, oldPath: string): Promise<void>;
 };
 
@@ -806,7 +832,7 @@ describe("unreachable provider", () => {
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 
-	it("a timeout gets the same batch retried once before the run stops", async () => {
+	it("a persistent timeout splits the batch down to one chunk, retries that once, then stops", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md"), file("e.md"), file("f.md")];
 		embedDocuments.mockImplementation(async () => {
@@ -815,16 +841,19 @@ describe("unreachable provider", () => {
 		await startService();
 		await vi.advanceTimersByTimeAsync(10_000);
 
-		expect(embedDocuments).toHaveBeenCalledTimes(2);
-		// The retry is of the batch that failed, not the next one.
-		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
+		// [a, b] timed out, so it was split; [a] alone timed out, was retried
+		// once as the same request, and the second failure stopped the run.
+		expect(embedDocuments).toHaveBeenCalledTimes(3);
+		expect(embedDocuments.mock.calls[0][0]).toHaveLength(2);
+		expect(embedDocuments.mock.calls[1][0]).toEqual([embedDocuments.mock.calls[0][0][0]]);
+		expect(embedDocuments.mock.calls[2][0]).toEqual(embedDocuments.mock.calls[1][0]);
 		expect(embedQuery).not.toHaveBeenCalled();
 		expect(showActionNotice).toHaveBeenCalledTimes(1);
 		expect(await stores.get(INDEX)?.countNotes()).toBe(0);
 		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 
-	it("a single blip drops no notes: the batch is retried and the build completes whole", async () => {
+	it("a timed-out batch is split, the smaller size sticks, and the build completes whole", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("a.md"), file("b.md"), file("c.md"), file("d.md")];
 		embedDocuments.mockImplementationOnce(async () => {
@@ -833,14 +862,37 @@ describe("unreachable provider", () => {
 		await startService();
 		await vi.advanceTimersByTimeAsync(10_000);
 
-		// Batch 1 failed once and was retried; batch 2 went through first time.
-		expect(embedDocuments).toHaveBeenCalledTimes(3);
-		expect(embedDocuments.mock.calls[1][0]).toEqual(embedDocuments.mock.calls[0][0]);
+		// [a, b] timed out and went again as [a], [b]; the rest of the run kept
+		// the batch size that worked rather than timing out on every batch.
+		const [first, ...rest] = embedDocuments.mock.calls.map(([texts]) => texts);
+		expect(first).toHaveLength(2);
+		expect(rest.slice(0, 2)).toEqual([[first[0]], [first[1]]]);
+		expect(rest.every((texts) => texts.length === 1)).toBe(true);
+		expect(rest).toHaveLength(4);
 		expect(showActionNotice).not.toHaveBeenCalled();
 		expect(await stores.get(INDEX)?.countNotes()).toBe(4);
 		expect(indexStats.lastBuiltAt).toEqual(expect.any(Number));
 		const report = await service?.getReport(INDEX);
 		expect(report?.skippedFiles).toEqual([]);
+	});
+	it("after a nested split, the rest of the batch goes out at the smallest size that worked", async () => {
+		platform.isMobile = false;
+		configuredBatchSize = 8;
+		vaultFiles = ["a", "b", "c", "d", "e", "f", "g", "h"].map((name) => file(`${name}.md`));
+		// Anything over two chunks times out.
+		embedDocuments.mockImplementation(async (texts: string[]) => {
+			if (texts.length > 2) throw new DOMException("Request timed out after 60000ms", "TimeoutError");
+			return texts.map(() => [1, 0, 0]);
+		});
+		await startService();
+		await vi.advanceTimersByTimeAsync(30_000);
+
+		// 8 timed out → 4 timed out → 2, 2 worked → the other half goes as 2, 2,
+		// never again as one request of 4.
+		expect(embedDocuments.mock.calls.map(([texts]) => texts.length)).toEqual([8, 4, 2, 2, 2, 2]);
+		expect(showActionNotice).not.toHaveBeenCalled();
+		expect(await stores.get(INDEX)?.countNotes()).toBe(8);
+		embedDocuments.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0, 0]));
 	});
 });
 
@@ -943,7 +995,7 @@ describe("indexing review follow-ups", () => {
 		// Same on the incremental path.
 		const created = file("c.md");
 		vaultFiles.push(created);
-		await (svc as unknown as EventHooks).handleFileCreate(created);
+		await (svc as unknown as EventHooks).reindexModifiedFile(created);
 		expect(indexStats.failedNotes).toBeUndefined();
 
 		// The key is fixed: the next launch indexes every note.
@@ -962,7 +1014,7 @@ describe("indexing review follow-ups", () => {
 		const unreadable = file("a.md");
 		vaultFiles.push(unreadable);
 		readFailures.add("a.md");
-		await (svc as unknown as EventHooks).handleFileCreate(unreadable);
+		await (svc as unknown as EventHooks).reindexModifiedFile(unreadable);
 		expect(embedDocuments).not.toHaveBeenCalled();
 		expect(indexStats.failedNotes).toBeUndefined();
 
@@ -974,7 +1026,7 @@ describe("indexing review follow-ups", () => {
 		store.putNote = async () => {
 			throw new Error("QuotaExceededError");
 		};
-		await (svc as unknown as EventHooks).handleFileCreate(unreadable);
+		await (svc as unknown as EventHooks).reindexModifiedFile(unreadable);
 		expect(embedDocuments).toHaveBeenCalledTimes(1);
 		expect(indexStats.failedNotes).toBeUndefined();
 		store.putNote = putNote;
@@ -995,6 +1047,44 @@ describe("indexing review follow-ups", () => {
 		for (const listener of privacyListeners) listener();
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect([...(store?.docs.keys() ?? [])]).toEqual(["secret.md#0"]);
+	});
+
+	it("a content-indexing change re-validates: a group switched on comes in, switched off goes", async () => {
+		platform.isMobile = false;
+		const pdf: FakeFile = { ...file("paper.pdf"), basename: "paper", extension: "pdf" };
+		vaultFiles = [file("a.md"), pdf];
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		const store = stores.get(INDEX);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+
+		pdfContent = true;
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...(store?.docs.keys() ?? [])].sort()).toEqual(["a.md#0", "paper.pdf#0"]);
+
+		pdfContent = false;
+		for (const listener of contentIndexingListeners) listener();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["a.md#0"]);
+	});
+
+	it("reports the PDF tail as its own phase, and clears it when the run ends", async () => {
+		platform.isMobile = false;
+		pdfContent = true;
+		const pdf = (path: string): FakeFile => ({ ...file(path), basename: path, extension: "pdf" });
+		vaultFiles = [pdf("one.pdf"), file("a.md"), file("b.md"), pdf("two.pdf")];
+		const svc = await startService();
+		const seen: Array<{ done: number; total: number; active: boolean } | null | undefined> = [];
+		svc.onProgress((progress) => seen.push(progress.extraction && { ...progress.extraction }), INDEX);
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// Announced from the start, entered once the notes are read, counted per PDF.
+		expect(seen).toContainEqual({ done: 0, total: 2, active: false });
+		expect(seen).toContainEqual({ done: 0, total: 2, active: true });
+		expect(seen).toContainEqual({ done: 2, total: 2, active: true });
+		expect(svc.getProgress(INDEX).extraction ?? null).toBeNull();
+		expect(stores.get(INDEX)?.docs.size).toBe(4);
 	});
 
 	it("a note that stopped being indexable is dropped when its next event arrives", async () => {
@@ -1068,7 +1158,7 @@ describe("indexing review follow-ups", () => {
 		await vi.advanceTimersByTimeAsync(1_000); // nothing to validate
 		const created = file("a.md");
 		vaultFiles.push(created);
-		await (svc as unknown as EventHooks).handleFileCreate(created);
+		await (svc as unknown as EventHooks).reindexModifiedFile(created);
 		expect(embedQuery).not.toHaveBeenCalled();
 		expect(embedDocuments).toHaveBeenCalledTimes(1);
 		expect(stores.get(INDEX)?.docs.has("a.md#0")).toBe(true);
@@ -1079,7 +1169,7 @@ describe("atomic notes and renames", () => {
 	it("a multi-chunk note whose chunks span batches is written once, whole", async () => {
 		platform.isMobile = false;
 		vaultFiles = [file("long.md"), file("short.md")];
-		// ~60k chars against a 24k-char chunk budget: three chunks, more than the batch size of 2.
+		// ~60k chars against a ~6k-char chunk budget: many chunks, more than the batch size of 2.
 		longContent = "word ".repeat(12_000);
 		const svc = await startService();
 		const store = stores.get(INDEX);
@@ -1093,6 +1183,20 @@ describe("atomic notes and renames", () => {
 		expect(longWrites[0][0].map((c) => c.chunkIndex)).toEqual(longWrites[0][0].map((_, i) => i));
 		expect(embedDocuments.mock.calls.length).toBeGreaterThan(1);
 		expect(svc.getProgress(INDEX)).toMatchObject({ indexed: 2, total: 2, percentage: 100 });
+	});
+
+	it("chunks stay small even when the model's window is large (#543)", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("long.md")];
+		// 20k chars would fit one 8191-token window (~24.5k chars) as a single
+		// chunk; the per-chunk cap splits it so no request carries a whole note.
+		longContent = "word ".repeat(4_000);
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const texts = embedDocuments.mock.calls.flatMap(([batch]) => batch);
+		expect(texts.length).toBeGreaterThan(2);
+		expect(Math.max(...texts.map((text) => text.length))).toBeLessThanOrEqual(2048 * 3);
 	});
 
 	it("a note that fails one chunk reaches the store not at all", async () => {
@@ -1213,5 +1317,74 @@ describe("provider rename", () => {
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(embedDocuments).toHaveBeenCalledTimes(embedCalls);
 		expect(oldStore?.docs.size).toBe(0);
+	});
+});
+
+describe("notes with no text to embed (#541)", () => {
+	it("are skipped instead of embedded title-only, and not re-read on later launches until they change", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("ok.md", 1_000), file("Sketch.excalidraw.md", 1_000)];
+		emptyPaths = new Set(["Sketch.excalidraw.md"]);
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const store = stores.get(INDEX);
+		expect([...(store?.docs.keys() ?? [])]).toEqual(["ok.md#0"]);
+		expect(embedDocuments.mock.calls.flat(2).some((text) => String(text).includes("Sketch"))).toBe(false);
+		expect(indexStats.emptyNotes).toEqual({ "Sketch.excalidraw.md": 1_000 });
+		expect(indexStats.failedNotes).toEqual({});
+		expect((await svc.getReport(INDEX))?.skippedFiles).toEqual([{ path: "Sketch.excalidraw.md", reason: "empty" }]);
+
+		// Next launch: still absent from the store, but not read or embedded again.
+		const attempts = embedDocuments.mock.calls.length;
+		await svc.cleanup();
+		service = null;
+		const relaunched = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(attempts);
+		expect((await relaunched.getReport(INDEX))?.skippedFiles).toEqual([
+			{ path: "Sketch.excalidraw.md", reason: "empty" },
+		]);
+
+		// The user writes on the back of the note: it is embedded and the verdict goes.
+		emptyPaths = new Set();
+		vaultFiles[1].stat.mtime = 2_000;
+		await (relaunched as unknown as EventHooks).reindexModifiedFile(vaultFiles[1]);
+		expect(stores.get(INDEX)?.docs.get("Sketch.excalidraw.md#0")?.mtime).toBe(2_000);
+		expect(indexStats.emptyNotes).toEqual({});
+	});
+
+	it("an indexed note that is emptied drops its stale vectors", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("a.md", 1_000)];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(stores.get(INDEX)?.docs.has("a.md#0")).toBe(true);
+
+		emptyPaths = new Set(["a.md"]);
+		vaultFiles[0].stat.mtime = 2_000;
+		await (svc as unknown as EventHooks).reindexModifiedFile(vaultFiles[0]);
+		expect(stores.get(INDEX)?.docs.has("a.md#0")).toBe(false);
+		expect(indexStats.emptyNotes).toEqual({ "a.md": 2_000 });
+	});
+
+	it("a drawing being drawn is re-read once it is left alone, not on every autosave", async () => {
+		platform.isMobile = false;
+		vaultFiles = [file("Sketch.excalidraw.md", 1_000)];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		embedDocuments.mockClear();
+		const hooks = svc as unknown as EventHooks;
+
+		// Excalidraw autosaves every few seconds while the user draws.
+		for (let mtime = 2_000; mtime <= 6_000; mtime += 1_000) {
+			vaultFiles[0].stat.mtime = mtime;
+			hooks.handleFileModify(vaultFiles[0]);
+			await vi.advanceTimersByTimeAsync(5_000);
+		}
+		expect(embedDocuments).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(25_000);
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		expect(stores.get(INDEX)?.docs.get("Sketch.excalidraw.md#0")?.mtime).toBe(6_000);
 	});
 });

@@ -61,6 +61,10 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", fingerprint(exploreVault10)],
 			["1.1", fingerprint(exploreVault11)],
+			// 1.2 (shipped in 2.3.0 through 2.4.4): before the `# Vault` section, when the model
+			//      was told to call get_all_tags / get_properties / list_directory first to learn
+			//      the vault's organisation.
+			["1.2", "65c96a8f87c81e89"],
 		]),
 	],
 	// 1.0 as actually released in 2.0.2-beta — i.e. the post-#381 body, which #381 edited
@@ -78,6 +82,15 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", fingerprint(dataview10)],
 			["1.1", fingerprint(dataview11)],
+			// 1.2 (shipped in 2.3.0 through 2.4.4): before the Result Size rewrite, when every
+			//      listing defaulted to `LIMIT 10` and tag/property names were verified with tools
+			//      instead of read from the `# Vault` section.
+			["1.2", "91ff059caaf10c33"],
+			// 1.3 (shipped in 2.5.0-beta.1): before the 100-note threshold, when a listing of any
+			//      size was rendered in full.
+			["1.3", "9dd44cf7dc5412f2"],
+			// 1.4 (shipped in 2.5.0-beta.2): before the "no LIMIT" rule named the large-set exception.
+			["1.4", "038b2a6ebdea2dd0"],
 		]),
 	],
 	["tasknotes", new Map([["1.0", fingerprint(tasknotes10)]])],
@@ -91,10 +104,20 @@ const PRIOR_SKILL_FINGERPRINTS: ReadonlyMap<string, ReadonlyMap<string, string>>
 		new Map([
 			["1.0", "4f7b8ff2b47b60e2"],
 			["1.1", "6243bd2c4cf42f9a"],
+			// 1.2 (2.3.0 betas): before the rule that a skill is deleted only when the user asks.
+			["1.2", "7b0e742eaeffaa0a"],
 		]),
 	],
 	// 1.0 (shipped in 2.2.0): before the note that memory-folder writes apply immediately.
-	["manage-notes", new Map([["1.0", "eab47f33c57cb977"]])],
+	// 1.1 (shipped in 2.3.0 through 2.4.4): before the "Creating a Note" section (match the
+	//      folder's naming pattern and structure, use the `# Vault` section's settings).
+	[
+		"manage-notes",
+		new Map([
+			["1.0", "eab47f33c57cb977"],
+			["1.1", "e52ac4f10f9dbfbb"],
+		]),
+	],
 ]);
 
 /**

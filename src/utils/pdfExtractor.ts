@@ -4,8 +4,9 @@ import { PDFDocument } from "pdf-lib";
 /**
  * pdfjs `VerbosityLevel.ERRORS`. Suppresses per-page `WARNING`-level noise from
  * the worker (e.g. "TT: undefined function: 32" — unimplemented TrueType font
- * hinting opcodes) while still surfacing real errors. Font hinting is irrelevant
- * to us: we only pull text via `getTextContent()`, never render.
+ * hinting opcodes) while still surfacing real errors. Font hinting barely
+ * matters here: we mostly pull text via `getTextContent()`, and only render
+ * tiny first-page thumbnails.
  */
 const PDFJS_VERBOSITY_ERRORS = 0;
 
@@ -96,6 +97,45 @@ export async function extractTextFromPdf(data: Uint8Array): Promise<PdfExtractRe
 		// Release worker-side memory (font caches, page objects) before the next
 		// PDF. Without this, a full-vault index accumulates every document until GC
 		// and OOMs the shared worker.
+		await pdf.destroy();
+	}
+}
+
+/**
+ * Renders the top of page 1 of a PDF to a PNG `width` pixels wide and at most
+ * as tall — the composer's attachment thumbnail.
+ *
+ * @param data - PDF file content as Uint8Array (pdfjs may transfer it; pass a copy)
+ * @param width - Width of the output image, in device pixels
+ */
+export async function renderPdfThumbnail(data: Uint8Array, width: number): Promise<Blob> {
+	const pdfjsLib = await loadPdfJs();
+	const pdf = await pdfjsLib.getDocument({
+		data,
+		verbosity: PDFJS_VERBOSITY_ERRORS,
+		...pdfAssetUrls(pdfjsLib),
+		cMapPacked: true,
+	}).promise;
+	try {
+		const page = await pdf.getPage(1);
+		const natural = page.getViewport({ scale: 1 });
+		const viewport = page.getViewport({ scale: width / natural.width });
+		const canvas = document.createElement("canvas");
+		canvas.width = Math.ceil(viewport.width);
+		// The tile shows only the top of the page, so a very tall page (a long
+		// receipt, a scrolling export) renders into a canvas cut at a square
+		// rather than allocating its full height.
+		canvas.height = Math.min(Math.ceil(viewport.height), canvas.width);
+		const canvasContext = canvas.getContext("2d");
+		if (!canvasContext) throw new Error("Canvas 2D context unavailable");
+		await page.render({ canvasContext, viewport }).promise;
+		return await new Promise<Blob>((resolve, reject) =>
+			canvas.toBlob(
+				(blob) => (blob ? resolve(blob) : reject(new Error("PDF thumbnail encode failed"))),
+				"image/png",
+			),
+		);
+	} finally {
 		await pdf.destroy();
 	}
 }

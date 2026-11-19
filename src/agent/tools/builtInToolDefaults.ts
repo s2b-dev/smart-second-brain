@@ -1,4 +1,5 @@
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type ToolConfig, type ToolsConfig } from "../../types/plugin";
+import { MAX_OPTIONS, MAX_QUESTIONS } from "../../utils/askQuestion";
 
 /**
  * The one table describing every built-in tool: what the settings UI calls it, the
@@ -60,6 +61,28 @@ const SEARCH_NOTES_DESC_LEXICAL_ONLY = `${SEARCH_NOTES_DESC_SHARED} This vault h
 export function getSearchNotesDescription(hasEmbeddingIndex: boolean): string {
 	return hasEmbeddingIndex ? SEARCH_NOTES_DESC_EMBEDDINGS : SEARCH_NOTES_DESC_LEXICAL_ONLY;
 }
+
+// --- write_todos: the guidance lives in the description, not in a skill ------------------
+
+const WRITE_TODOS_DESC = `Keep a visible task list for the current request. The user sees it pinned above the chat input and follows your progress there.
+
+Use it when a request takes several distinct steps or touches many notes: restructuring a folder, merging or splitting notes, researching a topic across the vault, a review that ends in edits. Write the list before you start, as short imperative steps, with the first one in_progress. Skip it for questions you can answer directly and for one- or two-step tasks.
+
+Each call replaces the whole list, so always send every item. Keep exactly one item in_progress while you work. Mark an item completed as soon as it is done, not in a batch at the end. Revise the list when you learn something that changes the plan: add steps, drop steps that no longer apply. Update it as you work through the request, but never call it twice in parallel within one response.
+
+If the user drops the plan or the work no longer needs one, send an empty list to clear it.`;
+
+// --- ask_question: same, the guidance lives in the description ----------------------------
+
+const ASK_QUESTION_DESC = `Ask the user a question and wait for the answer. The questions appear above the chat input with your options as buttons; the user can also type their own answer, so never add an "Other" option.
+
+Ask when the request can reasonably be read in more than one way and the readings lead to different results, when a choice is the user's to make (a name, a structure, which of several matching notes they mean), or before a large change whose direction you are unsure of. Ask early, before doing work the answer could throw away.
+
+Do not ask about anything you can find out yourself by searching or reading the vault, about details with an obvious default, or for permission to do what was plainly requested. Do not ask in plain text when this tool fits: options are faster to answer than a typed reply.
+
+Ask everything you need in one call, at most ${MAX_QUESTIONS} questions, each with 2 to ${MAX_OPTIONS} concrete, mutually exclusive options (unless multiSelect is true). Put the option you recommend first. Never call this tool twice in one response.
+
+The result holds the user's answers. If they dismissed the question, do not ask it again.`;
 
 // --- the table -----------------------------------------------------------------------------
 
@@ -185,7 +208,7 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 	manage_skills: {
 		displayName: "Manage Skills",
 		summary:
-			"Create new skills, revise the agent's own attached skills, or delete skills it created. Changes apply immediately. A skill's name and plugin link are locked once created.",
+			"Create new skills, revise the agent's own attached skills, or delete a skill when you ask it to. Changes apply immediately. A skill's name and plugin link are locked once created.",
 		config: {
 			// On by default: the routing doctrine in the memory section and the `# Skills`
 			// header both send task lessons into the skill that was used, and the post-turn
@@ -194,21 +217,42 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 			enabled: true,
 			name: "manage_skills",
 			description:
-				"Create new skills, revise your own attached skills, or delete skills you created. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
+				"Create new skills, revise your own attached skills, or delete a skill when the user asks you to. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
+		},
+	},
+	write_todos: {
+		displayName: "Task List",
+		summary:
+			"Lets the agent plan multi-step work as a checklist and tick it off as it goes. The list shows above the chat input.",
+		config: {
+			enabled: true,
+			name: "write_todos",
+			description: WRITE_TODOS_DESC,
 		},
 	},
 	ask_question: {
 		displayName: "Ask Question",
 		summary:
-			"Ask the user one or more multiple-choice questions to clarify requirements, solicit preferences, or choose between options. Execution pauses until the user responds in chat.",
+			"Lets the agent pause and ask you a multiple-choice question when a request is unclear. The question shows above the chat input.",
 		config: {
 			enabled: true,
 			name: "ask_question",
-			description:
-				"Ask the user one or more multiple-choice questions to clarify requirements, solicit preferences, or choose between options. Execution pauses until the user responds in chat.",
+			description: ASK_QUESTION_DESC,
 		},
 	},
 };
+
+/**
+ * Built-in tools bound without any skill attaching them; only the per-tool toggle in the
+ * Tools modal can turn them off. Reserved for tools that are about how the agent works
+ * rather than what it can do in the vault, so no skill is the natural owner. Main agent
+ * only: subagents run short scoped tasks, the chat has one task-list slot, and a nested
+ * worker must not stop and wait on the user.
+ */
+export const ALWAYS_ATTACHED_TOOL_IDS: ReadonlySet<BuiltInToolId> = new Set<BuiltInToolId>([
+	"write_todos",
+	"ask_question",
+]);
 
 /**
  * Default configuration for all built-in tools — what a new agent's `toolsConfig` is

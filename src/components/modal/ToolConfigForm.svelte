@@ -17,6 +17,7 @@ import SettingGroup from "../settings/SettingGroup.svelte";
 import Button from "../ui/Button.svelte";
 import Dropdown from "../ui/Dropdown.svelte";
 import { getToolDisplayName } from "../../agent/tools/builtInToolDefaults";
+import { getWebSearchProvider, WEB_SEARCH_PROVIDERS } from "../../agent/tools/webSearch";
 import type { ToolConfigAccessors } from "./ToolConfigModal";
 
 interface Props {
@@ -69,11 +70,8 @@ let maxResults = $state(
 		(defaultConfig.settings as { maxResults?: number })?.maxResults ??
 		10,
 );
-const webSearchProviderOptions = [
-	{ display: "Firecrawl (keyless)", value: "firecrawl" },
-	{ display: "Brave Search", value: "brave" },
-	{ display: "Tavily", value: "tavily" },
-];
+const webSearchProviderOptions = WEB_SEARCH_PROVIDERS.map((p) => ({ display: p.label, value: p.id }));
+const webSearchProviderInfo = $derived(getWebSearchProvider(pluginData.webSearchProvider));
 type ProcessorMode = "auto" | "custom" | "disabled";
 
 // Processor settings: undefined = auto, null = disabled, ChatModel = custom
@@ -354,7 +352,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if imageProcessor}
                 <span>{imageProcessor.provider}/{imageProcessor.model}</span>
               {:else}
-                <span class="text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">Select model…</span>
               {/if}
             </Button>
           {/if}
@@ -381,7 +379,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if pdfProcessor}
                 <span>{pdfProcessor.provider}/{pdfProcessor.model}</span>
               {:else}
-                <span class="text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">Select model…</span>
               {/if}
             </Button>
           {/if}
@@ -405,12 +403,8 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
       </SettingContainer>
       {#if pluginData.webSearchProvider}
         <SettingContainer
-          name={pluginData.webSearchProvider === "firecrawl" ? "API Key (optional)" : "API Key"}
-          desc={pluginData.webSearchProvider === "brave"
-            ? "Brave Search API key from api.search.brave.com."
-            : pluginData.webSearchProvider === "tavily"
-              ? "Tavily API key from app.tavily.com."
-              : "Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier."}
+          name={webSearchProviderInfo?.keyless ? "API Key (optional)" : "API Key"}
+          desc={webSearchProviderInfo?.keyHelp ?? ""}
         >
           <SecretSelect
             value={pluginData.webSearchApiKeyId}
@@ -425,7 +419,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
   {#if footer === "modal"}
     <div class="tool-config-actions">
       <Button buttonText="Cancel" onClick={() => onCancel?.()} />
-      <div class="flex-1"></div>
+      <div class="s2b-flex-1"></div>
       {#if showResetToDefault}
         <Button buttonText="Reset to default" onClick={handleResetToDefault} />
       {/if}

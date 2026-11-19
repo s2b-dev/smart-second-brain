@@ -80,6 +80,8 @@ const summaryLabel = $derived.by(() => {
 });
 
 let isExpanded = $state(false);
+/** Rendered height of the summary row; floors the bar's height (see `.pcb-container`). */
+let summaryHeight = $state(0);
 
 /** True while an Accept All / Reject All batch is running — disables both
  * buttons so a double-click can't queue a second batch (the store's guard
@@ -437,12 +439,18 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
 </script>
 
 {#if actionableEntries.length > 0}
-  <div class="pcb-container">
+  <!-- The bar may give up height when the composer runs out of room (see
+       Input.svelte), but never below its summary row: that row holds Accept /
+       Reject All. `overflow: hidden` zeroes the automatic flex minimum, and
+       no CSS-only minimum excludes the list, hence the measured floor (+2px
+       for the border; the box is border-box). -->
+  <div class="pcb-container" style:min-height={summaryHeight ? `${summaryHeight + 2}px` : undefined}>
     <!-- Summary bar. A div with button semantics, not a <button>: it CONTAINS
          the Accept/Reject All buttons, and interactive elements can't nest. -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="pcb-summary"
+      bind:clientHeight={summaryHeight}
       role="button"
       tabindex="0"
       aria-expanded={isExpanded}
@@ -645,7 +653,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                        an error with extra steps. If the note reverts to the staged
                        content, the vault-event recompute re-enables it. -->
                   <button
-                    class="pcb-action-icon pcb-action-accept"
+                    class="s2b-pcb-action-icon pcb-action-accept"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleAccept(entry);
@@ -660,7 +668,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     <div use:icon={"check"} style="--icon-size: 12px"></div>
                   </button>
                   <button
-                    class="pcb-action-icon pcb-action-reject"
+                    class="s2b-pcb-action-icon pcb-action-reject"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleReject(entry);
@@ -676,7 +684,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                        (both early-return on non-pending), so offer the one action that
                        still does something — undoing the text left in the note. -->
                   <button
-                    class="pcb-action-icon pcb-action-reject"
+                    class="s2b-pcb-action-icon pcb-action-reject"
                     onclick={(e) => {
                       e.stopPropagation();
                       handleUndoApplied(entry);
@@ -842,7 +850,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
     background: color-mix(in srgb, var(--color-red) 15%, transparent);
   }
 
-  .pcb-action-icon {
+  .s2b-pcb-action-icon {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -856,7 +864,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
 
   /* 12px icons + 2px padding are pointer-sized; on touch, bump the hit areas
      to guideline size. Obsidian marks mobile with body.is-mobile. */
-  :global(.is-mobile) .pcb-action-icon,
+  :global(.is-mobile) .s2b-pcb-action-icon,
   :global(.is-mobile) .pcb-preview-toggle {
     padding: 8px;
   }
@@ -864,12 +872,12 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
   /* Disabled accept on a stale row: keep it visible (its absence would read as
      "this row can't be accepted ever") but clearly inert. pointer-events stays
      on so the explanatory title tooltip still shows on hover. */
-  .pcb-action-icon[disabled] {
+  .s2b-pcb-action-icon[disabled] {
     opacity: 0.35;
     cursor: not-allowed;
   }
 
-  .pcb-action-icon[disabled]:hover {
+  .s2b-pcb-action-icon[disabled]:hover {
     background: transparent;
   }
 

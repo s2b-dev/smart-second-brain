@@ -318,7 +318,7 @@ function reviewNotice(notice: UpdateNotice): void {
   do) sit on top; plugin nudges and update notices are maintenance chores and are
   demoted to a quiet footer below a divider.
 -->
-<div class="chat-recommendations recommendation-stack flex flex-col">
+<div class="chat-recommendations recommendation-stack s2b-flex s2b-flex-col">
   <!-- Always centred, even when rows follow below: dismissing the last item is a
        normal thing to do, and anchoring the greeting to the rows' left edge means
        it visibly jumps to centre the moment that happens. A fixed position reads

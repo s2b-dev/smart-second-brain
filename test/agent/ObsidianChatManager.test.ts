@@ -11,6 +11,8 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 }));
 
 import { ObsidianChatManager } from "../../src/agent/ObsidianChatManager";
+import { THREAD_DATA_VERSION } from "../../src/agent/threadDataCodec";
+import type { BaseMessage } from "@langchain/core/messages";
 import type { Checkpoint, CheckpointMetadata } from "@langchain/langgraph-checkpoint";
 
 /* --------------------------------------------------------------------------
@@ -402,7 +404,7 @@ describe("ObsidianChatManager", () => {
 			const [, buf] = (plugin.app.vault.adapter.writeBinary as ReturnType<typeof vi.fn>).mock.calls[0];
 			const json = gunzipSync(Buffer.from(buf)).toString("utf8");
 
-			expect(json).toContain('"version":2');
+			expect(json).toContain(`"version":${THREAD_DATA_VERSION}`);
 			expect(json).toContain('"messageTable"');
 			// The long first answer is part of both checkpoints' histories but
 			// must be serialized exactly once.
@@ -423,12 +425,11 @@ describe("ObsidianChatManager", () => {
 			const tuple = await manager2.getTuple({
 				configurable: { thread_id: "Chats/reload.chat", checkpoint_id: "cp-2" },
 			});
-			const messages = (tuple!.checkpoint.channel_values as Record<string, unknown[]>).messages as {
-				kwargs: { content: string };
-			}[];
+			// getTuple hands LangGraph revived messages, as it would have stored them.
+			const messages = (tuple!.checkpoint.channel_values as Record<string, BaseMessage[]>).messages;
 			expect(messages).toHaveLength(4);
-			expect(messages[1].kwargs.content).toBe(longAnswer);
-			expect(messages[3].kwargs.content).toBe("Short answer.");
+			expect(messages[1].content).toBe(longAnswer);
+			expect(messages[3].content).toBe("Short answer.");
 
 			// The older checkpoint kept its own (shorter) history.
 			const tuple1 = await manager2.getTuple({
@@ -511,7 +512,7 @@ describe("ObsidianChatManager", () => {
 			expect(plugin.app.vault.adapter.writeBinary).toHaveBeenCalled();
 			const [, buf] = (plugin.app.vault.adapter.writeBinary as ReturnType<typeof vi.fn>).mock.calls[0];
 			const json = gunzipSync(Buffer.from(buf)).toString("utf8");
-			expect(json).toContain('"version":2');
+			expect(json).toContain(`"version":${THREAD_DATA_VERSION}`);
 			expect(json.split(longAnswer).length - 1).toBe(1);
 		});
 	});
@@ -544,51 +545,6 @@ describe("ObsidianChatManager", () => {
 		});
 	});
 
-	/* --------------------------------------------------------------------------
-	 * Generation metadata annotation
-	 * ------------------------------------------------------------------------*/
-
-	describe("generation metadata annotation", () => {
-		it("should annotate new AI messages with generation metadata", async () => {
-			const checkpoint = makeCheckpoint("cp-ann", "2024-01-01T00:00:00Z");
-			(checkpoint.channel_values as Record<string, unknown>).messages = [
-				{
-					type: "human",
-					kwargs: { content: "Hello" },
-				},
-				{
-					type: "ai",
-					kwargs: {
-						content: "Hi!",
-						response_metadata: {},
-					},
-				},
-			];
-
-			const config = {
-				configurable: { thread_id: "Chats/thread-ann.chat" },
-				metadata: {
-					agent_id: "agent-1",
-					agent_name: "My Agent",
-					model_provider: "openai",
-					model: "gpt-4",
-				},
-			};
-
-			await manager.put(config, checkpoint, makeMetadata(0), {});
-
-			const tuple = await manager.getTuple({
-				configurable: { thread_id: "Chats/thread-ann.chat", checkpoint_id: "cp-ann" },
-			});
-
-			const messages = (tuple!.checkpoint.channel_values as Record<string, unknown[]>).messages;
-			const aiMessage = messages[1] as Record<string, Record<string, Record<string, unknown>>>;
-			expect(aiMessage.kwargs.response_metadata.agent_id).toBe("agent-1");
-			expect(aiMessage.kwargs.response_metadata.model_provider).toBe("openai");
-			expect(aiMessage.kwargs.response_metadata.model).toBe("gpt-4");
-		});
-	});
-
 	describe("thinking duration annotation", () => {
 		async function annotateAndRead(cpId: string, messages: unknown[]) {
 			const threadId = `Chats/thread-${cpId}.chat`;
@@ -598,11 +554,12 @@ describe("ObsidianChatManager", () => {
 			await manager.annotateThinkingDuration(threadId, cpId, 42_000);
 
 			const tuple = await manager.getTuple({ configurable: { thread_id: threadId, checkpoint_id: cpId } });
-			const stored = (tuple!.checkpoint.channel_values as Record<string, unknown[]>).messages;
+			const stored = (tuple!.checkpoint.channel_values as Record<string, BaseMessage[]>).messages;
 			return stored.map(
 				(m) =>
-					((m as Record<string, Record<string, Record<string, unknown>>>).kwargs?.response_metadata
-						?.thinking_duration_ms as number | undefined) ?? undefined,
+					(m.response_metadata as Record<string, unknown> | undefined)?.thinking_duration_ms as
+						| number
+						| undefined,
 			);
 		}
 

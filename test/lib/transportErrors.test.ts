@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	isRateLimitError,
 	isConnectionRefusedError,
 	isDocumentRejectionError,
 	isProviderUnreachableError,
@@ -109,5 +110,17 @@ describe("isDocumentRejectionError", () => {
 		}
 		expect(isDocumentRejectionError(new Error("content policy"))).toBe(false);
 		expect(isDocumentRejectionError(new Error("net::ERR_CONNECTION_REFUSED"))).toBe(false);
+	});
+});
+
+describe("isRateLimitError", () => {
+	it("recognises 429 on the error or down its cause chain", () => {
+		expect(isRateLimitError({ status: 429 })).toBe(true);
+		expect(isRateLimitError(Object.assign(new Error("wrapped"), { cause: { status: 429 } }))).toBe(true);
+	});
+
+	it("is false for other statuses and transport errors", () => {
+		expect(isRateLimitError({ status: 400 })).toBe(false);
+		expect(isRateLimitError(new Error("fetch failed"))).toBe(false);
 	});
 });

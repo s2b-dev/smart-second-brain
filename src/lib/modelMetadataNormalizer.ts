@@ -16,6 +16,26 @@ const DEFAULT_EMBED_MAX_INPUT_TOKENS_BY_PROVIDER: Record<string, number> = {
 	anthropic: 8191,
 };
 
+/**
+ * Input windows of embedding families that commonly sit behind endpoints with no
+ * metadata (self-hosted or academic OpenAI-compatible APIs) and are *smaller*
+ * than the 8191-token fallback. Without these the chunker sized chunks for 8191
+ * tokens, and every long chunk went over the model's real limit. Matched as a
+ * case-insensitive substring of the model id, first match wins.
+ */
+const KNOWN_EMBED_MAX_INPUT_TOKENS: ReadonlyArray<readonly [string, number]> = [
+	["e5-mistral", 4096],
+	["multilingual-e5", 512],
+	["e5-large", 512],
+	["e5-base", 512],
+	["e5-small", 512],
+];
+
+export function knownEmbeddingMaxInputTokens(modelId: string): number | undefined {
+	const id = modelId.toLowerCase();
+	return KNOWN_EMBED_MAX_INPUT_TOKENS.find(([family]) => id.includes(family))?.[1];
+}
+
 export interface ModelHydrationSourceData {
 	modelsDevData?: ModelsDevApiResponse | null;
 	openRouterData?: Map<string, OpenRouterModelInfo> | null;
@@ -170,6 +190,7 @@ export function hydrateEmbeddingModel(
 		ollama?.contextLength ||
 		modelsDev?.limit?.input ||
 		modelsDev?.limit?.context ||
+		knownEmbeddingMaxInputTokens(variantKey) ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;
 

@@ -6,6 +6,7 @@ import {
 	getToolDescription,
 	getToolDisplayName,
 	toolHasConfigurableSettings,
+	ALWAYS_ATTACHED_TOOL_IDS,
 } from "../../agent/tools/builtInToolDefaults";
 import { toExecToolId } from "../../agent/integrations/pluginIntegrations";
 import { humanizeSkillName } from "../../skills";
@@ -112,8 +113,8 @@ function openToolConfig(toolId: BuiltInToolId) {
         {#each BUILT_IN_TOOL_IDS as toolId (toolId)}
           {@const config = selectedAgent.toolsConfig[toolId]}
           {@const skills = attachingSkills.get(toolId) ?? []}
-          {@const isInteractive = toolId === "ask_question"}
-          {@const attached = skills.length > 0 || isInteractive}
+          {@const alwaysAttached = ALWAYS_ATTACHED_TOOL_IDS.has(toolId)}
+          {@const attached = alwaysAttached || skills.length > 0}
           {@const enabled = isToolEnabled(toolId)}
           {@const displayName = getToolDisplayName(toolId, config?.name)}
           <ManagedEntityItem
@@ -122,11 +123,13 @@ function openToolConfig(toolId: BuiltInToolId) {
             disabled={!attached}
           >
             {#snippet badges()}
-              {#if attached && !isInteractive}
+              {#if alwaysAttached}
+                <Badge label="Built in" tone="accent" />
+              {:else if attached}
                 {#each skills as skillName (skillName)}
                   <Badge label={skillName} tone="accent" />
                 {/each}
-              {:else if !attached}
+              {:else}
                 <Badge label="Not attached by any enabled skill" tone="warning" />
               {/if}
             {/snippet}
@@ -181,7 +184,7 @@ function openToolConfig(toolId: BuiltInToolId) {
   {/if}
 
   <div class="tools-modal-footer">
-    <div class="flex-1"></div>
+    <div class="s2b-flex-1"></div>
     <Button buttonText="Done" cta={true} onClick={() => modal.close()} />
   </div>
 </div>

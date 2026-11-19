@@ -1,3 +1,5 @@
+import plugin from "tailwindcss/plugin.js";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./src/**/*.{js,svelte,ts}", "./v2/**/*.{js,svelte,ts}"],
@@ -233,5 +235,30 @@ export default {
   corePlugins: {
     preflight: false,
   },
-  plugins: [],
+  // Every utility carries the plugin's own prefix (`s2b-flex`, `hover:s2b-bg-…`,
+  // `!s2b-p-0`). Plugin stylesheets are global in Obsidian, so an unprefixed
+  // `.flex` or `.static` applies to every plugin's DOM: `.static{position:static}`
+  // overrode Excalidraw's canvas positioning and blanked its drawings (#558).
+  // With the prefix, a utility only matches an element S2B put the class on,
+  // and words Tailwind picks up from prose or code (`static`, `hidden`) no
+  // longer generate anything. `test/styles/tailwindUtilities.test.ts` guards it.
+  prefix: "s2b-",
+  // Emit the `--tw-*` defaults only on elements that use a utility needing
+  // them, not on `*, ::before, ::after`. A custom property declared on an
+  // element gives it its own copy of every inherited custom property (~1300
+  // with Obsidian's theme), which WebKit rebuilds on every root variable
+  // change — Obsidian mobile sets `--keyboard-height` on the root, and in a
+  // long chat that froze the page for ~1.8s on an iPhone before the composer
+  // could follow the keyboard.
+  experimental: {
+    optimizeUniversalDefaults: true,
+  },
+  plugins: [
+    // `overflow-wrap: anywhere` as a named utility (Tailwind 4 ships it as
+    // `wrap-anywhere`). The arbitrary-property form, `[overflow-wrap:anywhere]`,
+    // can't take the prefix, so it would ship as an unscoped class.
+    plugin(({ addUtilities }) => {
+      addUtilities({ ".wrap-anywhere": { "overflow-wrap": "anywhere" } });
+    }),
+  ],
 };

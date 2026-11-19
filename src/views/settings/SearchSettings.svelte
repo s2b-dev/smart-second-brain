@@ -48,4 +48,31 @@ function openDisplaySettingsModal() {
   {/if}
 </SettingGroup>
 
+<SettingGroup
+  heading="Indexed content"
+  headingDesc="Notes, canvases and widgets are always indexed. Choose which other files have their contents indexed for search and embeddings — the rest are still found by title and path, and the agent can still read them on demand."
+>
+  <SettingItem
+    name="PDFs"
+    desc="Extract and index the text of PDFs. Slow on large libraries, and most of a long PDF is rarely relevant. Long PDFs are indexed up to roughly their first 80 pages (4 on mobile)."
+  >
+    <Toggle checked={pluginData.contentIndexing.pdfs} onchange={(checked) => pluginData.setContentIndexed("pdfs", checked)} />
+  </SettingItem>
+  <SettingItem
+    name="Chats"
+    desc="Index past conversations. They are mostly the model's own answers, which can then come back as if they were sources."
+  >
+    <Toggle
+      checked={pluginData.contentIndexing.chats}
+      onchange={(checked) => pluginData.setContentIndexed("chats", checked)}
+    />
+  </SettingItem>
+  <SettingItem
+    name="Data files"
+    desc="Index CSV, JSON and YAML files. Structured data searches poorly by meaning, and a single export can add thousands of entries."
+  >
+    <Toggle checked={pluginData.contentIndexing.data} onchange={(checked) => pluginData.setContentIndexed("data", checked)} />
+  </SettingItem>
+</SettingGroup>
+
 <EmbeddingIndexSection purpose="search" />

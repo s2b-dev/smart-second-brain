@@ -130,11 +130,11 @@ function splitSkillMd(raw: string): { head: string; body: string } | null {
 }
 
 /**
- * `metadata.author` value stamped on every skill the agent creates. Bundled skills carry
- * `S2B` in the same key and hand-written ones carry whatever the user put there (or nothing),
- * so one existing key tells the three apart — which is what lets anything autonomous later
- * (a curator) confine itself to the agent's own skills. A fixed word rather than the agent's
- * name: consumers need no list of agent names, and a renamed or deleted agent changes nothing.
+ * `metadata.author` value stamped on every skill the agent creates: plain provenance in the
+ * same key the bundled skills use for `S2B`, written once and never read by the plugin. It is
+ * the one fact about a skill that cannot be reconstructed later, so it is recorded even though
+ * nothing acts on it today. A fixed word rather than the agent's name, so a renamed or deleted
+ * agent changes nothing.
  */
 export const AGENT_SKILL_AUTHOR = "agent";
 
@@ -166,7 +166,11 @@ const createOperationSchema = z.object({
 
 const deleteOperationSchema = z.object({
 	type: z.literal("delete"),
-	name: z.string().describe("The name of the skill to delete. Built-in core skills cannot be deleted."),
+	name: z
+		.string()
+		.describe(
+			"The name of the skill to delete. Only when the user asked for this skill to be deleted. Built-in core skills cannot be deleted.",
+		),
 });
 
 const patchOperationSchema = z.object({
@@ -212,23 +216,6 @@ const manageSkillsSchema = z.object({
 });
 
 /**
- * The post-turn reviewer's variant: create, patch and update only. Deletion is immediate and
- * recursive, needs no load and checks no authorship, and nothing a reviewer learns from one
- * conversation justifies it — the reviewer is told to create or revise, so its tool cannot do
- * more than that.
- */
-const reviewerManageSkillsSchema = z.object({
-	operation: z
-		.discriminatedUnion("type", [createOperationSchema, patchOperationSchema, updateOperationSchema])
-		.describe("The one operation to perform, selected by `type`."),
-});
-
-export interface ManageSkillsToolOptions {
-	/** Omit the delete operation from the schema (the post-turn reviewer). Default: allowed. */
-	allowDelete?: boolean;
-}
-
-/**
  * Checks shared by every revision path: the result must still be a valid skill, and the fields
  * the rest of the system wires on (name, plugin link, category) must not have moved. Returns the
  * rejection to hand back, or null when the revision may be written.
@@ -258,23 +245,16 @@ function rejectInvalidRevision(
 }
 
 type ManageSkillsInput = z.infer<typeof manageSkillsSchema>;
-type ManageSkillsOperation = ManageSkillsInput["operation"];
 
 /**
- * Tool letting an agent create new skills, revise skills attached to it, or delete skills it
- * created. All three operations apply immediately — there is no staging/review step, unlike
+ * Tool letting an agent create new skills, revise skills attached to it, or delete an attached
+ * skill the user asked it to delete. All three operations apply immediately — there is no staging/review step, unlike
  * manage_notes. A created skill is given no explicit `agent.skills` entry, so it reads as
  * attached the moment its file exists (agent.skills[id]?.enabled ?? true): creating IS attaching,
  * with no separate manual "enable" step.
  */
-export function createManageSkillsTool(
-	skillsService: SkillsService | undefined,
-	app: App,
-	agentId = "",
-	options: ManageSkillsToolOptions = {},
-) {
-	const allowDelete = options.allowDelete ?? true;
-	const schema = allowDelete ? manageSkillsSchema : reviewerManageSkillsSchema;
+export function createManageSkillsTool(skillsService: SkillsService | undefined, app: App, agentId = "") {
+	const schema = manageSkillsSchema;
 	// For the description only; the checks below re-resolve per call so a skill created
 	// earlier in the same turn is already attached when the model patches it.
 	const attachedAtBuild = skillsService ? getAttachedSkillNames(skillsService, agentId) : [];
@@ -329,9 +309,6 @@ export function createManageSkillsTool(
 			}
 
 			if (input.type === "delete") {
-				// Unreachable through the reviewer schema; kept as a hard stop should a caller
-				// ever pass a wider input past it.
-				if (!allowDelete) return "Deleting skills is not available in this context.";
 				const metadata = skillsService.getCachedSkills().get(input.name);
 				if (!metadata) {
 					return `Skill "${input.name}" not found.`;
@@ -354,7 +331,6 @@ export function createManageSkillsTool(
 				// counters so a later skill of the same name starts from zero.
 				const agent = getData().getAgent(agentId) ?? getData().getSelectedAgent();
 				if (agent?.skills[input.name]) delete agent.skills[input.name];
-				getData().forgetSkillUsage(input.name);
 
 				return `Deleted the "${input.name}" skill.`;
 			}
@@ -431,7 +407,6 @@ export function createManageSkillsTool(
 			// history, so a revised core skill is flagged as customized rather than overwritten
 			// by the next upgrade.
 			await skillsService.writeSkillFile(skillName, newContent);
-			getData().recordSkillRevision(skillName);
 			// The model wrote this text too, so a follow-up revision in the same turn needs no reload.
 			recordSkillLoaded(threadId, skillName, parseFrontmatter(newContent).body);
 
@@ -439,7 +414,7 @@ export function createManageSkillsTool(
 		},
 		{
 			name: "manage_skills",
-			description: `Create new skills, revise your own attached skills${allowDelete ? ", or delete skills you created" : ""}. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
+			description: `Create new skills, revise your own attached skills, or delete a skill when the user asks you to. Changes apply immediately — there is no review step. To revise, load the skill with load_skill first, then patch the exact passage that needs changing (update replaces the whole body; use it only to restructure). A skill's name and plugin link are locked once created. Attached skills: ${attachedAtBuild.join(", ")}`,
 			schema,
 		},
 	);

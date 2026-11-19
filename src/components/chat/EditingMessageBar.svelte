@@ -22,7 +22,7 @@ const isEditing = $derived(!isMobileUI() && Boolean(session?.editingPairId));
 </script>
 
 {#if isEditing}
-  <div class="emb-row text-xs text-text-muted">
+  <div class="emb-row s2b-text-xs s2b-text-text-muted">
     <div class="emb-icon" use:icon={"pencil"} style="--icon-size: 11px"></div>
     <span>Editing message</span>
     <button class="emb-cancel clickable-icon" onclick={onCancel} title="Cancel edit" aria-label="Cancel edit" type="button">

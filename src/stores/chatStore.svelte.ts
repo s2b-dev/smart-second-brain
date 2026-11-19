@@ -2,9 +2,10 @@ import { type BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { Notice, type TFile } from "obsidian";
 import { SvelteMap } from "svelte/reactivity";
 import type { AgentStreamChunk, ThreadHistory } from "../agent/Agent";
-import type { TurnActivity } from "../agent/postTurnReview";
 import type { AgentManager } from "../agent/AgentManager";
 import { DEFAULT_AGENT_PROMPT } from "../agent/prompts";
+import type { ToolInterrupt } from "../agent/toolInterrupts";
+import { formatReplyResult } from "../utils/askQuestion";
 import type { ChatModelConfig } from "../providers/index";
 import type { ChatAttachment, ReviewStatusRef, ThreadError } from "../types/shared";
 import type { AgentConfig } from "../types/plugin";
@@ -19,6 +20,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
+import { isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
 	MessageState,
@@ -31,6 +33,7 @@ import {
 	formatGraphNotesContext,
 	formatReviewOutcomesContext,
 	normalizeToolInput,
+	pendingToolInterrupts,
 	resolveActiveCheckpointId,
 	resolvePostRunCheckpointSelection,
 	selectUnresolvedPendingIds,
@@ -96,6 +99,13 @@ export class ChatSession {
 	 * stashing/restoring it around an edit — this is just the on/off switch
 	 * and target id, shared with MessageContainer.svelte so both react to it. */
 	editingPairId = $state<UUIDv7 | null>(null);
+
+	/** Tool calls the active branch is paused on, waiting for the user (an open
+	 * `ask_question`). Derived from the checkpoint graph on every rebuild, never set
+	 * from a live stream, so it is the same after a reload as it was before. The
+	 * turn that asked has already settled; answering continues it (see
+	 * `answerInterrupts`). */
+	pendingInterrupts = $state<ToolInterrupt[]>([]);
 
 	/** The in-flight run's identity + wall-clock start, held outside `messages` so
 	 * it survives the pair-object replacement a rebuild performs. Set when a run
@@ -183,6 +193,7 @@ export class ChatSession {
 			this.bootstrapMessages,
 			this.lastErrorMessage,
 		);
+		this.pendingInterrupts = pendingToolInterrupts(this.graphState);
 		this.restoreLiveRunAnchor();
 	}
 
@@ -287,6 +298,15 @@ export class ChatSession {
 		selection?: SelectionRef,
 		graphNotes?: GraphNoteRef[],
 	): Promise<UUIDv7> {
+		// A message sent while a question is open is the answer to it. It must go
+		// through the resume path: appended as a new turn it would leave the question's
+		// tool call without a result, which providers reject for the rest of the thread.
+		const askingPair = this.messages.at(-1);
+		if (this.pendingInterrupts.length > 0 && askingPair) {
+			await this.answerInterrupts(() => formatReplyResult(content));
+			return askingPair.id;
+		}
+
 		const pairId = genUUIDv7();
 
 		// Capture the current model at send time
@@ -313,6 +333,69 @@ export class ChatSession {
 		void this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
 
 		return pairId;
+	}
+
+	/**
+	 * Continue the turn that paused on {@link pendingInterrupts}, handing each paused
+	 * call its answer. `resultFor` returns the text the model reads as that call's
+	 * result. All pending calls are answered in one go, which is what LangGraph needs
+	 * to finish the paused step.
+	 *
+	 * The answer extends the asking turn rather than starting a new one: the stream
+	 * picks the existing pair back up, and the settle rebuild then shows the question
+	 * with its answer and whatever the agent did next.
+	 */
+	async answerInterrupts(resultFor: (interrupt: ToolInterrupt) => string): Promise<void> {
+		if (this.messageState !== MessageState.idle) {
+			throw new Error("A response is already in progress for this chat.");
+		}
+		const checkpointId = this.graphState.activeCheckpointId;
+		const pair = this.messages.at(-1);
+		const pending = this.pendingInterrupts;
+		if (pending.length === 0 || !checkpointId || !pair) return;
+
+		const responses = pending.map((interrupt) => ({ interrupt, message: resultFor(interrupt) }));
+		this.pendingInterrupts = [];
+
+		// Reopen the paused cards. The checkpoint replay closed them with no output
+		// (a call without a result reads as finished); the stream's `tool_end` for
+		// each answer closes them again, this time with the answer.
+		const reopened = new Set(pending.map((interrupt) => interrupt.toolCallId));
+		const assistant = pair.assistantMessage;
+		for (const call of assistant.toolCalls ?? []) {
+			if (reopened.has(call.id)) call.status = "running";
+		}
+		assistant.assistantTimeline = assistant.assistantTimeline?.filter(
+			(event) => !(event.type === "tool_end" && event.toolCallId && reopened.has(event.toolCallId)),
+		);
+
+		const plugin = getPlugin();
+		checkpointDebug("resume.parent", { threadId: this.id, parentCheckpointId: checkpointId });
+		try {
+			await this.runStream(
+				pair.id,
+				(signal) =>
+					plugin.agentManager.resumeFromInterrupt(
+						String(this.id),
+						this.selectedAgentId,
+						checkpointId,
+						responses,
+						signal,
+					) as AsyncIterable<AgentStreamChunk>,
+				{
+					reloadAfter: true,
+					parentCheckpointId: checkpointId,
+					beforeCheckpointIds: new Set(this.graphState.nodes.keys()),
+					// The wait for the user is not thinking time, but what the agent did
+					// before asking is: keep it in the turn's total.
+					elapsedBeforeMs: assistant.thinkingDurationMs,
+				},
+			);
+		} finally {
+			// A run that failed or was stopped before writing a checkpoint leaves the
+			// thread paused where it was: the question is still open.
+			this.pendingInterrupts = pendingToolInterrupts(this.graphState);
+		}
 	}
 
 	/** Abort current streaming (if any) */
@@ -598,11 +681,12 @@ export class ChatSession {
 		pairId: UUIDv7,
 		getStream: (signal: AbortSignal) => AsyncIterable<AgentStreamChunk>,
 		options: {
-			generateTitle?: string;
 			reloadAfter?: boolean;
 			parentCheckpointId?: string;
 			beforeCheckpointIds: Set<string>;
 			predictedSummarization?: boolean;
+			/** Time this turn already ran before it paused; counted into its duration. */
+			elapsedBeforeMs?: number;
 		},
 	) {
 		const pair = this.findPair(pairId);
@@ -631,23 +715,11 @@ export class ChatSession {
 			// Wall-clock start of the turn — used to compute the run duration stamped on
 			// the message (live) and persisted onto the checkpoint below, and stamped on
 			// the message itself so the live timer has a remount-proof anchor.
-			const runStartedAtMs = Date.now();
+			const runStartedAtMs = Date.now() - (options.elapsedBeforeMs ?? 0);
 			pair.assistantMessage.runStartedAtMs = runStartedAtMs;
 			this.liveRun = { pairId, stableKey: pair.stableKey, startedAtMs: runStartedAtMs };
 
-			// Count the turn's tool calls on the way through, for the post-turn review trigger.
-			// Loading a skill is not work (see TurnActivity.toolCalls), so it does not count.
-			const activity: TurnActivity = { toolCalls: 0, revisedSkills: false };
-			const counted = async function* (source: AsyncIterable<AgentStreamChunk>) {
-				for await (const chunk of source) {
-					if (chunk.type === "tool_end") {
-						if (chunk.toolName !== "load_skill") activity.toolCalls += 1;
-						if (chunk.toolName === "manage_skills") activity.revisedSkills = true;
-					}
-					yield chunk;
-				}
-			};
-			await this.consumeStream(pair.assistantMessage, counted(getStream(signal)));
+			await this.consumeStream(pair.assistantMessage, getStream(signal));
 			pair.assistantMessage.state = AssistantState.success;
 			// The turn has succeeded and the checkpointer has persisted the answer.
 			// Everything below is bookkeeping over that already-durable result, so
@@ -663,21 +735,24 @@ export class ChatSession {
 			const thinkingDurationMs = Date.now() - runStartedAtMs;
 			pair.assistantMessage.thinkingDurationMs = thinkingDurationMs;
 
-			// Generate chat title after stream completes for the first user message.
-			// Must be sequential because rename changes this.id (the thread path).
-			if (options.generateTitle && this.messages.length === 1) {
+			// Title the chat after the first turn that succeeds, not just after the first
+			// submit: a first turn that errored leaves the placeholder name, and the retry,
+			// regenerate or edit that eventually succeeds must still title it. Otherwise the
+			// file stays "New Chat", no longer counts as empty, and every later new chat is
+			// deduped to "New Chat (2)", "(3)", ... This includes a chat a failed turn moved
+			// to "New Chat (failed)". Titled from the conversation's opening message — the
+			// first pair with user text, since a summarized history leads with an empty
+			// marker pair. Must be sequential because rename changes this.id.
+			const titleSource = this.messages.find((p) => p.userMessage.content.trim())?.userMessage.content;
+			if (titleSource && needsChatTitle(String(this.id))) {
 				try {
 					const plugin = getPlugin();
 					const newPath = await plugin.agentManager.generateThreadTitleFromUserMessage(
 						String(this.id),
 						this.selectedAgentId,
-						options.generateTitle,
+						titleSource,
 					);
-					if (newPath) {
-						const oldPath = String(this.id);
-						this.id = newPath;
-						this.onThreadIdChange?.(oldPath, newPath);
-					}
+					this.adoptThreadPath(newPath);
 				} catch (err) {
 					Logger.warn("[ChatSession] Failed to generate chat title:", err);
 				}
@@ -722,10 +797,6 @@ export class ChatSession {
 			if (options.reloadAfter && this.onNeedReload) {
 				await this.onNeedReload();
 			}
-
-			// Last, and detached: the answer is on screen and durable; the review is a
-			// side run that must never delay or fail the turn.
-			void getPlugin().agentManager.maybeRunPostTurnReview(String(this.id), this.selectedAgentId, activity);
 		} catch (_err) {
 			if (this.cancelled) {
 				pair.assistantMessage.state = AssistantState.cancelled;
@@ -743,6 +814,7 @@ export class ChatSession {
 				pair.assistantMessage.state = AssistantState.error;
 				pair.assistantMessage.errorCode = extractErrorMessage(_err);
 				Logger.error("[ChatSession] Run failed:", _err);
+				await this.markPlaceholderFailed();
 			}
 		} finally {
 			// Drop the live anchor on every exit path — success, cancel and error
@@ -759,6 +831,33 @@ export class ChatSession {
 			this.summarizingHistory = false;
 			this.messageState = MessageState.idle;
 			this.touch();
+		}
+	}
+
+	/** Follow a rename of this thread's file (auto-title or failed-marker). */
+	private adoptThreadPath(newPath: string | undefined): void {
+		if (!newPath || newPath === String(this.id)) return;
+		const oldPath = String(this.id);
+		this.id = newPath;
+		this.onThreadIdChange?.(oldPath, newPath);
+	}
+
+	/**
+	 * Move a still-"New Chat" thread whose turn failed to "New Chat (failed)". A run
+	 * that failed after checkpointing the user message leaves a chat that no longer
+	 * counts as empty and can't be reused; left on the placeholder name, it would push
+	 * every later new chat to "New Chat (2)", "(3)", ... (`markThreadFailed` skips a
+	 * chat the run never checkpointed, which stays reusable.) A later successful turn
+	 * still titles it (see `needsChatTitle`). Best-effort: a failed rename only costs
+	 * the numbering, so it must never mask the run's own error.
+	 */
+	private async markPlaceholderFailed(): Promise<void> {
+		if (!isDefaultChatTitle(String(this.id))) return;
+		try {
+			const newPath = await getPlugin().agentManager.markThreadFailed(String(this.id));
+			this.adoptThreadPath(newPath);
+		} catch (err) {
+			Logger.warn("[ChatSession] Failed to mark chat as failed:", err);
 		}
 	}
 
@@ -873,7 +972,6 @@ export class ChatSession {
 					reviewStatus,
 				) as AsyncIterable<AgentStreamChunk>,
 			{
-				generateTitle: userContent,
 				reloadAfter: true,
 				parentCheckpointId,
 				beforeCheckpointIds,
@@ -1304,6 +1402,9 @@ export class ChatSession {
 	async summarizeHistoryNow(): Promise<void> {
 		if (this.messageState !== MessageState.idle) {
 			throw new Error("Cannot summarize while another response is in progress.");
+		}
+		if (this.pendingInterrupts.length > 0) {
+			throw new Error("Answer or dismiss the open question before summarizing.");
 		}
 
 		const plugin = getPlugin();

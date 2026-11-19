@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Dataview plugin to be installed and enabled in Obsidian
 metadata:
   author: "S2B"
-  version: "1.2"
+  version: "1.5"
   linkedPlugin: "dataview"
 ---
 
@@ -23,8 +23,9 @@ the question is about which notes exist or how they add up:
   project").
 
 One query returns the answer as a compact table with just the fields you asked for, which costs a
-fraction of the context that scanning notes one by one would. Verify the tag or property names
-first (`get_all_tags`, `get_properties`) rather than guessing them in the query.
+fraction of the context that scanning notes one by one would. Take tag, property and folder
+names from the `# Vault` section of your instructions rather than guessing them; call
+`get_all_tags` or `get_properties` only when the name you need isn't there (the lists are capped).
 
 Do **not** use it for questions about what notes *say* — Dataview does not see prose, so "what
 did I write about X" stays with `search_notes`. A common shape is both: find the candidate notes
@@ -47,10 +48,38 @@ To *show* the user a live, auto-updating view (rather than compute over results)
 ```dataview code fence directly in your reply — see [Displaying Lists/Tables](#displaying-liststables)
 below. That renders natively and does not need the `exec_dataview` tool.
 
-## Default Result Size
+## Result Size
 
-Include `LIMIT 10` in any DQL that lists notes (a `LIST` or `TABLE` you show or run) unless the user asks for more or specifies a different limit.
-If you need pagination or offsets, slice the pages array (e.g., `api.pages(...).slice(offset, offset + limit)`).
+**Showing notes to the user** ("what are my X notes", "list all my books"): answer with a
+```dataview fence in your reply (see [Displaying Lists/Tables](#displaying-liststables)). It renders
+the complete, live list for the user and costs you no context, so do not run the query with
+`exec_dataview` first just to show it. Add a `LIMIT` only when the user asked for a few, or for a
+large set: when it could be large (a common tag, a whole folder), count it first
+(`api.pages(...).length`), and above about 100 notes show the first 100 with `LIMIT 100`, since
+Dataview has no paging and a longer list is slow to render. Say how many there are in total and
+offer to narrow it (by folder, a property, or a date). "All" does not lift this cap; the offer to
+narrow does that.
+
+**Get the filter right the first time.** The fence renders for the user only; you never see what
+it returned, so a wrong filter reaches them as an empty or wrong table.
+
+- **Names:** take tags and property keys from the `# Vault` section, not from memory of how vaults
+  usually look.
+- **Dates** ("last week", "in March"): filter on the property these notes keep their date in, not a
+  guessed `date`. Task-style notes usually use `scheduled` or `due`; if you can't tell which one this
+  set uses, read one of its notes first. Fall back to `file.day` (a date in the file name) or
+  `file.ctime` only when no property holds the date, and say which one you used.
+- **Your own files:** your skills and memories are notes too, and a tag mentioned in them matches.
+  Exclude the folder that holds them (the parent of your memory folder) with `AND !"<folder>"`.
+- **When the user says a result is empty or wrong**, fix the query, and keep what you learned (say,
+  which property holds these notes' dates) where your instructions on learning send it, so the next
+  query gets it right without being told.
+
+**Results you need to work with yourself**: when the set could be large (a whole folder, a common
+tag), get the count first (`api.pages(...).length`) and fetch only what you need, slicing for
+pages (`api.pages(...).slice(offset, offset + limit)`). Whenever you cap a result, say how many
+notes there are in total; never present the first few as the whole set, and never re-list the same
+notes with another tool to get the rest.
 
 The limit does **not** apply to aggregation. A `GROUP BY`, a count, or a sum is only correct over the whole result set — cutting it at ten groups gives a wrong answer, not a shorter one. Run those without a `LIMIT`, or use `api.pages(...)` and aggregate in JavaScript when the number of groups could be large; return only the aggregate, never the underlying rows.
 
@@ -67,7 +96,7 @@ DQL is the query language you pass to `api.tryQueryMarkdown(...)` (and the langu
 - SORT: `SORT field asc|desc`
 - GROUP BY: `GROUP BY prop` then use `rows` (e.g., `rows.file.name`)
 - FLATTEN: `FLATTEN multiProp`
-- LIMIT: `LIMIT 10` (default) or user-specified
+- LIMIT: `LIMIT n`, only when the user asked for a few or you are sampling a large set
 - Display helper: `choice(boolProp, "Yes", "No") as "Label"`
 
 ## Minimal Example
@@ -77,14 +106,14 @@ TABLE Title, Author
 FROM #library AND !"Templates"
 WHERE Rating > 3
 SORT file.mtime desc
-LIMIT 10
 ```
 
 ## Data Analysis
 
 If you need to SEE the results to answer a question or perform analysis, run the query with the
-`exec_dataview` tool: `return await api.tryQueryMarkdown('LIST FROM "Projects" LIMIT 10')` for DQL,
-or use `api.pages(...)` for programmatic aggregation.
+`exec_dataview` tool: `return await api.tryQueryMarkdown('LIST FROM "Projects"')` for DQL, or use
+`api.pages(...)` for programmatic aggregation. To only show the user a list, use a fence instead
+(see Result Size above).
 
 ## Scripting the Dataview API (advanced)
 

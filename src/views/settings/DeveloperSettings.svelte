@@ -76,10 +76,10 @@ function getLangSmithCheckIcon(): string {
 }
 
 function getLangSmithCheckButtonStyles(): string {
-	if (langSmithCheckState === "success") return "langsmith-check-button is-success";
-	if (langSmithCheckState === "error") return "langsmith-check-button is-error";
-	if (langSmithCheckState === "pending") return "langsmith-check-button is-pending";
-	return "langsmith-check-button";
+	if (langSmithCheckState === "success") return "s2b-langsmith-check-button is-success";
+	if (langSmithCheckState === "error") return "s2b-langsmith-check-button is-error";
+	if (langSmithCheckState === "pending") return "s2b-langsmith-check-button is-pending";
+	return "s2b-langsmith-check-button";
 }
 
 function normalizeLangSmithEndpoint(endpoint: string): string {
@@ -229,7 +229,7 @@ async function handleCheckLangSmithConnection() {
     </SettingItem>
 
     <SettingItem name="Endpoint URL" desc="Override LangSmith API base URL (optional)">
-      <div class="flex items-center gap-2 w-full">
+      <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-w-full">
         <Button
           iconId={getLangSmithCheckIcon()}
           ariaLabel="Check LangSmith API key and endpoint"
@@ -242,7 +242,7 @@ async function handleCheckLangSmithConnection() {
           placeholder={DEFAULT_LANGSMITH_ENDPOINT}
           inputType="text"
           bind:value={langSmithEndpointDraft}
-          class="flex-1"
+          class="s2b-flex-1"
           onblur={(v) => (pluginData.langSmithEndpoint = v)}
         />
       </div>
@@ -251,19 +251,19 @@ async function handleCheckLangSmithConnection() {
 </SettingGroup>
 
 <style>
-  :global(.langsmith-check-button) {
+  :global(.s2b-langsmith-check-button) {
     color: var(--text-muted);
   }
 
-  :global(.langsmith-check-button.is-success) {
+  :global(.s2b-langsmith-check-button.is-success) {
     color: var(--text-success, #4caf50);
   }
 
-  :global(.langsmith-check-button.is-error) {
+  :global(.s2b-langsmith-check-button.is-error) {
     color: var(--text-error);
   }
 
-  :global(.langsmith-check-button.is-pending .s2b-button-icon) {
+  :global(.s2b-langsmith-check-button.is-pending .s2b-button-icon) {
     animation: langsmith-check-spin 1s linear infinite;
   }
 

@@ -33,13 +33,13 @@ let {
 </script>
 
 {#if loading}
-  <span class="text-[--text-muted] text-sm">Loading models…</span>
+  <span class="s2b-text-[--text-muted] s2b-text-sm">Loading models…</span>
 {:else if !available && configureLabel && onConfigure}
   <!-- Labelled, not icon-only: a bare gear reads as "configure this dropdown" and its meaning
        lived only in the tooltip/aria-label, which touch devices never surface. -->
   <div class="model-setting-unavailable">
     {#if unavailableHint}
-      <span class="model-setting-hint text-sm text-[--text-muted]">{unavailableHint}</span>
+      <span class="model-setting-hint s2b-text-sm s2b-text-[--text-muted]">{unavailableHint}</span>
     {/if}
     <Button
       iconId="settings"
@@ -60,7 +60,7 @@ let {
           <span>{selectedLabel}</span>
         </div>
       {:else}
-        <span class="text-[--text-muted]">{placeholder}</span>
+        <span class="s2b-text-[--text-muted]">{placeholder}</span>
       {/if}
     </Button>
 

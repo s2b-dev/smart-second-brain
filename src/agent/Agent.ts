@@ -4,10 +4,16 @@ import type { ContentBlock, ToolCallChunk } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import type { BaseCheckpointSaver, CheckpointTuple } from "@langchain/langgraph";
-import { MemorySaver } from "@langchain/langgraph";
-import { type ReactAgent, createAgent, summarizationMiddleware } from "langchain";
+import { Command, MemorySaver } from "@langchain/langgraph";
+import {
+	type ReactAgent,
+	createAgent,
+	humanInTheLoopMiddleware,
+	modelRefusalMiddleware,
+	summarizationMiddleware,
+} from "langchain";
 import { createSubAgentMiddleware } from "deepagents/browser";
-import { TFile } from "obsidian";
+import { Notice, TFile } from "obsidian";
 
 import { ProviderEndpointError } from "../providers/errors";
 import type { ChatModelConfig } from "../providers/index";
@@ -27,7 +33,26 @@ import {
 import { toBase64, toBase64DataUri } from "../utils/attachments";
 import { extractTextFromPdf } from "../utils/pdfExtractor";
 import { Logger } from "../utils/logging";
+import { countMessageTokens, estimateSystemPromptTokens } from "../utils/tokenEstimator";
+import { createContextOverflowRecoveryMiddleware } from "./contextOverflow";
+import { createGenerationMetadataMiddleware } from "./generationMetadata";
+import { createPromptCachingMiddleware } from "./promptCaching";
 import { normalizeMessages } from "./messageNormalization";
+import {
+	INTERRUPT_CHANNEL,
+	type InterruptResponse,
+	type ToolInterrupt,
+	buildResumeValue,
+	parseToolInterrupts,
+	toolsPausingForUser,
+} from "./toolInterrupts";
+import {
+	MESSAGES_CHANNEL,
+	type ReplayNode,
+	createDeltaMessagesStateSchema,
+	rebuildMessages,
+	replayMessages,
+} from "./threadReplay";
 import { type ThreadSnapshot, type ThreadStore, createSnapshot } from "./memory/ThreadStore";
 import {
 	getSummarizationTriggerTokens,
@@ -112,6 +137,19 @@ export interface AgentEditOptions {
 	configurable?: Record<string, unknown>;
 }
 
+/** Options for continuing a run paused on tool calls that wait for the user. */
+export interface AgentResumeOptions {
+	resolved: ResolvedRun;
+	threadId: string;
+	/** The paused checkpoint: the tip of the branch the user is answering on. */
+	checkpointId: string;
+	/** One answer per paused call. Every pending interrupt must be answered at once. */
+	responses: InterruptResponse[];
+	signal?: AbortSignal;
+	metadata?: Record<string, unknown>;
+	configurable?: Record<string, unknown>;
+}
+
 /** Options for regenerating a response from a checkpoint (no new user message) */
 export interface AgentRegenerateOptions {
 	resolved: ResolvedRun;
@@ -147,6 +185,11 @@ export interface CheckpointHistoryItem {
 	parentCheckpointId?: string;
 	/** Optional checkpoint timestamp for deterministic ordering/tie-breaking */
 	ts?: string;
+	/**
+	 * Tool calls this checkpoint's run paused on, waiting for the user. Recorded even after
+	 * they were answered; `pendingToolInterrupts` in `chatTimeline.ts` decides which still wait.
+	 */
+	interrupts?: ToolInterrupt[];
 }
 
 export interface AgentOptions {
@@ -328,7 +371,7 @@ export class Agent {
 		this.registry = options.registry;
 		this.telemetry = options.telemetry;
 		this.threadStore = options.threadStore;
-		this.checkpointer = this.wrapCheckpointer(options.checkpointer ?? new MemorySaver());
+		this.checkpointer = options.checkpointer ?? new MemorySaver();
 		Logger.debug("agent.init", {
 			hasTelemetry: Boolean(this.telemetry),
 			hasThreadStore: Boolean(this.threadStore),
@@ -612,9 +655,23 @@ export class Agent {
 				tools: Array.isArray(tools) ? [...tools] : [],
 				systemPrompt,
 				checkpointer: this.checkpointer,
+				// `messages` as a DeltaChannel: each checkpoint stores only its step's
+				// new messages plus a periodic snapshot, not the whole history (#540).
+				// Same value and input types as the default `messages`, so the runnable
+				// keeps the default agent type; the cast only hides the schema class.
+				stateSchema: createDeltaMessagesStateSchema() as never,
 				middleware: [
-					...this.buildSummarizationMiddleware(selectedModel, resolvedSummarization),
+					createGenerationMetadataMiddleware(),
+					...this.buildSummarizationMiddleware(selectedModel, systemPrompt, resolvedSummarization),
+					// A refusal is a successful response to the provider, so without this
+					// the turn ends as an empty answer; with it, the turn fails with the
+					// provider's explanation (see `extractErrorMessage`).
+					modelRefusalMiddleware(),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
+					...this.buildHumanInTheLoopMiddleware(tools),
+					// Last, so it wraps the model call closest to the provider and sees
+					// the request after summarization has rewritten the history.
+					createPromptCachingMiddleware(),
 				] as never,
 			});
 			this.pruneStaleAuthGenerations(cacheKey);
@@ -632,32 +689,91 @@ export class Agent {
 		};
 	}
 
-	private buildSummarizationMiddleware(selectedModel: SelectedModel, summarizationModel?: SelectedModel) {
+	/**
+	 * Pauses every call to a tool marked as waiting for the user (`ask_question`) before
+	 * it runs. `per_call` mode raises one interrupt per call, carrying the model's
+	 * tool-call id, and lets the other calls of the same step run meanwhile. The only
+	 * decision offered is `respond`: the user's answer is the tool result.
+	 *
+	 * Top-level only by construction: subagents are built without this middleware and
+	 * without those tools (see `buildToolsForAgent`).
+	 */
+	private buildHumanInTheLoopMiddleware(tools: readonly unknown[]): unknown[] {
+		const names = toolsPausingForUser(tools);
+		if (names.length === 0) return [];
+		return [
+			humanInTheLoopMiddleware({
+				interruptMode: "per_call",
+				interruptOn: Object.fromEntries(
+					names.map((name) => [
+						name,
+						{ allowedDecisions: ["respond" as const], description: "Waiting for the user's answer." },
+					]),
+				),
+			}),
+		];
+	}
+
+	private buildSummarizationMiddleware(
+		selectedModel: SelectedModel,
+		systemPrompt: string,
+		summarizationModel?: SelectedModel,
+	) {
 		const model = summarizationModel?.instance ?? selectedModel.instance;
 		const contextWindow = selectedModel.options?.contextWindow;
 		const triggerTokens = getSummarizationTriggerTokens(contextWindow);
-		if (!triggerTokens) {
+		if (!contextWindow || !triggerTokens) {
 			Logger.warn(
 				`[Agent] Summarization disabled: model "${selectedModel.name}" has no contextWindow configured. Long threads will not be summarized and may hit provider context limits.`,
 			);
 			return [];
 		}
 
-		const trimTokensToSummarize = getTrimTokensToSummarize(triggerTokens);
+		// The summarizer reads what it replaces, bounded by its OWN window: the
+		// dedicated summary model's when one is set, else the chat model's.
+		const summarizerContextWindow = summarizationModel ? summarizationModel.options?.contextWindow : contextWindow;
+		const trimTokensToSummarize = getTrimTokensToSummarize(summarizerContextWindow, triggerTokens);
+		// The middleware only counts messages; the system prompt rides along on
+		// every request outside them. Lowering the trigger by its size makes it
+		// fire at the same total the context meter shows (#545).
+		const messageTriggerTokens = Math.max(triggerTokens - estimateSystemPromptTokens(systemPrompt), 1);
+
+		// Guarded so a failed summary aborts the trim instead of replacing the
+		// trimmed history with an error stub (#435).
+		const summarizer = guardSummarizationFailure(
+			summarizationMiddleware({
+				model,
+				trigger: { tokens: messageTriggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
+				keep: { messages: SUMMARY_KEEP_MESSAGE_COUNT },
+				summaryPrefix: SUMMARY_PREFIX,
+				summaryPrompt: SUMMARY_PROMPT,
+				tokenCounter: countMessageTokens,
+				trimTokensToSummarize,
+			}),
+			{
+				tokenCounter: countMessageTokens,
+				trimTokensToSummarize,
+				onHistoryDropped: ({ droppedTokens }) => {
+					new Notice(
+						`Smart Second Brain: about ${formatThousands(droppedTokens)} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.`,
+					);
+				},
+				onRepeatedFailure: (failures) => {
+					new Notice(
+						`Smart Second Brain: summarizing this chat's history failed ${failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error.`,
+					);
+				},
+			},
+		);
 
 		return [
-			// Guarded so a failed summary aborts the trim instead of replacing the
-			// trimmed history with an error stub (#435).
-			guardSummarizationFailure(
-				summarizationMiddleware({
-					model,
-					trigger: { tokens: triggerTokens, messages: SUMMARY_KEEP_MESSAGE_COUNT + 2 },
-					keep: { messages: SUMMARY_KEEP_MESSAGE_COUNT },
-					summaryPrefix: SUMMARY_PREFIX,
-					summaryPrompt: SUMMARY_PROMPT,
-					trimTokensToSummarize,
-				}),
-			),
+			summarizer,
+			// Catches the provider's "prompt too long" when the request overflows
+			// before the proactive trigger fires, summarizes and retries once.
+			createContextOverflowRecoveryMiddleware({
+				summarizer: summarizer.beforeModel as never,
+				tokenCounter: countMessageTokens,
+			}),
 		] as const;
 	}
 
@@ -694,7 +810,7 @@ export class Agent {
 						model: s.model as never,
 						systemPrompt: s.systemPrompt,
 						tools: [...s.tools] as never,
-						middleware: [] as never,
+						middleware: [createPromptCachingMiddleware()] as never,
 						// The runnable name is stamped onto the subagent's AIMessage.name,
 						// which serializes into the OpenAI/Azure request as `messages[N].name`.
 						// OpenAI-compatible endpoints enforce the pattern `^[^\s<|\\/>]+$`
@@ -909,13 +1025,15 @@ export class Agent {
 		};
 		threadId: string;
 		runId: string;
-		input: { messages: BaseMessage[] } | null;
+		input: { messages: BaseMessage[] } | Command | null;
 		checkpointId?: string;
+		/** Paused calls this run answers. Each is reported as ended with its answer. */
+		resumed?: readonly InterruptResponse[];
 		label: string;
 		noOutputError: string;
 		logStart: Record<string, unknown>;
 	}): AsyncGenerator<AgentStreamChunk> {
-		const { options, threadId, runId, input, checkpointId, label, noOutputError, logStart } = params;
+		const { options, threadId, runId, input, checkpointId, resumed, label, noOutputError, logStart } = params;
 		const { resolved } = options;
 		const { runnable: agent, selectedModel } = resolved;
 		const startedAt = new Date();
@@ -924,18 +1042,6 @@ export class Agent {
 
 		const invokeConfig = this.buildRunnableConfig(options, threadId, checkpointId);
 		const transportContext = createAiTransportContext("default", `${label}:${runId}`);
-
-		// Bind the LangChain stream so each pull runs inside this run's transport
-		// context (run()-scoped, concurrency-safe). Without this the fetch issued
-		// deep inside the stream would read whichever context another concurrent
-		// run last set.
-		const stream = bindAsyncIterableToTransportContext(
-			await agent.stream(input, {
-				...invokeConfig,
-				streamMode: ["messages", "tools", "values"] as const,
-			}),
-			transportContext,
-		);
 
 		let rawResult: unknown;
 		// Track tool calls in progress to correlate start/end events
@@ -962,7 +1068,35 @@ export class Agent {
 		// stream across many deltas announces exactly once. Never cleared on a step
 		// boundary: ids are globally unique per run, and `tool_start` reconciles by id.
 		const announcedPendingToolCalls = new Set<string>();
+		// Interrupt ids already reported, so a pause is announced once however often
+		// LangGraph repeats it across `values` chunks.
+		const announcedInterrupts = new Set<string>();
+
+		// An answered call never executes (the answer IS its result), so no tool callback
+		// fires for it. Report its end here, or its card would stay open for the whole run.
+		for (const { interrupt, message } of resumed ?? []) {
+			announcedInterrupts.add(interrupt.id);
+			yield {
+				type: "tool_end",
+				toolCallId: interrupt.toolCallId,
+				toolName: interrupt.toolName,
+				output: message,
+				runId,
+				threadId,
+			};
+		}
+
 		try {
+			// Scope initialization and each pull to this run; initialization can also require fallback.
+			const stream = bindAsyncIterableToTransportContext(
+				await runWithAiTransportContext(transportContext, () =>
+					agent.stream(input, {
+						...invokeConfig,
+						streamMode: ["messages", "tools", "values"] as const,
+					}),
+				),
+				transportContext,
+			);
 			for await (const chunk of stream) {
 				// Check if aborted before processing
 				if (options.signal?.aborted) {
@@ -1135,6 +1269,27 @@ export class Agent {
 				if (mode === "values") {
 					if (this.isAgentOutputCandidate(payload)) {
 						rawResult = payload;
+					}
+					// A paused tool call. It never reaches `on_tool_start`, so announce it
+					// here with its arguments: the chat shows the call, and what it is
+					// waiting for is read from the checkpoint once the run settles.
+					const raised = (payload as { [INTERRUPT_CHANNEL]?: unknown } | null)?.[INTERRUPT_CHANNEL];
+					for (const interrupt of parseToolInterrupts(raised)) {
+						if (announcedInterrupts.has(interrupt.id)) continue;
+						announcedInterrupts.add(interrupt.id);
+						const preamble = toolCallPreambles.get(interrupt.toolCallId);
+						toolCallPreambles.delete(interrupt.toolCallId);
+						Logger.debug(`${label}.tool_interrupt`, { runId, toolCallId: interrupt.toolCallId });
+						yield {
+							type: "tool_start",
+							toolCallId: interrupt.toolCallId,
+							toolName: interrupt.toolName,
+							input: interrupt.args,
+							preamble,
+							aiMessageId: lastAiMessageId,
+							runId,
+							threadId,
+						};
 					}
 				}
 			}
@@ -1346,6 +1501,38 @@ export class Agent {
 		});
 	}
 
+	/**
+	 * Continue a run that paused on tool calls waiting for the user, handing each its answer.
+	 *
+	 * The run continues in place when the paused checkpoint is still the thread's latest.
+	 * Only when the user answers on an older branch is the checkpoint named explicitly:
+	 * that forks from it, and a fork re-runs the paused step's other tool calls, which the
+	 * in-place path does not.
+	 */
+	async *resumeFromInterrupt(options: AgentResumeOptions): AsyncGenerator<AgentStreamChunk> {
+		const { threadId, checkpointId, responses, resolved } = options;
+		if (responses.length === 0) throw new Error("At least one answer is required to continue.");
+
+		const latestCheckpointId = await this.getLatestCheckpointId(threadId);
+
+		yield* this.runStream({
+			options,
+			threadId,
+			runId: this.generateId(),
+			input: new Command({ resume: buildResumeValue(responses) }),
+			checkpointId: latestCheckpointId === checkpointId ? undefined : checkpointId,
+			resumed: responses,
+			label: "agent.resumeFromInterrupt",
+			noOutputError: "Agent completed without producing a final output.",
+			logStart: {
+				checkpointId,
+				provider: resolved.selectedModel.provider,
+				model: resolved.selectedModel.name,
+				answered: responses.length,
+			},
+		});
+	}
+
 	async getThreadHistory(threadId: string): Promise<ThreadHistory | undefined> {
 		const [metadata, tuple] = await Promise.all([
 			this.threadStore?.read(threadId),
@@ -1364,7 +1551,7 @@ export class Agent {
 					updatedAt: checkpointTimestamp,
 					createdAt: checkpointTimestamp,
 				});
-		const messages = tuple ? this.extractMessagesFromCheckpoint(tuple) : [];
+		const messages = tuple ? await this.extractMessagesFromCheckpoint(tuple) : [];
 		const { lastError, errorCount } = tuple
 			? this.extractErrorsFromCheckpoint(tuple)
 			: { lastError: undefined, errorCount: 0 };
@@ -1383,23 +1570,42 @@ export class Agent {
 	 * Used for building the checkpoint-to-message mapping for regenerate/edit operations.
 	 */
 	async getCheckpointHistory(threadId: string): Promise<CheckpointHistoryItem[]> {
-		const results: CheckpointHistoryItem[] = [];
+		// The vault saver replays straight from the loaded thread, normalizing each
+		// distinct message once (see `threadReplay`).
+		const vaultSaver = this.checkpointer as {
+			readCheckpointHistory?: (path: string) => Promise<CheckpointHistoryItem[]>;
+		};
+		if (typeof vaultSaver.readCheckpointHistory === "function") {
+			return vaultSaver.readCheckpointHistory.call(this.checkpointer, threadId);
+		}
 
+		// Any other saver: collect every checkpoint's stored value and writes, then replay.
 		const config = { configurable: { thread_id: threadId } };
-
+		const nodes = new Map<string, ReplayNode>();
+		const items: Omit<CheckpointHistoryItem, "messages">[] = [];
 		for await (const tuple of this.checkpointer.list(config)) {
 			const checkpointId = tuple.config.configurable?.checkpoint_id as string | undefined;
 			if (!checkpointId) continue;
-
-			const messages = this.extractMessagesFromCheckpoint(tuple);
-			const step = (tuple.metadata?.step as number) ?? 0;
 			const parentCheckpointId = tuple.parentConfig?.configurable?.checkpoint_id as string | undefined;
-			const ts = tuple.checkpoint?.ts as string | undefined;
-
-			results.push({ checkpointId, messages, step, parentCheckpointId, ts });
+			const values = tuple.checkpoint?.channel_values as Record<string, unknown> | undefined;
+			nodes.set(checkpointId, {
+				parentId: parentCheckpointId,
+				seed: values && Object.hasOwn(values, MESSAGES_CHANNEL) ? values[MESSAGES_CHANNEL] : undefined,
+				writes: (tuple.pendingWrites ?? []).filter((write) => write[1] === MESSAGES_CHANNEL),
+			});
+			const interrupts = (tuple.pendingWrites ?? [])
+				.filter((write) => write[1] === INTERRUPT_CHANNEL)
+				.flatMap((write) => parseToolInterrupts(write[2]));
+			items.push({
+				checkpointId,
+				step: (tuple.metadata?.step as number) ?? 0,
+				parentCheckpointId,
+				ts: tuple.checkpoint?.ts as string | undefined,
+				...(interrupts.length > 0 ? { interrupts } : {}),
+			});
 		}
-
-		return results;
+		const replayed = replayMessages(nodes);
+		return items.map((item) => ({ ...item, messages: replayed.get(item.checkpointId) ?? [] }));
 	}
 
 	/**
@@ -1510,63 +1716,6 @@ export class Agent {
 		} as RunnableConfig;
 	}
 
-	private wrapCheckpointer(checkpointer: BaseCheckpointSaver): BaseCheckpointSaver {
-		// The async generator below is a `function*` (arrow generators do not exist),
-		// so it cannot see the class `this`; hand it a bound normalizer instead.
-		const normalizeTuple = (tuple: CheckpointTuple | undefined) => this.normalizeCheckpointTuple(tuple);
-		return new Proxy(checkpointer, {
-			get: (target, prop, receiver) => {
-				if (prop === "getTuple") {
-					return async (...args: unknown[]) => {
-						const getTuple = Reflect.get(target, prop, receiver) as (
-							...innerArgs: unknown[]
-						) => Promise<CheckpointTuple | undefined>;
-						const tuple = await getTuple.apply(target, args);
-						return normalizeTuple(tuple);
-					};
-				}
-
-				if (prop === "list") {
-					return async function* (...args: unknown[]) {
-						const list = Reflect.get(target, prop, receiver) as (
-							...innerArgs: unknown[]
-						) => AsyncIterable<CheckpointTuple>;
-						for await (const tuple of list.apply(target, args)) {
-							yield normalizeTuple(tuple) as CheckpointTuple;
-						}
-					};
-				}
-
-				const value = Reflect.get(target, prop, receiver);
-				return typeof value === "function" ? value.bind(target) : value;
-			},
-		});
-	}
-
-	private normalizeCheckpointTuple(tuple: CheckpointTuple | undefined): CheckpointTuple | undefined {
-		if (!tuple?.checkpoint?.channel_values) {
-			return tuple;
-		}
-
-		const channelValues = tuple.checkpoint.channel_values;
-		const rawMessages = channelValues.messages;
-		if (!Array.isArray(rawMessages)) {
-			return tuple;
-		}
-
-		const normalizedMessages = normalizeMessages(rawMessages);
-		return {
-			...tuple,
-			checkpoint: {
-				...tuple.checkpoint,
-				channel_values: {
-					...channelValues,
-					messages: normalizedMessages,
-				},
-			},
-		};
-	}
-
 	private extractMessagesFromResult(result: unknown): BaseMessage[] {
 		if (!result || typeof result !== "object" || !("messages" in result)) {
 			return [];
@@ -1579,17 +1728,22 @@ export class Agent {
 		return normalizeMessages(messages);
 	}
 
-	private extractMessagesFromCheckpoint(tuple: CheckpointTuple): BaseMessage[] {
+	/**
+	 * The checkpoint's message list. `messages` is a delta channel, so most
+	 * checkpoints store none: those are rebuilt from the saver's delta history.
+	 */
+	private async extractMessagesFromCheckpoint(tuple: CheckpointTuple): Promise<BaseMessage[]> {
 		const channelValues = tuple.checkpoint?.channel_values as Record<string, unknown> | undefined;
-		if (!channelValues) {
-			return [];
-		}
-		const messages = channelValues.messages;
-		if (!Array.isArray(messages)) {
-			return [];
-		}
-		// Convert serialized messages to BaseMessage instances
-		return normalizeMessages(messages);
+		const ownValue =
+			channelValues && Object.hasOwn(channelValues, MESSAGES_CHANNEL)
+				? channelValues[MESSAGES_CHANNEL]
+				: undefined;
+		if (ownValue !== undefined) return rebuildMessages(ownValue, undefined);
+		const history = await this.checkpointer.getDeltaChannelHistory({
+			config: tuple.config,
+			channels: [MESSAGES_CHANNEL],
+		});
+		return rebuildMessages(undefined, history[MESSAGES_CHANNEL]);
 	}
 
 	/**
@@ -1936,7 +2090,7 @@ ${userMessage}`;
 			return undefined;
 		}
 
-		const messages = this.extractMessagesFromCheckpoint(tuple);
+		const messages = await this.extractMessagesFromCheckpoint(tuple);
 		if (messages.length === 0) {
 			return undefined;
 		}
@@ -1950,4 +2104,8 @@ ${userMessage}`;
 
 		return undefined;
 	}
+}
+
+function formatThousands(tokens: number): string {
+	return tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens);
 }
