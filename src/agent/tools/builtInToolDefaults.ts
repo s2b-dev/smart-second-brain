@@ -61,6 +61,16 @@ export function getSearchNotesDescription(hasEmbeddingIndex: boolean): string {
 	return hasEmbeddingIndex ? SEARCH_NOTES_DESC_EMBEDDINGS : SEARCH_NOTES_DESC_LEXICAL_ONLY;
 }
 
+// --- write_todos: the guidance lives in the description, not in a skill ------------------
+
+const WRITE_TODOS_DESC = `Keep a visible task list for the current request. The user sees it pinned above the chat input and follows your progress there.
+
+Use it when a request takes several distinct steps or touches many notes: restructuring a folder, merging or splitting notes, researching a topic across the vault, a review that ends in edits. Write the list before you start, as short imperative steps, with the first one in_progress. Skip it for questions you can answer directly and for one- or two-step tasks.
+
+Each call replaces the whole list, so always send every item. Keep exactly one item in_progress while you work. Mark an item completed as soon as it is done, not in a batch at the end. Revise the list when you learn something that changes the plan: add steps, drop steps that no longer apply. Update it as you work through the request, but never call it twice in parallel within one response.
+
+If the user drops the plan or the work no longer needs one, send an empty list to clear it.`;
+
 // --- the table -----------------------------------------------------------------------------
 
 export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> = {
@@ -197,7 +207,25 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 				"Create new skills, revise your own attached skills, or delete a skill when the user asks you to. Changes apply immediately. A skill's name and plugin link are locked once created; only the body and description can change.",
 		},
 	},
+	write_todos: {
+		displayName: "Task List",
+		summary:
+			"Lets the agent plan multi-step work as a checklist and tick it off as it goes. The list shows above the chat input.",
+		config: {
+			enabled: true,
+			name: "write_todos",
+			description: WRITE_TODOS_DESC,
+		},
+	},
 };
+
+/**
+ * Built-in tools bound without any skill attaching them; only the per-tool toggle in the
+ * Tools modal can turn them off. Reserved for tools that are about how the agent works
+ * rather than what it can do in the vault, so no skill is the natural owner. Main agent
+ * only: subagents run short scoped tasks, and the chat has one task-list slot.
+ */
+export const ALWAYS_ATTACHED_TOOL_IDS: ReadonlySet<BuiltInToolId> = new Set<BuiltInToolId>(["write_todos"]);
 
 /**
  * Default configuration for all built-in tools — what a new agent's `toolsConfig` is
