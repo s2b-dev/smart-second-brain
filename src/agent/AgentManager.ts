@@ -76,6 +76,8 @@ import { fingerprint } from "../utils/shippedDefaults";
 import { getBundledSkill } from "../skills/defaults";
 import { extractErrorMessage } from "../utils/errorMessage";
 import { LangSmithTelemetry, type Telemetry } from "./telemetry";
+import type { InterruptResponse } from "./toolInterrupts";
+import { createAskQuestionTool } from "./tools/askQuestion";
 import { createExecuteJavaScriptTool } from "./tools/executeJavaScript";
 import { createPluginApiExecTool } from "./tools/executePluginApi";
 import { createFetchUrlTool } from "./tools/fetchUrl";
@@ -966,7 +968,8 @@ export class AgentManager {
 		// Resolved once here rather than via isToolBound per tool, so the skill cache is only
 		// walked a single time while building the whole tool list.
 		const attached = this.attachedToolIds(agentCfg);
-		// A subagent gets no task list: its run is one scoped step of the parent's work.
+		// A subagent gets no task list and cannot ask the user: its run is one scoped step of
+		// the parent's work, and only the top-level run can pause on the chat.
 		if (forSubAgent) {
 			for (const id of ALWAYS_ATTACHED_TOOL_IDS) attached.delete(id);
 		}
@@ -1040,6 +1043,7 @@ export class AgentManager {
 			["web_search", () => createWebSearchTool(agentCfg.id)],
 			["manage_skills", () => createManageSkillsTool(this.plugin.skillsService, this.plugin.app, agentCfg.id)],
 			["write_todos", () => createWriteTodosTool(agentCfg.id)],
+			["ask_question", () => createAskQuestionTool(agentCfg.id)],
 		];
 
 		for (const [toolId, factory] of builtInTools) {
@@ -1885,6 +1889,36 @@ export class AgentManager {
 			signal,
 			chatModel,
 			"Error regenerating response",
+		);
+	}
+
+	/**
+	 * Continue a turn that paused on tool calls waiting for the user (an `ask_question`
+	 * card), handing each call its answer. Continues the same turn: no new user message.
+	 */
+	async *resumeFromInterrupt(
+		threadId: string,
+		agentId: string,
+		checkpointId: string,
+		responses: InterruptResponse[],
+		signal?: AbortSignal,
+	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
+		const resolvedThreadId = this.normalizeThreadId(threadId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+
+		yield* this.dispatchStream(
+			agent.resumeFromInterrupt({
+				resolved,
+				threadId: resolvedThreadId,
+				checkpointId,
+				responses,
+				metadata: runMetadata,
+				configurable: { agent_id: resolvedAgentId },
+				signal,
+			}),
+			signal,
+			chatModel,
+			"Error continuing after your answer",
 		);
 	}
 

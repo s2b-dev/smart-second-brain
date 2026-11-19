@@ -22,6 +22,7 @@ import AgentPopover from "./AgentPopover.svelte";
 import ModelSelectButton from "./ModelSelectButton.svelte";
 import PendingChangesBar from "./PendingChangesBar.svelte";
 import TodoListBar from "./TodoListBar.svelte";
+import QuestionBar from "./QuestionBar.svelte";
 import EditingMessageBar from "./EditingMessageBar.svelte";
 import ContextTray from "./ContextTray.svelte";
 import ContextUsageCircle from "./ContextUsageCircle.svelte";
@@ -221,7 +222,13 @@ const hasChatModel = $derived(Boolean(selectedChatModel));
 const hasContentToSend = $derived(inputValue.trim().length > 0 || attachments.length > 0);
 const canSendMessage = $derived(hasContentToSend && hasChatModel);
 const canSummarizeNow = $derived.by(() => {
-	return Boolean(session && session.messageState === MessageState.idle && session.messages.length > 0);
+	return Boolean(
+		session &&
+			session.messageState === MessageState.idle &&
+			session.messages.length > 0 &&
+			// Summarizing appends a turn, which a thread paused on a question cannot take.
+			session.pendingInterrupts.length === 0,
+	);
 });
 // Only the composer's OWN drag state tints the composer. In `view` mode the
 // whole pane is the drop target and Chat.svelte draws one dashed frame around
@@ -717,6 +724,12 @@ function sendMessage() {
 	}
 	if (!session) {
 		new Notice("Chat is not ready yet");
+		return;
+	}
+	// A message sent while the agent's question is open is delivered as the answer to
+	// it (see ChatSession.sendMessage), and an answer is text only.
+	if (session.pendingInterrupts.length > 0 && attachments.length > 0) {
+		new Notice("Answer or dismiss the agent's question before attaching files");
 		return;
 	}
 
@@ -1243,6 +1256,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
   <TodoListBar {registry} {threadPath} />
   <PendingChangesBar {threadPath} />
   <EditingMessageBar {registry} {threadPath} onCancel={cancelActiveEdit} />
+  <QuestionBar {registry} {threadPath} />
   <!-- Input wrapper with glow effect.
        Transition is scoped to the two properties that actually change state
        (border-color on focus/drag, background on drag-active) rather than

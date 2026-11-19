@@ -4,8 +4,14 @@ import type { ContentBlock, ToolCallChunk } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import type { BaseCheckpointSaver, CheckpointTuple } from "@langchain/langgraph";
-import { MemorySaver } from "@langchain/langgraph";
-import { type ReactAgent, createAgent, modelRefusalMiddleware, summarizationMiddleware } from "langchain";
+import { Command, MemorySaver } from "@langchain/langgraph";
+import {
+	type ReactAgent,
+	createAgent,
+	humanInTheLoopMiddleware,
+	modelRefusalMiddleware,
+	summarizationMiddleware,
+} from "langchain";
 import { createSubAgentMiddleware } from "deepagents/browser";
 import { Notice, TFile } from "obsidian";
 
@@ -32,6 +38,14 @@ import { createContextOverflowRecoveryMiddleware } from "./contextOverflow";
 import { createGenerationMetadataMiddleware } from "./generationMetadata";
 import { createPromptCachingMiddleware } from "./promptCaching";
 import { normalizeMessages } from "./messageNormalization";
+import {
+	INTERRUPT_CHANNEL,
+	type InterruptResponse,
+	type ToolInterrupt,
+	buildResumeValue,
+	parseToolInterrupts,
+	toolsPausingForUser,
+} from "./toolInterrupts";
 import {
 	MESSAGES_CHANNEL,
 	type ReplayNode,
@@ -123,6 +137,19 @@ export interface AgentEditOptions {
 	configurable?: Record<string, unknown>;
 }
 
+/** Options for continuing a run paused on tool calls that wait for the user. */
+export interface AgentResumeOptions {
+	resolved: ResolvedRun;
+	threadId: string;
+	/** The paused checkpoint: the tip of the branch the user is answering on. */
+	checkpointId: string;
+	/** One answer per paused call. Every pending interrupt must be answered at once. */
+	responses: InterruptResponse[];
+	signal?: AbortSignal;
+	metadata?: Record<string, unknown>;
+	configurable?: Record<string, unknown>;
+}
+
 /** Options for regenerating a response from a checkpoint (no new user message) */
 export interface AgentRegenerateOptions {
 	resolved: ResolvedRun;
@@ -158,6 +185,11 @@ export interface CheckpointHistoryItem {
 	parentCheckpointId?: string;
 	/** Optional checkpoint timestamp for deterministic ordering/tie-breaking */
 	ts?: string;
+	/**
+	 * Tool calls this checkpoint's run paused on, waiting for the user. Recorded even after
+	 * they were answered; `pendingToolInterrupts` in `chatTimeline.ts` decides which still wait.
+	 */
+	interrupts?: ToolInterrupt[];
 }
 
 export interface AgentOptions {
@@ -636,6 +668,7 @@ export class Agent {
 					// provider's explanation (see `extractErrorMessage`).
 					modelRefusalMiddleware(),
 					...this.buildSubAgentMiddleware(selectedModel, subAgents, tools),
+					...this.buildHumanInTheLoopMiddleware(tools),
 					// Last, so it wraps the model call closest to the provider and sees
 					// the request after summarization has rewritten the history.
 					createPromptCachingMiddleware(),
@@ -654,6 +687,31 @@ export class Agent {
 			supportsVision: options?.supportsVision ?? false,
 			currentProvider: provider,
 		};
+	}
+
+	/**
+	 * Pauses every call to a tool marked as waiting for the user (`ask_question`) before
+	 * it runs. `per_call` mode raises one interrupt per call, carrying the model's
+	 * tool-call id, and lets the other calls of the same step run meanwhile. The only
+	 * decision offered is `respond`: the user's answer is the tool result.
+	 *
+	 * Top-level only by construction: subagents are built without this middleware and
+	 * without those tools (see `buildToolsForAgent`).
+	 */
+	private buildHumanInTheLoopMiddleware(tools: readonly unknown[]): unknown[] {
+		const names = toolsPausingForUser(tools);
+		if (names.length === 0) return [];
+		return [
+			humanInTheLoopMiddleware({
+				interruptMode: "per_call",
+				interruptOn: Object.fromEntries(
+					names.map((name) => [
+						name,
+						{ allowedDecisions: ["respond" as const], description: "Waiting for the user's answer." },
+					]),
+				),
+			}),
+		];
 	}
 
 	private buildSummarizationMiddleware(
@@ -967,13 +1025,15 @@ export class Agent {
 		};
 		threadId: string;
 		runId: string;
-		input: { messages: BaseMessage[] } | null;
+		input: { messages: BaseMessage[] } | Command | null;
 		checkpointId?: string;
+		/** Paused calls this run answers. Each is reported as ended with its answer. */
+		resumed?: readonly InterruptResponse[];
 		label: string;
 		noOutputError: string;
 		logStart: Record<string, unknown>;
 	}): AsyncGenerator<AgentStreamChunk> {
-		const { options, threadId, runId, input, checkpointId, label, noOutputError, logStart } = params;
+		const { options, threadId, runId, input, checkpointId, resumed, label, noOutputError, logStart } = params;
 		const { resolved } = options;
 		const { runnable: agent, selectedModel } = resolved;
 		const startedAt = new Date();
@@ -1008,6 +1068,24 @@ export class Agent {
 		// stream across many deltas announces exactly once. Never cleared on a step
 		// boundary: ids are globally unique per run, and `tool_start` reconciles by id.
 		const announcedPendingToolCalls = new Set<string>();
+		// Interrupt ids already reported, so a pause is announced once however often
+		// LangGraph repeats it across `values` chunks.
+		const announcedInterrupts = new Set<string>();
+
+		// An answered call never executes (the answer IS its result), so no tool callback
+		// fires for it. Report its end here, or its card would stay open for the whole run.
+		for (const { interrupt, message } of resumed ?? []) {
+			announcedInterrupts.add(interrupt.id);
+			yield {
+				type: "tool_end",
+				toolCallId: interrupt.toolCallId,
+				toolName: interrupt.toolName,
+				output: message,
+				runId,
+				threadId,
+			};
+		}
+
 		try {
 			// Scope initialization and each pull to this run; initialization can also require fallback.
 			const stream = bindAsyncIterableToTransportContext(
@@ -1191,6 +1269,27 @@ export class Agent {
 				if (mode === "values") {
 					if (this.isAgentOutputCandidate(payload)) {
 						rawResult = payload;
+					}
+					// A paused tool call. It never reaches `on_tool_start`, so announce it
+					// here with its arguments: the chat shows the call, and what it is
+					// waiting for is read from the checkpoint once the run settles.
+					const raised = (payload as { [INTERRUPT_CHANNEL]?: unknown } | null)?.[INTERRUPT_CHANNEL];
+					for (const interrupt of parseToolInterrupts(raised)) {
+						if (announcedInterrupts.has(interrupt.id)) continue;
+						announcedInterrupts.add(interrupt.id);
+						const preamble = toolCallPreambles.get(interrupt.toolCallId);
+						toolCallPreambles.delete(interrupt.toolCallId);
+						Logger.debug(`${label}.tool_interrupt`, { runId, toolCallId: interrupt.toolCallId });
+						yield {
+							type: "tool_start",
+							toolCallId: interrupt.toolCallId,
+							toolName: interrupt.toolName,
+							input: interrupt.args,
+							preamble,
+							aiMessageId: lastAiMessageId,
+							runId,
+							threadId,
+						};
 					}
 				}
 			}
@@ -1402,6 +1501,38 @@ export class Agent {
 		});
 	}
 
+	/**
+	 * Continue a run that paused on tool calls waiting for the user, handing each its answer.
+	 *
+	 * The run continues in place when the paused checkpoint is still the thread's latest.
+	 * Only when the user answers on an older branch is the checkpoint named explicitly:
+	 * that forks from it, and a fork re-runs the paused step's other tool calls, which the
+	 * in-place path does not.
+	 */
+	async *resumeFromInterrupt(options: AgentResumeOptions): AsyncGenerator<AgentStreamChunk> {
+		const { threadId, checkpointId, responses, resolved } = options;
+		if (responses.length === 0) throw new Error("At least one answer is required to continue.");
+
+		const latestCheckpointId = await this.getLatestCheckpointId(threadId);
+
+		yield* this.runStream({
+			options,
+			threadId,
+			runId: this.generateId(),
+			input: new Command({ resume: buildResumeValue(responses) }),
+			checkpointId: latestCheckpointId === checkpointId ? undefined : checkpointId,
+			resumed: responses,
+			label: "agent.resumeFromInterrupt",
+			noOutputError: "Agent completed without producing a final output.",
+			logStart: {
+				checkpointId,
+				provider: resolved.selectedModel.provider,
+				model: resolved.selectedModel.name,
+				answered: responses.length,
+			},
+		});
+	}
+
 	async getThreadHistory(threadId: string): Promise<ThreadHistory | undefined> {
 		const [metadata, tuple] = await Promise.all([
 			this.threadStore?.read(threadId),
@@ -1462,11 +1593,15 @@ export class Agent {
 				seed: values && Object.hasOwn(values, MESSAGES_CHANNEL) ? values[MESSAGES_CHANNEL] : undefined,
 				writes: (tuple.pendingWrites ?? []).filter((write) => write[1] === MESSAGES_CHANNEL),
 			});
+			const interrupts = (tuple.pendingWrites ?? [])
+				.filter((write) => write[1] === INTERRUPT_CHANNEL)
+				.flatMap((write) => parseToolInterrupts(write[2]));
 			items.push({
 				checkpointId,
 				step: (tuple.metadata?.step as number) ?? 0,
 				parentCheckpointId,
 				ts: tuple.checkpoint?.ts as string | undefined,
+				...(interrupts.length > 0 ? { interrupts } : {}),
 			});
 		}
 		const replayed = replayMessages(nodes);

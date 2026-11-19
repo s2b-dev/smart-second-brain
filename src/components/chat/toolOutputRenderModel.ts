@@ -1,3 +1,5 @@
+import { type AskQuestionResult, parseAskQuestionResult } from "../../utils/askQuestion";
+
 interface SearchNotesResult {
 	rank?: number;
 	name?: string;
@@ -138,6 +140,11 @@ export type ToolOutputRenderModel =
 			kind: "execute_javascript";
 			payload: ExecuteJavaScriptPayload;
 			rawText: string;
+	  }
+	| {
+			kind: "ask_question";
+			result: AskQuestionResult;
+			rawText: string;
 	  };
 
 const JSON_FENCE = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
@@ -264,6 +271,11 @@ function buildSpecializedStringModel(
 		};
 	}
 
+	if (toolName === "ask_question") {
+		const result = parseAskQuestionResult(trimmed);
+		if (result) return { kind: "ask_question", result, rawText: trimmed };
+	}
+
 	return undefined;
 }
 
@@ -306,6 +318,11 @@ function buildStructuredToolSpecificModel(
 			payload: buildExecuteJavaScriptPayload(value, input),
 			rawText,
 		};
+	}
+
+	if (toolName === "ask_question") {
+		const result = parseAskQuestionResult(value);
+		if (result) return { kind: "ask_question", result, rawText };
 	}
 
 	return undefined;

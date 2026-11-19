@@ -4,6 +4,8 @@ import { SvelteMap } from "svelte/reactivity";
 import type { AgentStreamChunk, ThreadHistory } from "../agent/Agent";
 import type { AgentManager } from "../agent/AgentManager";
 import { DEFAULT_AGENT_PROMPT } from "../agent/prompts";
+import type { ToolInterrupt } from "../agent/toolInterrupts";
+import { formatReplyResult } from "../utils/askQuestion";
 import type { ChatModelConfig } from "../providers/index";
 import type { ChatAttachment, ReviewStatusRef, ThreadError } from "../types/shared";
 import type { AgentConfig } from "../types/plugin";
@@ -31,6 +33,7 @@ import {
 	formatGraphNotesContext,
 	formatReviewOutcomesContext,
 	normalizeToolInput,
+	pendingToolInterrupts,
 	resolveActiveCheckpointId,
 	resolvePostRunCheckpointSelection,
 	selectUnresolvedPendingIds,
@@ -96,6 +99,18 @@ export class ChatSession {
 	 * stashing/restoring it around an edit — this is just the on/off switch
 	 * and target id, shared with MessageContainer.svelte so both react to it. */
 	editingPairId = $state<UUIDv7 | null>(null);
+
+	/** Tool calls the active branch is paused on, waiting for the user (an open
+	 * `ask_question`). Derived from the checkpoint graph on every rebuild, never set
+	 * from a live stream, so it is the same after a reload as it was before. The
+	 * turn that asked has already settled; answering continues it (see
+	 * `answerInterrupts`). */
+	pendingInterrupts = $state<ToolInterrupt[]>([]);
+
+	/** Set while a resumed run that did not settle is being reconciled with what the
+	 * thread saved (see `settleAfterResume`). Until it resolves, neither the graph nor
+	 * `pendingInterrupts` can be trusted, so anything that appends a turn waits on it. */
+	private resumeSettling: Promise<void> | null = null;
 
 	/** The in-flight run's identity + wall-clock start, held outside `messages` so
 	 * it survives the pair-object replacement a rebuild performs. Set when a run
@@ -183,6 +198,7 @@ export class ChatSession {
 			this.bootstrapMessages,
 			this.lastErrorMessage,
 		);
+		this.pendingInterrupts = pendingToolInterrupts(this.graphState);
 		this.restoreLiveRunAnchor();
 	}
 
@@ -287,6 +303,32 @@ export class ChatSession {
 		selection?: SelectionRef,
 		graphNotes?: GraphNoteRef[],
 	): Promise<UUIDv7> {
+		// The run that just ended may still be finding out whether its question was
+		// answered; deciding "new turn or answer" before it knows would be a guess.
+		if (this.resumeSettling) {
+			await this.resumeSettling;
+			// Another caller that waited alongside may have started a run meanwhile.
+			if (this.messageState !== MessageState.idle) {
+				throw new Error("A response is already in progress for this chat.");
+			}
+		}
+
+		// A message sent while a question is open is the answer to it. It must go
+		// through the resume path: appended as a new turn it would leave the question's
+		// tool call without a result, which providers reject for the rest of the thread.
+		const askingPair = this.messages.at(-1);
+		if (this.pendingInterrupts.length > 0 && askingPair) {
+			// An answer is text. Refuse files rather than drop them without a word.
+			if (attachments?.length) {
+				throw new Error("Answer or dismiss the agent's question before attaching files.");
+			}
+			// Whatever the composer attached to the message (open notes, a selection,
+			// graph notes) travels with the answer, as it would with a normal turn.
+			const context = this.augmentWithVisibleNotes("", visibleNotes, selection, graphNotes);
+			await this.answerInterrupts(() => formatReplyResult(content, context));
+			return askingPair.id;
+		}
+
 		const pairId = genUUIDv7();
 
 		// Capture the current model at send time
@@ -313,6 +355,103 @@ export class ChatSession {
 		void this.processAssistantReply(pairId, content, attachments, visibleNotes, selection, graphNotes);
 
 		return pairId;
+	}
+
+	/**
+	 * Continue the turn that paused on {@link pendingInterrupts}, handing each paused
+	 * call its answer. `resultFor` returns the text the model reads as that call's
+	 * result. All pending calls are answered in one go, which is what LangGraph needs
+	 * to finish the paused step.
+	 *
+	 * The answer extends the asking turn rather than starting a new one: the stream
+	 * picks the existing pair back up, and the settle rebuild then shows the question
+	 * with its answer and whatever the agent did next.
+	 */
+	async answerInterrupts(resultFor: (interrupt: ToolInterrupt) => string): Promise<void> {
+		if (this.messageState !== MessageState.idle) {
+			throw new Error("A response is already in progress for this chat.");
+		}
+		const checkpointId = this.graphState.activeCheckpointId;
+		const pair = this.messages.at(-1);
+		const pending = this.pendingInterrupts;
+		if (pending.length === 0 || !checkpointId || !pair) return;
+
+		const responses = pending.map((interrupt) => ({ interrupt, message: resultFor(interrupt) }));
+		this.pendingInterrupts = [];
+
+		// Reopen the paused cards. The checkpoint replay closed them with no output
+		// (a call without a result reads as finished); the stream's `tool_end` for
+		// each answer closes them again, this time with the answer.
+		const reopened = new Set(pending.map((interrupt) => interrupt.toolCallId));
+		const assistant = pair.assistantMessage;
+		for (const call of assistant.toolCalls ?? []) {
+			if (reopened.has(call.id)) call.status = "running";
+		}
+		assistant.assistantTimeline = assistant.assistantTimeline?.filter(
+			(event) => !(event.type === "tool_end" && event.toolCallId && reopened.has(event.toolCallId)),
+		);
+
+		const plugin = getPlugin();
+		const beforeCheckpointIds = new Set(this.graphState.nodes.keys());
+		checkpointDebug("resume.parent", { threadId: this.id, parentCheckpointId: checkpointId });
+		try {
+			await this.runStream(
+				pair.id,
+				(signal) =>
+					plugin.agentManager.resumeFromInterrupt(
+						String(this.id),
+						this.selectedAgentId,
+						checkpointId,
+						responses,
+						signal,
+					) as AsyncIterable<AgentStreamChunk>,
+				{
+					reloadAfter: true,
+					parentCheckpointId: checkpointId,
+					beforeCheckpointIds,
+					// The wait for the user is not thinking time, but what the agent did
+					// before asking is: keep it in the turn's total.
+					elapsedBeforeMs: assistant.thinkingDurationMs,
+				},
+			);
+		} finally {
+			// Assigned in the same tick the run released its busy flags, so no send can
+			// slip in between the two.
+			const settling = this.settleAfterResume(checkpointId, beforeCheckpointIds);
+			this.resumeSettling = settling;
+			try {
+				await settling;
+			} finally {
+				if (this.resumeSettling === settling) this.resumeSettling = null;
+			}
+		}
+	}
+
+	/**
+	 * Decide what is still open once a resumed run is over.
+	 *
+	 * A run that succeeded has synced the graph and moved the active checkpoint on. One
+	 * that failed or was stopped has not, and there are two cases to tell apart. If it
+	 * wrote no checkpoint, the thread is still paused where it was and the question is
+	 * still open. If it saved the answer and failed later (the next model call, say),
+	 * the question is settled in the thread even though this session's graph does not
+	 * know yet: showing it again would have the user answer from the stale checkpoint
+	 * and fork the thread. So look at what was actually saved before deciding.
+	 */
+	private async settleAfterResume(pausedCheckpointId: string, beforeCheckpointIds: Set<string>): Promise<void> {
+		if (this.graphState.activeCheckpointId === pausedCheckpointId) {
+			try {
+				const history = await getPlugin().agentManager.getCheckpointHistory(this.id);
+				if (history.some((item) => !beforeCheckpointIds.has(item.checkpointId))) {
+					await this.syncGraphAfterRun(pausedCheckpointId, beforeCheckpointIds);
+					// Brings the saved run error along, as opening the chat afresh would.
+					await this.onNeedReload?.();
+				}
+			} catch (err) {
+				Logger.warn("[ChatSession] Failed to refresh after an interrupted resume:", err);
+			}
+		}
+		this.pendingInterrupts = pendingToolInterrupts(this.graphState);
 	}
 
 	/** Abort current streaming (if any) */
@@ -602,6 +741,8 @@ export class ChatSession {
 			parentCheckpointId?: string;
 			beforeCheckpointIds: Set<string>;
 			predictedSummarization?: boolean;
+			/** Time this turn already ran before it paused; counted into its duration. */
+			elapsedBeforeMs?: number;
 		},
 	) {
 		const pair = this.findPair(pairId);
@@ -630,7 +771,7 @@ export class ChatSession {
 			// Wall-clock start of the turn — used to compute the run duration stamped on
 			// the message (live) and persisted onto the checkpoint below, and stamped on
 			// the message itself so the live timer has a remount-proof anchor.
-			const runStartedAtMs = Date.now();
+			const runStartedAtMs = Date.now() - (options.elapsedBeforeMs ?? 0);
 			pair.assistantMessage.runStartedAtMs = runStartedAtMs;
 			this.liveRun = { pairId, stableKey: pair.stableKey, startedAtMs: runStartedAtMs };
 
@@ -1315,8 +1456,13 @@ export class ChatSession {
 	}
 
 	async summarizeHistoryNow(): Promise<void> {
+		// Wait first, check second: two callers that waited together must not both pass.
+		if (this.resumeSettling) await this.resumeSettling;
 		if (this.messageState !== MessageState.idle) {
 			throw new Error("Cannot summarize while another response is in progress.");
+		}
+		if (this.pendingInterrupts.length > 0) {
+			throw new Error("Answer or dismiss the open question before summarizing.");
 		}
 
 		const plugin = getPlugin();

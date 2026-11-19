@@ -1,4 +1,5 @@
 import type { ToolCallStatus } from "../../stores/chatTimeline";
+import { parseAskQuestions } from "../../utils/askQuestion";
 import type { ToolOutputRenderModel } from "./toolOutputRenderModel";
 import { parseTodos } from "../../utils/todoList";
 
@@ -77,7 +78,8 @@ type BuiltInTool =
 	| "web_search"
 	| "load_skill"
 	| "write_todos"
-	| "task";
+	| "task"
+	| "ask_question";
 
 const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
 	"search_notes",
@@ -93,6 +95,7 @@ const BUILT_IN_TOOLS: ReadonlySet<string> = new Set<BuiltInTool>([
 	"load_skill",
 	"write_todos",
 	"task",
+	"ask_question",
 ]);
 
 function asBuiltIn(toolName: string): BuiltInTool | undefined {
@@ -295,6 +298,23 @@ function summarizeWriteTodos(input: Record<string, unknown> | null | undefined):
 	return { label, summary: `${done} of ${todos.length} done` };
 }
 
+function summarizeAskQuestion(
+	input: Record<string, unknown> | null | undefined,
+	model: ToolOutputRenderModel | undefined,
+): RawSummary {
+	const questions = parseAskQuestions(input);
+	const label: Label =
+		questions.length === 1
+			? { verb: verb("Asking", "Asked"), rest: `“${truncateTarget(questions[0].question)}”` }
+			: { verb: verb("Asking", "Asked"), rest: pluralize(questions.length, "question") };
+	if (model?.kind !== "ask_question") return { label, summary: "" };
+	const result = model.result;
+	if (result.status === "dismissed") return { label, summary: "dismissed" };
+	if (result.status === "replied") return { label, summary: "answered in chat" };
+	const only = result.answers.length === 1 ? result.answers[0].answer.join(", ") : "";
+	return { label, summary: only ? truncateTarget(only) : "answered" };
+}
+
 /* ── Generic fallback (unknown / renamed tools) ── */
 
 function summarizeGeneric(
@@ -417,6 +437,8 @@ export function buildToolSummary(
 				return summarizeLoadSkill(input);
 			case "write_todos":
 				return summarizeWriteTodos(input);
+			case "ask_question":
+				return summarizeAskQuestion(input, model);
 			default:
 				return summarizeGeneric(toolName, input, model);
 		}

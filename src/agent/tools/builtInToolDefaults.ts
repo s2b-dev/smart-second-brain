@@ -1,4 +1,5 @@
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type ToolConfig, type ToolsConfig } from "../../types/plugin";
+import { MAX_OPTIONS, MAX_QUESTIONS } from "../../utils/askQuestion";
 
 /**
  * The one table describing every built-in tool: what the settings UI calls it, the
@@ -70,6 +71,18 @@ Use it when a request takes several distinct steps or touches many notes: restru
 Each call replaces the whole list, so always send every item. Keep exactly one item in_progress while you work. Mark an item completed as soon as it is done, not in a batch at the end. Revise the list when you learn something that changes the plan: add steps, drop steps that no longer apply. Update it as you work through the request, but never call it twice in parallel within one response.
 
 If the user drops the plan or the work no longer needs one, send an empty list to clear it.`;
+
+// --- ask_question: same, the guidance lives in the description ----------------------------
+
+const ASK_QUESTION_DESC = `Ask the user a question and wait for the answer. The questions appear above the chat input with your options as buttons; the user can also type their own answer, so never add an "Other" option.
+
+Ask when the request can reasonably be read in more than one way and the readings lead to different results, when a choice is the user's to make (a name, a structure, which of several matching notes they mean), or before a large change whose direction you are unsure of. Ask early, before doing work the answer could throw away.
+
+Do not ask about anything you can find out yourself by searching or reading the vault, about details with an obvious default, or for permission to do what was plainly requested. Do not ask in plain text when this tool fits: options are faster to answer than a typed reply.
+
+Ask everything you need in one call, at most ${MAX_QUESTIONS} questions, each with 2 to ${MAX_OPTIONS} concrete, mutually exclusive options (unless multiSelect is true). Put the option you recommend first. Never call this tool twice in one response.
+
+The result holds the user's answers. If they dismissed the question, do not ask it again.`;
 
 // --- the table -----------------------------------------------------------------------------
 
@@ -217,15 +230,29 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 			description: WRITE_TODOS_DESC,
 		},
 	},
+	ask_question: {
+		displayName: "Ask Question",
+		summary:
+			"Lets the agent pause and ask you a multiple-choice question when a request is unclear. The question shows above the chat input.",
+		config: {
+			enabled: true,
+			name: "ask_question",
+			description: ASK_QUESTION_DESC,
+		},
+	},
 };
 
 /**
  * Built-in tools bound without any skill attaching them; only the per-tool toggle in the
  * Tools modal can turn them off. Reserved for tools that are about how the agent works
  * rather than what it can do in the vault, so no skill is the natural owner. Main agent
- * only: subagents run short scoped tasks, and the chat has one task-list slot.
+ * only: subagents run short scoped tasks, the chat has one task-list slot, and a nested
+ * worker must not stop and wait on the user.
  */
-export const ALWAYS_ATTACHED_TOOL_IDS: ReadonlySet<BuiltInToolId> = new Set<BuiltInToolId>(["write_todos"]);
+export const ALWAYS_ATTACHED_TOOL_IDS: ReadonlySet<BuiltInToolId> = new Set<BuiltInToolId>([
+	"write_todos",
+	"ask_question",
+]);
 
 /**
  * Default configuration for all built-in tools — what a new agent's `toolsConfig` is

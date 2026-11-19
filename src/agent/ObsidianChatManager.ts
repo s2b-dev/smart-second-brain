@@ -14,6 +14,7 @@ import { type DataAdapter, TFile, debounce, normalizePath } from "obsidian";
 import type SecondBrainPlugin from "../main";
 import { getData } from "../stores/dataStore.svelte";
 import type { CheckpointHistoryItem } from "./Agent";
+import { INTERRUPT_CHANNEL, parseToolInterrupts } from "./toolInterrupts";
 import type { ThreadSnapshot, ThreadStore } from "./memory/ThreadStore";
 import { Logger } from "../utils/logging";
 import { toBase64, toBase64DataUri } from "../utils/attachments";
@@ -447,12 +448,16 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 			const step = typeof entry.metadata?.step === "number" ? entry.metadata.step : 0;
 			const parentCheckpointId = entry.parentConfig?.configurable?.checkpoint_id as string | undefined;
 			const ts = (entry.checkpoint as { ts?: unknown })?.ts;
+			const interrupts = (data.writes[checkpointId] ?? [])
+				.filter((write) => write[1] === INTERRUPT_CHANNEL)
+				.flatMap((write) => parseToolInterrupts(write[2]));
 			results.push({
 				checkpointId,
 				messages,
 				step,
 				parentCheckpointId,
 				ts: typeof ts === "string" ? ts : undefined,
+				...(interrupts.length > 0 ? { interrupts } : {}),
 			});
 		}
 		return results;
