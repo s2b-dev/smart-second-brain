@@ -23,6 +23,7 @@ import type {
 	ChatModelConfig,
 } from "../types/provider/index";
 import { createBufferedTransportedChatOpenAI, createTransportedChatOpenAI } from "./chatProviders";
+import { HF_ROUTER_BASE_URL, populateHuggingFaceCache, type RouterCatalogEntry } from "./huggingfaceModels";
 import {
 	cancelHuggingFaceSignIn,
 	clearHuggingFaceSignIn,
@@ -30,14 +31,7 @@ import {
 	signInWithHuggingFace,
 } from "./huggingfaceOAuth";
 
-const HF_ROUTER_BASE_URL = "https://router.huggingface.co/v1";
 const HF_WHOAMI_URL = "https://huggingface.co/api/whoami-v2";
-
-/** One entry of the router's `/v1/models` catalog (only the fields we read). */
-interface RouterModel {
-	id?: string;
-	providers?: Array<{ status?: string; supports_tools?: boolean }>;
-}
 
 /**
  * The bearer token for a request: the pasted access token when there is one, otherwise
@@ -157,21 +151,12 @@ export const huggingfaceProvider: BaseProviderDefinition = {
 		}
 	},
 
-	/**
-	 * The router's catalog is public. Only models that at least one live inference provider
-	 * serves with tool calling are listed: the agent needs tools for nearly everything it
-	 * does, and a model without them fails on the first turn rather than degrading.
-	 */
+	/** The router's catalog is public; only tool-capable models are listed (see populateHuggingFaceCache). */
 	discoverModels: async (): Promise<string[]> => {
 		const response = await requestUrl({ url: `${HF_ROUTER_BASE_URL}/models`, method: "GET", throw: false });
 		if (response.status < 200 || response.status >= 300) {
 			throw new Error(`Model discovery failed (${response.status})`);
 		}
-		const models = (response.json as { data?: RouterModel[] })?.data ?? [];
-		return models
-			.filter((model) => model.providers?.some((p) => p.status === "live" && p.supports_tools))
-			.map((model) => model.id)
-			.filter((id): id is string => typeof id === "string" && id.trim() !== "")
-			.sort((a, b) => a.localeCompare(b));
+		return populateHuggingFaceCache((response.json as { data?: RouterCatalogEntry[] })?.data ?? []);
 	},
 };
