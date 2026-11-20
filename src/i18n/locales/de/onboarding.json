@@ -4,7 +4,7 @@
 	},
 	"welcome": {
 		"title": "Willkommen bei Smart Second Brain",
-		"subtitle": "Mach deinen Tresor zu einem KI-gestützten Second Brain – suche smarter, entdecke Verbindungen im Graphen und chatte mit deinen Notizen.",
+		"subtitle": "Mach deinen Vault zu einem KI-gestützten Second Brain – suche smarter, entdecke Verbindungen im Graphen und chatte mit deinen Notizen.",
 		"hotkeys_unavailable_notice": "Tastenkürzel konnten nicht geöffnet werden – öffne Einstellungen → Tastenkürzel und suche nach „Notizen durchsuchen“.",
 		"search": {
 			"title": "Smartere Suche",
@@ -19,7 +19,7 @@
 		},
 		"chat": {
 			"title": "Mit deinen Notizen chatten",
-			"desc": "Stelle Fragen, die auf deinem Tresor basieren – mit Websuche und integrierten Plugins wie Dataview und Tasks. Benötigt einen KI-Anbieter – richte unten einen ein."
+			"desc": "Stelle Fragen, die auf deinem Vault basieren – mit Websuche und integrierten Plugins wie Dataview und Tasks. Benötigt einen KI-Anbieter – richte unten einen ein."
 		},
 		"provider_step": {
 			"title": "KI-Anbieter verbinden",
@@ -46,15 +46,15 @@
 			"review_access": "Notizzugriff prüfen",
 			"trusted": "vertrauenswürdig",
 			"change_access": "ändere den Notizzugriff",
-			"no_provider": "Deine Notizen werden {not} mit KI-Anbietern geteilt, außer du erlaubst es. Sobald du oben einen Anbieter verbindest, kannst du ihm Zugriff gewähren – bis dahin verlässt nichts deinen Tresor.",
+			"no_provider": "Deine Notizen werden {not} mit KI-Anbietern geteilt, außer du erlaubst es. Sobald du oben einen Anbieter verbindest, kannst du ihm Zugriff gewähren – bis dahin verlässt nichts deinen Vault.",
 			"public": "Der Notizzugriff ist {mode}, daher können Anbieter deine Notizen lesen – außer denen, die du ausschließt. {review}.",
 			"all_trusted": {
 				"one": "Dein Anbieter ist als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten.",
 				"other": "Deine Anbieter sind als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten."
 			},
 			"untrusted": {
-				"one": "{providers} kann deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere ihn als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter.",
-				"other": "{providers} können deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere sie als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter."
+				"one": "{providers} kann deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Vault. Markiere ihn als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter.",
+				"other": "{providers} können deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Vault. Markiere sie als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter."
 			}
 		},
 		"skip": "Überspringen",

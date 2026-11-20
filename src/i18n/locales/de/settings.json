@@ -20,7 +20,7 @@
 			"note_access_desc": "Lege fest, ob nicht vertrauenswürdige Anbieter standardmäßig nichts oder alles sehen, und verwalte dann die passende Dateiliste.",
 			"manage": "Verwalten",
 			"check_updates": "Nach Updates suchen",
-			"check_updates_desc": "Einmal täglich die Versionsnummer dieses Plugins von GitHub abrufen und einen Hinweis anzeigen, wenn eine neuere verfügbar ist. Es werden keine Daten über dich oder deinen Tresor gesendet. Wird übersprungen, solange Obsidians eigene automatische Plugin-Update-Prüfung aktiv ist."
+			"check_updates_desc": "Einmal täglich die Versionsnummer dieses Plugins von GitHub abrufen und einen Hinweis anzeigen, wenn eine neuere verfügbar ist. Es werden keine Daten über dich oder deinen Vault gesendet. Wird übersprungen, solange Obsidians eigene automatische Plugin-Update-Prüfung aktiv ist."
 		}
 	},
 	"search": {
@@ -126,11 +126,11 @@
 		"view_issues": "Bestehende Issues ansehen",
 		"new_issue": "Neues Issue eröffnen",
 		"clear": "Plugin-Daten bereinigen",
-		"clear_desc": "Löscht Plugin-Einstellungen und erzeugte Indexdaten. Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Tresor bleiben erhalten.",
+		"clear_desc": "Löscht Plugin-Einstellungen und erzeugte Indexdaten. Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Vault bleiben erhalten.",
 		"clear_label": "Bereinigen",
 		"clear_modal": {
 			"title": "Plugin-Daten bereinigen",
-			"description": "Plugin-Einstellungen und erzeugte Indexdaten löschen? Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Tresor bleiben erhalten."
+			"description": "Plugin-Einstellungen und erzeugte Indexdaten löschen? Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Vault bleiben erhalten."
 		},
 		"verbose": "Protokollierung in der Entwicklerkonsole",
 		"verbose_desc": "Ausführliche Protokollierung in der Entwicklerkonsole aktivieren.",
@@ -191,7 +191,7 @@
 			"other": "{count} gespeicherte Datenbanken gehören zu keinem konfigurierten Embedding-Index mehr{size}: {list}."
 		},
 		"size": " (mindestens {size} an Vektoren)",
-		"origin_usage": "Obsidians Speicher auf diesem Gerät umfasst insgesamt {size} über alle Tresore.",
+		"origin_usage": "Obsidians Speicher auf diesem Gerät umfasst insgesamt {size} über alle Vaults.",
 		"confirm_title": "Verwaiste Indizes löschen?",
 		"confirm_desc": {
 			"one": "Dadurch wird {count} gespeicherte Datenbank, die von keinem konfigurierten Embedding-Index verwendet wird, dauerhaft entfernt. Fügst du eines dieser Modelle später erneut hinzu, wird sein Index von Grund auf neu erstellt.",
@@ -227,7 +227,7 @@
 		"remove_condition": "Bedingung entfernen",
 		"property_placeholder": "Name der Eigenschaft",
 		"any_value": "beliebiger Wert",
-		"no_properties": "Keine Eigenschaften im Tresor gefunden – gib einen Namen ein, um ihn trotzdem zu verwenden.",
+		"no_properties": "Keine Eigenschaften im Vault gefunden – gib einen Namen ein, um ihn trotzdem zu verwenden.",
 		"live_placeholder": "Triff eine Auswahl im Graphen",
 		"add_condition": "Bedingung",
 		"add_group": "Gruppe"

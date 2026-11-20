@@ -40,7 +40,7 @@
 			"granularity": "세분성",
 			"granularity_desc": "왼쪽: 소수의 넓은 주제. 오른쪽: 다수의 구체적인 주제. 모든 노트는 계속 표시됩니다.",
 			"granularity_desc_with_keys": "왼쪽: 소수의 넓은 주제. 오른쪽: 다수의 구체적인 주제. 모든 노트는 계속 표시됩니다. (그래프에서 ↑/↓)",
-			"granularity_pending": "이 보관소의 주제 단계를 계산하는 중…",
+			"granularity_pending": "이 보관함의 주제 단계를 계산하는 중…",
 			"inferred_links": "추론된 링크"
 		},
 		"inferred_hint": {

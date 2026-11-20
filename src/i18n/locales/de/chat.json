@@ -31,7 +31,7 @@
 		"tooltip": "Kontext hinzufügen",
 		"from_device": "Vom Gerät",
 		"take_photo": "Foto aufnehmen",
-		"from_vault": "Aus dem Tresor"
+		"from_vault": "Aus dem Vault"
 	},
 	"running": {
 		"go_to": "Zum laufenden Chat wechseln: {name}"
@@ -300,8 +300,8 @@
 				"done": "Ordner {target} aufgelistet"
 			},
 			"list_vault": {
-				"running": "Tresor wird aufgelistet",
-				"done": "Tresor aufgelistet"
+				"running": "Vault wird aufgelistet",
+				"done": "Vault aufgelistet"
 			},
 			"read_target": {
 				"running": "{target} wird gelesen",
@@ -522,7 +522,7 @@
 	"input": {
 		"drop_files": "Dateien hier ablegen",
 		"send_shortcut_hint": "↵ · {shortcut} in einer Liste",
-		"edit_attachment_missing": "Der Anhang „{name}“ existiert nicht mehr im Tresor – er ist nicht Teil der bearbeiteten Nachricht.",
+		"edit_attachment_missing": "Der Anhang „{name}“ existiert nicht mehr im Vault – er ist nicht Teil der bearbeiteten Nachricht.",
 		"select_model_to_send": "Wähle ein Chat-Modell, um dies zu senden.",
 		"placeholder": "Frag etwas zu deinen Notizen…",
 		"wait_for_attachments": "Warte, bis die Anhänge fertig gespeichert sind",
@@ -548,7 +548,7 @@
 		"wait_for_current_attachments": "Warte, bis die aktuellen Anhänge fertig gespeichert sind.",
 		"file_not_found": "Datei nicht gefunden: {path}",
 		"only_files": "Nur Dateien können angehängt werden: {path}",
-		"picker_placeholder": "Dateien im Tresor zum Anhängen suchen…",
+		"picker_placeholder": "Dateien im Vault zum Anhängen suchen…",
 		"picker_verb": "Anhängen",
 		"current_model": "aktuelles Modell",
 		"drag_images_unsupported": "Bilder werden von {model} nicht unterstützt. Wechsle zu einem Modell mit Bilderkennung.",

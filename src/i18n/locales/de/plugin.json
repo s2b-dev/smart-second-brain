@@ -272,11 +272,11 @@
 		},
 		"list_directory": {
 			"name": "Verzeichnis auflisten",
-			"summary": "Listet die Ordnerstruktur des Tresors auf: eine Übersicht mit Dateianzahlen auf oberster Ebene, Dateien und Unterordner innerhalb eines Ordners. Die Ausgabe wird gekürzt dargestellt, damit sie ins Kontextbudget passt."
+			"summary": "Listet die Ordnerstruktur des Vaults auf: eine Übersicht mit Dateianzahlen auf oberster Ebene, Dateien und Unterordner innerhalb eines Ordners. Die Ausgabe wird gekürzt dargestellt, damit sie ins Kontextbudget passt."
 		},
 		"read_content": {
 			"name": "Inhalt lesen",
-			"summary": "Liest Notizen und Dateien im Tresor per Pfad oder Wikilink. Unterstützt Markdown-/Textdateien und Textextraktion aus PDFs. Bilder müssen im Chat angehängt werden."
+			"summary": "Liest Notizen und Dateien im Vault per Pfad oder Wikilink. Unterstützt Markdown-/Textdateien und Textextraktion aus PDFs. Bilder müssen im Chat angehängt werden."
 		},
 		"grep_notes": {
 			"name": "Notizen greppen",
@@ -284,11 +284,11 @@
 		},
 		"get_all_tags": {
 			"name": "Alle Tags abrufen",
-			"summary": "Ruft eine Liste aller im Tresor verwendeten Tags ab."
+			"summary": "Ruft eine Liste aller im Vault verwendeten Tags ab."
 		},
 		"get_properties": {
 			"name": "Eigenschaften abrufen",
-			"summary": "Ruft Frontmatter-Eigenschaften aus Notizen ab oder listet alle Eigenschaftsschlüssel im Tresor auf."
+			"summary": "Ruft Frontmatter-Eigenschaften aus Notizen ab oder listet alle Eigenschaftsschlüssel im Vault auf."
 		},
 		"execute_javascript": {
 			"name": "JavaScript ausführen",
@@ -304,7 +304,7 @@
 		},
 		"web_search": {
 			"name": "Websuche",
-			"summary": "Durchsucht das Web und gibt Ergebnisse zurück (Titel, URL, Ausschnitt). Anbieter und API-Schlüssel legst du im Konfigurationsbereich des Tools fest. Bevorzugt zuerst die Suche im Tresor."
+			"summary": "Durchsucht das Web und gibt Ergebnisse zurück (Titel, URL, Ausschnitt). Anbieter und API-Schlüssel legst du im Konfigurationsbereich des Tools fest. Bevorzugt zuerst die Suche im Vault."
 		},
 		"manage_skills": {
 			"name": "Skills verwalten",

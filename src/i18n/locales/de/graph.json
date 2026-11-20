@@ -44,7 +44,7 @@
 			"granularity": "Detailgrad",
 			"granularity_desc": "Links: wenige breite Themen. Rechts: viele spezifische. Jede Notiz bleibt sichtbar.",
 			"granularity_desc_with_keys": "Links: wenige breite Themen. Rechts: viele spezifische. Jede Notiz bleibt sichtbar. (↑/↓ im Graphen)",
-			"granularity_pending": "Themenebenen dieses Tresors werden ermittelt…",
+			"granularity_pending": "Themenebenen dieses Vaults werden ermittelt…",
 			"inferred_links": "Abgeleitete Links"
 		},
 		"inferred_hint": {
