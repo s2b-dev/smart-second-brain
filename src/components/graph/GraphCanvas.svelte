@@ -19,6 +19,7 @@ import { type WorldRect, pointInPolygon, rectContains, trimOutliers } from "../.
 import { autoNodeSize, densityForceProfile, nodeDrawRadius, zoomNodeScale } from "../../utils/graphUtils";
 import { applyLayoutForces, clusterCohesionForce, type LayoutPhysicsConfig } from "../../utils/graphLayout";
 import { resolveNodePaths, topicNodeId } from "../../utils/mergeNodes";
+import { t } from "../../i18n";
 import { PixiRenderer, readThemeColors, type ClusterPillHit } from "./pixiRenderer";
 
 interface Props {
@@ -2047,7 +2048,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 		// No file behind a collapsed topic — offer the group actions instead.
 		menu.addItem((item) =>
 			item
-				.setTitle("Expand topic")
+				.setTitle(t("graph.node_menu.expand_topic"))
 				.setIcon("expand")
 				.onClick(() => {
 					if (node.cluster != null) onSetTopicCollapsed?.(node.cluster, false);
@@ -2055,7 +2056,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 		);
 		menu.addItem((item) =>
 			item
-				.setTitle(`Open all ${node.memberPaths?.length ?? 0} notes`)
+				.setTitle(t("graph.node_menu.open_all_notes", { count: node.memberPaths?.length ?? 0 }))
 				.setIcon("files")
 				.onClick(() => {
 					// Route through the shared handler so a 60-note topic hits the
@@ -2067,7 +2068,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 		// A tag belongs to no topic, so none of the cluster actions below apply.
 		menu.addItem((item) =>
 			item
-				.setTitle("Search notes with this tag")
+				.setTitle(t("graph.node_menu.search_tag"))
 				.setIcon("search")
 				.onClick(() => {
 					onTagClick?.(node.label);
@@ -2078,7 +2079,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 	} else {
 		menu.addItem((item) =>
 			item
-				.setTitle("Open file")
+				.setTitle(t("graph.node_menu.open_file"))
 				.setIcon("file-text")
 				.onClick(() => {
 					onNodeClick?.(node.path);
@@ -2087,7 +2088,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 
 		menu.addItem((item) =>
 			item
-				.setTitle("Reveal in file explorer")
+				.setTitle(t("graph.node_menu.reveal_in_explorer"))
 				.setIcon("folder-open")
 				.onClick(() => {
 					onRevealFile?.(node.path);
@@ -2099,7 +2100,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 
 	menu.addItem((item) =>
 		item
-			.setTitle("Focus on this cluster")
+			.setTitle(t("graph.node_menu.focus_cluster"))
 			.setIcon("scan")
 			.onClick(() => {
 				if (node.cluster != null) {
@@ -2115,7 +2116,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 		const cluster = node.cluster;
 		menu.addItem((item) =>
 			item
-				.setTitle("Collapse topic")
+				.setTitle(t("graph.node_menu.collapse_topic"))
 				.setIcon("shrink")
 				.onClick(() => {
 					onSetTopicCollapsed?.(cluster, true);
@@ -2125,7 +2126,7 @@ function openNodeMenu(node: GraphNode, clientX: number, clientY: number) {
 
 	menu.addItem((item) =>
 		item
-			.setTitle("Select this cluster")
+			.setTitle(t("graph.node_menu.select_cluster"))
 			.setIcon("box-select")
 			.onClick(() => {
 				if (node.cluster != null) {

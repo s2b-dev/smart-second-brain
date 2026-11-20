@@ -1,0 +1,600 @@
+{
+	"editing": {
+		"label": "Editando mensaje",
+		"cancel": "Cancelar edición"
+	},
+	"branch": {
+		"previous": "Rama anterior",
+		"next": "Rama siguiente"
+	},
+	"message": {
+		"collapse": "Contraer mensaje",
+		"expand": "Expandir mensaje",
+		"wait_before_edit": "Espera a que termine la respuesta actual antes de editar",
+		"regenerate_failed": "No se pudo regenerar: {error}",
+		"retry_failed": "No se pudo reintentar: {error}",
+		"branch_switch_failed": "No se pudo cambiar de rama: {error}",
+		"unknown_error": "Error desconocido",
+		"copied": "Copiado al portapapeles",
+		"edit": "Editar mensaje",
+		"copy": "Copiar mensaje",
+		"compaction_manual": "Compactación manual de la conversación",
+		"compaction_automatic": "Compactación automática de la conversación",
+		"regenerate": "Regenerar respuesta",
+		"copy_response": "Copiar respuesta",
+		"jump_to_bottom": "Ir al final"
+	},
+	"model_select": {
+		"tooltip": "Seleccionar modelo"
+	},
+	"attach": {
+		"tooltip": "Añadir contexto",
+		"from_device": "Desde el dispositivo",
+		"take_photo": "Hacer foto",
+		"from_vault": "Desde la bóveda"
+	},
+	"running": {
+		"go_to": "Ir al chat en ejecución: {name}"
+	},
+	"status": {
+		"request_failed": "La solicitud al modelo falló.",
+		"error_title": "Algo salió mal",
+		"retry_aria": "Reintentar esta solicitud",
+		"retry_tooltip": "Volver a ejecutar la solicitud fallida",
+		"stopped": "Detenido"
+	},
+	"embed": {
+		"open_chat": "Abrir chat",
+		"fallback_title": "Chat",
+		"empty": "Este chat aún no tiene mensajes.",
+		"load_failed": "No se pudo cargar la vista previa del chat."
+	},
+	"agent": {
+		"configure": "Configurar agente",
+		"options": "Opciones del agente",
+		"edit": "Editar agente",
+		"default_badge": "predeterminado",
+		"create": "Crear agente",
+		"new": "Nuevo agente"
+	},
+	"todos": {
+		"all_done": "Todos los pasos completados",
+		"status_pending": "Sin empezar",
+		"status_in_progress": "En curso",
+		"collapse": "Contraer lista de tareas",
+		"expand": "Expandir lista de tareas",
+		"progress": "{done} de {total}"
+	},
+	"pending": {
+		"count_create": {
+			"one": "{count} creación",
+			"many": "{count} creaciones",
+			"other": "{count} creaciones"
+		},
+		"count_update": {
+			"one": "{count} actualización",
+			"many": "{count} actualizaciones",
+			"other": "{count} actualizaciones"
+		},
+		"count_delete": {
+			"one": "{count} eliminación",
+			"many": "{count} eliminaciones",
+			"other": "{count} eliminaciones"
+		},
+		"count_move": {
+			"one": "{count} traslado",
+			"many": "{count} traslados",
+			"other": "{count} traslados"
+		},
+		"summary_pending": "{composition} pendientes",
+		"summary_partially_applied": "{count} aplicados parcialmente",
+		"type_create": "Crear",
+		"type_update": "Actualizar",
+		"type_move": "Mover",
+		"notice_applied": "Aplicado: {path}",
+		"notice_apply_failed": "No se pudo aplicar el cambio: {error}",
+		"notice_rejected": "Rechazado: {path}",
+		"notice_restored": "Restaurado: {path}",
+		"skip_conflict": "Se dejó «{path}» como estaba: cambió después de aplicarse parcialmente el cambio.",
+		"skip_missing": "No se pudo restaurar «{path}»: esa nota ya no existe. El contenido aplicado se movió con ella.",
+		"skip_failed": "No se pudo restaurar «{path}». Consulta la consola para más detalles.",
+		"notice_all_stale": "Todos los cambios pendientes están desactualizados: las notas cambiaron después de proponerse. Recházalos y pide al agente que los vuelva a proponer.",
+		"risk_deletions": {
+			"one": "{count} eliminación de nota",
+			"many": "{count} eliminaciones de notas",
+			"other": "{count} eliminaciones de notas"
+		},
+		"risk_deprivatizing_moves": {
+			"one": "{count} traslado fuera de una ubicación privada",
+			"many": "{count} traslados fuera de una ubicación privada",
+			"other": "{count} traslados fuera de una ubicación privada"
+		},
+		"risk_join": "{first} y {second}",
+		"confirm_accept_all_title": "¿Aceptar todos los cambios?",
+		"confirm_accept_all_message": {
+			"one": "Este lote incluye {risks}. ¿Aplicar {count} cambio?",
+			"many": "Este lote incluye {risks}. ¿Aplicar los {count} cambios?",
+			"other": "Este lote incluye {risks}. ¿Aplicar los {count} cambios?"
+		},
+		"accept_all": "Aceptar todo",
+		"skipped_stale_suffix": ", {count} desactualizados omitidos",
+		"notice_applied_one": "Se aplicó el cambio{skipped}",
+		"notice_applied_all": "Se aplicaron los {count} cambios{skipped}",
+		"notice_applied_partial": "Se aplicaron {applied} cambios{skipped}; fallaron {failed}: {paths}",
+		"notice_apply_error": "Error al aplicar los cambios: {error}",
+		"notice_rejected_all": "Se rechazaron todos los cambios pendientes",
+		"notice_restored_partial": "Se restauraron las notas aplicadas parcialmente",
+		"notice_rejected_all_head": "Se rechazaron todos los cambios pendientes.",
+		"notice_undo_finished_head": "Se terminó de deshacer los cambios aplicados.",
+		"notice_open_failed": "No se pudo abrir la nota de este cambio.",
+		"collapse": "Contraer cambios pendientes",
+		"expand": "Expandir cambios pendientes",
+		"diff_mode_to_split": "Cambiar las diferencias en la nota a vista de dos paneles",
+		"diff_mode_to_word": "Cambiar las diferencias en la nota a diferencias por palabra en línea",
+		"diff_mode_toggle": "Alternar modo de vista de diferencias",
+		"accept_all_tooltip": "Aceptar todos los cambios",
+		"reject_all_tooltip": "Rechazar todos los cambios y restaurar las notas aplicadas parcialmente",
+		"undo_applied_tooltip": "Restaurar el contenido original de las notas aplicadas parcialmente",
+		"reject_all": "Rechazar todo",
+		"undo_applied": "Deshacer aplicados",
+		"hide_widget_preview": "Ocultar vista previa del widget",
+		"preview_widget": "Vista previa del widget",
+		"hide_changes": "Ocultar cambios",
+		"show_changes": "Mostrar cambios",
+		"hide_content": "Ocultar contenido",
+		"show_content": "Mostrar contenido",
+		"hide_widget_preview_aria": "Ocultar vista previa de {path}",
+		"preview_widget_aria": "Vista previa de {path}",
+		"hide_changes_aria": "Ocultar cambios en {path}",
+		"show_changes_aria": "Mostrar cambios en {path}",
+		"hide_content_aria": "Ocultar contenido de {path}",
+		"show_content_aria": "Mostrar contenido de {path}",
+		"partly_applied_explanation": "Parte de este cambio se aplicó a la nota. Deshazlo para restaurar el contenido original de la nota.",
+		"partly_applied": "Aplicado en parte",
+		"stale_delete_explanation": "Esta nota cambió después de proponerse su eliminación: la vista previa ya no coincide con lo que se eliminaría. Aceptarlo fallará; recházalo y pide al agente que lo vuelva a proponer.",
+		"stale_explanation": "Esta nota cambió después de proponerse el cambio, así que aceptarlo fallará. Recházalo y pide al agente que vuelva a aplicar su edición sobre el contenido actual.",
+		"stale": "Desactualizado",
+		"deprivatizing_explanation": "Esta nota es privada actualmente. Moverla a esta ubicación la saca del filtro de privacidad, así que a partir de entonces se indexará, se podrá buscar y estará disponible para los proveedores que no son de confianza.",
+		"deprivatizing": "Deja de ser privada",
+		"cross_thread_explanation": {
+			"one": "{count} chat más también tiene una edición pendiente de este archivo. La primera que se acepte prevalece; es posible que las demás ya no se puedan aplicar.",
+			"many": "{count} chats más también tienen una edición pendiente de este archivo. La primera que se acepte prevalece; es posible que las demás ya no se puedan aplicar.",
+			"other": "{count} chats más también tienen una edición pendiente de este archivo. La primera que se acepte prevalece; es posible que las demás ya no se puedan aplicar."
+		},
+		"stale_accept_disabled": "No se puede aceptar: la nota cambió después de proponerse. Recházalo y pide al agente que lo vuelva a proponer.",
+		"accept_change": "Aceptar cambio",
+		"accept_change_aria": "Aceptar cambio en {path}",
+		"reject_change": "Rechazar cambio",
+		"reject_change_aria": "Rechazar cambio en {path}",
+		"undo_applied_change_tooltip": "Restaurar esta nota al contenido que tenía antes de la propuesta",
+		"undo_applied_change_aria": "Deshacer el cambio aplicado en {path}",
+		"hide_source_changes": "Ocultar cambios en el código fuente",
+		"show_source_changes": "Mostrar cambios en el código fuente",
+		"note_empty": "Esta nota está vacía.",
+		"no_remaining_differences": "No quedan diferencias.",
+		"accept_hunk": "Aceptar este cambio",
+		"accept_hunk_aria": "Aceptar cambio {index} de {total}",
+		"reject_hunk": "Rechazar este cambio",
+		"reject_hunk_aria": "Rechazar cambio {index} de {total}",
+		"hunk_too_large": "Este cambio es demasiado grande para mostrarlo aquí; abre la nota para revisarlo."
+	},
+	"question": {
+		"send_failed": "No se pudo enviar tu respuesta",
+		"group_aria": "Pregunta del agente",
+		"position": "Pregunta {index} de {total}",
+		"label": "Pregunta",
+		"dismiss_aria": "Descartar pregunta",
+		"dismiss_tooltip": "Descartar sin responder",
+		"multi_hint": "Selecciona todas las que correspondan",
+		"custom_placeholder": "Otra cosa…",
+		"answer_placeholder": "Escribe tu respuesta…",
+		"custom_aria": "Tu propia respuesta",
+		"send_answers": "Enviar respuestas",
+		"send_answer": "Enviar respuesta",
+		"unrenderable": "El agente hizo una pregunta que no se pudo mostrar.",
+		"retry": "Dejar que lo intente de nuevo"
+	},
+	"context_usage": {
+		"row_system": "Prompt del sistema",
+		"row_human": "Tus mensajes",
+		"row_assistant": "Asistente",
+		"row_tool": "Resultados de herramientas",
+		"row_draft": "Borrador y pendientes",
+		"tooltip_unknown_limit": "Uso del contexto (est.): {used}k tokens (límite desconocido)",
+		"tooltip": "Uso del contexto (est.): {percent} % ({used}k / {limit}k)",
+		"line_unknown_limit": "{tokens} tokens · límite desconocido",
+		"line": "{tokens} de {limit} tokens",
+		"compaction_unknown_short": "La compactación automática necesita un límite conocido",
+		"compaction_unknown_long": "El resumen automático necesita un modelo con un límite de contexto conocido.",
+		"compaction_short": "Se compacta automáticamente a {tokens}{percent}",
+		"compaction_long": "Los mensajes antiguos se resumen automáticamente a partir de {tokens} tokens{percent}.",
+		"trigger_aria": "Abrir la distribución de tokens del contexto",
+		"heading": "Uso del contexto (est.)",
+		"summarize_now": "Resumir ahora",
+		"summarize_now_tooltip": "Resumir ahora los mensajes antiguos",
+		"nothing_to_summarize": "Todavía no hay nada que resumir"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "¿En qué puedes ayudarme?",
+		"suggestion_summarize_recent": "Resume mis notas recientes",
+		"suggestion_find_notes": "Busca notas sobre un tema",
+		"suggestion_find_notes_query": "Busca mis notas sobre ",
+		"suggestion_tasknotes": "¿Qué tareas vencen esta semana?",
+		"suggestion_tasks": "¿Qué tareas están atrasadas?",
+		"suggestion_dataview": "Muestra una tabla de mis notas por etiqueta",
+		"skills_initializing": "Las habilidades todavía se están inicializando; vuelve a intentarlo en un momento.",
+		"skill_create_failed_detail": "No se pudo crear la habilidad para {name}: {error}",
+		"skill_create_failed": "No se pudo crear la habilidad para {name}.",
+		"open_agent_skills": "Abrir habilidades del agente",
+		"enabled_notice": "{name} activado para {agent}.",
+		"greeting_title": "Empieza una conversación nueva",
+		"greeting_sub": "Pregúntame lo que quieras sobre tus notas.",
+		"add_provider_title": "Añade un proveedor de IA",
+		"add_provider_sub": "Conecta un proveedor para empezar a chatear.",
+		"select_model_title": "Selecciona un modelo de chat",
+		"select_model_sub": "Elige un modelo para empezar a chatear.",
+		"dismiss_suggestion_aria": "Descartar «{label}»",
+		"stale_not_updated": "Cambió la versión predeterminada de {label}, pero tu copia no se pudo actualizar automáticamente.",
+		"stale_kept": "Cambió la versión predeterminada de {label}. Se conservó tu versión personalizada.",
+		"review": "Revisar",
+		"dismiss_notice_aria": "Descartar el aviso de actualización de {label}",
+		"dismiss_notice": "Descartar este aviso",
+		"dismiss_all_nudges_aria": "Descartar las {count} sugerencias de integraciones de plugins",
+		"dismiss_all_nudges_tooltip": "Descartar las {count} sugerencias",
+		"dismiss_all": "Descartar todo",
+		"enable": "Activar",
+		"dismiss_nudge_aria": "Descartar la sugerencia de {name}",
+		"dismiss_nudge": "Descartar esta sugerencia",
+		"show_less": "Mostrar menos",
+		"dismiss_all_aria": "Descartar todas las sugerencias",
+		"stale_label": {
+			"system_prompt": "prompt del sistema",
+			"skill": "habilidad «{name}»"
+		},
+		"nudge": "Activa la habilidad {skill} para este agente.",
+		"nudges_summary": {
+			"one": "{number} integración de plugin disponible para este agente.",
+			"many": "{number} integraciones de plugins disponibles para este agente.",
+			"other": "{number} integraciones de plugins disponibles para este agente."
+		},
+		"stale_agent_kept": "Cambió la versión predeterminada de {label}. Se conservó la versión personalizada de {agent}.",
+		"stale_agent_not_updated": "Cambió la versión predeterminada de {label}, pero la copia de {agent} no se pudo actualizar automáticamente."
+	},
+	"context_tray": {
+		"attachment_open": "{path} (haz clic para abrir)",
+		"remove_attachment": "Quitar adjunto",
+		"remove_attachment_aria": "Quitar {name}",
+		"note_excluded": "{path} (excluida; haz clic para incluirla como referencia)",
+		"note_included": "{path} (nota abierta; haz clic para excluirla)",
+		"attach_full_content": "Adjuntar el contenido completo al mensaje",
+		"graph_collapse": "Selección del grafo; haz clic para contraer",
+		"graph_topic_expand": "{topic}; haz clic para expandir",
+		"graph_notes_expand": {
+			"one": "{count} nota del grafo; haz clic para expandir",
+			"many": "{count} notas del grafo; haz clic para expandir",
+			"other": "{count} notas del grafo; haz clic para expandir"
+		},
+		"graph_notes_label": {
+			"one": "{count} nota del grafo",
+			"many": "{count} notas del grafo",
+			"other": "{count} notas del grafo"
+		},
+		"remove_graph_notes": "Quitar todas las notas del grafo",
+		"graph_member": "{path} (del grafo; haz clic para excluirla)",
+		"selection": "Texto seleccionado de {path} (haz clic para descartar)\n\n{text}",
+		"selection_long": "Selección larga: se recortará para ajustarse al contexto del modelo"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "Buscando {target} en las notas",
+				"done": "Buscó {target} en las notas"
+			},
+			"recent_notes": {
+				"running": "Revisando notas recientes",
+				"done": "Revisó notas recientes"
+			},
+			"search_notes": {
+				"running": "Buscando en las notas",
+				"done": "Buscó en las notas"
+			},
+			"grep_for": {
+				"running": "Buscando el texto {target}",
+				"done": "Buscó el texto {target}"
+			},
+			"grep": {
+				"running": "Buscando en el texto de las notas",
+				"done": "Buscó en el texto de las notas"
+			},
+			"list_folder": {
+				"running": "Listando la carpeta {target}",
+				"done": "Listó la carpeta {target}"
+			},
+			"list_vault": {
+				"running": "Listando la bóveda",
+				"done": "Listó la bóveda"
+			},
+			"read_target": {
+				"running": "Leyendo {target}",
+				"done": "Leyó {target}"
+			},
+			"read_note": {
+				"running": "Leyendo una nota",
+				"done": "Leyó una nota"
+			},
+			"edit_notes": {
+				"running": "Editando notas",
+				"done": "Editó notas"
+			},
+			"edit_note": {
+				"running": "Editando una nota",
+				"done": "Editó una nota"
+			},
+			"run_javascript": {
+				"running": "Ejecutando JavaScript",
+				"done": "Ejecutó JavaScript"
+			},
+			"list_tags": {
+				"running": "Listando todas las etiquetas",
+				"done": "Listó todas las etiquetas"
+			},
+			"read_properties_of": {
+				"running": "Leyendo las propiedades de {target}",
+				"done": "Leyó las propiedades de {target}"
+			},
+			"read_properties": {
+				"running": "Leyendo las propiedades de las notas",
+				"done": "Leyó las propiedades de las notas"
+			},
+			"fetch_target": {
+				"running": "Obteniendo {target}",
+				"done": "Obtuvo {target}"
+			},
+			"fetch_page": {
+				"running": "Obteniendo una página",
+				"done": "Obtuvo una página"
+			},
+			"web_search_for": {
+				"running": "Buscando {target} en la web",
+				"done": "Buscó {target} en la web"
+			},
+			"web_search": {
+				"running": "Buscando en la web",
+				"done": "Buscó en la web"
+			},
+			"load_skill_target": {
+				"running": "Cargando la habilidad {target}",
+				"done": "Cargó la habilidad {target}"
+			},
+			"load_skill": {
+				"running": "Cargando una habilidad",
+				"done": "Cargó una habilidad"
+			},
+			"update_todos": {
+				"running": "Actualizando la lista de tareas",
+				"done": "Actualizó la lista de tareas"
+			},
+			"clear_todos": {
+				"running": "Vaciando la lista de tareas",
+				"done": "Vació la lista de tareas"
+			},
+			"ask_target": {
+				"running": "Preguntando {target}",
+				"done": "Preguntó {target}"
+			},
+			"generic_target": {
+				"running": "Usando {name}: {target}",
+				"done": "Usó {name}: {target}"
+			},
+			"generic": {
+				"running": "Usando {name}",
+				"done": "Usó {name}"
+			}
+		},
+		"count": {
+			"note": {
+				"one": "{count} nota",
+				"many": "{count} notas",
+				"other": "{count} notas"
+			},
+			"match": {
+				"one": "{count} coincidencia",
+				"many": "{count} coincidencias",
+				"other": "{count} coincidencias"
+			},
+			"file": {
+				"one": "{count} archivo",
+				"many": "{count} archivos",
+				"other": "{count} archivos"
+			},
+			"folder": {
+				"one": "{count} carpeta",
+				"many": "{count} carpetas",
+				"other": "{count} carpetas"
+			},
+			"line": {
+				"one": "{count} línea",
+				"many": "{count} líneas",
+				"other": "{count} líneas"
+			},
+			"tag": {
+				"one": "{count} etiqueta",
+				"many": "{count} etiquetas",
+				"other": "{count} etiquetas"
+			},
+			"result": {
+				"one": "{count} resultado",
+				"many": "{count} resultados",
+				"other": "{count} resultados"
+			},
+			"question": {
+				"one": "{count} pregunta",
+				"many": "{count} preguntas",
+				"other": "{count} preguntas"
+			},
+			"operation": {
+				"one": "{count} operación",
+				"many": "{count} operaciones",
+				"other": "{count} operaciones"
+			},
+			"item": {
+				"one": "{count} elemento",
+				"many": "{count} elementos",
+				"other": "{count} elementos"
+			},
+			"row": {
+				"one": "{count} fila",
+				"many": "{count} filas",
+				"other": "{count} filas"
+			},
+			"field": {
+				"one": "{count} campo",
+				"many": "{count} campos",
+				"other": "{count} campos"
+			}
+		},
+		"found": "encontró {items}",
+		"found_no_matches": "no encontró coincidencias",
+		"found_in": "encontró {items} en {files}",
+		"found_folders_and_files": "encontró {folders} y {files}",
+		"truncated": "{lines} (recortado)",
+		"operations_across": "{operations} en {notes}",
+		"errored": "con error",
+		"logged": "registró {lines}",
+		"returned_value": "devolvió un valor",
+		"duration_ms": "en {ms} ms",
+		"todos_done": "{done} de {total} completadas",
+		"dismissed": "descartada",
+		"answered_in_chat": "respondida en el chat",
+		"answered": "respondida",
+		"failed": "falló",
+		"lines_total": "{lines} en total",
+		"list_separator": ", ",
+		"list_and": "{list} y {last}",
+		"list_and_more": "{list} y {count} más",
+		"tool_fallback": "Herramienta"
+	},
+	"tool_output": {
+		"key_count": {
+			"one": "{count} clave",
+			"many": "{count} claves",
+			"other": "{count} claves"
+		}
+	},
+	"tools": {
+		"review_accepted": "{count} aceptados",
+		"review_partial": "{count} aplicados en parte",
+		"review_rejected": "{count} rechazados",
+		"review_pending": "{count} pendientes de revisión",
+		"label_with_outcome": "{label}, {outcome}",
+		"source_note": "Nota",
+		"phase_summarizing": "Resumiendo mensajes anteriores",
+		"phase_running_tools": {
+			"one": "Ejecutando {count} herramienta",
+			"many": "Ejecutando {count} herramientas",
+			"other": "Ejecutando {count} herramientas"
+		},
+		"phase_loading_model": "Cargando modelo",
+		"phase_waiting": "Esperando al modelo",
+		"phase_writing": "Escribiendo",
+		"phase_thinking": "Pensando",
+		"running_label": "{phase}… {seconds}s",
+		"settled_label": "Pensó durante {seconds}s",
+		"via_subagent": "mediante {name}",
+		"input": "Entrada",
+		"output": "Salida",
+		"no_output": "(sin salida)",
+		"result": "Resultado",
+		"tree_more_files": {
+			"one": "+{count} archivo más",
+			"many": "+{count} archivos más",
+			"other": "+{count} archivos más"
+		},
+		"tree_unlisted_files": {
+			"one": "{count} archivo sin listar",
+			"many": "{count} archivos sin listar",
+			"other": "{count} archivos sin listar"
+		},
+		"no_answer": "Sin respuesta",
+		"dismissed_without_answer": "Descartada sin respuesta.",
+		"chip_query": "consulta: {value}",
+		"chip_algorithm": "algoritmo: {value}",
+		"chip_results": "resultados: {value}",
+		"chip_shown": "mostrados: {value}",
+		"chip_recent_only": "solo recientes",
+		"chip_skipped_private": "privadas omitidas: {value}",
+		"untitled": "Sin título",
+		"more_results": {
+			"one": "+{count} resultado más",
+			"many": "+{count} resultados más",
+			"other": "+{count} resultados más"
+		},
+		"chip_root": "raíz: {value}",
+		"chip_folders": "carpetas: {value}",
+		"chip_files": "archivos: {value}",
+		"chip_depth": "profundidad: {value}",
+		"chip_folders_only": "solo carpetas",
+		"chip_collapsed": "condensado",
+		"tree": "Árbol",
+		"chip_operations": "operaciones: {value}",
+		"chip_paths": "rutas: {value}",
+		"chip_truncated": "recortado",
+		"chip_logs": "registros: {value}",
+		"chip_error": "error",
+		"chip_return_value": "valor devuelto",
+		"console_output": "Salida de la consola",
+		"return_value": "Valor devuelto",
+		"executed_code": "Código ejecutado",
+		"raw_output": "Salida sin procesar"
+	},
+	"input": {
+		"drop_files": "Suelta los archivos aquí",
+		"send_shortcut_hint": "↵ · {shortcut} en una lista",
+		"edit_attachment_missing": "El adjunto «{name}» ya no existe en la bóveda; no formará parte del mensaje editado.",
+		"select_model_to_send": "Selecciona un modelo de chat para enviar esto.",
+		"placeholder": "Pregunta sobre tus notas...",
+		"wait_for_attachments": "Espera a que terminen de guardarse los adjuntos",
+		"select_model_before_sending": "Selecciona un modelo de chat antes de enviar.",
+		"empty_before_sending": "Añade texto o adjunta un archivo antes de enviar",
+		"empty_before_saving": "Añade texto o adjunta un archivo antes de guardar",
+		"select_model_before_saving": "Selecciona un modelo de chat antes de guardar.",
+		"save_edit_failed": "No se pudo guardar la edición",
+		"not_ready": "El chat aún no está listo",
+		"question_blocks_attachments": "Responde o descarta la pregunta del agente antes de adjuntar archivos",
+		"send_failed": "No se pudo enviar el mensaje",
+		"summarize_failed": "No se pudo resumir el historial",
+		"unsupported_file_type": "Tipo de archivo no compatible: .{ext}",
+		"the_selected_model": "el modelo seleccionado",
+		"vision_required_switch": "Los adjuntos de imagen requieren un modelo con visión. Cambia de modelo para adjuntar imágenes (actual: {model}).",
+		"vision_unknown": "Se desconoce si el modelo admite visión; el análisis de imágenes puede fallar con este modelo.",
+		"file_too_large": "Archivo demasiado grande: {name} supera el límite de 15 MB por archivo.",
+		"total_too_large": "El tamaño total de los adjuntos supera el límite de 25 MB por mensaje.",
+		"attach_failed": "No se pudo adjuntar el archivo: {error}",
+		"vision_required": "Los adjuntos de imagen requieren un modelo con visión (actual: {model}).",
+		"switch_model": "Cambiar de modelo",
+		"already_attached": "{name} ya está adjunto.",
+		"wait_for_current_attachments": "Espera a que terminen de guardarse los adjuntos actuales.",
+		"file_not_found": "No se encontró el archivo: {path}",
+		"only_files": "Solo se pueden adjuntar archivos: {path}",
+		"picker_placeholder": "Busca archivos de la bóveda para adjuntar...",
+		"picker_verb": "Adjuntar",
+		"current_model": "modelo actual",
+		"drag_images_unsupported": "{model} no admite imágenes. Cambia a un modelo con visión.",
+		"drag_some_unsupported": "Puede que algunos archivos no sean compatibles (se aceptan: txt, md, csv, json, imágenes, pdf).",
+		"retry_connection": "Haz clic para reintentar la conexión",
+		"provider_unreachable": "No se puede conectar con {provider}; haz clic para reintentar",
+		"saving": "Guardando...",
+		"save_edit_aria": "guardar edición",
+		"send_aria": "enviar mensaje",
+		"select_model_first": "Primero selecciona un modelo de chat",
+		"save_edit_with_hint": "Guardar edición ({hint})",
+		"save_edit": "Guardar edición",
+		"send_with_hint": "Enviar mensaje ({hint})",
+		"send": "Enviar mensaje",
+		"stop_aria": "detener la transmisión",
+		"stop": "Detener la transmisión"
+	},
+	"view": {
+		"session_unavailable": "La sesión de chat aún no está disponible. Vuelve a abrir esta vista cuando termine la inicialización del plugin."
+	}
+}

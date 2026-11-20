@@ -11,7 +11,6 @@ import {
 	requestUrl,
 } from "obsidian";
 import { mount, unmount } from "svelte";
-import "./lib/i18n";
 import "./lib/langgraphContext";
 import { Logger as Log, applyVerboseLogging } from "./utils/logging";
 import { isAgentFilePath } from "./utils/fileFiltering";
@@ -67,6 +66,7 @@ import {
 import { SmartGraphView, VIEW_TYPE_SMART_GRAPH } from "./views/smart-graph/SmartGraphView";
 import SettingsTab from "./views/settings/Settings";
 import { VectorStoreService, waitForVectorStore } from "./vectorstore";
+import { t } from "./i18n";
 
 const SUPPORTED_CHAT_ATTACHMENT_EXTENSIONS = new Set([
 	"txt",
@@ -127,10 +127,7 @@ export default class SecondBrainPlugin extends Plugin {
 	}
 
 	private getAddToChatMenuLabel(selectedCount: number): string {
-		if (selectedCount <= 1) {
-			return "Add to chat";
-		}
-		return `Add ${selectedCount} files to chat`;
+		return t("plugin.attach.menu_label", { count: Math.max(1, selectedCount) });
 	}
 
 	/** Thread path for pending-change navigation: the focused chat if there is one,
@@ -152,22 +149,31 @@ export default class SecondBrainPlugin extends Plugin {
 	private addChatFileMenuItems(menu: Menu, file: TFile): void {
 		menu.addItem((item) =>
 			item
-				.setTitle("Rename chat")
+				.setTitle(t("plugin.chat_file_menu.rename"))
 				.setIcon("pencil")
 				.onClick(async () => {
-					const newTitle = await promptText(this.app, "Rename chat", file.basename, "Rename");
+					const newTitle = await promptText(
+						this.app,
+						t("plugin.chat_file_menu.rename"),
+						file.basename,
+						t("plugin.chat_file_menu.rename_button"),
+					);
 					if (!newTitle || newTitle === file.basename) return;
 					try {
 						await this.agentManager.renameThread(file.path, newTitle);
 					} catch (error) {
-						new Notice(`Failed to rename chat: ${error instanceof Error ? error.message : String(error)}`);
+						new Notice(
+							t("plugin.chat_file_menu.rename_failed", {
+								error: error instanceof Error ? error.message : String(error),
+							}),
+						);
 					}
 				}),
 		);
 
 		menu.addItem((item) =>
 			item
-				.setTitle("Delete chat")
+				.setTitle(t("plugin.chat_file_menu.delete"))
 				.setIcon("trash")
 				.setWarning(true)
 				.onClick(async () => {
@@ -176,7 +182,11 @@ export default class SecondBrainPlugin extends Plugin {
 					try {
 						await this.agentManager.deleteThread(file.path);
 					} catch (error) {
-						new Notice(`Failed to delete chat: ${error instanceof Error ? error.message : String(error)}`);
+						new Notice(
+							t("plugin.chat_file_menu.delete_failed", {
+								error: error instanceof Error ? error.message : String(error),
+							}),
+						);
 					}
 				}),
 		);
@@ -230,22 +240,29 @@ export default class SecondBrainPlugin extends Plugin {
 			if (selectedFiles.length === 1 && selectedFiles[0].extension === "chat") {
 				const file = selectedFiles[0];
 				context.addItem((item) => {
-					item.setTitle("Rename chat")
+					item.setTitle(t("plugin.chat_file_menu.rename"))
 						.setIcon("pencil")
 						.onClick(async () => {
-							const newTitle = await promptText(this.app, "Rename chat", file.basename, "Rename");
+							const newTitle = await promptText(
+								this.app,
+								t("plugin.chat_file_menu.rename"),
+								file.basename,
+								t("plugin.chat_file_menu.rename_button"),
+							);
 							if (!newTitle || newTitle === file.basename) return;
 							try {
 								await this.agentManager.renameThread(file.path, newTitle);
 							} catch (error) {
 								new Notice(
-									`Failed to rename chat: ${error instanceof Error ? error.message : String(error)}`,
+									t("plugin.chat_file_menu.rename_failed", {
+										error: error instanceof Error ? error.message : String(error),
+									}),
 								);
 							}
 						});
 				});
 				context.addItem((item) => {
-					item.setTitle("Delete chat")
+					item.setTitle(t("plugin.chat_file_menu.delete"))
 						.setIcon("trash")
 						.onClick(async () => {
 							const confirmed = await confirmDelete(this.app, file.basename);
@@ -254,7 +271,9 @@ export default class SecondBrainPlugin extends Plugin {
 								await this.agentManager.deleteThread(file.path);
 							} catch (error) {
 								new Notice(
-									`Failed to delete chat: ${error instanceof Error ? error.message : String(error)}`,
+									t("plugin.chat_file_menu.delete_failed", {
+										error: error instanceof Error ? error.message : String(error),
+									}),
 								);
 							}
 						});
@@ -270,7 +289,9 @@ export default class SecondBrainPlugin extends Plugin {
 							await this.queueFilesForChatAttachment(selectedFiles);
 						} catch (error) {
 							new Notice(
-								`Failed to add files to chat: ${error instanceof Error ? error.message : String(error)}`,
+								t("plugin.attach.add_files_failed", {
+									error: error instanceof Error ? error.message : String(error),
+								}),
 							);
 						}
 					});
@@ -289,7 +310,7 @@ export default class SecondBrainPlugin extends Plugin {
 	private async queueFilesForChatAttachment(files: TFile[]) {
 		const supportedFiles = this.getSupportedFiles(files);
 		if (supportedFiles.length === 0) {
-			new Notice("No supported files selected. Supported: txt, md, csv, json, images, pdf.");
+			new Notice(t("plugin.attach.no_supported_files"));
 			return;
 		}
 
@@ -297,7 +318,7 @@ export default class SecondBrainPlugin extends Plugin {
 
 		const registry = getSessionRegistry();
 		if (!registry) {
-			new Notice("Chat is not initialized yet. Please open chat and try again.");
+			new Notice(t("plugin.attach.chat_not_initialized"));
 			return;
 		}
 
@@ -308,7 +329,9 @@ export default class SecondBrainPlugin extends Plugin {
 
 		const skipped = files.length - supportedFiles.length;
 		if (skipped > 0) {
-			new Notice(`Queued ${supportedFiles.length} file(s) for chat. Skipped ${skipped} unsupported file(s).`);
+			new Notice(
+				`${t("plugin.attach.queued", { count: supportedFiles.length })} ${t("plugin.attach.skipped_unsupported", { count: skipped })}`,
+			);
 		}
 	}
 
@@ -538,9 +561,9 @@ export default class SecondBrainPlugin extends Plugin {
 			throw new Error("Cannot localize plugin directory.");
 		}
 
-		this.addRibbonIcon("message-square", "New chat", () => this.createNewChat());
-		this.addRibbonIcon("search", "Search notes", () => new SearchModal(this.app).open());
-		this.addRibbonIcon("git-fork", "Open smart graph", () => this.activateSmartGraphView());
+		this.addRibbonIcon("message-square", t("plugin.commands.new_chat"), () => this.createNewChat());
+		this.addRibbonIcon("search", t("plugin.commands.search_notes"), () => new SearchModal(this.app).open());
+		this.addRibbonIcon("git-fork", t("plugin.commands.open_smart_graph"), () => this.activateSmartGraphView());
 
 		// Create Agent Manager (v2) + session registry BEFORE mounting the status-bar
 		// indicator below. Both constructors are cheap (heavy init is deferred to
@@ -562,21 +585,21 @@ export default class SecondBrainPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-chat",
-			name: "Open chat",
+			name: t("plugin.commands.open_chat"),
 			icon: "message-square",
 			callback: async () => await this.agentManager.openLatestChat(),
 		});
 
 		this.addCommand({
 			id: "new-chat",
-			name: "New chat",
+			name: t("plugin.commands.new_chat"),
 			icon: "plus",
 			callback: async () => await this.agentManager.createNewChat(),
 		});
 
 		this.addCommand({
 			id: "search-notes",
-			name: "Search notes",
+			name: t("plugin.commands.search_notes"),
 			icon: "search",
 			callback: () => new SearchModal(this.app).open(),
 		});
@@ -585,7 +608,7 @@ export default class SecondBrainPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-smart-graph",
-			name: "Open smart graph",
+			name: t("plugin.commands.open_smart_graph"),
 			icon: "git-fork",
 			callback: () => this.activateSmartGraphView(),
 		});
@@ -600,45 +623,45 @@ export default class SecondBrainPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-onboarding",
-			name: "Show welcome",
+			name: t("plugin.commands.show_welcome"),
 			icon: "zap",
 			callback: () => this.activateOnboardingView(),
 		});
 
 		this.addCommand({
 			id: "show-release-notes",
-			name: "Show release notes",
+			name: t("plugin.commands.show_release_notes"),
 			icon: "scroll-text",
 			callback: () => void this.showReleaseNotes(),
 		});
 
 		this.addCommand({
 			id: "next-pending-change",
-			name: "Next pending change",
+			name: t("plugin.commands.next_pending_change"),
 			icon: "chevron-down",
 			callback: async () => {
 				const threadId = this.resolveChatThreadIdForNavigation();
 				if (!threadId) {
-					new Notice("No chat is currently open");
+					new Notice(t("plugin.pending_navigation.no_chat_open"));
 					return;
 				}
 				const target = await navigateToPendingChange(this, threadId, "next");
-				if (!target) new Notice("No pending changes in this chat");
+				if (!target) new Notice(t("plugin.pending_navigation.no_pending_changes"));
 			},
 		});
 
 		this.addCommand({
 			id: "previous-pending-change",
-			name: "Previous pending change",
+			name: t("plugin.commands.previous_pending_change"),
 			icon: "chevron-up",
 			callback: async () => {
 				const threadId = this.resolveChatThreadIdForNavigation();
 				if (!threadId) {
-					new Notice("No chat is currently open");
+					new Notice(t("plugin.pending_navigation.no_chat_open"));
 					return;
 				}
 				const target = await navigateToPendingChange(this, threadId, "prev");
-				if (!target) new Notice("No pending changes in this chat");
+				if (!target) new Notice(t("plugin.pending_navigation.no_pending_changes"));
 			},
 		});
 
@@ -846,7 +869,9 @@ export default class SecondBrainPlugin extends Plugin {
 								await this.queueFilesForChatAttachment([file]);
 							} catch (error) {
 								new Notice(
-									`Failed to add file to chat: ${error instanceof Error ? error.message : String(error)}`,
+									t("plugin.attach.add_file_failed", {
+										error: error instanceof Error ? error.message : String(error),
+									}),
 								);
 							}
 						}),
@@ -872,7 +897,9 @@ export default class SecondBrainPlugin extends Plugin {
 								await this.queueFilesForChatAttachment(attachableFiles);
 							} catch (error) {
 								new Notice(
-									`Failed to add files to chat: ${error instanceof Error ? error.message : String(error)}`,
+									t("plugin.attach.add_files_failed", {
+										error: error instanceof Error ? error.message : String(error),
+									}),
 								);
 							}
 						}),
@@ -948,7 +975,7 @@ export default class SecondBrainPlugin extends Plugin {
 		while (taken.has(name().toLowerCase()) || data.getProviderMeta(id())) n++;
 		await data.addProviderInstance(id(), { templateId: "huggingface", displayName: name() });
 		data.setProviderConfigured(id(), true);
-		new Notice("Connected to Hugging Face.");
+		new Notice(t("plugin.huggingface_connected"));
 	}
 
 	onunload() {
@@ -1138,8 +1165,8 @@ export default class SecondBrainPlugin extends Plugin {
 			},
 			notify: (version) => {
 				const message = createFragment((frag) => {
-					frag.appendText(`Smart Second Brain ${version} is available. `);
-					const link = frag.createEl("a", { text: "Update", href: "#" });
+					frag.appendText(`${t("plugin.update.available", { version })} `);
+					const link = frag.createEl("a", { text: t("plugin.update.update_link"), href: "#" });
 					link.addEventListener("click", (event) => {
 						event.preventDefault();
 						this.openCommunityPluginSettings();
@@ -1203,8 +1230,8 @@ export default class SecondBrainPlugin extends Plugin {
 		if (record !== null) this.pluginData.lastSeenVersion = record;
 		if (sections.length === 0) return;
 		const message = createFragment((frag) => {
-			frag.appendText(`Smart Second Brain updated to ${current}. `);
-			const link = frag.createEl("a", { text: "See what's new", href: "#" });
+			frag.appendText(`${t("plugin.update.updated", { version: current })} `);
+			const link = frag.createEl("a", { text: t("plugin.update.whats_new_link"), href: "#" });
 			link.addEventListener("click", (event) => {
 				event.preventDefault();
 				void this.showReleaseNotes(sections.length);

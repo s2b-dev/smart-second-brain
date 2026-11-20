@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import {
 	MAX_EMBEDDING_BATCH_SIZE,
 	MIN_EMBEDDING_BATCH_SIZE,
@@ -95,17 +96,20 @@ function openModelSelection() {
 
 function handleSave() {
 	if (!selectedModel) {
-		error = "Select an embedding model.";
+		error = t("modals.embedding_index_setup.error_select_model");
 		return;
 	}
 
 	if (!Number.isFinite(batchSize)) {
-		error = "Batch size must be a number.";
+		error = t("modals.embedding_index_setup.error_batch_not_number");
 		return;
 	}
 
 	if (batchSize < MIN_EMBEDDING_BATCH_SIZE || batchSize > MAX_EMBEDDING_BATCH_SIZE) {
-		error = `Batch size must be between ${MIN_EMBEDDING_BATCH_SIZE} and ${MAX_EMBEDDING_BATCH_SIZE}.`;
+		error = t("modals.embedding_index_setup.error_batch_range", {
+			min: MIN_EMBEDDING_BATCH_SIZE,
+			max: MAX_EMBEDDING_BATCH_SIZE,
+		});
 		return;
 	}
 
@@ -137,19 +141,19 @@ async function handleImport() {
 </script>
 
 <div class="embedding-index-setup-modal">
-  <div class="modal-intro">Pick a model, then adjust the batch size if needed.</div>
+  <div class="modal-intro">{t("modals.embedding_index_setup.intro")}</div>
 
   <div class="settings-panel">
-    <SettingContainer name="Embedding model" desc="Used to build and refresh this index.">
+    <SettingContainer name={t("modals.embedding_index_setup.model_label")} desc={t("modals.embedding_index_setup.model_desc")}>
       <ModelSettingControl
         available={availableModels.hasProviders && availableModels.hasEmbedModels}
         loading={availableModels.hasProviders && availableModels.isLoadingModels}
-        configureLabel={!availableModels.hasProviders ? "Configure Provider" : "Configure Models"}
+        configureLabel={!availableModels.hasProviders ? t("modals.embedding_index_setup.configure_provider") : t("modals.embedding_index_setup.configure_models")}
         unavailableHint={!availableModels.hasProviders
-          ? "No AI provider is configured yet."
-          : "No embedding models found for your providers."}
+          ? t("modals.embedding_index_setup.no_provider_hint")
+          : t("modals.embedding_index_setup.no_models_hint")}
         onConfigure={() => availableModels.openSettings(() => modal.close(), { needsEmbedding: true })}
-        placeholder="Select a model"
+        placeholder={t("modals.embedding_index_setup.model_placeholder")}
         selectedLabel={selectedModelLabel}
         selectedLogo={selectedModelLogo}
         onSelect={openModelSelection}
@@ -157,8 +161,8 @@ async function handleImport() {
     </SettingContainer>
 
     <SettingContainer
-      name="Batch size"
-      desc={`Notes per embedding request. Lower values are safer for local models; higher values are better for hosted providers. Range: ${MIN_EMBEDDING_BATCH_SIZE}-${MAX_EMBEDDING_BATCH_SIZE}.`}
+      name={t("modals.embedding_index_setup.batch_size_label")}
+      desc={t("modals.embedding_index_setup.batch_size_desc", { min: MIN_EMBEDDING_BATCH_SIZE, max: MAX_EMBEDDING_BATCH_SIZE })}
     >
       <Text
         inputType="number"
@@ -173,12 +177,12 @@ async function handleImport() {
 
     {#if onImport}
       <SettingContainer
-        name="Import existing index"
-        desc="Load an index exported from another vault instead of building one. Rebuilding is only needed if the export is outdated."
+        name={t("modals.embedding_index_setup.import_label")}
+        desc={t("modals.embedding_index_setup.import_desc")}
       >
         <Button
           iconId="upload"
-          buttonText={isImporting ? "Importing…" : "Import"}
+          buttonText={isImporting ? t("modals.embedding_index_setup.importing") : t("modals.embedding_index_setup.import_button")}
           disabled={isImporting}
           onClick={() => void handleImport()}
         />
@@ -194,8 +198,8 @@ async function handleImport() {
 </div>
 
 <div class="modal-button-container">
-  <Button buttonText="Cancel" onClick={() => modal.close()} />
-  <Button buttonText="Start indexing" cta={true} onClick={handleSave} disabled={!selectedModel} />
+  <Button buttonText={t("common.cancel")} onClick={() => modal.close()} />
+  <Button buttonText={t("modals.embedding_index_setup.start_button")} cta={true} onClick={handleSave} disabled={!selectedModel} />
 </div>
 
 <style>

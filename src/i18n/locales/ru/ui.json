@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "Изменить размер панели"
+	},
+	"docs_link": {
+		"subject_label": "Документация: {subject}",
+		"open_label": "Открыть документацию"
+	},
+	"markdown": {
+		"copy_code": "Копировать код"
+	},
+	"search": {
+		"placeholder": "Поиск..."
+	}
+}

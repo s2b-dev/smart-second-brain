@@ -1,4 +1,5 @@
 import type { HydratedChatModelMetadata } from "../types/modelMetadata";
+import { t } from "../i18n";
 
 /**
  * Icon + label for each chat-model capability flag, shared by the desktop
@@ -12,8 +13,8 @@ export const MODEL_CAPABILITY_ICONS: Record<
 	keyof HydratedChatModelMetadata["capabilities"],
 	{ icon: string; label: string }
 > = {
-	toolCalls: { icon: "wrench", label: "Tool calling" },
-	reasoning: { icon: "brain", label: "Extended reasoning" },
-	vision: { icon: "eye", label: "Vision / file attachments" },
-	structuredOutput: { icon: "braces", label: "Structured output (JSON schema)" },
+	toolCalls: { icon: "wrench", label: t("plugin.model_capabilities.tool_calls") },
+	reasoning: { icon: "brain", label: t("plugin.model_capabilities.reasoning") },
+	vision: { icon: "eye", label: t("plugin.model_capabilities.vision") },
+	structuredOutput: { icon: "braces", label: t("plugin.model_capabilities.structured_output") },
 };

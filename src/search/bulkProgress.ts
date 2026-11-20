@@ -4,6 +4,8 @@
  * the embedding row in settings, so the surfaces read as one feature.
  */
 
+import { t } from "../i18n";
+
 /** A bulk run's extraction tail: see `IndexingProgress.extraction`. */
 export interface ExtractionProgress {
 	done: number;
@@ -48,7 +50,7 @@ export function formatEta(ms: number): string {
 }
 
 function pdfs(count: number): string {
-	return `${count} PDF${count === 1 ? "" : "s"}`;
+	return t("plugin.bulk_progress.pdfs", { count });
 }
 
 function basename(path: string): string {
@@ -66,18 +68,21 @@ function basename(path: string): string {
  */
 export function describeBulkProgress(input: BulkProgressInput): BulkProgressText {
 	const { processed, total, skipped = 0, etaMs = null, extraction, currentFile } = input;
-	const skippedText = skipped > 0 ? ` (${skipped} skipped)` : "";
-	const etaText = etaMs !== null ? ` (~${formatEta(etaMs)} left)` : "";
+	const skippedText = skipped > 0 ? ` ${t("plugin.bulk_progress.skipped", { count: skipped })}` : "";
+	const etaText = etaMs !== null ? ` ${t("plugin.bulk_progress.eta", { eta: formatEta(etaMs) })}` : "";
 
 	if (extraction?.active && extraction.total > 0) {
 		const fileText = currentFile ? ` · ${basename(currentFile)}` : "";
 		return {
-			status: `PDFs ${extraction.done}/${extraction.total}${fileText}${skippedText}${etaText}`,
+			status: `${t("plugin.bulk_progress.pdfs_progress", { done: extraction.done, total: extraction.total })}${fileText}${skippedText}${etaText}`,
 			percentage: Math.round((extraction.done / extraction.total) * 100),
 		};
 	}
 
-	const pending = extraction && extraction.total > 0 ? ` · then ${pdfs(extraction.total)}` : "";
+	const pending =
+		extraction && extraction.total > 0
+			? ` · ${t("plugin.bulk_progress.then", { pdfs: pdfs(extraction.total) })}`
+			: "";
 	return {
 		status: `${processed}/${total}${pending}${skippedText}${etaText}`,
 		percentage: total > 0 ? Math.round((processed / total) * 100) : 100,

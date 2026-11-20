@@ -10,6 +10,7 @@ import {
 import { resolveWidgetLibs } from "./widgetLibs";
 import { runWidgetQueries } from "./widgetQueries";
 import type { WidgetSpec } from "./widgetSpec";
+import { t } from "../i18n";
 
 const LIVE_UPDATE_DEBOUNCE_MS = 400;
 const DEFAULT_AUTO_HEIGHT = 96;
@@ -172,7 +173,7 @@ export class WidgetRenderChild extends MarkdownRenderChild {
 		this.frame = null;
 		this.containerEl.createDiv({
 			cls: "s2b-widget-blocked",
-			text: "This widget was stopped because it tried to navigate away from its sandbox.",
+			text: t("widget.frame.navigation_blocked"),
 		});
 	}
 

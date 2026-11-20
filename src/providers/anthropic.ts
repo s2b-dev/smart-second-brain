@@ -18,6 +18,7 @@ import type {
 	ChatModelConfig,
 } from "../types/provider/index";
 import { createBufferedTransportedChatAnthropic, createTransportedChatAnthropic } from "./chatProviders";
+import { t } from "../i18n";
 
 // =============================================================================
 // Constants
@@ -93,7 +94,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 		],
 		link: {
 			url: "https://console.anthropic.com/settings/keys",
-			text: "Anthropic Console",
+			text: t("plugin.providers.anthropic.link"),
 		},
 	},
 
@@ -102,22 +103,22 @@ export const anthropicProvider: BaseProviderDefinition = {
 	// =========================================================================
 	auth: {
 		apiKey: {
-			label: "API Key",
-			description: "Your Anthropic API key for authentication",
+			label: t("plugin.providers.fields.api_key"),
+			description: t("plugin.providers.anthropic.api_key_desc"),
 			kind: "secret",
 			required: true,
 			placeholder: "sk-ant-...",
 		},
 		baseUrl: {
-			label: "Base URL",
-			description: "The base URL for the Anthropic-compatible API endpoint",
+			label: t("plugin.providers.fields.base_url"),
+			description: t("plugin.providers.anthropic.base_url_desc"),
 			kind: "text",
 			required: false,
 			placeholder: ANTHROPIC_DEFAULT_BASE_URL,
 		},
 		headers: {
-			label: "Custom Headers",
-			description: "Additional headers as JSON (optional)",
+			label: t("plugin.providers.fields.custom_headers"),
+			description: t("plugin.providers.fields.custom_headers_desc"),
 			kind: "textarea",
 			required: false,
 			placeholder: '{"X-Custom-Header": "value"}',
@@ -170,7 +171,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 
 	validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {
 		if (!auth.apiKey?.trim()) {
-			return { valid: false, error: "API key is required" };
+			return { valid: false, error: t("plugin.provider_auth.api_key_required") };
 		}
 
 		try {
@@ -197,16 +198,22 @@ export const anthropicProvider: BaseProviderDefinition = {
 			}
 
 			if (response.status === 401 || response.status === 403 || errorType === "authentication_error") {
-				return { valid: false, error: errorMessage || `Authentication failed (${response.status})` };
+				return {
+					valid: false,
+					error: errorMessage || t("plugin.provider_auth.auth_failed_status", { status: response.status }),
+				};
 			}
 
 			return {
 				valid: false,
-				error: errorMessage || response.text || `Request failed with status ${response.status}`,
+				error:
+					errorMessage ||
+					response.text ||
+					t("plugin.provider_auth.request_failed_status", { status: response.status }),
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return { valid: false, error: `Connection failed: ${message}` };
+			return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 		}
 	},
 

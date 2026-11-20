@@ -13,6 +13,7 @@ import type { ChatAttachment } from "../../types/shared";
 import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
+import { t } from "../../i18n";
 
 const SELECTION_PREVIEW_LENGTH = 40;
 const BASENAME_RE = /(?:.*\/)?([^/]+?)(?:\.\w+)?$/;
@@ -297,7 +298,7 @@ onDestroy(() => {
             <button
               type="button"
               class="attachment-tile-body"
-              title={`${attachment.vaultPath} (click to open)`}
+              title={t("chat.context_tray.attachment_open", { path: attachment.vaultPath })}
               onclick={() => openLink(attachment.vaultPath)}
               onmouseover={(evt) => previewLink(evt, attachment.vaultPath)}
               onfocus={(evt) => previewLink(evt, attachment.vaultPath)}
@@ -318,8 +319,8 @@ onDestroy(() => {
             <button
               type="button"
               class="attachment-tile-remove"
-              title="Remove attachment"
-              aria-label={`Remove ${attachment.name}`}
+              title={t("chat.context_tray.remove_attachment")}
+              aria-label={t("chat.context_tray.remove_attachment_aria", { name: attachment.name })}
               onclick={(evt) => removeAttachment(evt, attachment)}
             >
               <div class="chip-icon" use:icon={"x"} style="--icon-size: 10px"></div>
@@ -338,8 +339,8 @@ onDestroy(() => {
           type="button"
           class="chip-body s2b-pill s2b-pill--interactive"
           title={deactivated
-            ? `${note.file.path} (excluded — click to include as reference)`
-            : `${note.file.path} (open note — click to exclude)`}
+            ? t("chat.context_tray.note_excluded", { path: note.file.path })
+            : t("chat.context_tray.note_included", { path: note.file.path })}
           onclick={(evt) => onNoteClick(evt, note)}
           onmouseover={(evt) => previewLink(evt, noteLinkPath(note))}
           onfocus={(evt) => previewLink(evt, noteLinkPath(note))}
@@ -359,7 +360,7 @@ onDestroy(() => {
           <button
             type="button"
             class="chip-action"
-            title="Attach full content to the message"
+            title={t("chat.context_tray.attach_full_content")}
             onclick={(evt) => onPromote(evt, note)}
           >
             <div class="chip-icon" use:icon={"paperclip"} style="--icon-size: 11px"></div>
@@ -375,23 +376,23 @@ onDestroy(() => {
           type="button"
           class="chip-body s2b-pill s2b-pill--interactive"
           title={graphExpanded
-            ? "Graph selection — click to collapse"
+            ? t("chat.context_tray.graph_collapse")
             : effectiveTopicLabel
-              ? `${effectiveTopicLabel} — click to expand`
-              : `${activeGraphPaths.length} note${activeGraphPaths.length === 1 ? "" : "s"} from graph — click to expand`}
+              ? t("chat.context_tray.graph_topic_expand", { topic: effectiveTopicLabel })
+              : t("chat.context_tray.graph_notes_expand", { count: activeGraphPaths.length })}
           aria-expanded={graphExpanded}
           onclick={() => (graphExpanded = !graphExpanded)}
         >
           <div class="chip-icon" use:icon={"git-fork"} style="--icon-size: 12px"></div>
           <span>
-            {effectiveTopicLabel ?? `${activeGraphPaths.length} Graph Note${activeGraphPaths.length === 1 ? "" : "s"}`}
+            {effectiveTopicLabel ?? t("chat.context_tray.graph_notes_label", { count: activeGraphPaths.length })}
           </span>
           <div class="chip-icon chip-chevron" use:icon={graphExpanded ? "chevron-up" : "chevron-down"} style="--icon-size: 12px"></div>
         </button>
         <button
           type="button"
           class="chip-action"
-          title="Remove all graph notes"
+          title={t("chat.context_tray.remove_graph_notes")}
           onclick={clearAllGraphNotes}
         >
           <div class="chip-icon" use:icon={"x"} style="--icon-size: 11px"></div>
@@ -404,7 +405,7 @@ onDestroy(() => {
             <button
               type="button"
               class="s2b-chip s2b-pill s2b-pill--interactive graph-member"
-              title={`${path} (from graph — click to exclude)`}
+              title={t("chat.context_tray.graph_member", { path })}
               onclick={(evt) => onGraphClick(evt, path)}
             >
               <span class="chip-label">{basename(path)}</span>
@@ -420,13 +421,16 @@ onDestroy(() => {
       <button
         type="button"
         class="s2b-chip s2b-pill s2b-pill--interactive selection"
-        title={`Selected text from ${activeSelection.path} (click to dismiss)\n\n${activeSelection.text.slice(0, 200)}`}
+        title={t("chat.context_tray.selection", {
+          path: activeSelection.path,
+          text: activeSelection.text.slice(0, 200),
+        })}
         onclick={onSelectionClick}
       >
         <div class="chip-icon" use:icon={activeSelection.icon} style="--icon-size: 12px"></div>
         <span class="chip-label">{selectionPreview(activeSelection.text)}</span>
         {#if selectionTracker.isLong}
-          <span class="chip-warning" title="Long selection — will be truncated to fit the model's context">⚠</span>
+          <span class="chip-warning" title={t("chat.context_tray.selection_long")}>⚠</span>
         {/if}
         <div class="chip-close" use:icon={"x"} style="--icon-size: 10px"></div>
       </button>

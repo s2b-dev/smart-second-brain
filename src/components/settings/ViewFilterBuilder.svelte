@@ -14,6 +14,7 @@
  */
 import { formatPropertyValues, parsePropertyValues } from "../../lib/propertyValues";
 import type { ViewFilter, ViewFilterLeaf, ViewFilterGroup } from "../../types/viewFilter";
+import { t } from "../../i18n";
 import Dropdown from "../ui/Dropdown.svelte";
 import Text from "../ui/Text.svelte";
 import Icon from "../ui/Icon.svelte";
@@ -59,10 +60,10 @@ let isGroup = $derived(filter.type === "all" || filter.type === "any" || filter.
 
 // ── Leaf options ────────────────────────────────────────
 const baseLeafTypeOptions = [
-	{ display: "Folder", value: "folder" as LeafType },
-	{ display: "Tag", value: "tag" as LeafType },
-	{ display: "Extension", value: "extension" as LeafType },
-	{ display: "Property", value: "property" as LeafType },
+	{ display: t("settings.filter.type_folder"), value: "folder" as LeafType },
+	{ display: t("settings.filter.type_tag"), value: "tag" as LeafType },
+	{ display: t("settings.filter.type_extension"), value: "extension" as LeafType },
+	{ display: t("settings.filter.type_property"), value: "property" as LeafType },
 ];
 
 function getLeafTypeOptions(selectedType?: LeafType) {
@@ -71,9 +72,9 @@ function getLeafTypeOptions(selectedType?: LeafType) {
 
 // ── Group combinator options ────────────────────────────
 const combinatorOptions = [
-	{ display: "ALL of", value: "all" as const },
-	{ display: "ANY of", value: "any" as const },
-	{ display: "NONE of", value: "none" as const },
+	{ display: t("settings.filter.all_of"), value: "all" as const },
+	{ display: t("settings.filter.any_of"), value: "any" as const },
+	{ display: t("settings.filter.none_of"), value: "none" as const },
 ];
 
 // ── Combobox state ──────────────────────────────────────
@@ -229,7 +230,7 @@ function handlePropertyValuesChange(raw: string) {
         class="filter-combinator-dropdown"
       />
       {#if onremove}
-        <button type="button" class="filter-remove" onclick={onremove} title="Remove condition">
+        <button type="button" class="filter-remove" onclick={onremove} title={t("settings.filter.remove_condition")}>
           <Icon name="x" size="xs" />
         </button>
       {/if}
@@ -258,7 +259,7 @@ function handlePropertyValuesChange(raw: string) {
                 type="options"
                 dropdown={getLeafTypeOptions(liveType)}
                 selected={liveType}
-                onchange={(t) => onLiveLeafChange?.({ type: t, value: "" } as ViewFilterLeaf)}
+                onchange={(nextType) => onLiveLeafChange?.({ type: nextType, value: "" } as ViewFilterLeaf)}
                 class="filter-leaf-type"
               />
               {#if hasCombo(liveLeaf.type)}
@@ -271,7 +272,7 @@ function handlePropertyValuesChange(raw: string) {
                     placeholder={liveType === "folder"
                       ? "Work/projects"
                       : liveType === "property"
-                        ? "property name"
+                        ? t("settings.filter.property_placeholder")
                         : "#my-tag"}
                     oninput={(e) => {
                       const v = (e.target as HTMLInputElement).value;
@@ -296,7 +297,7 @@ function handlePropertyValuesChange(raw: string) {
                   {:else if comboOpen && comboTarget === "live" && showsEmptyPoolHint(liveType)}
                     <div class="filter-combo-list s2b-picker-popover-content">
                       <div class="filter-combo-empty">
-                        No properties found in vault — type a name to use it anyway.
+                        {t("settings.filter.no_properties")}
                       </div>
                     </div>
                   {/if}
@@ -305,7 +306,7 @@ function handlePropertyValuesChange(raw: string) {
                   <Text
                     inputType="text"
                     value={formatPropertyValues((liveLeaf as ViewFilterLeaf & { values?: string[] }).values)}
-                    placeholder="any value"
+                    placeholder={t("settings.filter.any_value")}
                     onchange={(v: string) =>
                       onLiveLeafChange?.(buildPropertyLeaf(liveLeaf!.value as string, v))}
                     class="filter-leaf-value"
@@ -325,7 +326,7 @@ function handlePropertyValuesChange(raw: string) {
             </div>
           </div>
         {:else if (filter as ViewFilterGroup).conditions.length === 0}
-          <div class="live-leaf-placeholder">Make a selection in the graph</div>
+          <div class="live-leaf-placeholder">{t("settings.filter.live_placeholder")}</div>
         {/if}
       {/if}
 
@@ -344,7 +345,7 @@ function handlePropertyValuesChange(raw: string) {
             ><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"
             ></line></svg
           >
-          Condition
+          {t("settings.filter.add_condition")}
         </button>
         <button type="button" class="filter-add-button" onclick={handleAddGroup}>
           <svg
@@ -360,7 +361,7 @@ function handlePropertyValuesChange(raw: string) {
             ><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"
             ></line></svg
           >
-          Group
+          {t("settings.filter.add_group")}
         </button>
       </div>
     </div>
@@ -385,7 +386,7 @@ function handlePropertyValuesChange(raw: string) {
             placeholder={leafType === "folder"
               ? "Work/projects"
               : leafType === "property"
-                ? "property name"
+                ? t("settings.filter.property_placeholder")
                 : "#my-tag"}
             oninput={(e) => {
               const v = (e.target as HTMLInputElement).value;
@@ -409,7 +410,7 @@ function handlePropertyValuesChange(raw: string) {
             </div>
           {:else if comboOpen && comboTarget === "leaf" && showsEmptyPoolHint(leafType)}
             <div class="filter-combo-list s2b-picker-popover-content">
-              <div class="filter-combo-empty">No properties found in vault — type a name to use it anyway.</div>
+              <div class="filter-combo-empty">{t("settings.filter.no_properties")}</div>
             </div>
           {/if}
         </div>
@@ -417,7 +418,7 @@ function handlePropertyValuesChange(raw: string) {
           <Text
             inputType="text"
             value={formatPropertyValues((filter as ViewFilterLeaf & { values?: string[] }).values)}
-            placeholder="any value"
+            placeholder={t("settings.filter.any_value")}
             onchange={handlePropertyValuesChange}
             class="filter-leaf-value"
           />
@@ -432,7 +433,7 @@ function handlePropertyValuesChange(raw: string) {
         />
       {/if}
       {#if onremove}
-        <button type="button" class="filter-remove" onclick={onremove} title="Remove condition">
+        <button type="button" class="filter-remove" onclick={onremove} title={t("settings.filter.remove_condition")}>
           <Icon name="x" size="xs" />
         </button>
       {/if}

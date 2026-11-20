@@ -3,6 +3,7 @@ import type { MessagePair } from "../../stores/chatTimeline";
 import { icon } from "../../utils/utils";
 import CollapsibleUserBubble from "./CollapsibleUserBubble.svelte";
 import MarkdownRenderer from "../ui/MarkdownRenderer.svelte";
+import { getLocale, t } from "../../i18n";
 
 interface Props {
 	pairs: MessagePair[];
@@ -15,7 +16,7 @@ interface Props {
 const { pairs, title, updatedAt, loading = false, onOpenChat }: Props = $props();
 
 const formattedDate = $derived(
-	typeof updatedAt === "number" && updatedAt > 0 ? new Date(updatedAt).toLocaleString() : undefined,
+	typeof updatedAt === "number" && updatedAt > 0 ? new Date(updatedAt).toLocaleString(getLocale()) : undefined,
 );
 </script>
 
@@ -28,12 +29,12 @@ const formattedDate = $derived(
 					type="button"
 					class="s2b-chat-embed-title s2b-chat-embed-title-link"
 					onclick={onOpenChat}
-					aria-label="Open chat"
+					aria-label={t("chat.embed.open_chat")}
 				>
-					{title || "Chat"}
+					{title || t("chat.embed.fallback_title")}
 				</button>
 			{:else}
-				<span class="s2b-chat-embed-title">{title || "Chat"}</span>
+				<span class="s2b-chat-embed-title">{title || t("chat.embed.fallback_title")}</span>
 			{/if}
 		</div>
 		{#if formattedDate}
@@ -48,7 +49,7 @@ const formattedDate = $derived(
 			<div class="s2b-chat-embed-skeleton-line s2b-chat-embed-skeleton-medium"></div>
 		</div>
 	{:else if pairs.length === 0}
-		<div class="s2b-chat-embed-empty">This chat has no messages yet.</div>
+		<div class="s2b-chat-embed-empty">{t("chat.embed.empty")}</div>
 	{:else}
 		<div class="s2b-chat-embed-body">
 			{#each pairs as pair (pair.id)}

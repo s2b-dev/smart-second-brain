@@ -28,6 +28,7 @@ import AssistantStatusNotice from "./AssistantStatusNotice.svelte";
 import ToolCallsSection from "./ToolCallsSection.svelte";
 import ChatRecommendations from "./ChatRecommendations.svelte";
 import { icon } from "../../utils/utils";
+import { getLocale, t } from "../../i18n";
 
 interface Props {
 	registry: SessionRegistry;
@@ -76,7 +77,7 @@ const editingMessageId = $derived(session?.editingPairId ?? null);
 
 function startEdit(messagePair: MessagePair) {
 	if (session?.isRunning) {
-		new Notice("Wait for the current response to finish before editing");
+		new Notice(t("chat.message.wait_before_edit"));
 		return;
 	}
 	session?.beginEdit(messagePair.id);
@@ -100,7 +101,11 @@ async function regenerateResponse(messageId: UUIDv7) {
 		await session?.regenerateResponse(messageId);
 	} catch (error) {
 		Logger.error("[MessageContainer] Regenerate failed:", error);
-		new Notice(`Regenerate failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+		new Notice(
+			t("chat.message.regenerate_failed", {
+				error: error instanceof Error ? error.message : t("chat.message.unknown_error"),
+			}),
+		);
 	}
 }
 
@@ -109,7 +114,11 @@ async function retryLastError(messageId: UUIDv7) {
 		await session?.retryLastError(messageId);
 	} catch (error) {
 		Logger.error("[MessageContainer] Retry failed:", error);
-		new Notice(`Retry failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+		new Notice(
+			t("chat.message.retry_failed", {
+				error: error instanceof Error ? error.message : t("chat.message.unknown_error"),
+			}),
+		);
 	}
 }
 
@@ -119,7 +128,11 @@ async function handleBranchNavigate(checkpointId: string) {
 		await registry.switchToBranch(threadPath, checkpointId);
 	} catch (error) {
 		Logger.error("[MessageContainer] Branch switch failed:", error);
-		new Notice(`Branch switch failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+		new Notice(
+			t("chat.message.branch_switch_failed", {
+				error: error instanceof Error ? error.message : t("chat.message.unknown_error"),
+			}),
+		);
 	}
 }
 
@@ -420,7 +433,7 @@ function getRenderableAssistantContent(assistantAnswer: AssistantMessage) {
 
 async function copyToClipboard(content: string) {
 	await navigator.clipboard.writeText(content);
-	new Notice("Copied to Clipboard");
+	new Notice(t("chat.message.copied"));
 }
 
 /**
@@ -446,14 +459,14 @@ function openUserMessageMenu(pair: MessagePair, x: number, y: number) {
 
 	menu.addItem((item) =>
 		item
-			.setTitle("Edit message")
+			.setTitle(t("chat.message.edit"))
 			.setIcon("edit")
 			.onClick(() => startEdit(pair)),
 	);
 
 	menu.addItem((item) =>
 		item
-			.setTitle("Copy message")
+			.setTitle(t("chat.message.copy"))
 			.setIcon("copy")
 			.onClick(() => copyToClipboard(pair.userMessage.content)),
 	);
@@ -464,7 +477,7 @@ function openUserMessageMenu(pair: MessagePair, x: number, y: number) {
 function formatMessageTimestamp(pair: MessagePair): string | null {
 	const date = getMessagePairTimestamp(pair);
 	if (!date) return null;
-	return date.toLocaleString(undefined, {
+	return date.toLocaleString(getLocale(), {
 		year: "numeric",
 		month: "short",
 		day: "numeric",
@@ -736,8 +749,8 @@ $effect(() => {
               <div
                 class="summary-marker s2b-inline-flex s2b-items-center s2b-gap-2 s2b-rounded-full s2b-px-3 s2b-py-1.5 s2b-text-xs"
                 title={messagePair.transcriptEvent.source === "manual_summarization"
-                  ? "Manual conversation compaction"
-                  : "Automatic conversation compaction"}
+                  ? t("chat.message.compaction_manual")
+                  : t("chat.message.compaction_automatic")}
               >
                 <span class="summary-marker-icon" use:icon={"archive"} style="--icon-size: 12px"
                 ></span>
@@ -881,14 +894,14 @@ $effect(() => {
                       {#if !onMobile && !isBeingEdited}
                         <Button
                           iconId="edit"
-                          ariaLabel="Edit message"
-                          tooltip="Edit message"
+                          ariaLabel={t("chat.message.edit")}
+                          tooltip={t("chat.message.edit")}
                           onClick={() => startEdit(messagePair)}
                         />
                         <Button
                           iconId="copy"
-                          ariaLabel="Copy message"
-                          tooltip="Copy message"
+                          ariaLabel={t("chat.message.copy")}
+                          tooltip={t("chat.message.copy")}
                           onClick={() => copyToClipboard(messagePair.userMessage.content)}
                         />
                       {/if}
@@ -969,14 +982,14 @@ $effect(() => {
                     {/if}
                     <Button
                       iconId="refresh-cw"
-                      ariaLabel="Regenerate response"
-                      tooltip="Regenerate response"
+                      ariaLabel={t("chat.message.regenerate")}
+                      tooltip={t("chat.message.regenerate")}
                       onClick={() => regenerateResponse(messagePair.id)}
                     />
                     <Button
                       iconId="copy"
-                      ariaLabel="Copy response"
-                      tooltip="Copy response"
+                      ariaLabel={t("chat.message.copy_response")}
+                      tooltip={t("chat.message.copy_response")}
                       onClick={() => copyToClipboard(messagePair.assistantMessage.content)}
                     />
                   </div>
@@ -1031,7 +1044,7 @@ $effect(() => {
       <Button
         class="jump-to-bottom"
         iconId="arrow-down"
-        tooltip="Jump to bottom"
+        tooltip={t("chat.message.jump_to_bottom")}
         dataTestId="jump-to-bottom"
         onClick={jumpToBottom}
       />

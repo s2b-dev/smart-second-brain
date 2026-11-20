@@ -1,0 +1,572 @@
+{
+	"editing": {
+		"label": "Editing message",
+		"cancel": "Cancel edit"
+	},
+	"branch": {
+		"previous": "Previous branch",
+		"next": "Next branch"
+	},
+	"message": {
+		"collapse": "Collapse message",
+		"expand": "Expand message",
+		"wait_before_edit": "Wait for the current response to finish before editing",
+		"regenerate_failed": "Regenerate failed: {error}",
+		"retry_failed": "Retry failed: {error}",
+		"branch_switch_failed": "Branch switch failed: {error}",
+		"unknown_error": "Unknown error",
+		"copied": "Copied to Clipboard",
+		"edit": "Edit message",
+		"copy": "Copy message",
+		"compaction_manual": "Manual conversation compaction",
+		"compaction_automatic": "Automatic conversation compaction",
+		"regenerate": "Regenerate response",
+		"copy_response": "Copy response",
+		"jump_to_bottom": "Jump to bottom"
+	},
+	"model_select": {
+		"tooltip": "Select model"
+	},
+	"attach": {
+		"tooltip": "Add context",
+		"from_device": "From device",
+		"take_photo": "Take photo",
+		"from_vault": "From vault"
+	},
+	"running": {
+		"go_to": "Go to the running chat: {name}"
+	},
+	"status": {
+		"request_failed": "The model request failed.",
+		"error_title": "Something went wrong",
+		"retry_aria": "Retry this request",
+		"retry_tooltip": "Re-run the failed request",
+		"stopped": "Stopped"
+	},
+	"embed": {
+		"open_chat": "Open chat",
+		"fallback_title": "Chat",
+		"empty": "This chat has no messages yet.",
+		"load_failed": "Could not load chat preview."
+	},
+	"agent": {
+		"configure": "Configure Agent",
+		"options": "Agent options",
+		"edit": "Edit agent",
+		"default_badge": "default",
+		"create": "Create agent",
+		"new": "New Agent"
+	},
+	"todos": {
+		"all_done": "All steps done",
+		"status_pending": "Not started",
+		"status_in_progress": "In progress",
+		"collapse": "Collapse task list",
+		"expand": "Expand task list",
+		"progress": "{done} of {total}"
+	},
+	"pending": {
+		"count_create": {
+			"one": "{count} create",
+			"other": "{count} creates"
+		},
+		"count_update": {
+			"one": "{count} update",
+			"other": "{count} updates"
+		},
+		"count_delete": {
+			"one": "{count} delete",
+			"other": "{count} deletes"
+		},
+		"count_move": {
+			"one": "{count} move",
+			"other": "{count} moves"
+		},
+		"summary_pending": "{composition} pending",
+		"summary_partially_applied": "{count} partially applied",
+		"type_create": "Create",
+		"type_update": "Update",
+		"type_move": "Move",
+		"notice_applied": "Applied: {path}",
+		"notice_apply_failed": "Failed to apply change: {error}",
+		"notice_rejected": "Rejected: {path}",
+		"notice_restored": "Restored: {path}",
+		"skip_conflict": "Left \"{path}\" as-is — it changed after the change was partially applied.",
+		"skip_missing": "Could not restore \"{path}\" — that note no longer exists. Any applied content moved with it.",
+		"skip_failed": "Failed to restore \"{path}\". See the console for details.",
+		"notice_all_stale": "All pending changes are stale — the notes changed after they were proposed. Reject them and ask the agent to re-stage.",
+		"risk_deletions": {
+			"one": "{count} note deletion",
+			"other": "{count} note deletions"
+		},
+		"risk_deprivatizing_moves": {
+			"one": "{count} move out of a private location",
+			"other": "{count} moves out of a private location"
+		},
+		"risk_join": "{first} and {second}",
+		"confirm_accept_all_title": "Accept all changes?",
+		"confirm_accept_all_message": {
+			"one": "This batch includes {risks}. Apply all {count} change?",
+			"other": "This batch includes {risks}. Apply all {count} changes?"
+		},
+		"accept_all": "Accept All",
+		"skipped_stale_suffix": ", skipped {count} stale",
+		"notice_applied_one": "Applied the change{skipped}",
+		"notice_applied_all": "Applied all {count} changes{skipped}",
+		"notice_applied_partial": "Applied {applied} changes{skipped}, {failed} failed: {paths}",
+		"notice_apply_error": "Error applying changes: {error}",
+		"notice_rejected_all": "Rejected all pending changes",
+		"notice_restored_partial": "Restored the partially applied notes",
+		"notice_rejected_all_head": "Rejected all pending changes.",
+		"notice_undo_finished_head": "Finished undoing applied changes.",
+		"notice_open_failed": "Could not open the note for this change.",
+		"collapse": "Collapse pending changes",
+		"expand": "Expand pending changes",
+		"diff_mode_to_split": "Switch in-note diffs to two-pane view",
+		"diff_mode_to_word": "Switch in-note diffs to inline word diff",
+		"diff_mode_toggle": "Toggle diff view mode",
+		"accept_all_tooltip": "Accept all changes",
+		"reject_all_tooltip": "Reject all changes, restoring any partially applied notes",
+		"undo_applied_tooltip": "Restore the partially applied notes to their original content",
+		"reject_all": "Reject All",
+		"undo_applied": "Undo Applied",
+		"hide_widget_preview": "Hide widget preview",
+		"preview_widget": "Preview widget",
+		"hide_changes": "Hide changes",
+		"show_changes": "Show changes",
+		"hide_content": "Hide content",
+		"show_content": "Show content",
+		"hide_widget_preview_aria": "Hide preview of {path}",
+		"preview_widget_aria": "Preview {path}",
+		"hide_changes_aria": "Hide changes to {path}",
+		"show_changes_aria": "Show changes to {path}",
+		"hide_content_aria": "Hide content of {path}",
+		"show_content_aria": "Show content of {path}",
+		"partly_applied_explanation": "Some of this change was applied to the note. Undo it to restore the note's original content.",
+		"partly_applied": "Partly applied",
+		"stale_delete_explanation": "This note changed after the delete was proposed — the preview no longer matches what would be deleted. Accepting will fail; reject and ask the agent to re-stage it.",
+		"stale_explanation": "This note changed after the change was proposed, so accepting it will fail. Reject it and ask the agent to re-apply its edit on the current content.",
+		"stale": "Stale",
+		"deprivatizing_explanation": "This note is currently private. Moving it to this location takes it out of the privacy filter, so it will be indexed, searchable, and available to untrusted providers from then on.",
+		"deprivatizing": "Leaves private",
+		"cross_thread_explanation": {
+			"one": "{count} other chat also has a pending edit to this file. Whichever is accepted first wins; the others may then fail to apply.",
+			"other": "{count} other chats also have a pending edit to this file. Whichever is accepted first wins; the others may then fail to apply."
+		},
+		"stale_accept_disabled": "Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage.",
+		"accept_change": "Accept change",
+		"accept_change_aria": "Accept change to {path}",
+		"reject_change": "Reject change",
+		"reject_change_aria": "Reject change to {path}",
+		"undo_applied_change_tooltip": "Restore this note to its content from before the proposal",
+		"undo_applied_change_aria": "Undo applied change to {path}",
+		"hide_source_changes": "Hide source changes",
+		"show_source_changes": "Show source changes",
+		"note_empty": "This note is empty.",
+		"no_remaining_differences": "No remaining differences.",
+		"accept_hunk": "Accept this change",
+		"accept_hunk_aria": "Accept change {index} of {total}",
+		"reject_hunk": "Reject this change",
+		"reject_hunk_aria": "Reject change {index} of {total}",
+		"hunk_too_large": "This change is too large to preview here — open the note to review it."
+	},
+	"question": {
+		"send_failed": "Could not send your answer",
+		"group_aria": "Question from the agent",
+		"position": "Question {index} of {total}",
+		"label": "Question",
+		"dismiss_aria": "Dismiss question",
+		"dismiss_tooltip": "Dismiss without answering",
+		"multi_hint": "Select all that apply",
+		"custom_placeholder": "Something else…",
+		"answer_placeholder": "Type your answer…",
+		"custom_aria": "Your own answer",
+		"send_answers": "Send answers",
+		"send_answer": "Send answer",
+		"unrenderable": "The agent asked a question that could not be shown.",
+		"retry": "Let it try again"
+	},
+	"context_usage": {
+		"row_system": "System prompt",
+		"row_human": "Your messages",
+		"row_assistant": "Assistant",
+		"row_tool": "Tool results",
+		"row_draft": "Draft & pending",
+		"tooltip_unknown_limit": "Context usage (est.): {used}k tokens (limit unknown)",
+		"tooltip": "Context usage (est.): {percent}% ({used}k / {limit}k)",
+		"line_unknown_limit": "{tokens} tokens · limit unknown",
+		"line": "{tokens} of {limit} tokens",
+		"compaction_unknown_short": "Auto-compaction needs a known limit",
+		"compaction_unknown_long": "Automatic summarization needs a model with a known context limit.",
+		"compaction_short": "Auto-compacts at {tokens}{percent}",
+		"compaction_long": "Older messages are summarized automatically at {tokens} tokens{percent}.",
+		"trigger_aria": "Open context token distribution",
+		"heading": "Context usage (est.)",
+		"summarize_now": "Summarize now",
+		"summarize_now_tooltip": "Summarize older messages now",
+		"nothing_to_summarize": "Nothing to summarize yet"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "What can you help me with?",
+		"suggestion_summarize_recent": "Summarize my recent notes",
+		"suggestion_find_notes": "Find notes about a topic",
+		"suggestion_find_notes_query": "Find my notes about ",
+		"suggestion_tasknotes": "What tasks are due this week?",
+		"suggestion_tasks": "What tasks are overdue?",
+		"suggestion_dataview": "Show a table of my notes by tag",
+		"skills_initializing": "Skills are still initializing — try again in a moment.",
+		"skill_create_failed_detail": "Could not create skill for {name}: {error}",
+		"skill_create_failed": "Could not create skill for {name}.",
+		"open_agent_skills": "Open agent skills",
+		"enabled_notice": "Enabled {name} for {agent}.",
+		"greeting_title": "Start a new conversation",
+		"greeting_sub": "Ask me anything about your notes.",
+		"add_provider_title": "Add an AI provider",
+		"add_provider_sub": "Connect a provider to start chatting.",
+		"select_model_title": "Select a chat model",
+		"select_model_sub": "Choose a model to start chatting.",
+		"dismiss_suggestion_aria": "Dismiss \"{label}\"",
+		"stale_not_updated": "The default {label} changed, but your copy couldn't be updated automatically.",
+		"stale_kept": "The default {label} changed. Your customized version was kept.",
+		"review": "Review",
+		"dismiss_notice_aria": "Dismiss {label} update notice",
+		"dismiss_notice": "Dismiss this notice",
+		"dismiss_all_nudges_aria": "Dismiss all {count} plugin integration suggestions",
+		"dismiss_all_nudges_tooltip": "Dismiss all {count} suggestions",
+		"dismiss_all": "Dismiss all",
+		"enable": "Enable",
+		"dismiss_nudge_aria": "Dismiss {name} suggestion",
+		"dismiss_nudge": "Dismiss this suggestion",
+		"show_less": "Show less",
+		"dismiss_all_aria": "Dismiss all suggestions",
+		"stale_label": {
+			"system_prompt": "system prompt",
+			"skill": "{name} skill"
+		},
+		"nudge": "Enable the {skill} skill for this agent.",
+		"nudges_summary": {
+			"one": "{number} plugin integration available for this agent.",
+			"other": "{number} plugin integrations available for this agent."
+		},
+		"stale_agent_kept": "The default {label} changed. {agent}'s customized version was kept.",
+		"stale_agent_not_updated": "The default {label} changed, but {agent}'s copy couldn't be updated automatically."
+	},
+	"context_tray": {
+		"attachment_open": "{path} (click to open)",
+		"remove_attachment": "Remove attachment",
+		"remove_attachment_aria": "Remove {name}",
+		"note_excluded": "{path} (excluded — click to include as reference)",
+		"note_included": "{path} (open note — click to exclude)",
+		"attach_full_content": "Attach full content to the message",
+		"graph_collapse": "Graph selection — click to collapse",
+		"graph_topic_expand": "{topic} — click to expand",
+		"graph_notes_expand": {
+			"one": "{count} note from graph — click to expand",
+			"other": "{count} notes from graph — click to expand"
+		},
+		"graph_notes_label": {
+			"one": "{count} Graph Note",
+			"other": "{count} Graph Notes"
+		},
+		"remove_graph_notes": "Remove all graph notes",
+		"graph_member": "{path} (from graph — click to exclude)",
+		"selection": "Selected text from {path} (click to dismiss)\n\n{text}",
+		"selection_long": "Long selection — will be truncated to fit the model's context"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "Searching notes for {target}",
+				"done": "Searched notes for {target}"
+			},
+			"recent_notes": {
+				"running": "Looking at recent notes",
+				"done": "Looked at recent notes"
+			},
+			"search_notes": {
+				"running": "Searching notes",
+				"done": "Searched notes"
+			},
+			"grep_for": {
+				"running": "Searching for text {target}",
+				"done": "Searched for text {target}"
+			},
+			"grep": {
+				"running": "Searching note text",
+				"done": "Searched note text"
+			},
+			"list_folder": {
+				"running": "Listing folder {target}",
+				"done": "Listed folder {target}"
+			},
+			"list_vault": {
+				"running": "Listing the vault",
+				"done": "Listed the vault"
+			},
+			"read_target": {
+				"running": "Reading {target}",
+				"done": "Read {target}"
+			},
+			"read_note": {
+				"running": "Reading a note",
+				"done": "Read a note"
+			},
+			"edit_notes": {
+				"running": "Editing notes",
+				"done": "Edited notes"
+			},
+			"edit_note": {
+				"running": "Editing a note",
+				"done": "Edited a note"
+			},
+			"run_javascript": {
+				"running": "Running JavaScript",
+				"done": "Ran JavaScript"
+			},
+			"list_tags": {
+				"running": "Listing all tags",
+				"done": "Listed all tags"
+			},
+			"read_properties_of": {
+				"running": "Reading properties of {target}",
+				"done": "Read properties of {target}"
+			},
+			"read_properties": {
+				"running": "Reading note properties",
+				"done": "Read note properties"
+			},
+			"fetch_target": {
+				"running": "Fetching {target}",
+				"done": "Fetched {target}"
+			},
+			"fetch_page": {
+				"running": "Fetching a page",
+				"done": "Fetched a page"
+			},
+			"web_search_for": {
+				"running": "Searching the web for {target}",
+				"done": "Searched the web for {target}"
+			},
+			"web_search": {
+				"running": "Searching the web",
+				"done": "Searched the web"
+			},
+			"load_skill_target": {
+				"running": "Loading skill {target}",
+				"done": "Loaded skill {target}"
+			},
+			"load_skill": {
+				"running": "Loading a skill",
+				"done": "Loaded a skill"
+			},
+			"update_todos": {
+				"running": "Updating task list",
+				"done": "Updated task list"
+			},
+			"clear_todos": {
+				"running": "Clearing task list",
+				"done": "Cleared task list"
+			},
+			"ask_target": {
+				"running": "Asking {target}",
+				"done": "Asked {target}"
+			},
+			"generic_target": {
+				"running": "Using {name}: {target}",
+				"done": "Used {name}: {target}"
+			},
+			"generic": {
+				"running": "Using {name}",
+				"done": "Used {name}"
+			}
+		},
+		"count": {
+			"note": {
+				"one": "{count} note",
+				"other": "{count} notes"
+			},
+			"match": {
+				"one": "{count} match",
+				"other": "{count} matches"
+			},
+			"file": {
+				"one": "{count} file",
+				"other": "{count} files"
+			},
+			"folder": {
+				"one": "{count} folder",
+				"other": "{count} folders"
+			},
+			"line": {
+				"one": "{count} line",
+				"other": "{count} lines"
+			},
+			"tag": {
+				"one": "{count} tag",
+				"other": "{count} tags"
+			},
+			"result": {
+				"one": "{count} result",
+				"other": "{count} results"
+			},
+			"question": {
+				"one": "{count} question",
+				"other": "{count} questions"
+			},
+			"operation": {
+				"one": "{count} operation",
+				"other": "{count} operations"
+			},
+			"item": {
+				"one": "{count} item",
+				"other": "{count} items"
+			},
+			"row": {
+				"one": "{count} row",
+				"other": "{count} rows"
+			},
+			"field": {
+				"one": "{count} field",
+				"other": "{count} fields"
+			}
+		},
+		"found": "found {items}",
+		"found_no_matches": "found no matches",
+		"found_in": "found {items} in {files}",
+		"found_folders_and_files": "found {folders} and {files}",
+		"truncated": "{lines} (truncated)",
+		"operations_across": "{operations} across {notes}",
+		"errored": "errored",
+		"logged": "logged {lines}",
+		"returned_value": "returned a value",
+		"duration_ms": "in {ms}ms",
+		"todos_done": "{done} of {total} done",
+		"dismissed": "dismissed",
+		"answered_in_chat": "answered in chat",
+		"answered": "answered",
+		"failed": "failed",
+		"lines_total": "{lines} total",
+		"list_separator": ", ",
+		"list_and": "{list} and {last}",
+		"list_and_more": "{list} and {count} more",
+		"tool_fallback": "Tool"
+	},
+	"tool_output": {
+		"key_count": {
+			"one": "{count} key",
+			"other": "{count} keys"
+		}
+	},
+	"tools": {
+		"review_accepted": "{count} accepted",
+		"review_partial": "{count} partly applied",
+		"review_rejected": "{count} rejected",
+		"review_pending": "{count} awaiting review",
+		"label_with_outcome": "{label}, {outcome}",
+		"source_note": "Note",
+		"phase_summarizing": "Summarizing earlier messages",
+		"phase_running_tools": {
+			"one": "Running {count} tool",
+			"other": "Running {count} tools"
+		},
+		"phase_loading_model": "Loading model",
+		"phase_waiting": "Waiting for the model",
+		"phase_writing": "Writing",
+		"phase_thinking": "Thinking",
+		"running_label": "{phase}… {seconds}s",
+		"settled_label": "Thought for {seconds}s",
+		"via_subagent": "via {name}",
+		"input": "Input",
+		"output": "Output",
+		"no_output": "(no output)",
+		"result": "Result",
+		"tree_more_files": {
+			"one": "+{count} file more",
+			"other": "+{count} files more"
+		},
+		"tree_unlisted_files": {
+			"one": "{count} file not listed",
+			"other": "{count} files not listed"
+		},
+		"no_answer": "No answer",
+		"dismissed_without_answer": "Dismissed without an answer.",
+		"chip_query": "query: {value}",
+		"chip_algorithm": "algorithm: {value}",
+		"chip_results": "results: {value}",
+		"chip_shown": "shown: {value}",
+		"chip_recent_only": "recent only",
+		"chip_skipped_private": "skipped private: {value}",
+		"untitled": "Untitled",
+		"more_results": {
+			"one": "+{count} more result",
+			"other": "+{count} more result(s)"
+		},
+		"chip_root": "root: {value}",
+		"chip_folders": "folders: {value}",
+		"chip_files": "files: {value}",
+		"chip_depth": "depth: {value}",
+		"chip_folders_only": "folders only",
+		"chip_collapsed": "collapsed",
+		"tree": "Tree",
+		"chip_operations": "operations: {value}",
+		"chip_paths": "paths: {value}",
+		"chip_truncated": "truncated",
+		"chip_logs": "logs: {value}",
+		"chip_error": "error",
+		"chip_return_value": "return value",
+		"console_output": "Console Output",
+		"return_value": "Return Value",
+		"executed_code": "Executed Code",
+		"raw_output": "Raw output"
+	},
+	"input": {
+		"drop_files": "Drop files here",
+		"send_shortcut_hint": "↵ · {shortcut} in a list",
+		"edit_attachment_missing": "Attachment \"{name}\" no longer exists in the vault — it won't be part of the edited message.",
+		"select_model_to_send": "Select a chat model to send this.",
+		"placeholder": "Ask about your notes...",
+		"wait_for_attachments": "Please wait for attachments to finish saving",
+		"select_model_before_sending": "Select a chat model before sending.",
+		"empty_before_sending": "Add text or attach a file before sending",
+		"empty_before_saving": "Add text or attach a file before saving",
+		"select_model_before_saving": "Select a chat model before saving.",
+		"save_edit_failed": "Failed to save edit",
+		"not_ready": "Chat is not ready yet",
+		"question_blocks_attachments": "Answer or dismiss the agent's question before attaching files",
+		"send_failed": "Failed to send message",
+		"summarize_failed": "Failed to summarize history",
+		"unsupported_file_type": "Unsupported file type: .{ext}",
+		"the_selected_model": "the selected model",
+		"vision_required_switch": "Image attachments require a vision-capable model. Switch models to attach images (current: {model}).",
+		"vision_unknown": "Model vision support is unknown; image analysis may fail for this model.",
+		"file_too_large": "File too large: {name} exceeds 15 MB per-file limit.",
+		"total_too_large": "Total attachment size exceeds 25 MB limit for one message.",
+		"attach_failed": "Failed to attach file: {error}",
+		"vision_required": "Image attachments require a vision-capable model (current: {model}).",
+		"switch_model": "Switch model",
+		"already_attached": "{name} is already attached.",
+		"wait_for_current_attachments": "Please wait for the current attachments to finish saving.",
+		"file_not_found": "File not found: {path}",
+		"only_files": "Only files can be attached: {path}",
+		"picker_placeholder": "Search vault files to attach...",
+		"picker_verb": "Attach",
+		"current_model": "current model",
+		"drag_images_unsupported": "Images are not supported by {model}. Switch to a vision-capable model.",
+		"drag_some_unsupported": "Some files may be unsupported (accepted: txt, md, csv, json, images, pdf).",
+		"retry_connection": "Click to retry connection",
+		"provider_unreachable": "Cannot connect to {provider} — click to retry",
+		"saving": "Saving...",
+		"save_edit_aria": "save edit",
+		"send_aria": "send message",
+		"select_model_first": "Select a chat model first",
+		"save_edit_with_hint": "Save edit ({hint})",
+		"save_edit": "Save edit",
+		"send_with_hint": "Send message ({hint})",
+		"send": "Send message",
+		"stop_aria": "stop streaming",
+		"stop": "Stop streaming"
+	},
+	"view": {
+		"session_unavailable": "Chat session is not available yet. Reopen this view after plugin initialization completes."
+	}
+}

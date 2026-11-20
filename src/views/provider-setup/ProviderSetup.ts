@@ -1,5 +1,6 @@
 import { Modal } from "obsidian";
 import { mount } from "svelte";
+import { t } from "../../i18n";
 import ModalProvider from "../../lib/QueryClientProvider.svelte";
 import { removeProviderQueries } from "../../lib/query";
 import type SecondBrainPlugin from "../../main";
@@ -67,14 +68,14 @@ export class ProviderSetupModal extends Modal {
 	refreshTitle(displayName = this.resolveDisplayName()) {
 		// While picking a provider, keep a neutral title.
 		if (this.createdDraft && !this.templateId) {
-			this.setTitle("Add Provider");
+			this.setTitle(t("onboarding.provider_setup.title_add"));
 			return;
 		}
 		if (this.createdDraft) {
-			this.setTitle("Setup Provider");
+			this.setTitle(t("onboarding.provider_setup.title_setup"));
 			return;
 		}
-		this.setTitle(`Edit ${displayName}`);
+		this.setTitle(t("onboarding.provider_setup.title_edit", { name: displayName }));
 	}
 
 	onOpen() {

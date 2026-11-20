@@ -5,6 +5,7 @@ import { getData } from "../../stores/dataStore.svelte";
 import { Logger } from "../../utils/logging";
 import { toError } from "../../utils/toError";
 import { resolveToolAgent } from "./toolAgentContext";
+import { t } from "../../i18n";
 
 const DEFAULT_MAX_RESULTS = 10;
 const MIN_MAX_RESULTS = 1;
@@ -77,19 +78,17 @@ export interface WebSearchProviderInfo {
 export const WEB_SEARCH_PROVIDERS: readonly WebSearchProviderInfo[] = [
 	{
 		id: "firecrawl",
-		label: "Firecrawl (keyless)",
+		label: t("plugin.web_search.keyless_label", { provider: "Firecrawl" }),
 		keyless: true,
-		keyHelp:
-			"Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier.",
+		keyHelp: t("plugin.web_search.firecrawl_key_help"),
 	},
-	{ id: "brave", label: "Brave Search", keyless: false, keyHelp: "Brave Search API key from api.search.brave.com." },
-	{ id: "tavily", label: "Tavily", keyless: false, keyHelp: "Tavily API key from app.tavily.com." },
+	{ id: "brave", label: "Brave Search", keyless: false, keyHelp: t("plugin.web_search.brave_key_help") },
+	{ id: "tavily", label: "Tavily", keyless: false, keyHelp: t("plugin.web_search.tavily_key_help") },
 	{
 		id: "keenable",
-		label: "Keenable (keyless)",
+		label: t("plugin.web_search.keyless_label", { provider: "Keenable" }),
 		keyless: true,
-		keyHelp:
-			"Optional — add a Keenable API key for higher rate limits. Leave empty to use the free public endpoint.",
+		keyHelp: t("plugin.web_search.keenable_key_help"),
 	},
 ];
 

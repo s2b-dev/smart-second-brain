@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import { untrack, tick, onDestroy } from "svelte";
 import { getAllTags, Notice, TFile, type TAbstractFile, type WorkspaceLeaf } from "obsidian";
 import { settingsAction, showActionNotice } from "../../utils/actionNotice";
@@ -80,6 +81,7 @@ import BottomSheet from "../ui/BottomSheet.svelte";
 import Button from "../ui/Button.svelte";
 import GraphCanvas from "./GraphCanvas.svelte";
 import GraphControls from "./GraphControls.svelte";
+import { t } from "../../i18n";
 
 const plugin = getPlugin();
 const data = getData();
@@ -109,7 +111,7 @@ let isLoading = $state(false);
  * and don't set this). Used to short-circuit the atom toggle and prevent racing state writes.
  */
 let isLeidenRunning = $state(false);
-let loadingMessage = $state("Building graph...");
+let loadingMessage = $state(t("graph.view.loading"));
 let defaultClusterLabels: Record<number, string> = $state({});
 
 /** Fine topic → parent topic nesting derived from the two levels. */
@@ -543,7 +545,7 @@ async function buildGraph() {
 	currentBuild = ac;
 	const localBuildVersion = ++buildVersion;
 	isLoading = true;
-	loadingMessage = "Building graph...";
+	loadingMessage = t("graph.view.loading");
 
 	try {
 		// Restored caches must be in place before this build reads them: the
@@ -1437,9 +1439,9 @@ async function handleOpenPaths(paths: string[]) {
 	if (paths.length > OPEN_ALL_CONFIRM_THRESHOLD) {
 		const modal = new ConfirmModal(
 			plugin.app,
-			"Open all notes",
-			`This opens ${paths.length} notes in new tabs. Closing them again is manual.`,
-			`Open ${paths.length} tabs`,
+			t("graph.open_all_confirm.title"),
+			t("graph.open_all_confirm.message", { count: paths.length }),
+			t("graph.open_all_confirm.confirm", { count: paths.length }),
 		);
 		modal.open();
 		if (!(await modal.promise).confirmed) return;
@@ -1478,7 +1480,7 @@ async function handleSendToChat() {
 		// … plus a one-shot signal so the just-opened/focused chat grabs focus.
 		messenger.pendingGraphNotes = [...paths];
 	} else {
-		new Notice("Chat is not initialized yet. Please open a chat first.");
+		new Notice(t("graph.notices.chat_not_initialized"));
 	}
 }
 
@@ -1497,8 +1499,10 @@ function handleClearSelection() {
  * every surface calls a topic exactly what its pill did. */
 function clusterLabel(cluster: number): string {
 	return cluster === UNSORTED_CLUSTER
-		? "Unsorted"
-		: (effectiveClusterLabels[cluster] ?? segments[cluster]?.label ?? `Topic ${cluster}`);
+		? t("graph.topic_fallback.unsorted")
+		: (effectiveClusterLabels[cluster] ??
+				segments[cluster]?.label ??
+				t("graph.topic_fallback.topic", { id: cluster }));
 }
 
 /**
@@ -2231,8 +2235,8 @@ async function runTopicLabeling(options: { force?: boolean } = {}) {
 		).length;
 		if (withheld > 0) {
 			showActionNotice(
-				`Private note titles were withheld from ${withheld} ${withheld === 1 ? "topic" : "topics"}. Trust the graph model's provider to include them.`,
-				settingsAction("general", "Open provider settings"),
+				t("graph.notices.private_titles_withheld", { count: withheld }),
+				settingsAction("general", t("graph.notices.open_provider_settings")),
 			);
 		}
 	}
@@ -2285,8 +2289,8 @@ function handleLabelTopics() {
 	if (!settings.graphChatModel) {
 		// The breadcrumb is the link now, so it comes out of the message text.
 		showActionNotice(
-			"No graph chat model selected, so topics can't be named.",
-			settingsAction("graph", "Open graph settings"),
+			t("graph.notices.no_graph_chat_model"),
+			settingsAction("graph", t("graph.notices.open_graph_settings")),
 		);
 		return;
 	}
@@ -2520,11 +2524,15 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
              *how much*, and the mid-dot joins them as the independent facts
              they are — the same composition " · immersed" already uses. -->
         <strong title={selectedTopicLabels.join(", ")}>{selectedTopicLabels.join(", ")}</strong>
-        · {selectedPaths.length}
-        {selectedPaths.length === 1 ? "note" : "notes"} selected{isImmersed ? " · immersed" : ""}
+        · {t("graph.selection.count_selected", { count: selectedPaths.length })}{isImmersed
+          ? t("graph.selection.immersed_suffix")
+          : ""}
       {:else}
-        <strong>{selectedPaths.length}</strong>
-        {selectedPaths.length === 1 ? "note" : "notes"} selected{isImmersed ? " · immersed" : ""}
+        <I18nText message={t("graph.selection.notes_selected", { count: selectedPaths.length })}>
+          {#snippet number()}<strong>{selectedPaths.length}</strong>{/snippet}
+        </I18nText>{isImmersed
+          ? t("graph.selection.immersed_suffix")
+          : ""}
       {/if}
     {:else if immerseTopicLabels}
       <!-- Immersed into topics: name them. The count is what the graph already
@@ -2536,11 +2544,14 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
            selected, what mode you are in), which is right when the left side is
            a count. A topic name isn't independent of the mode — it's the thing
            immersed into — so it reads as the object of the verb instead. -->
-      Immersed into
-      <strong title={immerseTopicLabels.join(", ")}>{immerseTopicLabels.join(", ")}</strong>
+      {@const topicNames = immerseTopicLabels.join(", ")}
+      <I18nText message={t("graph.selection.immersed_into")}>
+        {#snippet topics()}<strong title={topicNames}>{topicNames}</strong>{/snippet}
+      </I18nText>
     {:else}
-      <strong>{noteNodeCount}</strong>
-      {noteNodeCount === 1 ? "note" : "notes"} · immersed
+      <I18nText message={t("graph.selection.notes_immersed", { count: noteNodeCount })}>
+        {#snippet number()}<strong>{noteNodeCount}</strong>{/snippet}
+      </I18nText>
     {/if}
   {/snippet}
 
@@ -2560,13 +2571,16 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
     <div class="graph-immerse-banner">
       <span class="selection-count">
         {#if immerseTopicLabels}
-          Immersed into
-          <strong>{immerseTopicLabels.join(", ")}</strong>
+          {@const topicNames = immerseTopicLabels.join(", ")}
+          <I18nText message={t("graph.selection.immersed_into")}>
+            {#snippet topics()}<strong>{topicNames}</strong>{/snippet}
+          </I18nText>
         {:else}
           <!-- A raw lasso has no name to give, so fall back to the size of what
                you're in — the same thing the desktop bar says in this case. -->
-          Immersed · <strong>{noteNodeCount}</strong>
-          {noteNodeCount === 1 ? "note" : "notes"}
+          <I18nText message={t("graph.selection.immersed_count", { count: noteNodeCount })}>
+            {#snippet number()}<strong>{noteNodeCount}</strong>{/snippet}
+          </I18nText>
         {/if}
       </span>
     </div>
@@ -2595,7 +2609,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
         open={true}
         onClose={handleClearSelection}
         draggable={false}
-        ariaLabel="Graph selection"
+        ariaLabel={t("graph.selection.aria_label")}
       >
         <!-- Same structure as the settings sheet: a heading outside a
              `.setting-items` card holding the rows, so the two sheets read as
@@ -2603,7 +2617,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
         <div class="selection-sheet setting-group">
           <div class="selection-sheet-header">
             <span class="selection-count">{@render selectionCount()}</span>
-            <Button iconId="x" onClick={handleClearSelection} tooltip="Clear selection" />
+            <Button iconId="x" onClick={handleClearSelection} tooltip={t("graph.selection.clear")} />
           </div>
           <div class="selection-sheet-actions setting-items">
             <!-- Promoted from icon-only to a labelled row. It rendered at
@@ -2611,39 +2625,39 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
                  it sat next to a destructive one. -->
             <Button
               iconId="scan"
-              buttonText="Zoom to selection"
+              buttonText={t("graph.selection.zoom")}
               onClick={handleZoomToSelection}
-              tooltip="Move the camera to fit the selected notes"
+              tooltip={t("graph.selection.zoom_tooltip")}
             />
             {#if selectedTopicsCollapseAction !== null}
               <Button
                 iconId={selectedTopicsCollapseAction === "collapse" ? "chevrons-down-up" : "chevrons-up-down"}
-                buttonText={selectedTopicsCollapseAction === "collapse" ? "Collapse" : "Expand"}
+                buttonText={selectedTopicsCollapseAction === "collapse" ? t("graph.selection.collapse") : t("graph.selection.expand")}
                 onClick={() => void handleCollapseSelectedTopics()}
                 tooltip={selectedTopicsCollapseAction === "collapse"
-                  ? "Fold the selected topics into single nodes"
-                  : "Unfold the selected topics back into notes"}
+                  ? t("graph.selection.collapse_tooltip")
+                  : t("graph.selection.expand_tooltip")}
               />
             {/if}
             <Button
               iconId="scan-search"
-              buttonText="Immerse"
+              buttonText={t("graph.selection.immerse")}
               onClick={handleImmerse}
-              tooltip="Rebuild graph with selected notes only"
+              tooltip={t("graph.selection.immerse_tooltip")}
             />
             {#if !hasOpenChat}
               <Button
                 iconId="message-square"
-                buttonText="Open in chat"
+                buttonText={t("graph.selection.open_in_chat")}
                 onClick={handleSendToChat}
-                tooltip="Reveal the chat and attach the selected notes"
+                tooltip={t("graph.selection.open_in_chat_tooltip")}
               />
             {/if}
             <Button
               iconId="copy-plus"
-              buttonText="Open all"
+              buttonText={t("graph.selection.open_all")}
               onClick={handleOpenAllSelected}
-              tooltip="Open all selected notes in new tabs"
+              tooltip={t("graph.selection.open_all_tooltip")}
             />
           </div>
         </div>
@@ -2656,7 +2670,7 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
              the count keeps that split legible, and leaves both icon-only buttons
              bracketing the labelled actions rather than sitting among them. -->
         {#if selectedPaths.length > 0}
-          <Button iconId="scan" onClick={handleZoomToSelection} tooltip="Zoom to selection (F)" />
+          <Button iconId="scan" onClick={handleZoomToSelection} tooltip={t("graph.selection.zoom_with_key")} />
         {/if}
         <div class="selection-divider"></div>
         <div class="selection-actions">
@@ -2667,42 +2681,46 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
                    not carry a different glyph. -->
               <Button
                 iconId={selectedTopicsCollapseAction === "collapse" ? "chevrons-down-up" : "chevrons-up-down"}
-                buttonText={selectedTopicsCollapseAction === "collapse" ? "Collapse" : "Expand"}
+                buttonText={selectedTopicsCollapseAction === "collapse" ? t("graph.selection.collapse") : t("graph.selection.expand")}
                 onClick={() => void handleCollapseSelectedTopics()}
                 tooltip={withKey(
                   selectedTopicsCollapseAction === "collapse"
-                    ? "Fold the selected topics into single nodes"
-                    : "Unfold the selected topics back into notes",
+                    ? t("graph.selection.collapse_tooltip")
+                    : t("graph.selection.expand_tooltip"),
                   "C",
                 )}
               />
             {/if}
             <Button
               iconId="scan-search"
-              buttonText="Immerse"
+              buttonText={t("graph.selection.immerse")}
               onClick={handleImmerse}
-              tooltip={withKey("Rebuild graph with selected notes only", "I")}
+              tooltip={withKey(t("graph.selection.immerse_tooltip"), "I")}
             />
             {#if !hasOpenChat}
               <Button
                 iconId="message-square"
-                buttonText="Open in chat"
+                buttonText={t("graph.selection.open_in_chat")}
                 onClick={handleSendToChat}
-                tooltip={withKey("Reveal the chat and attach the selected notes", "A")}
+                tooltip={withKey(t("graph.selection.open_in_chat_tooltip"), "A")}
               />
             {/if}
             <Button
               iconId="copy-plus"
-              buttonText="Open all"
+              buttonText={t("graph.selection.open_all")}
               onClick={handleOpenAllSelected}
-              tooltip={withKey("Open all selected notes in new tabs", "O")}
+              tooltip={withKey(t("graph.selection.open_all_tooltip"), "O")}
             />
 
             <!-- Icon-only: dismissing isn't one of the verbs you came here for, so
                  it reads as an affordance on the bar rather than a peer action. -->
-            <Button iconId="x" onClick={handleClearSelection} tooltip="Clear selection (Esc)" />
+            <Button iconId="x" onClick={handleClearSelection} tooltip={t("graph.selection.clear_with_key")} />
           {:else}
-            <Button buttonText="Exit" onClick={handleExitImmerse} tooltip="Exit immerse (Esc)" />
+            <Button
+              buttonText={t("graph.selection.exit")}
+              onClick={handleExitImmerse}
+              tooltip={t("graph.selection.exit_immerse_tooltip")}
+            />
           {/if}
         </div>
       </div>

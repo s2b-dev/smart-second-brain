@@ -113,6 +113,7 @@ import { ensureProviderRegistered } from "../providers/registrySync";
 import { DEFAULT_CHAT_TITLE, FAILED_CHAT_TITLE } from "../utils/chatTitle";
 
 import type { StructuredToolInterface } from "@langchain/core/tools";
+import { t } from "../i18n";
 
 const URL_REGEX = /https?:\/\/[^\s]+/g;
 const LANGCHAIN_TROUBLESHOOT_REGEX = /\n*Troubleshooting URL: https:\/\/docs\.langchain\.com\S*/g;
@@ -452,10 +453,12 @@ export class AgentManager {
 		this.omittedMemoryNoticeSignature = signature;
 		if (omittedPaths.length === 0) return;
 		const names = omittedPaths.map((path) => path.split("/").pop()?.replace(/\.md$/i, "") ?? path).join(", ");
-		const window = contextWindow ? ` (${Math.round(contextWindow / 1000)}k tokens)` : "";
+		const window = contextWindow
+			? ` ${t("plugin.agent.memory_window", { k: Math.round(contextWindow / 1000) })}`
+			: "";
 		showActionNotice(
-			`Memory too large for this model${window}: ${names} ${omittedPaths.length === 1 ? "is" : "are"} no longer loaded into every message. The agent reads ${omittedPaths.length === 1 ? "it" : "them"} only when needed. Shorten the note or use a model with a larger context window.`,
-			openNoteAction(omittedPaths[0], "Open note"),
+			t("plugin.agent.memory_too_large", { count: omittedPaths.length, window, names }),
+			openNoteAction(omittedPaths[0], t("plugin.actions.open_note")),
 			15000,
 		);
 	}
@@ -628,13 +631,13 @@ export class AgentManager {
 							Logger.error(`Failed to save the system prompt for ${agent.name}:`, error);
 							// The link shows what is actually on disk.
 							showActionNotice(
-								`Could not save the system prompt: ${extractErrorMessage(error)}`,
-								openNoteAction(agentDefinitionPath(agentId), "Open the agent note"),
+								t("plugin.agent.save_prompt_failed", { error: extractErrorMessage(error) }),
+								openNoteAction(agentDefinitionPath(agentId), t("plugin.agent.open_agent_note")),
 							);
 						});
 				},
 			},
-			{ title: `System Prompt — ${agent.name}` },
+			{ title: t("plugin.agent.prompt_modal_title", { name: agent.name }) },
 		).open();
 	}
 
@@ -685,13 +688,19 @@ export class AgentManager {
 						.catch((error) => {
 							Logger.error(`Failed to save skill ${skillName}:`, error);
 							showActionNotice(
-								`Could not save the "${skillName}" skill: ${extractErrorMessage(error)}`,
-								openNoteAction(`${skills.getSkillsDir()}/${skillName}/SKILL.md`, "Open the skill note"),
+								t("plugin.agent.save_skill_failed", {
+									skill: skillName,
+									error: extractErrorMessage(error),
+								}),
+								openNoteAction(
+									`${skills.getSkillsDir()}/${skillName}/SKILL.md`,
+									t("plugin.agent.open_skill_note"),
+								),
 							);
 						});
 				},
 			},
-			{ title: `Skill — ${skillName}` },
+			{ title: t("plugin.agent.skill_modal_title", { skill: skillName }) },
 		).open();
 		return true;
 	}
@@ -763,7 +772,7 @@ export class AgentManager {
 		const providerDef = getProviderDefinition(providerId, pluginData.getAllProviderMeta());
 
 		if (!providerDef) {
-			return { success: false, message: `Unknown provider: ${providerId}` };
+			return { success: false, message: t("plugin.provider_auth.unknown_provider", { provider: providerId }) };
 		}
 
 		try {
@@ -776,10 +785,10 @@ export class AgentManager {
 			return { success: true };
 		} catch (error) {
 			if (error instanceof ProviderAuthError) {
-				return { success: false, message: "Invalid API key" };
+				return { success: false, message: t("plugin.provider_auth.invalid_api_key") };
 			}
 			if (error instanceof ProviderEndpointError) {
-				return { success: false, message: "Invalid base URL or endpoint unreachable" };
+				return { success: false, message: t("plugin.provider_auth.invalid_endpoint") };
 			}
 			if (error instanceof ProviderRegistryError) {
 				return { success: false, message: error.message };
@@ -787,7 +796,7 @@ export class AgentManager {
 			if (error instanceof Error) {
 				return { success: false, message: error.message };
 			}
-			return { success: false, message: "Provider configuration failed" };
+			return { success: false, message: t("plugin.provider_auth.configuration_failed") };
 		}
 	}
 
@@ -1468,10 +1477,10 @@ export class AgentManager {
 			// list of links, and the settings tab shows all of them anyway. A single failure gets
 			// taken straight to its own setup modal.
 			showActionNotice(
-				`Cannot connect to: ${unavailableProviders.join(", ")}. Check that the service is running.`,
+				t("plugin.agent.cannot_connect", { providers: unavailableProviders.join(", ") }),
 				unavailableProviders.length === 1
 					? editProviderAction(unavailableProviders[0])
-					: settingsAction("general", "Review providers"),
+					: settingsAction("general", t("plugin.agent.review_providers")),
 			);
 		}
 
@@ -1784,8 +1793,8 @@ export class AgentManager {
 				pluginData.updateAgent(selectedAgent.id, { chatModel: null });
 				// The agent has just been left with no model, so the picker is the only way forward.
 				showActionNotice(
-					`Provider "${chatModel.provider}" is no longer available.`,
-					selectChatModelAction("Select a new model", selectedAgent.id),
+					t("plugin.agent.provider_unavailable", { provider: chatModel.provider }),
+					selectChatModelAction(t("plugin.agent.select_new_model"), selectedAgent.id),
 				);
 			}
 			throw error;

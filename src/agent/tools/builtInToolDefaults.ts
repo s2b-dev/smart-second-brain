@@ -1,5 +1,6 @@
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type ToolConfig, type ToolsConfig } from "../../types/plugin";
 import { MAX_OPTIONS, MAX_QUESTIONS } from "../../utils/askQuestion";
+import { t } from "../../i18n";
 
 /**
  * The one table describing every built-in tool: what the settings UI calls it, the
@@ -88,8 +89,8 @@ The result holds the user's answers. If they dismissed the question, do not ask 
 
 export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> = {
 	search_notes: {
-		displayName: "Search Notes",
-		summary: "Search through your Obsidian notes by keyword. Returns matching file names and metadata.",
+		displayName: t("plugin.tools.search_notes.name"),
+		summary: t("plugin.tools.search_notes.summary"),
 		config: {
 			enabled: true,
 			name: "search_notes",
@@ -103,9 +104,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	list_directory: {
-		displayName: "List Directory",
-		summary:
-			"List the vault's folder structure: an overview with file counts at the root, files and subfolders inside a folder. Output is collapsed to fit the context budget.",
+		displayName: t("plugin.tools.list_directory.name"),
+		summary: t("plugin.tools.list_directory.summary"),
 		config: {
 			enabled: true,
 			name: "list_directory",
@@ -114,9 +114,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	read_content: {
-		displayName: "Read Content",
-		summary:
-			"Read notes and vault files by path or wiki link. Supports markdown/text files and PDF text extraction. Images must be attached in chat.",
+		displayName: t("plugin.tools.read_content.name"),
+		summary: t("plugin.tools.read_content.summary"),
 		config: {
 			enabled: true,
 			name: "read_content",
@@ -124,9 +123,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	grep_notes: {
-		displayName: "Grep Notes",
-		summary:
-			"Find an exact substring or regex pattern across notes, returning matching lines with line numbers and context. Unlike Search Notes, it matches literal strings. Scope to one note with a path, or page large result sets.",
+		displayName: t("plugin.tools.grep_notes.name"),
+		summary: t("plugin.tools.grep_notes.summary"),
 		config: {
 			enabled: true,
 			name: "grep_notes",
@@ -135,8 +133,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	get_all_tags: {
-		displayName: "Get All Tags",
-		summary: "Retrieve a list of all tags used in the vault.",
+		displayName: t("plugin.tools.get_all_tags.name"),
+		summary: t("plugin.tools.get_all_tags.summary"),
 		config: {
 			enabled: true,
 			name: "get_all_tags",
@@ -145,8 +143,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	get_properties: {
-		displayName: "Get Properties",
-		summary: "Retrieve frontmatter properties from notes or list all property keys in the vault.",
+		displayName: t("plugin.tools.get_properties.name"),
+		summary: t("plugin.tools.get_properties.summary"),
 		config: {
 			enabled: true,
 			name: "get_properties",
@@ -155,9 +153,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	execute_javascript: {
-		displayName: "Execute JavaScript",
-		summary:
-			"Run isolated JavaScript for calculations and data transformation. Use return for the final value and console.log for intermediate output.",
+		displayName: t("plugin.tools.execute_javascript.name"),
+		summary: t("plugin.tools.execute_javascript.summary"),
 		config: {
 			enabled: true,
 			name: "execute_javascript",
@@ -166,9 +163,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	manage_notes: {
-		displayName: "Manage Notes",
-		summary:
-			"Create, update, or delete markdown notes in one staged batch. Related note operations can be proposed together for user approval.",
+		displayName: t("plugin.tools.manage_notes.name"),
+		summary: t("plugin.tools.manage_notes.summary"),
 		config: {
 			enabled: true,
 			name: "manage_notes",
@@ -177,9 +173,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	fetch_url: {
-		displayName: "Fetch URL",
-		summary:
-			"Fetch a public web page or text resource over HTTP(S) and return its main content as cleaned markdown. Use only with URLs the user provided or clearly public references.",
+		displayName: t("plugin.tools.fetch_url.name"),
+		summary: t("plugin.tools.fetch_url.summary"),
 		config: {
 			// Enabled by default, matching web_search: the web core skill ships enabled and
 			// its instructions direct the model to follow up promising search results with
@@ -192,9 +187,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	web_search: {
-		displayName: "Web Search",
-		summary:
-			"Search the web and return results (title, URL, snippet). Configure the provider and API key in the tool's Configure panel. Prefer vault search first.",
+		displayName: t("plugin.tools.web_search.name"),
+		summary: t("plugin.tools.web_search.summary"),
 		config: {
 			enabled: true,
 			name: "web_search",
@@ -206,9 +200,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	manage_skills: {
-		displayName: "Manage Skills",
-		summary:
-			"Create new skills, revise the agent's own attached skills, or delete a skill when you ask it to. Changes apply immediately. A skill's name and plugin link are locked once created.",
+		displayName: t("plugin.tools.manage_skills.name"),
+		summary: t("plugin.tools.manage_skills.summary"),
 		config: {
 			// On by default: the routing doctrine in the memory section and the `# Skills`
 			// header both send task lessons into the skill that was used, and the post-turn
@@ -221,9 +214,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	write_todos: {
-		displayName: "Task List",
-		summary:
-			"Lets the agent plan multi-step work as a checklist and tick it off as it goes. The list shows above the chat input.",
+		displayName: t("plugin.tools.write_todos.name"),
+		summary: t("plugin.tools.write_todos.summary"),
 		config: {
 			enabled: true,
 			name: "write_todos",
@@ -231,9 +223,8 @@ export const BUILT_IN_TOOL_DEFAULTS: Record<BuiltInToolId, BuiltInToolDefault> =
 		},
 	},
 	ask_question: {
-		displayName: "Ask Question",
-		summary:
-			"Lets the agent pause and ask you a multiple-choice question when a request is unclear. The question shows above the chat input.",
+		displayName: t("plugin.tools.ask_question.name"),
+		summary: t("plugin.tools.ask_question.summary"),
 		config: {
 			enabled: true,
 			name: "ask_question",
@@ -264,22 +255,19 @@ export const DEFAULT_TOOLS_CONFIG: ToolsConfig = Object.fromEntries(
 ) as ToolsConfig;
 
 /**
- * Human-facing display name for a tool. Prefers the agent's configured tool name,
- * falls back to the default, and title-cases snake_case names for readability.
+ * Human-facing display name for a tool, in the UI language. `toolsConfig[id].name` is the
+ * model-facing tool name (never edited in the UI), so it is deliberately not consulted here.
  */
-export function getToolDisplayName(toolId: BuiltInToolId, configuredName?: string): string {
-	const name = configuredName ?? BUILT_IN_TOOL_DEFAULTS[toolId]?.displayName ?? toolId;
-	return name.includes("_")
-		? name
-				.split("_")
-				.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-				.join(" ")
-		: name;
+export function getToolDisplayName(toolId: BuiltInToolId): string {
+	return BUILT_IN_TOOL_DEFAULTS[toolId]?.displayName ?? toolId;
 }
 
-/** Description shown for a tool in the UI — configured description first, then the summary. */
-export function getToolDescription(toolId: BuiltInToolId, configuredDescription?: string): string {
-	return configuredDescription ?? BUILT_IN_TOOL_DEFAULTS[toolId]?.summary ?? "";
+/**
+ * One-line description of a tool for the UI, in the UI language. `toolsConfig[id].description`
+ * is the model-facing tool description, so it is deliberately not shown here.
+ */
+export function getToolDescription(toolId: BuiltInToolId): string {
+	return BUILT_IN_TOOL_DEFAULTS[toolId]?.summary ?? "";
 }
 
 /**

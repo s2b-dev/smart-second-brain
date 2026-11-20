@@ -7,6 +7,7 @@ import { ModelSelectionModal } from "../modal/ModelSelectionModal";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import { stripVendorPrefix } from "../../lib/modelMetadataNormalizer";
 import Button from "../ui/Button.svelte";
+import { t } from "../../i18n";
 
 const data = getData();
 const plugin = getPlugin();
@@ -53,7 +54,7 @@ function openModelSelectionModal() {
 
 <Button
   styles="clickable-icon s2b-model-select-btn"
-  tooltip="Select model"
+  tooltip={t("chat.model_select.tooltip")}
   dataTestId="model-select-button"
   onClick={openModelSelectionModal}
 >
@@ -62,7 +63,7 @@ function openModelSelectionModal() {
       {getModelDisplayName(selectedAgent.chatModel.provider, selectedAgent.chatModel.model)}
     </span>
   {:else}
-    <span class="model-name no-model">Select model</span>
+    <span class="model-name no-model">{t("chat.model_select.tooltip")}</span>
   {/if}
 </Button>
 

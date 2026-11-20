@@ -1,7 +1,6 @@
 <script lang="ts">
 import { Notice } from "obsidian";
-import { get } from "svelte/store";
-import { t } from "svelte-i18n";
+import { t } from "../../i18n";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
@@ -22,9 +21,9 @@ const githubIssuesNewUrl = "https://github.com/s2b-dev/smart-second-brain/issues
 async function handleCleanupPluginData() {
 	const modal = new ConfirmModal(
 		plugin.app,
-		get(t)("settings.clear_modal.title"),
-		get(t)("settings.clear_modal.description"),
-		"Delete",
+		t("settings.troubleshooting.clear_modal.title"),
+		t("settings.troubleshooting.clear_modal.description"),
+		t("common.delete"),
 	);
 	modal.open();
 	if (!(await modal.promise).confirmed) return;
@@ -46,21 +45,19 @@ async function handleCleanupPluginData() {
 
 		await pluginData.deleteData();
 		if (failed.length > 0) {
-			new Notice(
-				`Plugin data cleared, but the stored vectors for ${failed.join(", ")} could not be deleted. See the console for details.`,
-			);
+			new Notice(t("settings.troubleshooting.cleared_partial", { indexes: failed.join(", ") }));
 		} else {
-			new Notice(get(t)("plugin_data_cleared"));
+			new Notice(t("settings.troubleshooting.cleared"));
 		}
 	} catch (error) {
-		new Notice(error instanceof Error ? error.message : "Failed to clean plugin data");
+		new Notice(error instanceof Error ? error.message : t("settings.troubleshooting.clear_failed"));
 	}
 }
 </script>
 
 <!-- Diagnostics -->
-<SettingGroup heading="Diagnostics">
-  <SettingItem name={$t("settings.verbose")} desc={$t("settings.verbose_desc")}>
+<SettingGroup heading={t("settings.troubleshooting.diagnostics_heading")}>
+  <SettingItem name={t("settings.troubleshooting.verbose")} desc={t("settings.troubleshooting.verbose_desc")}>
     <Toggle
       checked={pluginData.isVerbose}
       onchange={(checked) => (pluginData.isVerbose = checked)}
@@ -69,12 +66,12 @@ async function handleCleanupPluginData() {
 </SettingGroup>
 
 <!-- Maintenance -->
-<SettingGroup heading="Maintenance">
+<SettingGroup heading={t("settings.troubleshooting.maintenance_heading")}>
   <SettingItem
-    name="Release notes"
-    desc={`You are on version ${plugin.manifest.version}. See what changed in recent releases.`}
+    name={t("settings.troubleshooting.release_notes")}
+    desc={t("settings.troubleshooting.release_notes_desc", { version: plugin.manifest.version })}
   >
-    <Button buttonText="Show release notes" onClick={() => void plugin.showReleaseNotes()} />
+    <Button buttonText={t("settings.troubleshooting.show_release_notes")} onClick={() => void plugin.showReleaseNotes()} />
   </SettingItem>
 
   <!-- Docs first, GitHub as the escalation path: the troubleshooting guide is
@@ -82,25 +79,25 @@ async function handleCleanupPluginData() {
        is being withheld, …), so it answers most of what would otherwise arrive as
        an issue. -->
   <SettingItem
-    name="Troubleshooting guide"
-    desc="Common problems and how to resolve them — the agent not responding, unhelpful search results, withheld notes, missing MCP tools, and mobile-specific issues."
+    name={t("settings.troubleshooting.guide")}
+    desc={t("settings.troubleshooting.guide_desc")}
   >
-    <DocsLink variant="button" doc="troubleshooting" label="Open guide" />
+    <DocsLink variant="button" doc="troubleshooting" label={t("settings.troubleshooting.open_guide")} />
   </SettingItem>
 
   <SettingItem
-    name="Still stuck?"
-    desc="Look through existing GitHub issues to see whether the problem is already tracked. If it is not, open a new issue and include what you tried, any error messages, and steps to reproduce it."
+    name={t("settings.troubleshooting.still_stuck")}
+    desc={t("settings.troubleshooting.still_stuck_desc")}
   >
     <div class="s2b-flex s2b-gap-2 s2b-flex-wrap">
-      <ExternalLinkButton href={githubIssuesListUrl} label="View existing issues" />
-      <ExternalLinkButton href={githubIssuesNewUrl} label="Open new issue" />
+      <ExternalLinkButton href={githubIssuesListUrl} label={t("settings.troubleshooting.view_issues")} />
+      <ExternalLinkButton href={githubIssuesNewUrl} label={t("settings.troubleshooting.new_issue")} />
     </div>
   </SettingItem>
 
-  <SettingItem name={$t("settings.clear")} desc={$t("settings.clear_desc")}>
+  <SettingItem name={t("settings.troubleshooting.clear")} desc={t("settings.troubleshooting.clear_desc")}>
     <Button
-      buttonText={$t("settings.clear_label")}
+      buttonText={t("settings.troubleshooting.clear_label")}
       styles="mod-warning"
       onClick={() => void handleCleanupPluginData()}
     />

@@ -13,6 +13,7 @@ import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
 import { isMobileUI } from "../../utils/platform";
 import type { ThreadPathStore } from "./threadPathStore.svelte";
+import { t } from "../../i18n";
 
 interface Props {
 	threadPathStore: ThreadPathStore;
@@ -30,7 +31,7 @@ let messageContainer = $state<ReturnType<typeof MessageContainer> | undefined>()
 let input = $state<ReturnType<typeof Input> | undefined>();
 let lastSessionId: string | null = null;
 let isDragging = $state(false);
-let dragMessage = $state("Drop files here");
+let dragMessage = $state(t("chat.input.drop_files"));
 let dragHasIssue = $state(false);
 
 $effect(() => {
@@ -455,7 +456,7 @@ function portalComposer(node: HTMLElement) {
       <div
         class="s2b-flex s2b-h-full s2b-items-center s2b-justify-center s2b-p-4 s2b-text-center s2b-text-sm s2b-text-[--text-muted]"
       >
-        Chat session is not available yet. Reopen this view after plugin initialization completes.
+        {t("chat.view.session_unavailable")}
       </div>
     {/if}
 

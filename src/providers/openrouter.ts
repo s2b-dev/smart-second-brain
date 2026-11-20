@@ -27,6 +27,7 @@ import {
 	createTransportedChatOpenAI,
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
+import { t } from "../i18n";
 
 // =============================================================================
 // Constants
@@ -82,7 +83,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 		steps: ["Create an account at OpenRouter", "Generate an API key from the Keys page", "Paste the API key below"],
 		link: {
 			url: "https://openrouter.ai/keys",
-			text: "OpenRouter Keys",
+			text: t("plugin.providers.openrouter.link"),
 		},
 	},
 
@@ -92,7 +93,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 	oauth: {
 		label: "OpenRouter",
 		icon: "log-in",
-		description: "Authorize in your browser to connect without manually creating an API key.",
+		description: t("plugin.providers.openrouter.oauth_desc"),
 		signIn: async () => ({ kind: "apiKey", apiKey: await signInWithOpenRouter() }),
 		cancelSignIn: cancelOpenRouterSignIn,
 		supportsApiKey: true,
@@ -108,15 +109,15 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 	// =========================================================================
 	auth: {
 		apiKey: {
-			label: "API Key",
-			description: "Your OpenRouter API key for authentication",
+			label: t("plugin.providers.fields.api_key"),
+			description: t("plugin.providers.openrouter.api_key_desc"),
 			kind: "secret",
 			required: true,
 			placeholder: "sk-or-...",
 		},
 		headers: {
-			label: "Custom Headers",
-			description: "Additional headers as JSON (optional)",
+			label: t("plugin.providers.fields.custom_headers"),
+			description: t("plugin.providers.fields.custom_headers_desc"),
 			kind: "textarea",
 			required: false,
 			placeholder: '{"X-Custom-Header": "value"}',
@@ -185,7 +186,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 
 	validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {
 		if (!auth.apiKey?.trim()) {
-			return { valid: false, error: "API key is required" };
+			return { valid: false, error: t("plugin.provider_auth.api_key_required") };
 		}
 
 		const headers: Record<string, string> = {
@@ -221,17 +222,20 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			if (response.status === 401 || response.status === 403) {
 				return {
 					valid: false,
-					error: errorMessage || `Authentication failed (${response.status})`,
+					error: errorMessage || t("plugin.provider_auth.auth_failed_status", { status: response.status }),
 				};
 			}
 
 			return {
 				valid: false,
-				error: errorMessage || response.text || `Request failed with status ${response.status}`,
+				error:
+					errorMessage ||
+					response.text ||
+					t("plugin.provider_auth.request_failed_status", { status: response.status }),
 			};
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return { valid: false, error: `Connection failed: ${message}` };
+			return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 		}
 	},
 

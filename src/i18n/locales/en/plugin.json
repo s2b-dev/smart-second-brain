@@ -1,0 +1,329 @@
+{
+	"commands": {
+		"open_chat": "Open chat",
+		"new_chat": "New chat",
+		"search_notes": "Search notes",
+		"open_smart_graph": "Open smart graph",
+		"show_welcome": "Show welcome",
+		"show_release_notes": "Show release notes",
+		"next_pending_change": "Next pending change",
+		"previous_pending_change": "Previous pending change"
+	},
+	"chat_file_menu": {
+		"rename": "Rename chat",
+		"rename_button": "Rename",
+		"delete": "Delete chat",
+		"rename_failed": "Failed to rename chat: {error}",
+		"delete_failed": "Failed to delete chat: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Add to chat",
+			"other": "Add {count} files to chat"
+		},
+		"add_file_failed": "Failed to add file to chat: {error}",
+		"add_files_failed": "Failed to add files to chat: {error}",
+		"no_supported_files": "No supported files selected. Supported: txt, md, csv, json, images, pdf.",
+		"chat_not_initialized": "Chat is not initialized yet. Please open chat and try again.",
+		"queued": {
+			"one": "Queued {count} file for chat.",
+			"other": "Queued {count} files for chat."
+		},
+		"skipped_unsupported": {
+			"one": "Skipped {count} unsupported file.",
+			"other": "Skipped {count} unsupported files."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "No chat is currently open",
+		"no_pending_changes": "No pending changes in this chat",
+		"new_file_nothing_to_open": "This change creates a new file — nothing to open yet."
+	},
+	"huggingface_connected": "Connected to Hugging Face.",
+	"update": {
+		"available": "Smart Second Brain {version} is available.",
+		"update_link": "Update",
+		"updated": "Smart Second Brain updated to {version}.",
+		"whats_new_link": "See what's new"
+	},
+	"settings_save_failed": "Smart Second Brain could not save your settings: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: about {tokens} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.",
+		"repeated_failure": "Smart Second Brain: summarizing this chat's history failed {failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Memory too large for this model{window}: {names} is no longer loaded into every message. The agent reads it only when needed. Shorten the note or use a model with a larger context window.",
+			"other": "Memory too large for this model{window}: {names} are no longer loaded into every message. The agent reads them only when needed. Shorten the note or use a model with a larger context window."
+		},
+		"memory_window": "({k}k tokens)",
+		"save_prompt_failed": "Could not save the system prompt: {error}",
+		"open_agent_note": "Open the agent note",
+		"prompt_modal_title": "System Prompt — {name}",
+		"save_skill_failed": "Could not save the \"{skill}\" skill: {error}",
+		"open_skill_note": "Open the skill note",
+		"skill_modal_title": "Skill — {skill}",
+		"cannot_connect": "Cannot connect to: {providers}. Check that the service is running.",
+		"review_providers": "Review providers",
+		"provider_unavailable": "Provider \"{provider}\" is no longer available.",
+		"select_new_model": "Select a new model",
+		"withdrew_changes": {
+			"one": "Withdrew {count} pending note change proposed by the replaced response.",
+			"other": "Withdrew {count} pending note changes proposed by the replaced response."
+		},
+		"kept_partial_changes": {
+			"one": "{count} partially applied change was kept — resolve it in the review bar.",
+			"other": "{count} partially applied changes were kept — resolve them in the review bar."
+		}
+	},
+	"errors": {
+		"request_failed": "The model request failed.",
+		"context_overflow": "This chat no longer fits in the model's context window.",
+		"context_overflow_hint": "Start a new chat, or check the context window configured for this model.",
+		"refusal": "The model declined to answer this request.",
+		"refusal_hint": "Rephrasing the request, or switching to another model, may help."
+	},
+	"provider_auth": {
+		"unknown_provider": "Unknown provider: {provider}",
+		"invalid_api_key": "Invalid API key",
+		"invalid_endpoint": "Invalid base URL or endpoint unreachable",
+		"configuration_failed": "Provider configuration failed",
+		"no_auth_config": "No auth configuration found for {provider}",
+		"discovery_failed": "Model discovery failed: {error}",
+		"server_url_required": "Server URL is required",
+		"api_key_required": "API key is required",
+		"connection_failed": "Connection failed: {error}",
+		"auth_failed_status": "Authentication failed ({status})",
+		"auth_failed": "Authentication failed",
+		"request_failed_status": "Request failed with status {status}",
+		"codex_sign_in_required": "Sign in with ChatGPT to use Codex",
+		"openai_codex_sign_in_required": "Sign in with ChatGPT to use OpenAI via Codex",
+		"huggingface_token_rejected": "Hugging Face rejected this access token",
+		"huggingface_status": "Hugging Face returned status {status}",
+		"huggingface_sign_in_required": "Sign in with Hugging Face to connect"
+	},
+	"providers": {
+		"templates": {
+			"openai": "OpenAI models via ChatGPT sign-in or an API key.",
+			"openai_compatible": "Flexible OpenAI-style provider for OpenAI and compatible endpoints.",
+			"anthropic": "Claude models via Anthropic's API.",
+			"ollama": "Local Ollama models over the Ollama API.",
+			"omlx": "Local MLX models on your Mac via oMLX's OpenAI-compatible server.",
+			"openrouter": "OpenRouter account and model catalog.",
+			"huggingface": "Open models from Hugging Face's inference providers."
+		},
+		"fields": {
+			"api_key": "API Key",
+			"base_url": "Base URL",
+			"server_url": "Server URL",
+			"access_token": "Access Token",
+			"custom_headers": "Custom Headers",
+			"custom_headers_desc": "Additional headers as JSON (optional)",
+			"chatgpt_sign_in": "ChatGPT Sign-In"
+		},
+		"openai": {
+			"link": "OpenAI Dashboard",
+			"oauth_desc": "Open a browser window to complete ChatGPT/Codex authorization.",
+			"api_key_desc": "Your OpenAI API key for authentication",
+			"base_url_desc": "Custom API endpoint (leave empty for default OpenAI)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "This provider uses a browser-based ChatGPT/Codex sign-in flow.",
+			"sign_in_placeholder": "Authorized via ChatGPT sign-in"
+		},
+		"openai_compatible": {
+			"base_url_desc": "The base URL for the OpenAI-compatible API endpoint",
+			"api_key_desc": "API key for authentication (leave empty if your endpoint needs none)"
+		},
+		"anthropic": {
+			"link": "Anthropic Console",
+			"api_key_desc": "Your Anthropic API key for authentication",
+			"base_url_desc": "The base URL for the Anthropic-compatible API endpoint"
+		},
+		"ollama": {
+			"link": "Ollama Website",
+			"server_url_desc": "The URL where your Ollama server is running",
+			"api_key_desc": "API key for authentication (usually not required for local Ollama)"
+		},
+		"omlx": {
+			"link": "oMLX Website",
+			"server_url_desc": "The URL where your oMLX server is running",
+			"api_key_desc": "oMLX requires an API key by default (find it in the admin panel's global settings). Leave empty only if you disabled key verification."
+		},
+		"openrouter": {
+			"link": "OpenRouter Keys",
+			"oauth_desc": "Authorize in your browser to connect without manually creating an API key.",
+			"api_key_desc": "Your OpenRouter API key for authentication"
+		},
+		"huggingface": {
+			"link": "Hugging Face access tokens",
+			"oauth_desc": "Approve access in your browser to connect, without creating an access token."
+		}
+	},
+	"indexing": {
+		"status": "Indexing: {status}",
+		"cancelled_chunks": {
+			"one": "Indexing cancelled ({count} chunk updated)",
+			"other": "Indexing cancelled ({count} chunks updated)"
+		},
+		"updated_chunks": {
+			"one": "✓ Index updated: {count} chunk",
+			"other": "✓ Index updated: {count} chunks"
+		},
+		"cancelled_notes": {
+			"one": "Indexing cancelled ({count} note indexed so far)",
+			"other": "Indexing cancelled ({count} notes indexed so far)"
+		},
+		"indexed_notes": {
+			"one": "✓ Indexed {count} note",
+			"other": "✓ Indexed {count} notes"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ Indexed {count} note, {skipped} skipped",
+			"other": "✓ Indexed {count} notes, {skipped} skipped"
+		},
+		"no_embedding_model": "No embedding model configured. Please set a default embedding model.",
+		"invalid_config": "Invalid embedding index configuration.",
+		"provider_not_configured": "Provider \"{provider}\" is not configured.",
+		"embedding_init_failed": "Failed to initialize embedding model.",
+		"open_search_settings": "Open search settings",
+		"open_provider_settings": "Open provider settings",
+		"provider_unreachable": "Indexing stopped — the embedding provider is not reachable. Check the connection, then resume.",
+		"rate_limited": "Indexing paused — the embedding provider's rate limit was reached. It resumes on the next start, or resume it from the search settings later.",
+		"already_in_progress": "Indexing already in progress...",
+		"embed_failed": "Failed to embed {file}: {error}",
+		"embed_empty": "Failed to embed {file}: empty result from model",
+		"semantic_unreachable": "Semantic search unavailable — the embedding provider is not reachable. Showing no semantic results.",
+		"semantic_failed": "Semantic search failed: {error}",
+		"cancelling": "Cancelling indexing…",
+		"export_empty": "Index is empty — nothing to export.",
+		"export_dialog_title": "Export Embedding Index",
+		"exported": "Exported {count} embeddings.",
+		"export_failed": "Failed to export index.",
+		"import_dialog_title": "Import Embedding Index",
+		"import_invalid_version": "Export file has an invalid or missing version field. Re-index to regenerate a compatible export.",
+		"import_outdated": "Export file schema v{version} is outdated (current: v{current}). Re-index to regenerate a compatible export.",
+		"import_newer": "Export file was created with a newer plugin version (schema v{version}). Update the plugin to import it.",
+		"import_missing_metadata": "Export file is missing provider or model metadata.",
+		"imported": "Imported {count} embeddings ({model}).",
+		"import_failed": "Failed to import index. The file may be corrupted.",
+		"reindex": "Re-index"
+	},
+	"search_index": {
+		"status": "Indexing notes for search: {status}",
+		"updated": "✓ Search index updated: {count} notes"
+	},
+	"bulk_progress": {
+		"skipped": "({count} skipped)",
+		"eta": "(~{eta} left)",
+		"pdfs_progress": "PDFs {done}/{total}",
+		"then": "then {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"other": "{count} PDFs"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Search pane opened but could not set tag query",
+		"open_failed": "Failed to open search pane for tag: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "No embedding models found for your providers. Check that one exposes embeddings.",
+		"no_models": "No models found. Check that your provider is running and reachable."
+	},
+	"actions": {
+		"open_settings": "Open settings",
+		"add_provider": "Add a provider",
+		"check_provider_settings": "Check provider settings",
+		"select_model": "Select a model",
+		"configure_embedding_index": "Configure embedding index",
+		"edit_agent": "Edit agent",
+		"view_report": "View report",
+		"open_note": "Open note",
+		"open_chat": "Open chat",
+		"agent_gone_pick_model": "That agent no longer exists. Pick a model from the agent you want to use.",
+		"agent_gone_not_saved": "That agent no longer exists, so the model wasn't saved."
+	},
+	"diff": {
+		"pending_change": "Pending change",
+		"previous": "Previous pending change",
+		"next": "Next pending change",
+		"toggle_view": "Toggle diff view",
+		"accept": "Accept",
+		"accept_aria": "Accept change",
+		"reject": "Reject",
+		"reject_aria": "Reject change",
+		"stale_tooltip": "Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage.",
+		"cross_thread_banner": {
+			"one": "{count} other chat has a pending edit to this file. Only the latest is shown here; whichever is accepted first wins and the others may then fail to apply.",
+			"other": "{count} other chats have a pending edit to this file. Only the latest is shown here; whichever is accepted first wins and the others may then fail to apply."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Tool calling",
+		"reasoning": "Extended reasoning",
+		"vision": "Vision / file attachments",
+		"structured_output": "Structured output (JSON schema)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Search Notes",
+			"summary": "Search through your Obsidian notes by keyword. Returns matching file names and metadata."
+		},
+		"list_directory": {
+			"name": "List Directory",
+			"summary": "List the vault's folder structure: an overview with file counts at the root, files and subfolders inside a folder. Output is collapsed to fit the context budget."
+		},
+		"read_content": {
+			"name": "Read Content",
+			"summary": "Read notes and vault files by path or wiki link. Supports markdown/text files and PDF text extraction. Images must be attached in chat."
+		},
+		"grep_notes": {
+			"name": "Grep Notes",
+			"summary": "Find an exact substring or regex pattern across notes, returning matching lines with line numbers and context. Unlike Search Notes, it matches literal strings. Scope to one note with a path, or page large result sets."
+		},
+		"get_all_tags": {
+			"name": "Get All Tags",
+			"summary": "Retrieve a list of all tags used in the vault."
+		},
+		"get_properties": {
+			"name": "Get Properties",
+			"summary": "Retrieve frontmatter properties from notes or list all property keys in the vault."
+		},
+		"execute_javascript": {
+			"name": "Execute JavaScript",
+			"summary": "Run isolated JavaScript for calculations and data transformation. Use return for the final value and console.log for intermediate output."
+		},
+		"manage_notes": {
+			"name": "Manage Notes",
+			"summary": "Create, update, or delete markdown notes in one staged batch. Related note operations can be proposed together for user approval."
+		},
+		"fetch_url": {
+			"name": "Fetch URL",
+			"summary": "Fetch a public web page or text resource over HTTP(S) and return its main content as cleaned markdown. Use only with URLs the user provided or clearly public references."
+		},
+		"web_search": {
+			"name": "Web Search",
+			"summary": "Search the web and return results (title, URL, snippet). Configure the provider and API key in the tool's Configure panel. Prefer vault search first."
+		},
+		"manage_skills": {
+			"name": "Manage Skills",
+			"summary": "Create new skills, revise the agent's own attached skills, or delete a skill when you ask it to. Changes apply immediately. A skill's name and plugin link are locked once created."
+		},
+		"write_todos": {
+			"name": "Task List",
+			"summary": "Lets the agent plan multi-step work as a checklist and tick it off as it goes. The list shows above the chat input."
+		},
+		"ask_question": {
+			"name": "Ask Question",
+			"summary": "Lets the agent pause and ask you a multiple-choice question when a request is unclear. The question shows above the chat input."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (keyless)",
+		"firecrawl_key_help": "Optional — add a Firecrawl API key (fc-…) for higher rate limits. Leave empty to use the keyless tier.",
+		"brave_key_help": "Brave Search API key from api.search.brave.com.",
+		"tavily_key_help": "Tavily API key from app.tavily.com.",
+		"keenable_key_help": "Optional — add a Keenable API key for higher rate limits. Leave empty to use the free public endpoint."
+	}
+}

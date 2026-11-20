@@ -13,6 +13,7 @@ import {
 	widgetFileBasename,
 	wrapWidgetFence,
 } from "./widgetSpec";
+import { t } from "../i18n";
 
 /**
  * Set on the chat renderer's staging element for the still-streaming tail of a reply
@@ -40,7 +41,10 @@ export function registerWidgetBlocks(plugin: SecondBrainPlugin): void {
 		if (unknown.length > 0) {
 			el.createDiv({
 				cls: "s2b-widget-blocked",
-				text: `This widget asks for a library that is not bundled: ${unknown.join(", ")}. Available: ${Object.keys(WIDGET_LIBS).join(", ")}.`,
+				text: t("widget.block.unbundled_library", {
+					libs: unknown.join(", "),
+					available: Object.keys(WIDGET_LIBS).join(", "),
+				}),
 			});
 			return;
 		}
@@ -64,8 +68,10 @@ function renderPlaceholder(el: HTMLElement): void {
 	const placeholder = el.createDiv({ cls: "s2b-widget-placeholder" });
 	const phase = `-${Math.round(performance.now() % SWEEP_PERIOD_MS)}ms`;
 	placeholder.style.animationDelay = phase;
-	placeholder.createDiv({ cls: "s2b-widget-placeholder-label", text: "Generating widget…" }).style.animationDelay =
-		phase;
+	placeholder.createDiv({
+		cls: "s2b-widget-placeholder-label",
+		text: t("widget.block.generating"),
+	}).style.animationDelay = phase;
 }
 
 /**
@@ -82,7 +88,7 @@ function renderChatToolbar(
 ): void {
 	const bar = el.createDiv({ cls: "s2b-widget-toolbar" });
 	setIcon(bar.createSpan({ cls: "s2b-widget-toolbar-icon" }), resolveWidgetIcon(spec.icon));
-	bar.createSpan({ cls: "s2b-widget-toolbar-title", text: spec.title ?? "Widget" });
+	bar.createSpan({ cls: "s2b-widget-toolbar-title", text: spec.title ?? t("widget.fallback_title") });
 	// Saving twice from the same block would create a second file: share one in-flight
 	// save, and forget it only if it failed.
 	let saving: Promise<TFile> | null = null;
@@ -94,19 +100,21 @@ function renderChatToolbar(
 		return saving;
 	};
 
-	iconButton(bar, "maximize-2", "Expand", async () => {
+	iconButton(bar, "maximize-2", t("widget.block.expand"), async () => {
 		plugin.openWidgetModal(spec, sourcePath);
 	});
-	iconButton(bar, "copy", "Copy as block to paste into a note", async () => {
+	iconButton(bar, "copy", t("widget.block.copy_tooltip"), async () => {
 		await navigator.clipboard.writeText(wrapWidgetFence(source));
-		new Notice("Widget block copied. Paste it into any note.");
+		new Notice(t("widget.block.copied_notice"));
 	});
-	iconButton(bar, "save", "Save as a widget file and open it", async () => {
+	iconButton(bar, "save", t("widget.block.save_tooltip"), async () => {
 		try {
 			const file = await save();
 			await plugin.app.workspace.getLeaf("tab").openFile(file);
 		} catch (error) {
-			new Notice(`Could not save widget: ${error instanceof Error ? error.message : String(error)}`);
+			new Notice(
+				t("widget.block.save_failed", { error: error instanceof Error ? error.message : String(error) }),
+			);
 		}
 	});
 }

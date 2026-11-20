@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Widget",
+	"block": {
+		"unbundled_library": "Ce widget demande une bibliothèque non incluse : {libs}. Disponibles : {available}.",
+		"generating": "Génération du widget…",
+		"expand": "Agrandir",
+		"copy_tooltip": "Copier en tant que bloc à coller dans une note",
+		"copied_notice": "Bloc widget copié. Collez-le dans n’importe quelle note.",
+		"save_tooltip": "Enregistrer comme fichier widget et l’ouvrir",
+		"save_failed": "Impossible d’enregistrer le widget : {error}"
+	},
+	"frame": {
+		"navigation_blocked": "Ce widget a été arrêté, car il a tenté de quitter son bac à sable."
+	},
+	"embed": {
+		"load_failed": "Impossible de charger le widget."
+	},
+	"rename": {
+		"title": "Renommer le widget",
+		"name": "Nom",
+		"button": "Renommer",
+		"empty_name": "Saisissez un nom.",
+		"invalid_chars": "Un nom ne peut pas contenir \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "« {name} » existe déjà dans ce dossier.",
+		"failed": "Impossible de renommer : {error}"
+	},
+	"view": {
+		"menu_show_widget": "Afficher le widget",
+		"menu_edit_source": "Modifier la source",
+		"menu_rename": "Renommer…",
+		"review_showing_proposed": "Modification en attente depuis le chat — affichage du widget proposé",
+		"review_showing_current": "Modification en attente depuis le chat — affichage du widget actuel",
+		"show_current": "Afficher l’actuel",
+		"show_proposed": "Afficher la proposition",
+		"accept": "Accepter",
+		"reject": "Rejeter",
+		"rejected_notice": "Modification proposée de ce widget rejetée",
+		"conflict_tooltip": "Impossible d’accepter — le widget a changé depuis cette proposition. Rejetez-la et demandez à l’agent de la reproposer.",
+		"applied_notice": "Modification proposée appliquée à ce widget",
+		"apply_failed": "Échec de l’application de la modification : {error}",
+		"source_aria": "Source du widget",
+		"source_hint": "Le frontmatter (title, height, queries, libs), puis le HTML.",
+		"source_stale_hint": "Modifié sur le disque pendant l’édition — Annuler pour recharger ; Enregistrer est désactivé.",
+		"source_stale_notice": "Ce widget a été modifié sur le disque pendant votre édition. Annulez pour le recharger, puis modifiez-le à nouveau.",
+		"save_failed": "Impossible d’enregistrer le widget : {error}"
+	}
+}

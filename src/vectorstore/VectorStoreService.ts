@@ -79,6 +79,7 @@ import {
 	makeChunkId,
 	sanitizeIndexId,
 } from "./types";
+import { t } from "../i18n";
 
 // ── Electron dialog helpers (Obsidian desktop) ────────────────────────
 
@@ -1122,8 +1123,8 @@ export class VectorStoreService {
 			if (notice) {
 				notice.setMessage(
 					cancelled
-						? `Indexing cancelled (${outcome.indexedChunks} chunks updated)`
-						: `✓ Index updated: ${outcome.indexedChunks} chunks`,
+						? t("plugin.indexing.cancelled_chunks", { count: outcome.indexedChunks })
+						: t("plugin.indexing.updated_chunks", { count: outcome.indexedChunks }),
 				);
 				window.setTimeout(() => notice.hide(), 3000);
 			}
@@ -1373,40 +1374,40 @@ export class VectorStoreService {
 		const data = getData();
 		const resolvedId = indexId ?? data.searchEmbedIndex;
 		if (!resolvedId) {
-			showSettingsLinkNotice(
-				this.plugin.app,
-				"No embedding model configured. Please set a default embedding model.",
-				{
-					tab: "search",
-					linkText: "Open search settings",
-				},
-			);
+			showSettingsLinkNotice(this.plugin.app, t("plugin.indexing.no_embedding_model"), {
+				tab: "search",
+				linkText: t("plugin.indexing.open_search_settings"),
+			});
 			return false;
 		}
 
 		const inst = await this.getOrCreateInstance(resolvedId);
 		const model = this.getModelForInstance(inst);
 		if (!model) {
-			showSettingsLinkNotice(this.plugin.app, "Invalid embedding index configuration.", {
+			showSettingsLinkNotice(this.plugin.app, t("plugin.indexing.invalid_config"), {
 				tab: "search",
-				linkText: "Open search settings",
+				linkText: t("plugin.indexing.open_search_settings"),
 			});
 			return false;
 		}
 
 		if (!this.ensureProviderRegistered(model.provider)) {
-			showSettingsLinkNotice(this.plugin.app, `Provider "${model.provider}" is not configured.`, {
-				tab: "general",
-				linkText: "Open provider settings",
-			});
+			showSettingsLinkNotice(
+				this.plugin.app,
+				t("plugin.indexing.provider_not_configured", { provider: model.provider }),
+				{
+					tab: "general",
+					linkText: t("plugin.indexing.open_provider_settings"),
+				},
+			);
 			return false;
 		}
 
 		const embeddings = this.getEmbeddingsForInstance(inst, model);
 		if (!embeddings) {
-			showSettingsLinkNotice(this.plugin.app, "Failed to initialize embedding model.", {
+			showSettingsLinkNotice(this.plugin.app, t("plugin.indexing.embedding_init_failed"), {
 				tab: "general",
-				linkText: "Open provider settings",
+				linkText: t("plugin.indexing.open_provider_settings"),
 			});
 			return false;
 		}
@@ -1540,8 +1541,8 @@ export class VectorStoreService {
 			`[VectorStore] Stopping indexing for ${inst.indexId}: provider unreachable after ${consecutiveFailures} consecutive failures — ${reason}`,
 		);
 		showActionNotice(
-			"Indexing stopped — the embedding provider is not reachable. Check the connection, then resume.",
-			settingsAction("search", "Open search settings"),
+			t("plugin.indexing.provider_unreachable"),
+			settingsAction("search", t("plugin.indexing.open_search_settings")),
 			10_000,
 		);
 		inst.abortController?.abort();
@@ -1557,8 +1558,8 @@ export class VectorStoreService {
 		const reason = error instanceof Error ? error.message : String(error);
 		Logger.error(`[VectorStore] Stopping indexing for ${inst.indexId}: rate limited by the provider — ${reason}`);
 		showActionNotice(
-			"Indexing paused — the embedding provider's rate limit was reached. It resumes on the next start, or resume it from the search settings later.",
-			settingsAction("search", "Open search settings"),
+			t("plugin.indexing.rate_limited"),
+			settingsAction("search", t("plugin.indexing.open_search_settings")),
 			10_000,
 		);
 		inst.abortController?.abort();
@@ -1587,7 +1588,7 @@ export class VectorStoreService {
 		// than reporting "already in progress" against its own twin.
 		if (inst.buildPromise) return inst.buildPromise;
 		if (inst.isIndexing || inst.progress.isIndexing) {
-			new Notice("Indexing already in progress...");
+			new Notice(t("plugin.indexing.already_in_progress"));
 			return Promise.resolve();
 		}
 		inst.buildPromise = this.runFullBuild(inst, embeddings, model).finally(() => {
@@ -1662,11 +1663,12 @@ export class VectorStoreService {
 			}
 
 			const { indexed, skipped } = inst.progress;
-			const skippedText = skipped > 0 ? `, ${skipped} skipped` : "";
 			notice.setMessage(
 				cancelled
-					? `Indexing cancelled (${indexed} notes indexed so far)`
-					: `✓ Indexed ${indexed} notes${skippedText}`,
+					? t("plugin.indexing.cancelled_notes", { count: indexed })
+					: skipped > 0
+						? t("plugin.indexing.indexed_notes_skipped", { count: indexed, skipped })
+						: t("plugin.indexing.indexed_notes", { count: indexed }),
 			);
 			window.setTimeout(() => notice.hide(), 3000);
 
@@ -1992,7 +1994,7 @@ export class VectorStoreService {
 						if (this.abortForRateLimit(inst, entryError)) return false;
 						Logger.error(`[VectorStore] Failed to index ${entry.file.path}:`, entryError);
 						const reason = entryError instanceof Error ? entryError.message : String(entryError);
-						new Notice(`Failed to embed ${entry.file.basename}: ${reason}`);
+						new Notice(t("plugin.indexing.embed_failed", { file: entry.file.basename, error: reason }));
 						await noteFailed(entry, "embed-error", isDocumentRejectionError(entryError));
 						continue;
 					}
@@ -2166,7 +2168,7 @@ export class VectorStoreService {
 
 		container.createDiv({
 			cls: "s2b-indexing-status",
-			text: `Indexing: ${status}`,
+			text: t("plugin.indexing.status", { status }),
 		});
 
 		const progressContainer = container.createDiv({ cls: "s2b-indexing-progress" });
@@ -2251,7 +2253,7 @@ export class VectorStoreService {
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to embed ${file.path} (${inst.indexId}):`, error);
 			const reason = error instanceof Error ? error.message : String(error);
-			new Notice(`Failed to embed ${file.basename}: ${reason}`);
+			new Notice(t("plugin.indexing.embed_failed", { file: file.basename, error: reason }));
 			// Only a verdict on this document is remembered; a dead or misconfigured
 			// provider is not the note's fault, and the next validation retries it.
 			if (isDocumentRejectionError(error)) await this.rejectNote(inst, file.path, mtime);
@@ -2262,7 +2264,7 @@ export class VectorStoreService {
 			const vector = raw[i];
 			if (!vector || vector.length === 0) {
 				Logger.error(`[VectorStore] embedDocuments returned empty result for ${file.path}`);
-				new Notice(`Failed to embed ${file.basename}: empty result from model`);
+				new Notice(t("plugin.indexing.embed_empty", { file: file.basename }));
 				return;
 			}
 			vectors.push(new Float32Array(vector));
@@ -2526,9 +2528,9 @@ export class VectorStoreService {
 		const offline = isProviderUnreachableError(error);
 		showActionNotice(
 			offline
-				? "Semantic search unavailable — the embedding provider is not reachable. Showing no semantic results."
-				: `Semantic search failed: ${reason.slice(0, 120)}`,
-			settingsAction("search", "Open search settings"),
+				? t("plugin.indexing.semantic_unreachable")
+				: t("plugin.indexing.semantic_failed", { error: reason.slice(0, 120) }),
+			settingsAction("search", t("plugin.indexing.open_search_settings")),
 			8000,
 		);
 	}
@@ -2819,7 +2821,7 @@ export class VectorStoreService {
 			// The in-flight embedding call is raced against this signal rather than
 			// awaited (`embedWithCancellation`), so cancelling takes effect at once —
 			// it no longer waits out a request that may never return.
-			new Notice("Cancelling indexing…");
+			new Notice(t("plugin.indexing.cancelling"));
 		}
 	}
 
@@ -2833,12 +2835,12 @@ export class VectorStoreService {
 		const inst = await this.getOrCreateInstance(indexId);
 		const docs = await inst.store.getAllSerialized();
 		if (docs.length === 0) {
-			new Notice("Index is empty — nothing to export.");
+			new Notice(t("plugin.indexing.export_empty"));
 			return false;
 		}
 
 		const filePath = showSaveDialog({
-			title: "Export Embedding Index",
+			title: t("plugin.indexing.export_dialog_title"),
 			defaultPath: `s2b-embeddings-${sanitizeIndexId(...this.splitIndexId(indexId))}.msgpack`,
 			filters: [{ name: "MessagePack", extensions: ["msgpack"] }],
 		});
@@ -2858,11 +2860,11 @@ export class VectorStoreService {
 			const fs = requireNodeModule<typeof import("node:fs")>("fs");
 			fs.writeFileSync(filePath, new Uint8Array(encoded.buffer, encoded.byteOffset, encoded.byteLength));
 			Logger.log(`[VectorStore] Exported ${docs.length} documents to ${filePath}`);
-			new Notice(`Exported ${docs.length} embeddings.`);
+			new Notice(t("plugin.indexing.exported", { count: docs.length }));
 			return true;
 		} catch (error) {
 			Logger.error("[VectorStore] Export failed:", error);
-			new Notice("Failed to export index.");
+			new Notice(t("plugin.indexing.export_failed"));
 			return false;
 		}
 	}
@@ -2879,7 +2881,7 @@ export class VectorStoreService {
 	 */
 	async importIndex(purpose: "search" | "graph" = "search"): Promise<string | null> {
 		const filePaths = showOpenDialog({
-			title: "Import Embedding Index",
+			title: t("plugin.indexing.import_dialog_title"),
 			filters: [{ name: "MessagePack", extensions: ["msgpack"] }],
 			properties: ["openFile"],
 		});
@@ -2892,28 +2894,26 @@ export class VectorStoreService {
 
 			if (typeof decoded.version !== "number" || !Number.isInteger(decoded.version)) {
 				showActionNotice(
-					"Export file has an invalid or missing version field. Re-index to regenerate a compatible export.",
-					configureEmbedIndexAction(purpose, "Re-index"),
+					t("plugin.indexing.import_invalid_version"),
+					configureEmbedIndexAction(purpose, t("plugin.indexing.reindex")),
 				);
 				return null;
 			}
 			if (decoded.version < INDEX_VERSION) {
 				showActionNotice(
-					`Export file schema v${decoded.version} is outdated (current: v${INDEX_VERSION}). Re-index to regenerate a compatible export.`,
-					configureEmbedIndexAction(purpose, "Re-index"),
+					t("plugin.indexing.import_outdated", { version: decoded.version, current: INDEX_VERSION }),
+					configureEmbedIndexAction(purpose, t("plugin.indexing.reindex")),
 				);
 				return null;
 			}
 			if (decoded.version > INDEX_VERSION) {
-				new Notice(
-					`Export file was created with a newer plugin version (schema v${decoded.version}). Update the plugin to import it.`,
-				);
+				new Notice(t("plugin.indexing.import_newer", { version: decoded.version }));
 				return null;
 			}
 
 			const { providerId: provider, modelId: model } = decoded;
 			if (!provider || !model) {
-				new Notice("Export file is missing provider or model metadata.");
+				new Notice(t("plugin.indexing.import_missing_metadata"));
 				return null;
 			}
 
@@ -2945,11 +2945,11 @@ export class VectorStoreService {
 			});
 
 			Logger.log(`[VectorStore] Imported ${docs.length} documents for ${indexId}`);
-			new Notice(`Imported ${docs.length} embeddings (${model}).`);
+			new Notice(t("plugin.indexing.imported", { count: docs.length, model }));
 			return indexId;
 		} catch (error) {
 			Logger.error("[VectorStore] Failed to import index:", error);
-			new Notice("Failed to import index. The file may be corrupted.");
+			new Notice(t("plugin.indexing.import_failed"));
 			return null;
 		}
 	}

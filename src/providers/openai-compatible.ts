@@ -26,6 +26,7 @@ import {
 	type LiteLLMModelInfoEntry,
 	setCompatibleContextWindows,
 } from "./openaiCompatibleModels";
+import { t } from "../i18n";
 
 function sanitizeBaseUrl(url: string): string {
 	return url.replace(/\/+$/, "").replace(/\/v1$/i, "");
@@ -137,22 +138,22 @@ export function createOpenAICompatibleProvider(
 		},
 		auth: {
 			baseUrl: {
-				label: "Base URL",
-				description: "The base URL for the OpenAI-compatible API endpoint",
+				label: t("plugin.providers.fields.base_url"),
+				description: t("plugin.providers.openai_compatible.base_url_desc"),
 				kind: "text",
 				required: true,
 				placeholder: "https://your-endpoint.example/v1",
 			},
 			apiKey: {
-				label: "API Key",
-				description: "API key for authentication (leave empty if your endpoint needs none)",
+				label: t("plugin.providers.fields.api_key"),
+				description: t("plugin.providers.openai_compatible.api_key_desc"),
 				kind: "secret",
 				required: true,
 				placeholder: "sk-...",
 			},
 			headers: {
-				label: "Custom Headers",
-				description: "Additional headers as JSON (optional)",
+				label: t("plugin.providers.fields.custom_headers"),
+				description: t("plugin.providers.fields.custom_headers_desc"),
 				kind: "textarea",
 				required: false,
 				placeholder: '{"X-Custom-Header": "value"}',
@@ -220,16 +221,16 @@ export function createOpenAICompatibleProvider(
 				}
 
 				if (response.status === 401 || response.status === 403) {
-					return { valid: false, error: errorMessage || "Authentication failed" };
+					return { valid: false, error: errorMessage || t("plugin.provider_auth.auth_failed") };
 				}
 
 				return {
 					valid: false,
-					error: errorMessage || `Request failed with status ${response.status}`,
+					error: errorMessage || t("plugin.provider_auth.request_failed_status", { status: response.status }),
 				};
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				return { valid: false, error: `Connection failed: ${message}` };
+				return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 			}
 		},
 		discoverModels: async (auth: AuthObject): Promise<string[]> => {

@@ -20,6 +20,7 @@ import type {
 } from "../types/provider/index";
 import { fetchOllamaModelsInfo, OLLAMA_EMBED_NUM_CTX } from "./ollamaModels";
 import { createTransportedChatOllama, createTransportedOllamaEmbeddings } from "./chatProviders";
+import { t } from "../i18n";
 
 // =============================================================================
 // Helper Functions
@@ -80,7 +81,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 		],
 		link: {
 			url: "https://ollama.ai",
-			text: "Ollama Website",
+			text: t("plugin.providers.ollama.link"),
 		},
 	},
 
@@ -89,21 +90,21 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 	// =========================================================================
 	auth: {
 		baseUrl: {
-			label: "Server URL",
-			description: "The URL where your Ollama server is running",
+			label: t("plugin.providers.fields.server_url"),
+			description: t("plugin.providers.ollama.server_url_desc"),
 			kind: "text",
 			required: true,
 			placeholder: "http://localhost:11434",
 		},
 		apiKey: {
-			label: "API Key",
-			description: "API key for authentication (usually not required for local Ollama)",
+			label: t("plugin.providers.fields.api_key"),
+			description: t("plugin.providers.ollama.api_key_desc"),
 			kind: "secret",
 			required: false,
 		},
 		headers: {
-			label: "Custom Headers",
-			description: "Additional headers as JSON (optional)",
+			label: t("plugin.providers.fields.custom_headers"),
+			description: t("plugin.providers.fields.custom_headers_desc"),
 			kind: "textarea",
 			required: false,
 			placeholder: '{"X-Custom-Header": "value"}',
@@ -158,7 +159,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 
 	validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {
 		if (!auth.baseUrl?.trim()) {
-			return { valid: false, error: "Server URL is required" };
+			return { valid: false, error: t("plugin.provider_auth.server_url_required") };
 		}
 
 		const baseUrl = sanitizeBaseUrl(auth.baseUrl);
@@ -173,7 +174,7 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return { valid: false, error: `Connection failed: ${message}` };
+			return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 		}
 
 		if (response.ok) {
@@ -183,10 +184,16 @@ export const ollamaProvider: EmbeddingProviderDefinition = {
 		const errorBody = await safeReadText(response);
 
 		if (response.status === 401 || response.status === 403) {
-			return { valid: false, error: errorBody || `Authentication failed (${response.status})` };
+			return {
+				valid: false,
+				error: errorBody || t("plugin.provider_auth.auth_failed_status", { status: response.status }),
+			};
 		}
 
-		return { valid: false, error: errorBody || `Request failed with status ${response.status}` };
+		return {
+			valid: false,
+			error: errorBody || t("plugin.provider_auth.request_failed_status", { status: response.status }),
+		};
 	},
 
 	discoverModels: async (auth: AuthObject): Promise<string[]> => {

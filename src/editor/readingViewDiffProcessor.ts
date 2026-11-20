@@ -16,6 +16,7 @@ import { getPlugin } from "../stores/state.svelte";
 import { computeOriginalAffectedLines, countOriginalLines, countPartLines, insertionAnchorLine } from "./diffLineMath";
 import type { DiffViewMode } from "../types/plugin";
 import type { PendingChangeEntry } from "../types/shared";
+import { t } from "../i18n";
 
 function buildLineMapper(originalContent: string, currentContent: string): (currentLine: number) => number | null {
 	if (originalContent === currentContent) return (line) => line;
@@ -337,7 +338,7 @@ function createReadingDiffActionBar(
 
 	const label = createSpan();
 	label.className = "s2b-diff-actions-label";
-	label.textContent = "Pending change";
+	label.textContent = t("plugin.diff.pending_change");
 	bar.appendChild(label);
 
 	// Position among this note's pending change groups (e.g. "2/3"). Only shown
@@ -376,14 +377,14 @@ function createReadingDiffActionBar(
 	// Only when the thread has another stop to reach — navigation wraps, so a
 	// lone pending change would give two chevrons that lead back here.
 	if (canNavigate(entryId)) {
-		bar.appendChild(makeNavBtn("chevron-up", "Previous pending change", "prev"));
-		bar.appendChild(makeNavBtn("chevron-down", "Next pending change", "next"));
+		bar.appendChild(makeNavBtn("chevron-up", t("plugin.diff.previous"), "prev"));
+		bar.appendChild(makeNavBtn("chevron-down", t("plugin.diff.next"), "next"));
 	}
 
 	// Toggle view mode icon (visible on hover via CSS)
 	const toggleBtn = createEl("button");
 	toggleBtn.className = "s2b-diff-toggle-btn";
-	toggleBtn.setAttribute("aria-label", "Toggle diff view");
+	toggleBtn.setAttribute("aria-label", t("plugin.diff.toggle_view"));
 	let currentMode: DiffViewMode;
 	try {
 		currentMode = getData().diffViewMode;
@@ -409,7 +410,12 @@ function createReadingDiffActionBar(
 	});
 	bar.appendChild(toggleBtn);
 
-	const acceptBtn = createResolveButton("s2b-diff-accept-btn", "check", "Accept", "Accept change");
+	const acceptBtn = createResolveButton(
+		"s2b-diff-accept-btn",
+		"check",
+		t("plugin.diff.accept"),
+		t("plugin.diff.accept_aria"),
+	);
 	acceptBtn.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -433,10 +439,7 @@ function createReadingDiffActionBar(
 			.then((conflict) => {
 				if (!conflict) return;
 				acceptBtn.disabled = true;
-				acceptBtn.setAttribute(
-					"title",
-					"Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage.",
-				);
+				acceptBtn.setAttribute("title", t("plugin.diff.stale_tooltip"));
 			})
 			.catch(() => {
 				/* vault read failed — leave the button as-is */
@@ -445,7 +448,12 @@ function createReadingDiffActionBar(
 		/* store not initialized */
 	}
 
-	const rejectBtn = createResolveButton("s2b-diff-reject-btn", "x", "Reject", "Reject change");
+	const rejectBtn = createResolveButton(
+		"s2b-diff-reject-btn",
+		"x",
+		t("plugin.diff.reject"),
+		t("plugin.diff.reject_aria"),
+	);
 	rejectBtn.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();

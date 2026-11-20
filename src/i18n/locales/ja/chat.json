@@ -1,0 +1,544 @@
+{
+	"editing": {
+		"label": "メッセージを編集中",
+		"cancel": "編集をキャンセル"
+	},
+	"branch": {
+		"previous": "前のブランチ",
+		"next": "次のブランチ"
+	},
+	"message": {
+		"collapse": "メッセージを折りたたむ",
+		"expand": "メッセージを展開",
+		"wait_before_edit": "編集する前に、現在の応答が終わるまでお待ちください",
+		"regenerate_failed": "再生成に失敗しました: {error}",
+		"retry_failed": "再試行に失敗しました: {error}",
+		"branch_switch_failed": "ブランチを切り替えられませんでした: {error}",
+		"unknown_error": "不明なエラー",
+		"copied": "クリップボードにコピーしました",
+		"edit": "メッセージを編集",
+		"copy": "メッセージをコピー",
+		"compaction_manual": "会話の手動圧縮",
+		"compaction_automatic": "会話の自動圧縮",
+		"regenerate": "応答を再生成",
+		"copy_response": "応答をコピー",
+		"jump_to_bottom": "一番下へ移動"
+	},
+	"model_select": {
+		"tooltip": "モデルを選択"
+	},
+	"attach": {
+		"tooltip": "コンテキストを追加",
+		"from_device": "デバイスから",
+		"take_photo": "写真を撮る",
+		"from_vault": "保管庫から"
+	},
+	"running": {
+		"go_to": "実行中のチャットへ移動: {name}"
+	},
+	"status": {
+		"request_failed": "モデルへのリクエストに失敗しました。",
+		"error_title": "問題が発生しました",
+		"retry_aria": "このリクエストを再試行",
+		"retry_tooltip": "失敗したリクエストを再実行",
+		"stopped": "停止しました"
+	},
+	"embed": {
+		"open_chat": "チャットを開く",
+		"fallback_title": "チャット",
+		"empty": "このチャットにはまだメッセージがありません。",
+		"load_failed": "チャットのプレビューを読み込めませんでした。"
+	},
+	"agent": {
+		"configure": "エージェントを設定",
+		"options": "エージェントのオプション",
+		"edit": "エージェントを編集",
+		"default_badge": "デフォルト",
+		"create": "エージェントを作成",
+		"new": "新しいエージェント"
+	},
+	"todos": {
+		"all_done": "すべての手順が完了しました",
+		"status_pending": "未着手",
+		"status_in_progress": "進行中",
+		"collapse": "タスクリストを折りたたむ",
+		"expand": "タスクリストを展開",
+		"progress": "{done}/{total}"
+	},
+	"pending": {
+		"count_create": {
+			"other": "作成 {count} 件"
+		},
+		"count_update": {
+			"other": "更新 {count} 件"
+		},
+		"count_delete": {
+			"other": "削除 {count} 件"
+		},
+		"count_move": {
+			"other": "移動 {count} 件"
+		},
+		"summary_pending": "{composition} が保留中",
+		"summary_partially_applied": "{count} 件を部分的に適用済み",
+		"type_create": "作成",
+		"type_update": "更新",
+		"type_move": "移動",
+		"notice_applied": "適用しました: {path}",
+		"notice_apply_failed": "変更を適用できませんでした: {error}",
+		"notice_rejected": "却下しました: {path}",
+		"notice_restored": "復元しました: {path}",
+		"skip_conflict": "「{path}」はそのままにしました — 変更の部分適用後に内容が変わっています。",
+		"skip_missing": "「{path}」を復元できませんでした — そのノートはもう存在しません。適用済みの内容はノートとともに移動しています。",
+		"skip_failed": "「{path}」を復元できませんでした。詳細はコンソールを確認してください。",
+		"notice_all_stale": "保留中の変更はすべて古くなっています — 提案後にノートが変更されました。却下して、エージェントに再提案を依頼してください。",
+		"risk_deletions": {
+			"other": "ノートの削除 {count} 件"
+		},
+		"risk_deprivatizing_moves": {
+			"other": "非公開の場所からの移動 {count} 件"
+		},
+		"risk_join": "{first}と{second}",
+		"confirm_accept_all_title": "すべての変更を承認しますか?",
+		"confirm_accept_all_message": {
+			"other": "この変更には{risks}が含まれています。{count} 件の変更をすべて適用しますか?"
+		},
+		"accept_all": "すべて承認",
+		"skipped_stale_suffix": "、古くなった {count} 件をスキップ",
+		"notice_applied_one": "変更を適用しました{skipped}",
+		"notice_applied_all": "{count} 件の変更をすべて適用しました{skipped}",
+		"notice_applied_partial": "{applied} 件の変更を適用しました{skipped}。{failed} 件は失敗しました: {paths}",
+		"notice_apply_error": "変更の適用中にエラーが発生しました: {error}",
+		"notice_rejected_all": "保留中の変更をすべて却下しました",
+		"notice_restored_partial": "部分的に適用されたノートを復元しました",
+		"notice_rejected_all_head": "保留中の変更をすべて却下しました。",
+		"notice_undo_finished_head": "適用済みの変更の取り消しが完了しました。",
+		"notice_open_failed": "この変更のノートを開けませんでした。",
+		"collapse": "保留中の変更を折りたたむ",
+		"expand": "保留中の変更を展開",
+		"diff_mode_to_split": "ノート内の差分を 2 ペイン表示に切り替え",
+		"diff_mode_to_word": "ノート内の差分を単語単位のインライン表示に切り替え",
+		"diff_mode_toggle": "差分の表示モードを切り替え",
+		"accept_all_tooltip": "すべての変更を承認",
+		"reject_all_tooltip": "すべての変更を却下し、部分的に適用されたノートを復元",
+		"undo_applied_tooltip": "部分的に適用されたノートを元の内容に戻す",
+		"reject_all": "すべて却下",
+		"undo_applied": "適用を取り消す",
+		"hide_widget_preview": "ウィジェットのプレビューを隠す",
+		"preview_widget": "ウィジェットをプレビュー",
+		"hide_changes": "変更を隠す",
+		"show_changes": "変更を表示",
+		"hide_content": "内容を隠す",
+		"show_content": "内容を表示",
+		"hide_widget_preview_aria": "{path} のプレビューを隠す",
+		"preview_widget_aria": "{path} をプレビュー",
+		"hide_changes_aria": "{path} への変更を隠す",
+		"show_changes_aria": "{path} への変更を表示",
+		"hide_content_aria": "{path} の内容を隠す",
+		"show_content_aria": "{path} の内容を表示",
+		"partly_applied_explanation": "この変更の一部がノートに適用されています。取り消すとノートが元の内容に戻ります。",
+		"partly_applied": "一部適用済み",
+		"stale_delete_explanation": "削除の提案後にこのノートが変更されたため、プレビューは削除される内容と一致しなくなりました。承認は失敗します。却下して、エージェントに再提案を依頼してください。",
+		"stale_explanation": "変更の提案後にこのノートが変更されたため、承認は失敗します。却下して、エージェントに現在の内容に対して編集をやり直すよう依頼してください。",
+		"stale": "古い提案",
+		"deprivatizing_explanation": "このノートは現在非公開です。この場所に移動するとプライバシーフィルターの対象外となり、以後はインデックス化・検索され、信頼されていないプロバイダーからも利用可能になります。",
+		"deprivatizing": "非公開から外れます",
+		"cross_thread_explanation": {
+			"other": "他の {count} 件のチャットにも、このファイルへの保留中の編集があります。最初に承認されたものが優先され、それ以外は適用に失敗する可能性があります。"
+		},
+		"stale_accept_disabled": "承認できません — 提案後にノートが変更されました。却下して、エージェントに再提案を依頼してください。",
+		"accept_change": "変更を承認",
+		"accept_change_aria": "{path} への変更を承認",
+		"reject_change": "変更を却下",
+		"reject_change_aria": "{path} への変更を却下",
+		"undo_applied_change_tooltip": "このノートを提案前の内容に戻す",
+		"undo_applied_change_aria": "{path} への適用済みの変更を取り消す",
+		"hide_source_changes": "ソースの変更を隠す",
+		"show_source_changes": "ソースの変更を表示",
+		"note_empty": "このノートは空です。",
+		"no_remaining_differences": "残りの差分はありません。",
+		"accept_hunk": "この変更を承認",
+		"accept_hunk_aria": "変更 {index}/{total} を承認",
+		"reject_hunk": "この変更を却下",
+		"reject_hunk_aria": "変更 {index}/{total} を却下",
+		"hunk_too_large": "この変更は大きすぎてここではプレビューできません — ノートを開いて確認してください。"
+	},
+	"question": {
+		"send_failed": "回答を送信できませんでした",
+		"group_aria": "エージェントからの質問",
+		"position": "質問 {index}/{total}",
+		"label": "質問",
+		"dismiss_aria": "質問を閉じる",
+		"dismiss_tooltip": "回答せずに閉じる",
+		"multi_hint": "当てはまるものをすべて選択",
+		"custom_placeholder": "その他…",
+		"answer_placeholder": "回答を入力…",
+		"custom_aria": "自分の回答",
+		"send_answers": "回答を送信",
+		"send_answer": "回答を送信",
+		"unrenderable": "エージェントが表示できない質問をしました。",
+		"retry": "もう一度試してもらう"
+	},
+	"context_usage": {
+		"row_system": "システムプロンプト",
+		"row_human": "あなたのメッセージ",
+		"row_assistant": "アシスタント",
+		"row_tool": "ツールの結果",
+		"row_draft": "下書きと保留中",
+		"tooltip_unknown_limit": "コンテキスト使用量(推定): {used}k トークン(上限不明)",
+		"tooltip": "コンテキスト使用量(推定): {percent}%({used}k / {limit}k)",
+		"line_unknown_limit": "{tokens} トークン · 上限不明",
+		"line": "{limit} トークン中 {tokens} トークン",
+		"compaction_unknown_short": "自動圧縮には上限が判明している必要があります",
+		"compaction_unknown_long": "自動要約には、コンテキストの上限が判明しているモデルが必要です。",
+		"compaction_short": "{tokens}{percent} で自動圧縮",
+		"compaction_long": "{tokens} トークン{percent}に達すると、古いメッセージが自動的に要約されます。",
+		"trigger_aria": "コンテキストのトークン内訳を開く",
+		"heading": "コンテキスト使用量(推定)",
+		"summarize_now": "今すぐ要約",
+		"summarize_now_tooltip": "古いメッセージを今すぐ要約",
+		"nothing_to_summarize": "要約するものはまだありません"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "どんなことを手伝ってもらえますか?",
+		"suggestion_summarize_recent": "最近のノートを要約して",
+		"suggestion_find_notes": "トピックに関するノートを探す",
+		"suggestion_find_notes_query": "次のトピックに関するノートを探して: ",
+		"suggestion_tasknotes": "今週期限のタスクは?",
+		"suggestion_tasks": "期限切れのタスクは?",
+		"suggestion_dataview": "ノートをタグ別に表で表示して",
+		"skills_initializing": "スキルはまだ初期化中です — しばらくしてからもう一度お試しください。",
+		"skill_create_failed_detail": "{name} のスキルを作成できませんでした: {error}",
+		"skill_create_failed": "{name} のスキルを作成できませんでした。",
+		"open_agent_skills": "エージェントのスキルを開く",
+		"enabled_notice": "{agent} で {name} を有効にしました。",
+		"greeting_title": "新しい会話を始める",
+		"greeting_sub": "ノートについて何でも聞いてください。",
+		"add_provider_title": "AI プロバイダーを追加",
+		"add_provider_sub": "プロバイダーを接続してチャットを始めましょう。",
+		"select_model_title": "チャットモデルを選択",
+		"select_model_sub": "モデルを選んでチャットを始めましょう。",
+		"dismiss_suggestion_aria": "「{label}」を非表示",
+		"stale_not_updated": "デフォルトの{label}が変更されましたが、あなたのコピーを自動で更新できませんでした。",
+		"stale_kept": "デフォルトの{label}が変更されました。カスタマイズ版はそのまま保持されています。",
+		"review": "確認",
+		"dismiss_notice_aria": "{label} の更新通知を閉じる",
+		"dismiss_notice": "この通知を閉じる",
+		"dismiss_all_nudges_aria": "{count} 件のプラグイン連携の提案をすべて非表示",
+		"dismiss_all_nudges_tooltip": "{count} 件の提案をすべて非表示",
+		"dismiss_all": "すべて非表示",
+		"enable": "有効にする",
+		"dismiss_nudge_aria": "{name} の提案を非表示",
+		"dismiss_nudge": "この提案を非表示",
+		"show_less": "表示を減らす",
+		"dismiss_all_aria": "すべての提案を非表示",
+		"stale_label": {
+			"system_prompt": "システムプロンプト",
+			"skill": "スキル「{name}」"
+		},
+		"nudge": "このエージェントで {skill} スキルを有効にします。",
+		"nudges_summary": {
+			"other": "このエージェントで利用できるプラグイン連携が {number} 件あります。"
+		},
+		"stale_agent_kept": "デフォルトの{label}が変更されました。{agent} のカスタマイズ版はそのまま保持されています。",
+		"stale_agent_not_updated": "デフォルトの{label}が変更されましたが、{agent} のコピーを自動で更新できませんでした。"
+	},
+	"context_tray": {
+		"attachment_open": "{path}(クリックして開く)",
+		"remove_attachment": "添付ファイルを削除",
+		"remove_attachment_aria": "{name} を削除",
+		"note_excluded": "{path}(除外中 — クリックして参照として含める)",
+		"note_included": "{path}(開いているノート — クリックして除外)",
+		"attach_full_content": "メッセージに内容全体を添付",
+		"graph_collapse": "グラフの選択 — クリックして折りたたむ",
+		"graph_topic_expand": "{topic} — クリックして展開",
+		"graph_notes_expand": {
+			"other": "グラフからの {count} 件のノート — クリックして展開"
+		},
+		"graph_notes_label": {
+			"other": "グラフのノート {count} 件"
+		},
+		"remove_graph_notes": "グラフのノートをすべて削除",
+		"graph_member": "{path}(グラフから — クリックして除外)",
+		"selection": "{path} から選択したテキスト(クリックして閉じる)\n\n{text}",
+		"selection_long": "長い選択範囲 — モデルのコンテキストに収まるよう切り詰められます"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "ノートで {target} を検索中",
+				"done": "ノートで {target} を検索しました"
+			},
+			"recent_notes": {
+				"running": "最近のノートを確認中",
+				"done": "最近のノートを確認しました"
+			},
+			"search_notes": {
+				"running": "ノートを検索中",
+				"done": "ノートを検索しました"
+			},
+			"grep_for": {
+				"running": "テキスト {target} を検索中",
+				"done": "テキスト {target} を検索しました"
+			},
+			"grep": {
+				"running": "ノートのテキストを検索中",
+				"done": "ノートのテキストを検索しました"
+			},
+			"list_folder": {
+				"running": "フォルダ {target} を一覧表示中",
+				"done": "フォルダ {target} を一覧表示しました"
+			},
+			"list_vault": {
+				"running": "保管庫を一覧表示中",
+				"done": "保管庫を一覧表示しました"
+			},
+			"read_target": {
+				"running": "{target} を読み取り中",
+				"done": "{target} を読み取りました"
+			},
+			"read_note": {
+				"running": "ノートを読み取り中",
+				"done": "ノートを読み取りました"
+			},
+			"edit_notes": {
+				"running": "ノートを編集中",
+				"done": "ノートを編集しました"
+			},
+			"edit_note": {
+				"running": "ノートを編集中",
+				"done": "ノートを編集しました"
+			},
+			"run_javascript": {
+				"running": "JavaScript を実行中",
+				"done": "JavaScript を実行しました"
+			},
+			"list_tags": {
+				"running": "すべてのタグを一覧表示中",
+				"done": "すべてのタグを一覧表示しました"
+			},
+			"read_properties_of": {
+				"running": "{target} のプロパティを読み取り中",
+				"done": "{target} のプロパティを読み取りました"
+			},
+			"read_properties": {
+				"running": "ノートのプロパティを読み取り中",
+				"done": "ノートのプロパティを読み取りました"
+			},
+			"fetch_target": {
+				"running": "{target} を取得中",
+				"done": "{target} を取得しました"
+			},
+			"fetch_page": {
+				"running": "ページを取得中",
+				"done": "ページを取得しました"
+			},
+			"web_search_for": {
+				"running": "ウェブで {target} を検索中",
+				"done": "ウェブで {target} を検索しました"
+			},
+			"web_search": {
+				"running": "ウェブを検索中",
+				"done": "ウェブを検索しました"
+			},
+			"load_skill_target": {
+				"running": "スキル {target} を読み込み中",
+				"done": "スキル {target} を読み込みました"
+			},
+			"load_skill": {
+				"running": "スキルを読み込み中",
+				"done": "スキルを読み込みました"
+			},
+			"update_todos": {
+				"running": "タスクリストを更新中",
+				"done": "タスクリストを更新しました"
+			},
+			"clear_todos": {
+				"running": "タスクリストをクリア中",
+				"done": "タスクリストをクリアしました"
+			},
+			"ask_target": {
+				"running": "{target}を質問中",
+				"done": "{target}を質問しました"
+			},
+			"generic_target": {
+				"running": "{name} を使用中: {target}",
+				"done": "{name} を使用しました: {target}"
+			},
+			"generic": {
+				"running": "{name} を使用中",
+				"done": "{name} を使用しました"
+			}
+		},
+		"count": {
+			"note": {
+				"other": "{count} 件のノート"
+			},
+			"match": {
+				"other": "{count} 件の一致"
+			},
+			"file": {
+				"other": "{count} 個のファイル"
+			},
+			"folder": {
+				"other": "{count} 個のフォルダ"
+			},
+			"line": {
+				"other": "{count} 行"
+			},
+			"tag": {
+				"other": "{count} 個のタグ"
+			},
+			"result": {
+				"other": "{count} 件の結果"
+			},
+			"question": {
+				"other": "{count} 件の質問"
+			},
+			"operation": {
+				"other": "{count} 件の操作"
+			},
+			"item": {
+				"other": "{count} 項目"
+			},
+			"row": {
+				"other": "{count} 行"
+			},
+			"field": {
+				"other": "{count} 個のフィールド"
+			}
+		},
+		"found": "{items}が見つかりました",
+		"found_no_matches": "一致なし",
+		"found_in": "{files}で{items}が見つかりました",
+		"found_folders_and_files": "{folders}と{files}が見つかりました",
+		"truncated": "{lines}(切り詰め)",
+		"operations_across": "{notes}に対して{operations}",
+		"errored": "エラー",
+		"logged": "{lines}のログ",
+		"returned_value": "値を返しました",
+		"duration_ms": "{ms}ms",
+		"todos_done": "{total} 件中 {done} 件完了",
+		"dismissed": "閉じられました",
+		"answered_in_chat": "チャットで回答",
+		"answered": "回答済み",
+		"failed": "失敗",
+		"lines_total": "合計 {lines}",
+		"list_separator": "、",
+		"list_and": "{list}、{last}",
+		"list_and_more": "{list}、ほか {count} 件",
+		"tool_fallback": "ツール"
+	},
+	"tool_output": {
+		"key_count": {
+			"other": "{count} 個のキー"
+		}
+	},
+	"tools": {
+		"review_accepted": "{count} 件承認",
+		"review_partial": "{count} 件一部適用",
+		"review_rejected": "{count} 件却下",
+		"review_pending": "{count} 件レビュー待ち",
+		"label_with_outcome": "{label}、{outcome}",
+		"source_note": "ノート",
+		"phase_summarizing": "以前のメッセージを要約中",
+		"phase_running_tools": {
+			"other": "{count} 個のツールを実行中"
+		},
+		"phase_loading_model": "モデルを読み込み中",
+		"phase_waiting": "モデルを待機中",
+		"phase_writing": "書き込み中",
+		"phase_thinking": "思考中",
+		"running_label": "{phase}… {seconds}秒",
+		"settled_label": "{seconds}秒間思考しました",
+		"via_subagent": "{name} 経由",
+		"input": "入力",
+		"output": "出力",
+		"no_output": "(出力なし)",
+		"result": "結果",
+		"tree_more_files": {
+			"other": "ほか {count} 個のファイル"
+		},
+		"tree_unlisted_files": {
+			"other": "一覧にない {count} 個のファイル"
+		},
+		"no_answer": "回答なし",
+		"dismissed_without_answer": "回答せずに閉じられました。",
+		"chip_query": "クエリ: {value}",
+		"chip_algorithm": "アルゴリズム: {value}",
+		"chip_results": "結果: {value}",
+		"chip_shown": "表示: {value}",
+		"chip_recent_only": "最近のみ",
+		"chip_skipped_private": "非公開をスキップ: {value}",
+		"untitled": "無題",
+		"more_results": {
+			"other": "ほか {count} 件の結果"
+		},
+		"chip_root": "ルート: {value}",
+		"chip_folders": "フォルダ: {value}",
+		"chip_files": "ファイル: {value}",
+		"chip_depth": "深さ: {value}",
+		"chip_folders_only": "フォルダのみ",
+		"chip_collapsed": "折りたたみ",
+		"tree": "ツリー",
+		"chip_operations": "操作: {value}",
+		"chip_paths": "パス: {value}",
+		"chip_truncated": "切り詰め",
+		"chip_logs": "ログ: {value}",
+		"chip_error": "エラー",
+		"chip_return_value": "戻り値",
+		"console_output": "コンソール出力",
+		"return_value": "戻り値",
+		"executed_code": "実行したコード",
+		"raw_output": "生の出力"
+	},
+	"input": {
+		"drop_files": "ここにファイルをドロップ",
+		"send_shortcut_hint": "↵ · リスト内では {shortcut}",
+		"edit_attachment_missing": "添付ファイル「{name}」は保管庫に存在しなくなったため、編集したメッセージには含まれません。",
+		"select_model_to_send": "送信するにはチャットモデルを選択してください。",
+		"placeholder": "ノートについて質問...",
+		"wait_for_attachments": "添付ファイルの保存が完了するまでお待ちください",
+		"select_model_before_sending": "送信する前にチャットモデルを選択してください。",
+		"empty_before_sending": "送信する前にテキストを入力するかファイルを添付してください",
+		"empty_before_saving": "保存する前にテキストを入力するかファイルを添付してください",
+		"select_model_before_saving": "保存する前にチャットモデルを選択してください。",
+		"save_edit_failed": "編集を保存できませんでした",
+		"not_ready": "チャットの準備がまだできていません",
+		"question_blocks_attachments": "ファイルを添付する前に、エージェントの質問に回答するか閉じてください",
+		"send_failed": "メッセージを送信できませんでした",
+		"summarize_failed": "履歴を要約できませんでした",
+		"unsupported_file_type": "対応していないファイル形式です: .{ext}",
+		"the_selected_model": "選択したモデル",
+		"vision_required_switch": "画像を添付するには画像に対応したモデルが必要です。画像を添付するにはモデルを切り替えてください(現在: {model})。",
+		"vision_unknown": "このモデルが画像に対応しているかは不明です。画像の解析に失敗する可能性があります。",
+		"file_too_large": "ファイルが大きすぎます: {name} は 1 ファイルあたりの上限 15 MB を超えています。",
+		"total_too_large": "添付ファイルの合計サイズが 1 メッセージあたりの上限 25 MB を超えています。",
+		"attach_failed": "ファイルを添付できませんでした: {error}",
+		"vision_required": "画像を添付するには画像に対応したモデルが必要です(現在: {model})。",
+		"switch_model": "モデルを切り替え",
+		"already_attached": "{name} はすでに添付されています。",
+		"wait_for_current_attachments": "現在の添付ファイルの保存が完了するまでお待ちください。",
+		"file_not_found": "ファイルが見つかりません: {path}",
+		"only_files": "添付できるのはファイルのみです: {path}",
+		"picker_placeholder": "添付する保管庫のファイルを検索...",
+		"picker_verb": "添付",
+		"current_model": "現在のモデル",
+		"drag_images_unsupported": "{model} は画像に対応していません。画像に対応したモデルに切り替えてください。",
+		"drag_some_unsupported": "対応していないファイルが含まれている可能性があります(対応形式: txt、md、csv、json、画像、pdf)。",
+		"retry_connection": "クリックして接続を再試行",
+		"provider_unreachable": "{provider} に接続できません — クリックして再試行",
+		"saving": "保存中...",
+		"save_edit_aria": "編集を保存",
+		"send_aria": "メッセージを送信",
+		"select_model_first": "先にチャットモデルを選択してください",
+		"save_edit_with_hint": "編集を保存 ({hint})",
+		"save_edit": "編集を保存",
+		"send_with_hint": "メッセージを送信 ({hint})",
+		"send": "メッセージを送信",
+		"stop_aria": "ストリーミングを停止",
+		"stop": "ストリーミングを停止"
+	},
+	"view": {
+		"session_unavailable": "チャットセッションはまだ利用できません。プラグインの初期化が完了してから、このビューを開き直してください。"
+	}
+}

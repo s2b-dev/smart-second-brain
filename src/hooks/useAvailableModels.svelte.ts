@@ -12,6 +12,7 @@ import { getData } from "../stores/dataStore.svelte";
 import { getPlugin, requestSettingsTab } from "../stores/state.svelte";
 import { ProviderSetupModal } from "../views/provider-setup/ProviderSetup";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
+import { t } from "../i18n";
 
 export interface ModelOption {
 	value: string;
@@ -495,9 +496,9 @@ export class AvailableModels {
 		// knowable here, so the General tab (listing all of them) is the honest destination —
 		// and the notice is what stops that tab from looking like nothing happened.
 		if (needsEmbedding && !this.hasEmbedModels) {
-			new Notice("No embedding models found for your providers. Check that one exposes embeddings.");
+			new Notice(t("plugin.models.no_embedding_models"));
 		} else if (!needsEmbedding && !this.hasModels) {
-			new Notice("No models found. Check that your provider is running and reachable.");
+			new Notice(t("plugin.models.no_models"));
 		}
 
 		dismiss?.();

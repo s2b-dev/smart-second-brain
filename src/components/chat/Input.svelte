@@ -28,6 +28,7 @@ import ContextTray from "./ContextTray.svelte";
 import ContextUsageCircle from "./ContextUsageCircle.svelte";
 import AttachPopover from "./AttachPopover.svelte";
 import { SearchModal } from "../modal/SearchModal";
+import { t } from "../../i18n";
 import { isMobileUI } from "../../utils/platform";
 import Button from "../ui/Button.svelte";
 interface Props {
@@ -82,13 +83,15 @@ let savingFiles = $state(false);
 /** Drag-and-drop state */
 let isDragging = $state(false);
 let dragCounter = 0;
-let dragMessage = $state("Drop files here");
+let dragMessage = $state(t("chat.input.drop_files"));
 let dragHasIssue = $state(false);
 // On mobile there's no keyboard shortcut at all — Enter is always a newline
 // there (see the `onEnter` handler below) and the send button is the only
 // way to submit, so there's nothing to hint. On desktop Enter sends except on a
 // list line, where it continues the list and Mod+Enter sends.
-const sendShortcutHint = isMobileUI() ? "" : `↵ · ${Platform.isMacOS ? "⌘↵" : "Ctrl+↵"} in a list`;
+const sendShortcutHint = isMobileUI()
+	? ""
+	: t("chat.input.send_shortcut_hint", { shortcut: Platform.isMacOS ? "⌘↵" : "Ctrl+↵" });
 let containerEl: HTMLDivElement | undefined = $state();
 // Floor for the input card when the composer runs out of pane height: its
 // controls plus one editor line. Summed from the rows around the editor, never
@@ -139,7 +142,7 @@ const sendButtonStyle = $derived.by(() => {
 	].join("; ");
 });
 
-const DEFAULT_DRAG_MESSAGE = "Drop files here";
+const DEFAULT_DRAG_MESSAGE = t("chat.input.drop_files");
 
 const ACCEPTED_EXTENSIONS = new Set(["txt", "md", "csv", "json", "png", "jpg", "jpeg", "gif", "webp", "pdf"]);
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
@@ -352,9 +355,7 @@ async function seedEditAttachments(restored: ChatAttachment[]) {
 		if (attachments.some((a) => a.vaultPath === att.vaultPath)) continue;
 		const file = plugin.app.vault.getAbstractFileByPath(att.vaultPath);
 		if (!(file instanceof TFile)) {
-			new Notice(
-				`Attachment "${att.name}" no longer exists in the vault — it won't be part of the edited message.`,
-			);
+			new Notice(t("chat.input.edit_attachment_missing", { name: att.name }));
 			continue;
 		}
 		attachments.push({ name: att.name, mimeType: att.mimeType, vaultPath: att.vaultPath });
@@ -487,8 +488,8 @@ $effect(() => {
 	// The text stays in the composer, so nothing is lost by explaining and stopping.
 	if (!hasChatModel) {
 		showActionNotice(
-			"Select a chat model to send this.",
-			selectChatModelAction("Select model", selectedAgentWriteTarget),
+			t("chat.input.select_model_to_send"),
+			selectChatModelAction(t("chat.model_select.tooltip"), selectedAgentWriteTarget),
 		);
 		return;
 	}
@@ -582,7 +583,7 @@ function initializeEditor() {
 		value: inputValue,
 		// Orients first-time users toward the product's actual job — chatting
 		// with the vault — instead of the generic "Type a message...".
-		placeholder: "Ask about your notes...",
+		placeholder: t("chat.input.placeholder"),
 		cls: "chat-markdown-editor",
 		enterVimInsertMode: true,
 		onPaste: (event) => {
@@ -636,13 +637,13 @@ function initializeEditor() {
 
 function attemptSend() {
 	if (savingFiles) {
-		new Notice("Please wait for attachments to finish saving");
+		new Notice(t("chat.input.wait_for_attachments"));
 	} else if (!hasChatModel) {
 		// Reachable from the keyboard even though the button is disabled.
 		// The picker is the only way forward, so offer it rather than just saying no.
 		showActionNotice(
-			"Select a chat model before sending.",
-			selectChatModelAction("Select model", selectedAgentWriteTarget),
+			t("chat.input.select_model_before_sending"),
+			selectChatModelAction(t("chat.model_select.tooltip"), selectedAgentWriteTarget),
 		);
 	} else if (canSendMessage) {
 		if (isEditing) {
@@ -651,7 +652,7 @@ function attemptSend() {
 			sendMessage();
 		}
 	} else {
-		new Notice("Add text or attach a file before sending");
+		new Notice(t("chat.input.empty_before_sending"));
 	}
 }
 
@@ -667,15 +668,15 @@ function cancelActiveEdit() {
 function saveEdit() {
 	if (!session || editingPairId === null) return;
 	if (savingFiles) {
-		new Notice("Please wait for attachments to finish saving");
+		new Notice(t("chat.input.wait_for_attachments"));
 		return;
 	}
 	if (!hasContentToSend) {
-		new Notice("Add text or attach a file before saving");
+		new Notice(t("chat.input.empty_before_saving"));
 		return;
 	}
 	if (!hasChatModel) {
-		new Notice("Select a chat model before saving.");
+		new Notice(t("chat.input.select_model_before_saving"));
 		return;
 	}
 
@@ -684,7 +685,7 @@ function saveEdit() {
 	// message's attachment list, so text is optional exactly as it is on send.
 	const contentToSave = inputValue.trim().length > 0 ? inputValue : "Please analyze the attached files.";
 	session.editMessage(pairId, contentToSave, [...attachments]).catch((error) => {
-		new Notice(error instanceof Error ? error.message : "Failed to save edit");
+		new Notice(error instanceof Error ? error.message : t("chat.input.save_edit_failed"));
 	});
 	// Not session.cancelEdit() — that's for an abandoned edit; this one succeeded.
 	// The draft that was stashed before the edit began is simply gone: the user
@@ -711,25 +712,25 @@ function saveEdit() {
 
 function sendMessage() {
 	if (savingFiles) {
-		new Notice("Please wait for attachments to finish saving");
+		new Notice(t("chat.input.wait_for_attachments"));
 		return;
 	}
 	if (!hasContentToSend) {
-		new Notice("Add text or attach a file before sending");
+		new Notice(t("chat.input.empty_before_sending"));
 		return;
 	}
 	if (!hasChatModel) {
-		new Notice("Select a chat model before sending.");
+		new Notice(t("chat.input.select_model_before_sending"));
 		return;
 	}
 	if (!session) {
-		new Notice("Chat is not ready yet");
+		new Notice(t("chat.input.not_ready"));
 		return;
 	}
 	// A message sent while the agent's question is open is delivered as the answer to
 	// it (see ChatSession.sendMessage), and an answer is text only.
 	if (session.pendingInterrupts.length > 0 && attachments.length > 0) {
-		new Notice("Answer or dismiss the agent's question before attaching files");
+		new Notice(t("chat.input.question_blocks_attachments"));
 		return;
 	}
 
@@ -743,7 +744,7 @@ function sendMessage() {
 			activeGraphNotes.length > 0 ? [...activeGraphNotes] : undefined,
 		)
 		.catch((error) => {
-			new Notice(error instanceof Error ? error.message : "Failed to send message");
+			new Notice(error instanceof Error ? error.message : t("chat.input.send_failed"));
 		});
 	attachments = [];
 	attachmentSizes = new Map();
@@ -763,7 +764,7 @@ async function summarizeNow() {
 	try {
 		await session.summarizeHistoryNow();
 	} catch (error) {
-		new Notice(error instanceof Error ? error.message : "Failed to summarize history");
+		new Notice(error instanceof Error ? error.message : t("chat.input.summarize_failed"));
 	}
 }
 
@@ -849,31 +850,29 @@ async function processFiles(files: File[]) {
 			const file = withFallbackAttachmentName(sourceFile, index);
 			const ext = extensionFromFile(file);
 			if (!ACCEPTED_EXTENSIONS.has(ext)) {
-				new Notice(`Unsupported file type: .${ext}`);
+				new Notice(t("chat.input.unsupported_file_type", { ext }));
 				continue;
 			}
 
 			const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
 			if (isImage && selectedModelSupportsVision === false) {
-				const modelName = selectedChatModel?.model ?? "the selected model";
-				new Notice(
-					`Image attachments require a vision-capable model. Switch models to attach images (current: ${modelName}).`,
-				);
+				const modelName = selectedChatModel?.model ?? t("chat.input.the_selected_model");
+				new Notice(t("chat.input.vision_required_switch", { model: modelName }));
 				continue;
 			}
 
 			if (isImage && selectedModelSupportsVision === undefined && !warnedUnknownVision) {
 				warnedUnknownVision = true;
-				new Notice("Model vision support is unknown; image analysis may fail for this model.");
+				new Notice(t("chat.input.vision_unknown"));
 			}
 
 			if (file.size > MAX_FILE_SIZE_BYTES) {
-				new Notice(`File too large: ${file.name} exceeds 15 MB per-file limit.`);
+				new Notice(t("chat.input.file_too_large", { name: file.name }));
 				continue;
 			}
 
 			if (totalBytes + file.size > MAX_TOTAL_ATTACHMENTS_BYTES) {
-				new Notice("Total attachment size exceeds 25 MB limit for one message.");
+				new Notice(t("chat.input.total_too_large"));
 				continue;
 			}
 
@@ -900,7 +899,7 @@ async function processFiles(files: File[]) {
 			if (hasPreview(mime)) publishPreview(vaultPath, await createPreviewUrl(buffer, mime));
 		}
 	} catch (error) {
-		new Notice(`Failed to attach file: ${error instanceof Error ? error.message : String(error)}`);
+		new Notice(t("chat.input.attach_failed", { error: error instanceof Error ? error.message : String(error) }));
 	} finally {
 		savingFiles = false;
 	}
@@ -910,40 +909,40 @@ async function attachVaultFile(file: TFile): Promise<boolean> {
 	const ext = file.extension.toLowerCase();
 
 	if (!ACCEPTED_EXTENSIONS.has(ext)) {
-		new Notice(`Unsupported file type: .${ext}`);
+		new Notice(t("chat.input.unsupported_file_type", { ext }));
 		return false;
 	}
 
 	const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
 	if (isImage && selectedModelSupportsVision === false) {
-		const modelName = selectedChatModel?.model ?? "the selected model";
+		const modelName = selectedChatModel?.model ?? t("chat.input.the_selected_model");
 		showActionNotice(
-			`Image attachments require a vision-capable model (current: ${modelName}).`,
-			selectChatModelAction("Switch model", selectedAgentWriteTarget),
+			t("chat.input.vision_required", { model: modelName }),
+			selectChatModelAction(t("chat.input.switch_model"), selectedAgentWriteTarget),
 		);
 		return false;
 	}
 
 	if (isImage && selectedModelSupportsVision === undefined) {
-		new Notice("Model vision support is unknown; image analysis may fail for this model.");
+		new Notice(t("chat.input.vision_unknown"));
 	}
 
 	try {
 		const size = file.stat.size;
 
 		if (size > MAX_FILE_SIZE_BYTES) {
-			new Notice(`File too large: ${file.name} exceeds 15 MB per-file limit.`);
+			new Notice(t("chat.input.file_too_large", { name: file.name }));
 			return false;
 		}
 
 		const totalBytes = [...attachmentSizes.values()].reduce((sum, s) => sum + s, 0);
 		if (totalBytes + size > MAX_TOTAL_ATTACHMENTS_BYTES) {
-			new Notice("Total attachment size exceeds 25 MB limit for one message.");
+			new Notice(t("chat.input.total_too_large"));
 			return false;
 		}
 
 		if (attachments.some((att) => att.vaultPath === file.path)) {
-			new Notice(`${file.name} is already attached.`);
+			new Notice(t("chat.input.already_attached", { name: file.name }));
 			return false;
 		}
 
@@ -959,7 +958,7 @@ async function attachVaultFile(file: TFile): Promise<boolean> {
 
 		return true;
 	} catch (error) {
-		new Notice(`Failed to attach file: ${error instanceof Error ? error.message : String(error)}`);
+		new Notice(t("chat.input.attach_failed", { error: error instanceof Error ? error.message : String(error) }));
 		return false;
 	}
 }
@@ -968,7 +967,7 @@ async function attachVaultFilesByPath(paths: string[]) {
 	if (paths.length === 0) return;
 
 	if (savingFiles) {
-		new Notice("Please wait for the current attachments to finish saving.");
+		new Notice(t("chat.input.wait_for_current_attachments"));
 		return;
 	}
 
@@ -980,12 +979,12 @@ async function attachVaultFilesByPath(paths: string[]) {
 		for (const path of paths) {
 			const abstract = app.vault.getAbstractFileByPath(path);
 			if (!abstract) {
-				new Notice(`File not found: ${path}`);
+				new Notice(t("chat.input.file_not_found", { path }));
 				continue;
 			}
 
 			if (!(abstract instanceof TFile)) {
-				new Notice(`Only files can be attached: ${path}`);
+				new Notice(t("chat.input.only_files", { path }));
 				continue;
 			}
 
@@ -1021,7 +1020,7 @@ async function onEditorPaste(event: ClipboardEvent) {
 
 	event.preventDefault();
 	if (savingFiles) {
-		new Notice("Please wait for the current attachments to finish saving.");
+		new Notice(t("chat.input.wait_for_current_attachments"));
 		return;
 	}
 
@@ -1031,7 +1030,7 @@ async function onEditorPaste(event: ClipboardEvent) {
 async function onFileAttachment(event: Event) {
 	const input = event.target as HTMLInputElement;
 	if (savingFiles) {
-		new Notice("Please wait for the current attachments to finish saving.");
+		new Notice(t("chat.input.wait_for_current_attachments"));
 		input.value = "";
 		return;
 	}
@@ -1048,9 +1047,8 @@ function openVaultPicker() {
 	new SearchModal(getPlugin().app, {
 		picker: {
 			pickerText: {
-				searchPlaceholder: "Search vault files to attach...",
-				confirmVerb: "Attach",
-				selectionLabel: "to attach",
+				searchPlaceholder: t("chat.input.picker_placeholder"),
+				confirmVerb: t("chat.input.picker_verb"),
 			},
 			pickerExistingPaths: attachments.map((att) => att.vaultPath),
 			onAddPaths: (paths) => attachVaultFilesByPath(paths),
@@ -1109,9 +1107,9 @@ function getDragFeedback(dataTransfer?: DataTransfer | null): {
 	}
 
 	if (hasImage && selectedModelSupportsVision === false) {
-		const modelName = selectedChatModel?.model ?? "current model";
+		const modelName = selectedChatModel?.model ?? t("chat.input.current_model");
 		return {
-			message: `Images are not supported by ${modelName}. Switch to a vision-capable model.`,
+			message: t("chat.input.drag_images_unsupported", { model: modelName }),
 			hasIssue: true,
 			shouldBlockDrop: true,
 		};
@@ -1119,7 +1117,7 @@ function getDragFeedback(dataTransfer?: DataTransfer | null): {
 
 	if (hasClearlyUnsupported) {
 		return {
-			message: "Some files may be unsupported (accepted: txt, md, csv, json, images, pdf).",
+			message: t("chat.input.drag_some_unsupported"),
 			hasIssue: true,
 			shouldBlockDrop: false,
 		};
@@ -1169,7 +1167,7 @@ export async function handleDrop(event: DragEvent) {
 	resetDragState();
 
 	if (savingFiles) {
-		new Notice("Please wait for the current attachments to finish saving.");
+		new Notice(t("chat.input.wait_for_current_attachments"));
 		return;
 	}
 
@@ -1220,12 +1218,12 @@ function canPromoteVisibleNoteToAttachment(note: VisibleNote): boolean {
 /** Promote the active visible note to a content attachment (inline its bytes/content). */
 async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 	if (!canPromoteVisibleNoteToAttachment(note)) {
-		new Notice(`Unsupported file type: .${note.file.extension.toLowerCase()}`);
+		new Notice(t("chat.input.unsupported_file_type", { ext: note.file.extension.toLowerCase() }));
 		return;
 	}
 
 	if (savingFiles) {
-		new Notice("Please wait for the current attachments to finish saving.");
+		new Notice(t("chat.input.wait_for_current_attachments"));
 		return;
 	}
 
@@ -1247,10 +1245,10 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     <button
       class="provider-unreachable-banner s2b-flex s2b-flex-row s2b-items-center s2b-gap-1.5 s2b-text-xs s2b-cursor-pointer"
       onclick={models.refetchProviders}
-      title="Click to retry connection"
+      title={t("chat.input.retry_connection")}
     >
       <div class="s2b-h-icon-xs s2b-shrink-0" use:icon={"alert-triangle"} style="--icon-size: var(--icon-xs)"></div>
-      <span>Cannot connect to {selectedChatModel.provider} — click to retry</span>
+      <span>{t("chat.input.provider_unreachable", { provider: selectedChatModel.provider })}</span>
     </button>
   {/if}
   <TodoListBar {registry} {threadPath} />
@@ -1298,7 +1296,7 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         attachmentPreviewUrls={previewUrls}
       />
       {#if savingFiles}
-        <div class="s2b-text-xs s2b-text-text-muted s2b-flex s2b-items-center">Saving...</div>
+        <div class="s2b-text-xs s2b-text-text-muted s2b-flex s2b-items-center">{t("chat.input.saving")}</div>
       {/if}
     </div>
 
@@ -1365,8 +1363,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
         {#if !session || session.messageState === MessageState.idle}
           {#if isEditing && isMobileUI()}
             <Button
-              ariaLabel="Cancel edit"
-              tooltip="Cancel edit"
+              ariaLabel={t("chat.editing.cancel")}
+              tooltip={t("chat.editing.cancel")}
               onClick={cancelActiveEdit}
               styles="s2b-chat-input-icon-button clickable-icon s2b-mr-2"
               iconId="x"
@@ -1374,16 +1372,16 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
           {/if}
           <Button
             disabled={!canSendMessage || savingFiles}
-            ariaLabel={isEditing ? "save edit" : "send message"}
+            ariaLabel={isEditing ? t("chat.input.save_edit_aria") : t("chat.input.send_aria")}
             tooltip={!hasChatModel
-              ? "Select a chat model first"
+              ? t("chat.input.select_model_first")
               : isEditing
                 ? sendShortcutHint
-                  ? `Save edit (${sendShortcutHint})`
-                  : "Save edit"
+                  ? t("chat.input.save_edit_with_hint", { hint: sendShortcutHint })
+                  : t("chat.input.save_edit")
                 : sendShortcutHint
-                  ? `Send message (${sendShortcutHint})`
-                  : "Send message"}
+                  ? t("chat.input.send_with_hint", { hint: sendShortcutHint })
+                  : t("chat.input.send")}
             onClick={attemptSend}
             dataTestId="send-message-button"
             styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200 disabled:s2b-cursor-not-allowed"
@@ -1392,8 +1390,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
           />
         {:else if session.messageState === MessageState.answering}
           <Button
-            ariaLabel="stop streaming"
-            tooltip="Stop streaming"
+            ariaLabel={t("chat.input.stop_aria")}
+            tooltip={t("chat.input.stop")}
             onClick={() => session?.stopStreaming()}
             styles="s2b-send-message-button s2b-p-0 s2b-border-none s2b-cursor-pointer s2b-flex s2b-items-center s2b-justify-center s2b-shrink-0 s2b-transition-all s2b-duration-200"
             style={sendButtonStyle}

@@ -1,5 +1,6 @@
 import ModalProvider from "../../lib/QueryClientProvider.svelte";
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import AgentEditorModalComponent from "./AgentEditorModal.svelte";
 import { SvelteModal } from "./SvelteModal";
 
@@ -14,7 +15,7 @@ export class AgentEditorModal extends SvelteModal {
 	}
 
 	onOpen() {
-		this.setTitle("Edit Agent");
+		this.setTitle(t("agents.editor.title"));
 		this.mountComponent(
 			ModalProvider<{
 				modal: AgentEditorModal;

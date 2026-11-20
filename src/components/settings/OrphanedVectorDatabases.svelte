@@ -16,6 +16,7 @@ import SettingContainer from "./SettingContainer.svelte";
 import Button from "../ui/Button.svelte";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import { getPlugin } from "../../stores/state.svelte";
 import { Logger } from "../../utils/logging";
 import {
@@ -62,20 +63,22 @@ $effect(() => {
 const totalEstimatedBytes = $derived(orphans.reduce((sum, orphan) => sum + (orphan.estimatedBytes ?? 0), 0));
 
 function describe(orphan: OrphanedDatabase): string {
-	if (orphan.kind === "legacy-sidecar") return `${orphan.label} (legacy graph data)`;
-	const chunks = orphan.chunkCount ?? 0;
-	return `${orphan.indexId} (${chunks} ${chunks === 1 ? "chunk" : "chunks"})`;
+	if (orphan.kind === "legacy-sidecar") return t("settings.orphaned.legacy", { label: orphan.label });
+	return t("settings.orphaned.chunks", { id: String(orphan.indexId), count: orphan.chunkCount ?? 0 });
 }
 
 const description = $derived.by(() => {
 	const count = orphans.length;
 	const parts = [
-		`${count} stored ${count === 1 ? "database" : "databases"} no longer ${count === 1 ? "belongs" : "belong"} to a configured embedding index${
-			totalEstimatedBytes > 0 ? ` (at least ${formatBytes(totalEstimatedBytes)} of vectors)` : ""
-		}: ${orphans.map(describe).join(", ")}.`,
+		t("settings.orphaned.summary", {
+			count,
+			size:
+				totalEstimatedBytes > 0 ? t("settings.orphaned.size", { size: formatBytes(totalEstimatedBytes) }) : "",
+			list: orphans.map(describe).join(", "),
+		}),
 	];
 	if (originUsage !== null) {
-		parts.push(`Obsidian's storage on this device totals ${formatBytes(originUsage)} across all vaults.`);
+		parts.push(t("settings.orphaned.origin_usage", { size: formatBytes(originUsage) }));
 	}
 	return parts.join(" ");
 });
@@ -85,9 +88,9 @@ async function deleteOrphans(): Promise<void> {
 	if (names.length === 0) return;
 	const modal = new ConfirmModal(
 		plugin.app,
-		"Delete orphaned indexes?",
-		`This permanently removes ${names.length} stored ${names.length === 1 ? "database" : "databases"} that no configured embedding index uses. Re-adding one of these models later will rebuild its index from scratch.`,
-		"Delete",
+		t("settings.orphaned.confirm_title"),
+		t("settings.orphaned.confirm_desc", { count: names.length }),
+		t("common.delete"),
 	);
 	modal.open();
 	const { confirmed } = await modal.promise;
@@ -98,14 +101,18 @@ async function deleteOrphans(): Promise<void> {
 		const outcome = await deleteOrphanedDatabases(names);
 		if (outcome.failed.length === 0) {
 			new Notice(
-				`Deleted ${outcome.deleted.length} orphaned ${outcome.deleted.length === 1 ? "index" : "indexes"}.`,
+				t("settings.orphaned.deleted", { count: outcome.deleted.length }),
 			);
 		} else {
 			for (const failure of outcome.failed) {
 				Logger.error(`[OrphanedVectorDatabases] Could not delete ${failure.name}: ${failure.reason}`);
 			}
 			new Notice(
-				`Deleted ${outcome.deleted.length}, could not delete ${outcome.failed.length}: ${outcome.failed[0].reason}`,
+				t("settings.orphaned.deleted_partial", {
+					deleted: outcome.deleted.length,
+					failed: outcome.failed.length,
+					reason: outcome.failed[0].reason,
+				}),
 			);
 		}
 	} finally {
@@ -116,7 +123,7 @@ async function deleteOrphans(): Promise<void> {
 </script>
 
 {#if orphans.length > 0}
-  <SettingContainer name="Orphaned vector databases" desc={description}>
-    <Button buttonText="Delete orphaned indexes" disabled={deleting} onClick={() => void deleteOrphans()} />
+  <SettingContainer name={t("settings.orphaned.name")} desc={description}>
+    <Button buttonText={t("settings.orphaned.delete_button")} disabled={deleting} onClick={() => void deleteOrphans()} />
   </SettingContainer>
 {/if}

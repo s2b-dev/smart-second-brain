@@ -1,0 +1,316 @@
+{
+	"commands": {
+		"open_chat": "打开对话",
+		"new_chat": "新建对话",
+		"search_notes": "搜索笔记",
+		"open_smart_graph": "打开智能关系图谱",
+		"show_welcome": "显示欢迎页",
+		"show_release_notes": "显示更新说明",
+		"next_pending_change": "下一个待处理更改",
+		"previous_pending_change": "上一个待处理更改"
+	},
+	"chat_file_menu": {
+		"rename": "重命名对话",
+		"rename_button": "重命名",
+		"delete": "删除对话",
+		"rename_failed": "重命名对话失败：{error}",
+		"delete_failed": "删除对话失败：{error}"
+	},
+	"attach": {
+		"menu_label": {
+			"other": "将 {count} 个文件添加到对话"
+		},
+		"add_file_failed": "将文件添加到对话失败：{error}",
+		"add_files_failed": "将文件添加到对话失败：{error}",
+		"no_supported_files": "未选择受支持的文件。支持的类型：txt、md、csv、json、图片、pdf。",
+		"chat_not_initialized": "对话尚未初始化。请打开对话后重试。",
+		"queued": {
+			"other": "已将 {count} 个文件加入对话队列。"
+		},
+		"skipped_unsupported": {
+			"other": "跳过了 {count} 个不受支持的文件。"
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "当前没有打开的对话",
+		"no_pending_changes": "此对话中没有待处理更改",
+		"new_file_nothing_to_open": "此更改会创建一个新文件——目前还没有可打开的内容。"
+	},
+	"huggingface_connected": "已连接到 Hugging Face。",
+	"update": {
+		"available": "Smart Second Brain {version} 已发布。",
+		"update_link": "更新",
+		"updated": "Smart Second Brain 已更新到 {version}。",
+		"whats_new_link": "查看新功能"
+	},
+	"settings_save_failed": "Smart Second Brain 无法保存你的设置：{error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain：约 {tokens} 个 token 的最早对话历史超出了摘要模型的上下文窗口，未被纳入摘要。",
+		"repeated_failure": "Smart Second Brain：此对话历史的摘要已连续失败 {failures} 次，因此仍会发送完整历史，可能超出模型的上下文限制。请检查智能体的摘要模型；错误信息见开发者控制台。"
+	},
+	"agent": {
+		"memory_too_large": {
+			"other": "记忆对此模型来说过大{window}：{names} 不再随每条消息加载，智能体只会在需要时读取。请缩短笔记，或使用上下文窗口更大的模型。"
+		},
+		"memory_window": "（{k}k token）",
+		"save_prompt_failed": "无法保存系统提示词：{error}",
+		"open_agent_note": "打开智能体笔记",
+		"prompt_modal_title": "系统提示词——{name}",
+		"save_skill_failed": "无法保存“{skill}”技能：{error}",
+		"open_skill_note": "打开技能笔记",
+		"skill_modal_title": "技能——{skill}",
+		"cannot_connect": "无法连接到：{providers}。请检查服务是否正在运行。",
+		"review_providers": "检查提供商",
+		"provider_unavailable": "提供商“{provider}”已不可用。",
+		"select_new_model": "选择新模型",
+		"withdrew_changes": {
+			"other": "已撤回被替换的回复所提议的 {count} 个待处理笔记更改。"
+		},
+		"kept_partial_changes": {
+			"other": "保留了 {count} 个部分应用的更改——请在审阅栏中处理。"
+		}
+	},
+	"errors": {
+		"request_failed": "模型请求失败。",
+		"context_overflow": "此对话已超出模型的上下文窗口。",
+		"context_overflow_hint": "请新建对话，或检查为此模型配置的上下文窗口。",
+		"refusal": "模型拒绝回答此请求。",
+		"refusal_hint": "换一种方式表述请求，或切换到其他模型，可能会有帮助。"
+	},
+	"provider_auth": {
+		"unknown_provider": "未知的提供商：{provider}",
+		"invalid_api_key": "API 密钥无效",
+		"invalid_endpoint": "基础 URL 无效或端点无法访问",
+		"configuration_failed": "提供商配置失败",
+		"no_auth_config": "未找到 {provider} 的身份验证配置",
+		"discovery_failed": "模型发现失败：{error}",
+		"server_url_required": "服务器 URL 为必填项",
+		"api_key_required": "API 密钥为必填项",
+		"connection_failed": "连接失败：{error}",
+		"auth_failed_status": "身份验证失败（{status}）",
+		"auth_failed": "身份验证失败",
+		"request_failed_status": "请求失败，状态码 {status}",
+		"codex_sign_in_required": "请使用 ChatGPT 登录以使用 Codex",
+		"openai_codex_sign_in_required": "请使用 ChatGPT 登录以通过 Codex 使用 OpenAI",
+		"huggingface_token_rejected": "Hugging Face 拒绝了此访问令牌",
+		"huggingface_status": "Hugging Face 返回状态码 {status}",
+		"huggingface_sign_in_required": "请使用 Hugging Face 登录以连接"
+	},
+	"providers": {
+		"templates": {
+			"openai": "通过 ChatGPT 登录或 API 密钥使用 OpenAI 模型。",
+			"openai_compatible": "灵活的 OpenAI 风格提供商，适用于 OpenAI 及兼容端点。",
+			"anthropic": "通过 Anthropic API 使用 Claude 模型。",
+			"ollama": "通过 Ollama API 使用本地 Ollama 模型。",
+			"omlx": "通过 oMLX 的 OpenAI 兼容服务器，在你的 Mac 上使用本地 MLX 模型。",
+			"openrouter": "OpenRouter 账户及模型目录。",
+			"huggingface": "来自 Hugging Face 推理提供商的开放模型。"
+		},
+		"fields": {
+			"api_key": "API 密钥",
+			"base_url": "基础 URL",
+			"server_url": "服务器 URL",
+			"access_token": "访问令牌",
+			"custom_headers": "自定义请求头",
+			"custom_headers_desc": "以 JSON 格式提供的额外请求头（可选）",
+			"chatgpt_sign_in": "ChatGPT 登录"
+		},
+		"openai": {
+			"link": "OpenAI 控制台",
+			"oauth_desc": "打开浏览器窗口以完成 ChatGPT/Codex 授权。",
+			"api_key_desc": "用于身份验证的 OpenAI API 密钥",
+			"base_url_desc": "自定义 API 端点（留空则使用默认的 OpenAI）"
+		},
+		"openai_codex": {
+			"sign_in_desc": "此提供商使用基于浏览器的 ChatGPT/Codex 登录流程。",
+			"sign_in_placeholder": "已通过 ChatGPT 登录授权"
+		},
+		"openai_compatible": {
+			"base_url_desc": "OpenAI 兼容 API 端点的基础 URL",
+			"api_key_desc": "用于身份验证的 API 密钥（端点不需要时可留空）"
+		},
+		"anthropic": {
+			"link": "Anthropic 控制台",
+			"api_key_desc": "用于身份验证的 Anthropic API 密钥",
+			"base_url_desc": "Anthropic 兼容 API 端点的基础 URL"
+		},
+		"ollama": {
+			"link": "Ollama 网站",
+			"server_url_desc": "Ollama 服务器的运行地址",
+			"api_key_desc": "用于身份验证的 API 密钥（本地 Ollama 通常不需要）"
+		},
+		"omlx": {
+			"link": "oMLX 网站",
+			"server_url_desc": "oMLX 服务器的运行地址",
+			"api_key_desc": "oMLX 默认需要 API 密钥（可在管理面板的全局设置中找到）。仅在你关闭了密钥验证时才可留空。"
+		},
+		"openrouter": {
+			"link": "OpenRouter 密钥",
+			"oauth_desc": "在浏览器中授权即可连接，无需手动创建 API 密钥。",
+			"api_key_desc": "用于身份验证的 OpenRouter API 密钥"
+		},
+		"huggingface": {
+			"link": "Hugging Face 访问令牌",
+			"oauth_desc": "在浏览器中批准访问即可连接，无需创建访问令牌。"
+		}
+	},
+	"indexing": {
+		"status": "索引中：{status}",
+		"cancelled_chunks": {
+			"other": "索引已取消（已更新 {count} 个分块）"
+		},
+		"updated_chunks": {
+			"other": "✓ 索引已更新：{count} 个分块"
+		},
+		"cancelled_notes": {
+			"other": "索引已取消（目前已索引 {count} 篇笔记）"
+		},
+		"indexed_notes": {
+			"other": "✓ 已索引 {count} 篇笔记"
+		},
+		"indexed_notes_skipped": {
+			"other": "✓ 已索引 {count} 篇笔记，跳过 {skipped} 篇"
+		},
+		"no_embedding_model": "未配置嵌入模型。请设置默认嵌入模型。",
+		"invalid_config": "嵌入索引配置无效。",
+		"provider_not_configured": "提供商“{provider}”未配置。",
+		"embedding_init_failed": "初始化嵌入模型失败。",
+		"open_search_settings": "打开搜索设置",
+		"open_provider_settings": "打开提供商设置",
+		"provider_unreachable": "索引已停止——无法访问嵌入提供商。请检查连接，然后继续。",
+		"rate_limited": "索引已暂停——已达到嵌入提供商的速率限制。下次启动时会自动继续，也可以稍后在搜索设置中继续。",
+		"already_in_progress": "索引已在进行中…",
+		"embed_failed": "嵌入 {file} 失败：{error}",
+		"embed_empty": "嵌入 {file} 失败：模型返回空结果",
+		"semantic_unreachable": "语义搜索不可用——无法访问嵌入提供商。不显示语义结果。",
+		"semantic_failed": "语义搜索失败：{error}",
+		"cancelling": "正在取消索引…",
+		"export_empty": "索引为空——没有可导出的内容。",
+		"export_dialog_title": "导出嵌入索引",
+		"exported": "已导出 {count} 个嵌入。",
+		"export_failed": "导出索引失败。",
+		"import_dialog_title": "导入嵌入索引",
+		"import_invalid_version": "导出文件的版本字段无效或缺失。请重新索引以生成兼容的导出文件。",
+		"import_outdated": "导出文件的结构版本 v{version} 已过时（当前：v{current}）。请重新索引以生成兼容的导出文件。",
+		"import_newer": "导出文件由更新版本的插件创建（结构版本 v{version}）。请更新插件后再导入。",
+		"import_missing_metadata": "导出文件缺少提供商或模型元数据。",
+		"imported": "已导入 {count} 个嵌入（{model}）。",
+		"import_failed": "导入索引失败，文件可能已损坏。",
+		"reindex": "重新索引"
+	},
+	"search_index": {
+		"status": "正在为搜索索引笔记：{status}",
+		"updated": "✓ 搜索索引已更新：{count} 篇笔记"
+	},
+	"bulk_progress": {
+		"skipped": "（跳过 {count} 个）",
+		"eta": "（剩余约 {eta}）",
+		"pdfs_progress": "PDF {done}/{total}",
+		"then": "然后处理 {pdfs}",
+		"pdfs": {
+			"other": "{count} 个 PDF"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "搜索面板已打开，但无法设置标签查询",
+		"open_failed": "无法为标签打开搜索面板：{tag}"
+	},
+	"models": {
+		"no_embedding_models": "你的提供商中未找到嵌入模型。请检查是否有提供商提供嵌入功能。",
+		"no_models": "未找到模型。请检查提供商是否正在运行且可访问。"
+	},
+	"actions": {
+		"open_settings": "打开设置",
+		"add_provider": "添加提供商",
+		"check_provider_settings": "检查提供商设置",
+		"select_model": "选择模型",
+		"configure_embedding_index": "配置嵌入索引",
+		"edit_agent": "编辑智能体",
+		"view_report": "查看报告",
+		"open_note": "打开笔记",
+		"open_chat": "打开对话",
+		"agent_gone_pick_model": "该智能体已不存在。请从你要使用的智能体中选择模型。",
+		"agent_gone_not_saved": "该智能体已不存在，因此模型未保存。"
+	},
+	"diff": {
+		"pending_change": "待处理更改",
+		"previous": "上一个待处理更改",
+		"next": "下一个待处理更改",
+		"toggle_view": "切换差异视图",
+		"accept": "接受",
+		"accept_aria": "接受更改",
+		"reject": "拒绝",
+		"reject_aria": "拒绝更改",
+		"stale_tooltip": "无法接受——此提议生成后笔记已被修改。请拒绝它，并让智能体重新提交。",
+		"cross_thread_banner": {
+			"other": "另有 {count} 个对话对此文件有待处理的编辑。此处仅显示最新的一个；最先被接受的编辑生效，其他编辑之后可能无法应用。"
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "工具调用",
+		"reasoning": "扩展推理",
+		"vision": "视觉 / 文件附件",
+		"structured_output": "结构化输出（JSON schema）"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "搜索笔记",
+			"summary": "按关键词搜索你的 Obsidian 笔记。返回匹配的文件名和元数据。"
+		},
+		"list_directory": {
+			"name": "列出目录",
+			"summary": "列出仓库的文件夹结构：根目录显示带文件数的概览，文件夹内显示文件和子文件夹。输出会折叠以适应上下文预算。"
+		},
+		"read_content": {
+			"name": "读取内容",
+			"summary": "按路径或 Wiki 链接读取笔记和仓库文件。支持 Markdown/文本文件以及 PDF 文本提取。图片须在对话中附加。"
+		},
+		"grep_notes": {
+			"name": "Grep 笔记",
+			"summary": "在笔记中查找精确的子字符串或正则表达式，返回匹配的行及行号和上下文。与“搜索笔记”不同，它匹配字面字符串。可用路径限定到单篇笔记，或对大量结果分页。"
+		},
+		"get_all_tags": {
+			"name": "获取所有标签",
+			"summary": "获取仓库中使用的所有标签列表。"
+		},
+		"get_properties": {
+			"name": "获取属性",
+			"summary": "获取笔记的 frontmatter 属性，或列出仓库中的所有属性键。"
+		},
+		"execute_javascript": {
+			"name": "执行 JavaScript",
+			"summary": "运行隔离的 JavaScript，用于计算和数据转换。用 return 返回最终值，用 console.log 输出中间结果。"
+		},
+		"manage_notes": {
+			"name": "管理笔记",
+			"summary": "在一个暂存批次中创建、更新或删除 Markdown 笔记。相关的笔记操作可以一起提议，供用户批准。"
+		},
+		"fetch_url": {
+			"name": "获取 URL",
+			"summary": "通过 HTTP(S) 获取公开网页或文本资源，并以清理后的 Markdown 返回其主要内容。仅用于用户提供的 URL 或明显公开的参考资料。"
+		},
+		"web_search": {
+			"name": "网页搜索",
+			"summary": "搜索网络并返回结果（标题、URL、摘要）。在工具的配置面板中设置提供商和 API 密钥。优先使用仓库搜索。"
+		},
+		"manage_skills": {
+			"name": "管理技能",
+			"summary": "创建新技能、修改智能体自己附加的技能，或在你要求时删除技能。更改立即生效。技能创建后，其名称和插件关联将被锁定。"
+		},
+		"write_todos": {
+			"name": "任务清单",
+			"summary": "让智能体将多步骤工作规划为清单，并在进行中逐项勾选。清单显示在对话输入框上方。"
+		},
+		"ask_question": {
+			"name": "提问",
+			"summary": "当请求不明确时，让智能体暂停并向你提出一个选择题。问题显示在对话输入框上方。"
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider}（免密钥）",
+		"firecrawl_key_help": "可选——添加 Firecrawl API 密钥（fc-…）以获得更高的速率限制。留空则使用免密钥档位。",
+		"brave_key_help": "来自 api.search.brave.com 的 Brave Search API 密钥。",
+		"tavily_key_help": "来自 app.tavily.com 的 Tavily API 密钥。",
+		"keenable_key_help": "可选——添加 Keenable API 密钥以获得更高的速率限制。留空则使用免费的公共端点。"
+	}
+}

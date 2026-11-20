@@ -1,4 +1,5 @@
 import { type App, Modal } from "obsidian";
+import { t } from "../../i18n";
 
 /**
  * Obsidian-native single-line text prompt that replaces `window.prompt()`.
@@ -13,7 +14,7 @@ class PromptModal extends Modal {
 		app: App,
 		private readonly title: string,
 		private readonly initialValue = "",
-		private readonly confirmLabel = "Confirm",
+		private readonly confirmLabel = t("common.confirm"),
 	) {
 		super(app);
 		this.promise = new Promise<string | null>((resolve) => {
@@ -49,7 +50,7 @@ class PromptModal extends Modal {
 
 		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
 
-		buttonRow.createEl("button", { text: "Cancel" }).addEventListener("click", () => {
+		buttonRow.createEl("button", { text: t("common.cancel") }).addEventListener("click", () => {
 			this.resolved = true;
 			this.resolve(null);
 			this.close();
@@ -70,7 +71,7 @@ export function promptText(
 	app: App,
 	title: string,
 	initialValue = "",
-	confirmLabel = "Confirm",
+	confirmLabel = t("common.confirm"),
 ): Promise<string | null> {
 	const modal = new PromptModal(app, title, initialValue, confirmLabel);
 	modal.open();

@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "패널 크기 조절"
+	},
+	"docs_link": {
+		"subject_label": "문서: {subject}",
+		"open_label": "문서 열기"
+	},
+	"markdown": {
+		"copy_code": "코드 복사"
+	},
+	"search": {
+		"placeholder": "검색..."
+	}
+}

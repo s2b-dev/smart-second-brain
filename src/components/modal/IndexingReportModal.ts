@@ -1,4 +1,5 @@
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import IndexingReportModalComponent from "./IndexingReportModal.svelte";
 import { SvelteModal } from "./SvelteModal";
 
@@ -11,7 +12,7 @@ export class IndexingReportModal extends SvelteModal {
 	}
 
 	onOpen() {
-		this.setTitle("Indexing Report");
+		this.setTitle(t("modals.indexing_report.title"));
 		this.mountComponent(
 			IndexingReportModalComponent,
 			{ modal: this, indexId: this.indexId },

@@ -1,4 +1,5 @@
 import { type App, Modal } from "obsidian";
+import { t } from "../../i18n";
 
 /** An optional opt-in checkbox rendered between the message and the buttons. */
 export interface ConfirmCheckbox {
@@ -30,7 +31,7 @@ export class ConfirmModal extends Modal {
 		app: App,
 		private readonly title: string,
 		private readonly message: string,
-		private readonly confirmLabel = "Delete",
+		private readonly confirmLabel = t("common.delete"),
 		private readonly checkbox?: ConfirmCheckbox,
 	) {
 		super(app);
@@ -64,7 +65,7 @@ export class ConfirmModal extends Modal {
 
 		const buttonRow = this.contentEl.createDiv({ cls: "modal-button-container" });
 
-		buttonRow.createEl("button", { text: "Cancel" }).addEventListener("click", () => {
+		buttonRow.createEl("button", { text: t("common.cancel") }).addEventListener("click", () => {
 			this.resolved = true;
 			this.resolve({ confirmed: false, checked: false });
 			this.close();
@@ -90,7 +91,11 @@ export class ConfirmModal extends Modal {
 
 /** Show an Obsidian-native confirmation dialog. Resolves `true` if confirmed. */
 export async function confirmDelete(app: App, entityName: string): Promise<boolean> {
-	const modal = new ConfirmModal(app, "Confirm deletion", `Delete "${entityName}"?`);
+	const modal = new ConfirmModal(
+		app,
+		t("modals.confirm.deletion_title"),
+		t("modals.confirm.delete_entity", { name: entityName }),
+	);
 	modal.open();
 	return (await modal.promise).confirmed;
 }
@@ -103,9 +108,9 @@ export function confirmDeleteWithOption(
 	app: App,
 	entityName: string,
 	checkbox: ConfirmCheckbox,
-	message = `Delete "${entityName}"?`,
+	message = t("modals.confirm.delete_entity", { name: entityName }),
 ): Promise<ConfirmResult> {
-	const modal = new ConfirmModal(app, "Confirm deletion", message, "Delete", checkbox);
+	const modal = new ConfirmModal(app, t("modals.confirm.deletion_title"), message, t("common.delete"), checkbox);
 	modal.open();
 	return modal.promise;
 }

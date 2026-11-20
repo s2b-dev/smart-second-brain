@@ -63,6 +63,7 @@ import {
 	SUMMARY_PROMPT,
 } from "./summarization";
 import type { Telemetry } from "./telemetry/Telemetry";
+import { t } from "../i18n";
 
 /**
  * Upper bound on memoized runnables. Sized well above the number of agent configs a
@@ -754,14 +755,10 @@ export class Agent {
 				tokenCounter: countMessageTokens,
 				trimTokensToSummarize,
 				onHistoryDropped: ({ droppedTokens }) => {
-					new Notice(
-						`Smart Second Brain: about ${formatThousands(droppedTokens)} tokens of the oldest chat history did not fit the summarization model's context window and were left out of the summary.`,
-					);
+					new Notice(t("plugin.summarization.history_dropped", { tokens: formatThousands(droppedTokens) }));
 				},
 				onRepeatedFailure: (failures) => {
-					new Notice(
-						`Smart Second Brain: summarizing this chat's history failed ${failures} times in a row, so the full history is still sent and may exceed the model's context limit. Check the agent's summarization model; the developer console has the error.`,
-					);
+					new Notice(t("plugin.summarization.repeated_failure", { failures }));
 				},
 			},
 		);

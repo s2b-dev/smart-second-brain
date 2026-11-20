@@ -3,6 +3,7 @@ import type SecondBrainPlugin from "../../main";
 import { WidgetRenderChild } from "../../widget/WidgetRenderChild";
 import { parseWidgetSpec, WIDGET_FILE_EXTENSION } from "../../widget/widgetSpec";
 import { Logger } from "../../utils/logging";
+import { t } from "../../i18n";
 
 /** Shape of the context Obsidian's (internal) embed registry passes to an embed creator. */
 interface WidgetEmbedContext {
@@ -60,7 +61,7 @@ class WidgetEmbed extends MarkdownRenderChild {
 			this.addChild(this.child);
 		} catch (error) {
 			Logger.error(`Failed to render .widget embed for ${this.file.path}:`, error);
-			this.containerEl.setText("Could not load widget.");
+			this.containerEl.setText(t("widget.embed.load_failed"));
 		}
 	}
 

@@ -1,0 +1,221 @@
+{
+	"view": {
+		"display_text": "Grafo inteligente",
+		"loading": "Construyendo el grafo..."
+	},
+	"toolbar": {
+		"exit_immerse": "Salir de la inmersión — volver al grafo completo",
+		"fit": "Ajustar el grafo a la vista",
+		"fit_with_key": "Ajustar el grafo a la vista (F)",
+		"lasso": "Selección con lazo",
+		"lasso_with_hint": "Selección con lazo (o mantén Shift y arrastra)",
+		"exit_lasso": "Salir de la selección con lazo",
+		"hide_topics": "Ocultar temas — mostrar el grafo sin agrupar",
+		"show_topics": "Mostrar temas — colorear las notas según el tema detectado",
+		"computing_topics": "Calculando temas…",
+		"collapse_needs_topics": "Activa los temas para contraerlos",
+		"expand_all": "Expandir todos los temas en notas (S)",
+		"collapse_all": "Contraer todos los temas en nodos únicos (S) — o selecciona temas y usa Contraer",
+		"show_panel": "Mostrar panel del grafo",
+		"hide_panel": "Ocultar panel del grafo"
+	},
+	"controls": {
+		"aria_label": "Configuración del grafo",
+		"stats": {
+			"notes": {
+				"one": "{count} nota",
+				"many": "{count} notas",
+				"other": "{count} notas"
+			},
+			"unlinked": {
+				"one": "{count} sin enlaces",
+				"many": "{count} sin enlaces",
+				"other": "{count} sin enlaces"
+			},
+			"links": {
+				"one": "{count} enlace",
+				"many": "{count} enlaces",
+				"other": "{count} enlaces"
+			},
+			"inferred": {
+				"one": "{count} inferido",
+				"many": "{count} inferidos",
+				"other": "{count} inferidos"
+			}
+		},
+		"topics": {
+			"heading": "Temas",
+			"granularity": "Granularidad",
+			"granularity_desc": "Izquierda: pocos temas amplios. Derecha: muchos temas concretos. Todas las notas siguen visibles.",
+			"granularity_desc_with_keys": "Izquierda: pocos temas amplios. Derecha: muchos temas concretos. Todas las notas siguen visibles. (↑/↓ en el grafo)",
+			"granularity_pending": "Calculando los niveles de temas de esta bóveda…",
+			"inferred_links": "Enlaces inferidos"
+		},
+		"inferred_hint": {
+			"no_index": "Conecta las notas por su significado además de por los enlaces que escribiste. Necesita un índice de embeddings para el grafo: elige uno en la configuración del grafo del plugin.",
+			"hidden_still_grouping": "Ocultos, pero siguen agrupando notas. Desactívalo dos veces para excluirlos también de los temas.",
+			"off": "Desactivado — los temas salen de los enlaces que escribiste.",
+			"off_coverage": "Desactivado — los temas salen de los enlaces que escribiste. Tus enlaces por sí solos agrupan {placed} de {total} notas ({percent} %); las otras {unlinked} no tienen enlaces.",
+			"on_no_edges": "Conecta las notas por su significado además de por los enlaces que escribiste; necesita un índice de embeddings para el grafo.",
+			"on": "Conecta las notas por su significado además de por los enlaces que escribiste: {inferred} conexiones por similitud para que las notas sin enlaces también encuentren un tema. Desactívalo para ver lo que cubren tus propios enlaces."
+		},
+		"found": {
+			"heading": "Encontrados · {count}",
+			"multi_select_hint": "shift/⌘ selección múltiple",
+			"cancel_naming_aria": "Cancelar el nombrado de temas",
+			"cancel_naming": "Cancelar nombrado",
+			"name_topics": "Nombrar temas con IA"
+		},
+		"scope": {
+			"heading": "Alcance",
+			"markdown_only": "Solo Markdown",
+			"markdown_only_desc": "Mostrar solo notas Markdown; desactivado muestra todos los archivos indexables",
+			"tags": "Etiquetas",
+			"tags_desc": "Dibujar cada etiqueta como un nodo enlazado a las notas que la llevan; las etiquetas compartidas también ayudan a dar forma a los temas"
+		},
+		"display": {
+			"heading": "Visualización",
+			"topic_regions": "Regiones de temas",
+			"topic_regions_desc": "Sombrear el área detrás de cada tema para distinguir los grupos de un vistazo",
+			"topic_labels": "Etiquetas de temas",
+			"topic_labels_desc": "Mostrar los nombres de los temas sobre el grafo",
+			"direction_arrows": "Flechas de dirección",
+			"direction_arrows_desc": "Mostrar flechas en los enlaces wiki dirigidos",
+			"highlight_inferred": "Resaltar enlaces inferidos",
+			"highlight_inferred_desc_no_index": "Dibujar los enlaces inferidos en el color de acento. Necesita un índice de embeddings para el grafo: elige uno en la configuración del grafo del plugin.",
+			"highlight_inferred_desc": "Dibujar los enlaces inferidos en el color de acento para distinguirlos de los enlaces que escribiste",
+			"highlight_inferred_desc_off": "Dibujar los enlaces inferidos en el color de acento. Requiere activar Enlaces inferidos (en Temas).",
+			"highlight_isolated": "Resaltar aisladas",
+			"highlight_isolated_desc": "Marcar en color de acento las notas sin enlaces wiki",
+			"highlight_bridges": "Resaltar puentes",
+			"highlight_bridges_desc": "Marcar en color de acento las notas que conectan varios temas"
+		}
+	},
+	"selection": {
+		"aria_label": "Selección del grafo",
+		"count_selected": {
+			"one": "{count} nota seleccionada",
+			"many": "{count} notas seleccionadas",
+			"other": "{count} notas seleccionadas"
+		},
+		"notes_selected": {
+			"one": "{number} nota seleccionada",
+			"many": "{number} notas seleccionadas",
+			"other": "{number} notas seleccionadas"
+		},
+		"immersed_suffix": " · en inmersión",
+		"notes_immersed": {
+			"one": "{number} nota · en inmersión",
+			"many": "{number} notas · en inmersión",
+			"other": "{number} notas · en inmersión"
+		},
+		"immersed_into": "En inmersión en {topics}",
+		"clear": "Borrar selección",
+		"clear_with_key": "Borrar selección (Esc)",
+		"zoom": "Ampliar a la selección",
+		"zoom_with_key": "Ampliar a la selección (F)",
+		"zoom_tooltip": "Mover la cámara para encuadrar las notas seleccionadas",
+		"collapse": "Contraer",
+		"expand": "Expandir",
+		"collapse_tooltip": "Plegar los temas seleccionados en nodos únicos",
+		"expand_tooltip": "Desplegar los temas seleccionados en notas",
+		"immerse": "Inmersión",
+		"immerse_tooltip": "Reconstruir el grafo solo con las notas seleccionadas",
+		"open_in_chat": "Abrir en el chat",
+		"open_in_chat_tooltip": "Mostrar el chat y adjuntar las notas seleccionadas",
+		"open_all": "Abrir todas",
+		"open_all_tooltip": "Abrir todas las notas seleccionadas en pestañas nuevas",
+		"exit": "Salir",
+		"exit_immerse_tooltip": "Salir de la inmersión (Esc)",
+		"immersed_count": {
+			"one": "En inmersión · {number} nota",
+			"many": "En inmersión · {number} notas",
+			"other": "En inmersión · {number} notas"
+		}
+	},
+	"open_all_confirm": {
+		"title": "Abrir todas las notas",
+		"message": {
+			"one": "Se abrirá {count} nota en una pestaña nueva. Tendrás que cerrarla a mano.",
+			"many": "Se abrirán {count} notas en pestañas nuevas. Tendrás que cerrarlas a mano.",
+			"other": "Se abrirán {count} notas en pestañas nuevas. Tendrás que cerrarlas a mano."
+		},
+		"confirm": {
+			"one": "Abrir {count} pestaña",
+			"many": "Abrir {count} pestañas",
+			"other": "Abrir {count} pestañas"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "El chat aún no se ha inicializado. Abre primero un chat.",
+		"private_titles_withheld": {
+			"one": "Se ocultaron títulos de notas privadas en {count} tema. Marca como de confianza el proveedor del modelo del grafo para incluirlos.",
+			"many": "Se ocultaron títulos de notas privadas en {count} temas. Marca como de confianza el proveedor del modelo del grafo para incluirlos.",
+			"other": "Se ocultaron títulos de notas privadas en {count} temas. Marca como de confianza el proveedor del modelo del grafo para incluirlos."
+		},
+		"open_provider_settings": "Abrir configuración del proveedor",
+		"no_graph_chat_model": "No hay ningún modelo de chat seleccionado para el grafo, así que no se pueden nombrar los temas.",
+		"open_graph_settings": "Abrir configuración del grafo"
+	},
+	"node_menu": {
+		"expand_topic": "Expandir tema",
+		"open_all_notes": {
+			"one": "Abrir {count} nota",
+			"many": "Abrir las {count} notas",
+			"other": "Abrir las {count} notas"
+		},
+		"search_tag": "Buscar notas con esta etiqueta",
+		"open_file": "Abrir archivo",
+		"reveal_in_explorer": "Mostrar en el explorador de archivos",
+		"focus_cluster": "Centrarse en este grupo",
+		"collapse_topic": "Contraer tema",
+		"select_cluster": "Seleccionar este grupo"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} nota",
+			"many": "{n} notas",
+			"other": "{n} notas"
+		},
+		"links": {
+			"one": "{n} enlace",
+			"many": "{n} enlaces",
+			"other": "{n} enlaces"
+		},
+		"cluster_fallback": "Grupo {id}",
+		"connections": {
+			"one": "{count} conexión",
+			"many": "{count} conexiones",
+			"other": "{count} conexiones"
+		},
+		"pinned": "📌 Fijado"
+	},
+	"note_context": {
+		"title": "Contexto",
+		"title_of": "Contexto de {name}",
+		"semantic_hint": "Los vecinos semánticos aparecen cuando se configura un índice de embeddings para el grafo.",
+		"direction_in": "Entrantes",
+		"direction_out": "Salientes",
+		"direction_both": "Ambos",
+		"updating": "Actualizando…",
+		"fit": "Ajustar el grafo a la vista",
+		"options": "Opciones de Contexto de la nota",
+		"close_options": "Cerrar opciones de Contexto de la nota",
+		"view": "Vista",
+		"mode_graph": "Grafo",
+		"mode_list": "Lista",
+		"show": "Mostrar",
+		"linked": "Enlazados",
+		"semantic": "Semánticos",
+		"both": "Ambos",
+		"display": "Visualización",
+		"direction_arrows": "Flechas de dirección",
+		"no_neighbors": "Sin vecinos.",
+		"open_a_note": "Abre una nota."
+	},
+	"topic_fallback": {
+		"unsorted": "Sin clasificar",
+		"unsorted_with_count": "Sin clasificar · {count}",
+		"topic": "Tema {id}"
+	}
+}

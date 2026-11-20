@@ -1,0 +1,355 @@
+{
+	"commands": {
+		"open_chat": "Odpri klepet",
+		"new_chat": "Nov klepet",
+		"search_notes": "Išči zapiske",
+		"open_smart_graph": "Odpri pametni graf",
+		"show_welcome": "Prikaži pozdravni zaslon",
+		"show_release_notes": "Prikaži opombe ob izdaji",
+		"next_pending_change": "Naslednja čakajoča sprememba",
+		"previous_pending_change": "Prejšnja čakajoča sprememba"
+	},
+	"chat_file_menu": {
+		"rename": "Preimenuj klepet",
+		"rename_button": "Preimenuj",
+		"delete": "Izbriši klepet",
+		"rename_failed": "Preimenovanje klepeta ni uspelo: {error}",
+		"delete_failed": "Brisanje klepeta ni uspelo: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Dodaj {count} datoteko v klepet",
+			"two": "Dodaj {count} datoteki v klepet",
+			"few": "Dodaj {count} datoteke v klepet",
+			"other": "Dodaj {count} datotek v klepet"
+		},
+		"add_file_failed": "Dodajanje datoteke v klepet ni uspelo: {error}",
+		"add_files_failed": "Dodajanje datotek v klepet ni uspelo: {error}",
+		"no_supported_files": "Izbrana ni nobena podprta datoteka. Podprto: txt, md, csv, json, slike, pdf.",
+		"chat_not_initialized": "Klepet še ni inicializiran. Odprite klepet in poskusite znova.",
+		"queued": {
+			"one": "Za klepet je v čakalno vrsto dodana {count} datoteka.",
+			"two": "Za klepet sta v čakalno vrsto dodani {count} datoteki.",
+			"few": "Za klepet so v čakalno vrsto dodane {count} datoteke.",
+			"other": "Za klepet je v čakalno vrsto dodanih {count} datotek."
+		},
+		"skipped_unsupported": {
+			"one": "Preskočena je {count} nepodprta datoteka.",
+			"two": "Preskočeni sta {count} nepodprti datoteki.",
+			"few": "Preskočene so {count} nepodprte datoteke.",
+			"other": "Preskočenih je {count} nepodprtih datotek."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "Trenutno ni odprt noben klepet",
+		"no_pending_changes": "V tem klepetu ni čakajočih sprememb",
+		"new_file_nothing_to_open": "Ta sprememba ustvari novo datoteko – zaenkrat ni ničesar za odpreti."
+	},
+	"huggingface_connected": "Povezano s Hugging Face.",
+	"update": {
+		"available": "Na voljo je Smart Second Brain {version}.",
+		"update_link": "Posodobi",
+		"updated": "Smart Second Brain je posodobljen na različico {version}.",
+		"whats_new_link": "Oglejte si novosti"
+	},
+	"settings_save_failed": "Smart Second Brain ni mogel shraniti vaših nastavitev: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: približno {tokens} žetonov najstarejše zgodovine klepeta ni bilo mogoče umestiti v kontekstno okno modela za povzemanje, zato so izpuščeni iz povzetka.",
+		"repeated_failure": "Smart Second Brain: povzemanje zgodovine tega klepeta ni uspelo {failures}-krat zapored, zato se še vedno pošilja celotna zgodovina, ki lahko preseže omejitev konteksta modela. Preverite agentov model za povzemanje; napaka je v konzoli za razvijalce."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Spomin je prevelik za ta model{window}: {names} se ne nalaga več v vsako sporočilo. Agent ga prebere le, kadar je potrebno. Skrajšajte zapisek ali uporabite model z večjim kontekstnim oknom.",
+			"two": "Spomin je prevelik za ta model{window}: {names} se ne nalagata več v vsako sporočilo. Agent ju prebere le, kadar je potrebno. Skrajšajte zapisek ali uporabite model z večjim kontekstnim oknom.",
+			"few": "Spomin je prevelik za ta model{window}: {names} se ne nalagajo več v vsako sporočilo. Agent jih prebere le, kadar je potrebno. Skrajšajte zapisek ali uporabite model z večjim kontekstnim oknom.",
+			"other": "Spomin je prevelik za ta model{window}: {names} se ne nalagajo več v vsako sporočilo. Agent jih prebere le, kadar je potrebno. Skrajšajte zapisek ali uporabite model z večjim kontekstnim oknom."
+		},
+		"memory_window": "({k}k žetonov)",
+		"save_prompt_failed": "Sistemskega poziva ni bilo mogoče shraniti: {error}",
+		"open_agent_note": "Odpri zapisek agenta",
+		"prompt_modal_title": "Sistemski poziv – {name}",
+		"save_skill_failed": "Veščine »{skill}« ni bilo mogoče shraniti: {error}",
+		"open_skill_note": "Odpri zapisek veščine",
+		"skill_modal_title": "Veščina – {skill}",
+		"cannot_connect": "Povezava ni mogoča: {providers}. Preverite, ali storitev deluje.",
+		"review_providers": "Preglej ponudnike",
+		"provider_unavailable": "Ponudnik »{provider}« ni več na voljo.",
+		"select_new_model": "Izberite nov model",
+		"withdrew_changes": {
+			"one": "Umaknjena je {count} čakajoča sprememba zapiska, ki jo je predlagal zamenjani odgovor.",
+			"two": "Umaknjeni sta {count} čakajoči spremembi zapiskov, ki ju je predlagal zamenjani odgovor.",
+			"few": "Umaknjene so {count} čakajoče spremembe zapiskov, ki jih je predlagal zamenjani odgovor.",
+			"other": "Umaknjenih je {count} čakajočih sprememb zapiskov, ki jih je predlagal zamenjani odgovor."
+		},
+		"kept_partial_changes": {
+			"one": "{count} delno uveljavljena sprememba je ohranjena – razrešite jo v vrstici za pregled.",
+			"two": "{count} delno uveljavljeni spremembi sta ohranjeni – razrešite ju v vrstici za pregled.",
+			"few": "{count} delno uveljavljene spremembe so ohranjene – razrešite jih v vrstici za pregled.",
+			"other": "{count} delno uveljavljenih sprememb je ohranjenih – razrešite jih v vrstici za pregled."
+		}
+	},
+	"errors": {
+		"request_failed": "Zahteva za model ni uspela.",
+		"context_overflow": "Ta klepet ne gre več v kontekstno okno modela.",
+		"context_overflow_hint": "Začnite nov klepet ali preverite kontekstno okno, nastavljeno za ta model.",
+		"refusal": "Model je zavrnil odgovor na to zahtevo.",
+		"refusal_hint": "Morda pomaga, če zahtevo preoblikujete ali preklopite na drug model."
+	},
+	"provider_auth": {
+		"unknown_provider": "Neznan ponudnik: {provider}",
+		"invalid_api_key": "Neveljaven ključ API",
+		"invalid_endpoint": "Neveljaven osnovni URL ali nedosegljiva končna točka",
+		"configuration_failed": "Nastavitev ponudnika ni uspela",
+		"no_auth_config": "Za {provider} ni najdene konfiguracije za preverjanje pristnosti",
+		"discovery_failed": "Odkrivanje modelov ni uspelo: {error}",
+		"server_url_required": "URL strežnika je obvezen",
+		"api_key_required": "Ključ API je obvezen",
+		"connection_failed": "Povezava ni uspela: {error}",
+		"auth_failed_status": "Preverjanje pristnosti ni uspelo ({status})",
+		"auth_failed": "Preverjanje pristnosti ni uspelo",
+		"request_failed_status": "Zahteva ni uspela s stanjem {status}",
+		"codex_sign_in_required": "Za uporabo Codexa se prijavite z računom ChatGPT",
+		"openai_codex_sign_in_required": "Za uporabo OpenAI prek Codexa se prijavite z računom ChatGPT",
+		"huggingface_token_rejected": "Hugging Face je zavrnil ta dostopni žeton",
+		"huggingface_status": "Hugging Face je vrnil stanje {status}",
+		"huggingface_sign_in_required": "Za povezavo se prijavite z računom Hugging Face"
+	},
+	"providers": {
+		"templates": {
+			"openai": "Modeli OpenAI prek prijave v ChatGPT ali s ključem API.",
+			"openai_compatible": "Prilagodljiv ponudnik v slogu OpenAI za OpenAI in združljive končne točke.",
+			"anthropic": "Modeli Claude prek API-ja Anthropic.",
+			"ollama": "Lokalni modeli Ollama prek API-ja Ollama.",
+			"omlx": "Lokalni modeli MLX na vašem Macu prek strežnika oMLX, združljivega z OpenAI.",
+			"openrouter": "Račun OpenRouter in katalog modelov.",
+			"huggingface": "Odprti modeli ponudnikov sklepanja Hugging Face."
+		},
+		"fields": {
+			"api_key": "Ključ API",
+			"base_url": "Osnovni URL",
+			"server_url": "URL strežnika",
+			"access_token": "Dostopni žeton",
+			"custom_headers": "Glave po meri",
+			"custom_headers_desc": "Dodatne glave kot JSON (neobvezno)",
+			"chatgpt_sign_in": "Prijava v ChatGPT"
+		},
+		"openai": {
+			"link": "Nadzorna plošča OpenAI",
+			"oauth_desc": "Odprite okno brskalnika, da dokončate avtorizacijo ChatGPT/Codex.",
+			"api_key_desc": "Vaš ključ API za OpenAI za preverjanje pristnosti",
+			"base_url_desc": "Končna točka API po meri (pustite prazno za privzeti OpenAI)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Ta ponudnik uporablja prijavo v ChatGPT/Codex prek brskalnika.",
+			"sign_in_placeholder": "Avtorizirano s prijavo v ChatGPT"
+		},
+		"openai_compatible": {
+			"base_url_desc": "Osnovni URL končne točke API, združljive z OpenAI",
+			"api_key_desc": "Ključ API za preverjanje pristnosti (pustite prazno, če ga vaša končna točka ne potrebuje)"
+		},
+		"anthropic": {
+			"link": "Konzola Anthropic",
+			"api_key_desc": "Vaš ključ API za Anthropic za preverjanje pristnosti",
+			"base_url_desc": "Osnovni URL končne točke API, združljive z Anthropic"
+		},
+		"ollama": {
+			"link": "Spletno mesto Ollama",
+			"server_url_desc": "URL, na katerem teče vaš strežnik Ollama",
+			"api_key_desc": "Ključ API za preverjanje pristnosti (za lokalno Ollamo običajno ni potreben)"
+		},
+		"omlx": {
+			"link": "Spletno mesto oMLX",
+			"server_url_desc": "URL, na katerem teče vaš strežnik oMLX",
+			"api_key_desc": "oMLX privzeto zahteva ključ API (najdete ga v globalnih nastavitvah skrbniške plošče). Pustite prazno le, če ste izklopili preverjanje ključa."
+		},
+		"openrouter": {
+			"link": "Ključi OpenRouter",
+			"oauth_desc": "Avtorizirajte se v brskalniku in se povežite, ne da bi ročno ustvarili ključ API.",
+			"api_key_desc": "Vaš ključ API za OpenRouter za preverjanje pristnosti"
+		},
+		"huggingface": {
+			"link": "Dostopni žetoni Hugging Face",
+			"oauth_desc": "Za povezavo odobrite dostop v brskalniku, ne da bi ustvarili dostopni žeton."
+		}
+	},
+	"indexing": {
+		"status": "Indeksiranje: {status}",
+		"cancelled_chunks": {
+			"one": "Indeksiranje preklicano (posodobljen {count} kos)",
+			"two": "Indeksiranje preklicano (posodobljena {count} kosa)",
+			"few": "Indeksiranje preklicano (posodobljeni {count} kosi)",
+			"other": "Indeksiranje preklicano (posodobljenih {count} kosov)"
+		},
+		"updated_chunks": {
+			"one": "✓ Indeks posodobljen: {count} kos",
+			"two": "✓ Indeks posodobljen: {count} kosa",
+			"few": "✓ Indeks posodobljen: {count} kosi",
+			"other": "✓ Indeks posodobljen: {count} kosov"
+		},
+		"cancelled_notes": {
+			"one": "Indeksiranje preklicano (doslej indeksiran {count} zapisek)",
+			"two": "Indeksiranje preklicano (doslej indeksirana {count} zapiska)",
+			"few": "Indeksiranje preklicano (doslej indeksirani {count} zapiski)",
+			"other": "Indeksiranje preklicano (doslej indeksiranih {count} zapiskov)"
+		},
+		"indexed_notes": {
+			"one": "✓ Indeksiran {count} zapisek",
+			"two": "✓ Indeksirana {count} zapiska",
+			"few": "✓ Indeksirani {count} zapiski",
+			"other": "✓ Indeksiranih {count} zapiskov"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ Indeksiran {count} zapisek, preskočenih: {skipped}",
+			"two": "✓ Indeksirana {count} zapiska, preskočenih: {skipped}",
+			"few": "✓ Indeksirani {count} zapiski, preskočenih: {skipped}",
+			"other": "✓ Indeksiranih {count} zapiskov, preskočenih: {skipped}"
+		},
+		"no_embedding_model": "Ni nastavljenega modela za vdelave. Nastavite privzeti model za vdelave.",
+		"invalid_config": "Neveljavna konfiguracija indeksa vdelav.",
+		"provider_not_configured": "Ponudnik »{provider}« ni nastavljen.",
+		"embedding_init_failed": "Inicializacija modela za vdelave ni uspela.",
+		"open_search_settings": "Odpri nastavitve iskanja",
+		"open_provider_settings": "Odpri nastavitve ponudnika",
+		"provider_unreachable": "Indeksiranje se je ustavilo – ponudnik vdelav ni dosegljiv. Preverite povezavo, nato nadaljujte.",
+		"rate_limited": "Indeksiranje je začasno ustavljeno – dosežena je omejitev hitrosti ponudnika vdelav. Nadaljuje se ob naslednjem zagonu ali pa ga pozneje nadaljujte v nastavitvah iskanja.",
+		"already_in_progress": "Indeksiranje že poteka ...",
+		"embed_failed": "Vdelava datoteke {file} ni uspela: {error}",
+		"embed_empty": "Vdelava datoteke {file} ni uspela: model je vrnil prazen rezultat",
+		"semantic_unreachable": "Pomensko iskanje ni na voljo – ponudnik vdelav ni dosegljiv. Pomenski rezultati niso prikazani.",
+		"semantic_failed": "Pomensko iskanje ni uspelo: {error}",
+		"cancelling": "Preklicevanje indeksiranja …",
+		"export_empty": "Indeks je prazen – ni ničesar za izvoz.",
+		"export_dialog_title": "Izvozi indeks vdelav",
+		"exported": "Izvoženih vdelav: {count}.",
+		"export_failed": "Izvoz indeksa ni uspel.",
+		"import_dialog_title": "Uvozi indeks vdelav",
+		"import_invalid_version": "Izvozna datoteka ima neveljavno ali manjkajoče polje različice. Znova indeksirajte, da ustvarite združljiv izvoz.",
+		"import_outdated": "Shema izvozne datoteke v{version} je zastarela (trenutna: v{current}). Znova indeksirajte, da ustvarite združljiv izvoz.",
+		"import_newer": "Izvozna datoteka je bila ustvarjena z novejšo različico vtičnika (shema v{version}). Za uvoz posodobite vtičnik.",
+		"import_missing_metadata": "Izvozni datoteki manjkajo metapodatki o ponudniku ali modelu.",
+		"imported": "Uvoženih vdelav: {count} ({model}).",
+		"import_failed": "Uvoz indeksa ni uspel. Datoteka je morda poškodovana.",
+		"reindex": "Znova indeksiraj"
+	},
+	"search_index": {
+		"status": "Indeksiranje zapiskov za iskanje: {status}",
+		"updated": "✓ Indeks iskanja posodobljen: zapiskov: {count}"
+	},
+	"bulk_progress": {
+		"skipped": "(preskočenih: {count})",
+		"eta": "(še ~{eta})",
+		"pdfs_progress": "PDF-ji {done}/{total}",
+		"then": "nato {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"two": "{count} PDF-ja",
+			"few": "{count} PDF-ji",
+			"other": "{count} PDF-jev"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Podokno za iskanje je odprto, vendar poizvedbe z oznako ni bilo mogoče nastaviti",
+		"open_failed": "Podokna za iskanje oznake ni bilo mogoče odpreti: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "Za vaše ponudnike ni najdenih modelov za vdelave. Preverite, ali kateri od njih ponuja vdelave.",
+		"no_models": "Ni najdenih modelov. Preverite, ali vaš ponudnik deluje in je dosegljiv."
+	},
+	"actions": {
+		"open_settings": "Odpri nastavitve",
+		"add_provider": "Dodaj ponudnika",
+		"check_provider_settings": "Preveri nastavitve ponudnika",
+		"select_model": "Izberi model",
+		"configure_embedding_index": "Nastavi indeks vdelav",
+		"edit_agent": "Uredi agenta",
+		"view_report": "Prikaži poročilo",
+		"open_note": "Odpri zapisek",
+		"open_chat": "Odpri klepet",
+		"agent_gone_pick_model": "Ta agent ne obstaja več. Izberite model pri agentu, ki ga želite uporabiti.",
+		"agent_gone_not_saved": "Ta agent ne obstaja več, zato model ni bil shranjen."
+	},
+	"diff": {
+		"pending_change": "Čakajoča sprememba",
+		"previous": "Prejšnja čakajoča sprememba",
+		"next": "Naslednja čakajoča sprememba",
+		"toggle_view": "Preklopi pogled razlik",
+		"accept": "Sprejmi",
+		"accept_aria": "Sprejmi spremembo",
+		"reject": "Zavrni",
+		"reject_aria": "Zavrni spremembo",
+		"stale_tooltip": "Ni mogoče sprejeti – zapisek se je spremenil po tem, ko je bila sprememba predlagana. Zavrnite jo in prosite agenta, naj jo pripravi znova.",
+		"cross_thread_banner": {
+			"one": "{count} drug klepet ima čakajoče urejanje te datoteke. Tukaj je prikazano le najnovejše; zmaga tisto, ki je sprejeto prvo, uveljavitev ostalih pa lahko nato ne uspe.",
+			"two": "{count} druga klepeta imata čakajoče urejanje te datoteke. Tukaj je prikazano le najnovejše; zmaga tisto, ki je sprejeto prvo, uveljavitev ostalih pa lahko nato ne uspe.",
+			"few": "{count} drugi klepeti imajo čakajoče urejanje te datoteke. Tukaj je prikazano le najnovejše; zmaga tisto, ki je sprejeto prvo, uveljavitev ostalih pa lahko nato ne uspe.",
+			"other": "{count} drugih klepetov ima čakajoče urejanje te datoteke. Tukaj je prikazano le najnovejše; zmaga tisto, ki je sprejeto prvo, uveljavitev ostalih pa lahko nato ne uspe."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Klicanje orodij",
+		"reasoning": "Razširjeno sklepanje",
+		"vision": "Vid / priloge datotek",
+		"structured_output": "Strukturiran izhod (shema JSON)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Iskanje zapiskov",
+			"summary": "Iskanje po vaših zapiskih v Obsidianu s ključnimi besedami. Vrne imena ujemajočih se datotek in metapodatke."
+		},
+		"list_directory": {
+			"name": "Seznam map",
+			"summary": "Prikaže strukturo map v sefu: pregled s številom datotek v korenu ter datoteke in podmape znotraj mape. Izhod je strnjen, da ustreza proračunu konteksta."
+		},
+		"read_content": {
+			"name": "Branje vsebine",
+			"summary": "Branje zapiskov in datotek v sefu po poti ali wiki povezavi. Podpira datoteke markdown/besedilne datoteke in izluščenje besedila iz PDF-jev. Slike morajo biti priložene v klepetu."
+		},
+		"grep_notes": {
+			"name": "Grep po zapiskih",
+			"summary": "Poišče natančen podniz ali vzorec regularnega izraza v zapiskih in vrne ujemajoče se vrstice s številkami vrstic in kontekstom. Za razliko od Iskanja zapiskov se ujema z dobesednimi nizi. Omejite ga na en zapisek s potjo ali pa velike nabore rezultatov prikazujte po straneh."
+		},
+		"get_all_tags": {
+			"name": "Pridobi vse oznake",
+			"summary": "Pridobi seznam vseh oznak, uporabljenih v sefu."
+		},
+		"get_properties": {
+			"name": "Pridobi lastnosti",
+			"summary": "Pridobi lastnosti iz začetnih metapodatkov zapiskov ali navede vse ključe lastnosti v sefu."
+		},
+		"execute_javascript": {
+			"name": "Izvedi JavaScript",
+			"summary": "Izvaja izoliran JavaScript za izračune in preoblikovanje podatkov. Za končno vrednost uporabite return, za vmesni izhod pa console.log."
+		},
+		"manage_notes": {
+			"name": "Upravljanje zapiskov",
+			"summary": "Ustvarjanje, posodabljanje ali brisanje zapiskov markdown v enem pripravljenem paketu. Povezane operacije na zapiskih je mogoče predlagati skupaj v odobritev uporabniku."
+		},
+		"fetch_url": {
+			"name": "Pridobi URL",
+			"summary": "Pridobi javno spletno stran ali besedilni vir prek HTTP(S) in vrne njeno glavno vsebino kot prečiščen markdown. Uporabljajte le z URL-ji, ki jih je podal uporabnik, ali z očitno javnimi viri."
+		},
+		"web_search": {
+			"name": "Spletno iskanje",
+			"summary": "Išče po spletu in vrne rezultate (naslov, URL, izrezek). Ponudnika in ključ API nastavite v plošči Nastavi tega orodja. Najprej raje iščite v sefu."
+		},
+		"manage_skills": {
+			"name": "Upravljanje veščin",
+			"summary": "Ustvarjanje novih veščin, popravljanje agentovih lastnih priloženih veščin ali brisanje veščine, ko to zahtevate. Spremembe začnejo veljati takoj. Ime veščine in povezava z vtičnikom sta po ustvarjanju zaklenjena."
+		},
+		"write_todos": {
+			"name": "Seznam nalog",
+			"summary": "Agentu omogoča, da večstopenjsko delo načrtuje kot kontrolni seznam in ga sproti odkljukava. Seznam je prikazan nad vnosnim poljem klepeta."
+		},
+		"ask_question": {
+			"name": "Postavi vprašanje",
+			"summary": "Agentu omogoča, da se ustavi in vam postavi vprašanje z izbiro odgovorov, kadar zahteva ni jasna. Vprašanje je prikazano nad vnosnim poljem klepeta."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (brez ključa)",
+		"firecrawl_key_help": "Neobvezno – dodajte ključ API za Firecrawl (fc-…) za višje omejitve hitrosti. Pustite prazno, če želite uporabiti raven brez ključa.",
+		"brave_key_help": "Ključ API za Brave Search z api.search.brave.com.",
+		"tavily_key_help": "Ključ API za Tavily z app.tavily.com.",
+		"keenable_key_help": "Neobvezno – dodajte ključ API za Keenable za višje omejitve hitrosti. Pustite prazno, če želite uporabiti brezplačno javno končno točko."
+	}
+}

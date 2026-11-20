@@ -1,0 +1,572 @@
+{
+	"editing": {
+		"label": "Mesaj düzenleniyor",
+		"cancel": "Düzenlemeyi iptal et"
+	},
+	"branch": {
+		"previous": "Önceki dal",
+		"next": "Sonraki dal"
+	},
+	"message": {
+		"collapse": "Mesajı daralt",
+		"expand": "Mesajı genişlet",
+		"wait_before_edit": "Düzenlemeden önce geçerli yanıtın bitmesini bekleyin",
+		"regenerate_failed": "Yeniden oluşturma başarısız: {error}",
+		"retry_failed": "Yeniden deneme başarısız: {error}",
+		"branch_switch_failed": "Dal değiştirme başarısız: {error}",
+		"unknown_error": "Bilinmeyen hata",
+		"copied": "Panoya kopyalandı",
+		"edit": "Mesajı düzenle",
+		"copy": "Mesajı kopyala",
+		"compaction_manual": "Elle konuşma sıkıştırma",
+		"compaction_automatic": "Otomatik konuşma sıkıştırma",
+		"regenerate": "Yanıtı yeniden oluştur",
+		"copy_response": "Yanıtı kopyala",
+		"jump_to_bottom": "En alta git"
+	},
+	"model_select": {
+		"tooltip": "Model seç"
+	},
+	"attach": {
+		"tooltip": "Bağlam ekle",
+		"from_device": "Cihazdan",
+		"take_photo": "Fotoğraf çek",
+		"from_vault": "Kasadan"
+	},
+	"running": {
+		"go_to": "Çalışan sohbete git: {name}"
+	},
+	"status": {
+		"request_failed": "Model isteği başarısız oldu.",
+		"error_title": "Bir şeyler ters gitti",
+		"retry_aria": "Bu isteği yeniden dene",
+		"retry_tooltip": "Başarısız isteği yeniden çalıştır",
+		"stopped": "Durduruldu"
+	},
+	"embed": {
+		"open_chat": "Sohbeti aç",
+		"fallback_title": "Sohbet",
+		"empty": "Bu sohbette henüz mesaj yok.",
+		"load_failed": "Sohbet önizlemesi yüklenemedi."
+	},
+	"agent": {
+		"configure": "Ajanı yapılandır",
+		"options": "Ajan seçenekleri",
+		"edit": "Ajanı düzenle",
+		"default_badge": "varsayılan",
+		"create": "Ajan oluştur",
+		"new": "Yeni ajan"
+	},
+	"todos": {
+		"all_done": "Tüm adımlar tamamlandı",
+		"status_pending": "Başlanmadı",
+		"status_in_progress": "Devam ediyor",
+		"collapse": "Görev listesini daralt",
+		"expand": "Görev listesini genişlet",
+		"progress": "{done} / {total}"
+	},
+	"pending": {
+		"count_create": {
+			"one": "{count} oluşturma",
+			"other": "{count} oluşturma"
+		},
+		"count_update": {
+			"one": "{count} güncelleme",
+			"other": "{count} güncelleme"
+		},
+		"count_delete": {
+			"one": "{count} silme",
+			"other": "{count} silme"
+		},
+		"count_move": {
+			"one": "{count} taşıma",
+			"other": "{count} taşıma"
+		},
+		"summary_pending": "{composition} bekliyor",
+		"summary_partially_applied": "{count} kısmen uygulandı",
+		"type_create": "Oluştur",
+		"type_update": "Güncelle",
+		"type_move": "Taşı",
+		"notice_applied": "Uygulandı: {path}",
+		"notice_apply_failed": "Değişiklik uygulanamadı: {error}",
+		"notice_rejected": "Reddedildi: {path}",
+		"notice_restored": "Geri yüklendi: {path}",
+		"skip_conflict": "\"{path}\" olduğu gibi bırakıldı — değişiklik kısmen uygulandıktan sonra değişti.",
+		"skip_missing": "\"{path}\" geri yüklenemedi — bu not artık yok. Uygulanan içerik onunla birlikte taşındı.",
+		"skip_failed": "\"{path}\" geri yüklenemedi. Ayrıntılar için konsola bakın.",
+		"notice_all_stale": "Bekleyen tüm değişiklikler eskimiş — notlar, öneriler yapıldıktan sonra değişti. Reddedin ve ajandan değişiklikleri yeniden hazırlamasını isteyin.",
+		"risk_deletions": {
+			"one": "{count} not silme",
+			"other": "{count} not silme"
+		},
+		"risk_deprivatizing_moves": {
+			"one": "gizli bir konumdan dışarı {count} taşıma",
+			"other": "gizli bir konumdan dışarı {count} taşıma"
+		},
+		"risk_join": "{first} ve {second}",
+		"confirm_accept_all_title": "Tüm değişiklikler kabul edilsin mi?",
+		"confirm_accept_all_message": {
+			"one": "Bu toplu işlem şunları içeriyor: {risks}. {count} değişiklik uygulansın mı?",
+			"other": "Bu toplu işlem şunları içeriyor: {risks}. {count} değişikliğin tümü uygulansın mı?"
+		},
+		"accept_all": "Tümünü kabul et",
+		"skipped_stale_suffix": ", {count} eskimiş değişiklik atlandı",
+		"notice_applied_one": "Değişiklik uygulandı{skipped}",
+		"notice_applied_all": "{count} değişikliğin tümü uygulandı{skipped}",
+		"notice_applied_partial": "{applied} değişiklik uygulandı{skipped}, {failed} başarısız: {paths}",
+		"notice_apply_error": "Değişiklikler uygulanırken hata oluştu: {error}",
+		"notice_rejected_all": "Bekleyen tüm değişiklikler reddedildi",
+		"notice_restored_partial": "Kısmen uygulanan notlar geri yüklendi",
+		"notice_rejected_all_head": "Bekleyen tüm değişiklikler reddedildi.",
+		"notice_undo_finished_head": "Uygulanan değişikliklerin geri alınması tamamlandı.",
+		"notice_open_failed": "Bu değişikliğin notu açılamadı.",
+		"collapse": "Bekleyen değişiklikleri daralt",
+		"expand": "Bekleyen değişiklikleri genişlet",
+		"diff_mode_to_split": "Not içi farkları iki bölmeli görünüme geçir",
+		"diff_mode_to_word": "Not içi farkları satır içi kelime farkına geçir",
+		"diff_mode_toggle": "Fark görünümü modunu değiştir",
+		"accept_all_tooltip": "Tüm değişiklikleri kabul et",
+		"reject_all_tooltip": "Tüm değişiklikleri reddet ve kısmen uygulanan notları geri yükle",
+		"undo_applied_tooltip": "Kısmen uygulanan notları özgün içeriklerine geri döndür",
+		"reject_all": "Tümünü reddet",
+		"undo_applied": "Uygulananı geri al",
+		"hide_widget_preview": "Widget önizlemesini gizle",
+		"preview_widget": "Widget'ı önizle",
+		"hide_changes": "Değişiklikleri gizle",
+		"show_changes": "Değişiklikleri göster",
+		"hide_content": "İçeriği gizle",
+		"show_content": "İçeriği göster",
+		"hide_widget_preview_aria": "{path} önizlemesini gizle",
+		"preview_widget_aria": "{path} önizle",
+		"hide_changes_aria": "{path} değişikliklerini gizle",
+		"show_changes_aria": "{path} değişikliklerini göster",
+		"hide_content_aria": "{path} içeriğini gizle",
+		"show_content_aria": "{path} içeriğini göster",
+		"partly_applied_explanation": "Bu değişikliğin bir kısmı nota uygulandı. Notun özgün içeriğini geri yüklemek için geri alın.",
+		"partly_applied": "Kısmen uygulandı",
+		"stale_delete_explanation": "Bu not, silme önerildikten sonra değişti — önizleme artık silinecek içerikle eşleşmiyor. Kabul etmek başarısız olur; reddedin ve ajandan yeniden hazırlamasını isteyin.",
+		"stale_explanation": "Bu not, değişiklik önerildikten sonra değişti, bu yüzden kabul etmek başarısız olur. Reddedin ve ajandan düzenlemesini mevcut içeriğe yeniden uygulamasını isteyin.",
+		"stale": "Eskimiş",
+		"deprivatizing_explanation": "Bu not şu anda gizli. Bu konuma taşımak onu gizlilik filtresinin dışına çıkarır; bundan sonra dizinlenir, aranabilir ve güvenilmeyen sağlayıcılar tarafından erişilebilir olur.",
+		"deprivatizing": "Gizlilikten çıkıyor",
+		"cross_thread_explanation": {
+			"one": "{count} başka sohbette de bu dosya için bekleyen bir düzenleme var. Önce kabul edilen geçerli olur; diğerleri sonrasında uygulanamayabilir.",
+			"other": "{count} başka sohbette de bu dosya için bekleyen bir düzenleme var. Önce kabul edilen geçerli olur; diğerleri sonrasında uygulanamayabilir."
+		},
+		"stale_accept_disabled": "Kabul edilemiyor — not, bu öneri yapıldıktan sonra değişti. Reddedin ve ajandan değişikliği yeniden hazırlamasını isteyin.",
+		"accept_change": "Değişikliği kabul et",
+		"accept_change_aria": "{path} değişikliğini kabul et",
+		"reject_change": "Değişikliği reddet",
+		"reject_change_aria": "{path} değişikliğini reddet",
+		"undo_applied_change_tooltip": "Bu notu öneriden önceki içeriğine geri döndür",
+		"undo_applied_change_aria": "{path} için uygulanan değişikliği geri al",
+		"hide_source_changes": "Kaynak değişikliklerini gizle",
+		"show_source_changes": "Kaynak değişikliklerini göster",
+		"note_empty": "Bu not boş.",
+		"no_remaining_differences": "Kalan fark yok.",
+		"accept_hunk": "Bu değişikliği kabul et",
+		"accept_hunk_aria": "{total} değişiklikten {index}. değişikliği kabul et",
+		"reject_hunk": "Bu değişikliği reddet",
+		"reject_hunk_aria": "{total} değişiklikten {index}. değişikliği reddet",
+		"hunk_too_large": "Bu değişiklik burada önizlenemeyecek kadar büyük — incelemek için notu açın."
+	},
+	"question": {
+		"send_failed": "Yanıtınız gönderilemedi",
+		"group_aria": "Ajandan soru",
+		"position": "Soru {index} / {total}",
+		"label": "Soru",
+		"dismiss_aria": "Soruyu kapat",
+		"dismiss_tooltip": "Yanıtlamadan kapat",
+		"multi_hint": "Uygun olanların tümünü seçin",
+		"custom_placeholder": "Başka bir şey…",
+		"answer_placeholder": "Yanıtınızı yazın…",
+		"custom_aria": "Kendi yanıtınız",
+		"send_answers": "Yanıtları gönder",
+		"send_answer": "Yanıtı gönder",
+		"unrenderable": "Ajan, gösterilemeyen bir soru sordu.",
+		"retry": "Yeniden denemesine izin ver"
+	},
+	"context_usage": {
+		"row_system": "Sistem istemi",
+		"row_human": "Mesajlarınız",
+		"row_assistant": "Asistan",
+		"row_tool": "Araç sonuçları",
+		"row_draft": "Taslak ve bekleyenler",
+		"tooltip_unknown_limit": "Bağlam kullanımı (tahmini): {used}k token (sınır bilinmiyor)",
+		"tooltip": "Bağlam kullanımı (tahmini): %{percent} ({used}k / {limit}k)",
+		"line_unknown_limit": "{tokens} token · sınır bilinmiyor",
+		"line": "{tokens} / {limit} token",
+		"compaction_unknown_short": "Otomatik sıkıştırma için bilinen bir sınır gerekir",
+		"compaction_unknown_long": "Otomatik özetleme, bağlam sınırı bilinen bir model gerektirir.",
+		"compaction_short": "Otomatik sıkıştırma: {tokens}{percent}",
+		"compaction_long": "Eski mesajlar {tokens} token{percent} seviyesinde otomatik olarak özetlenir.",
+		"trigger_aria": "Bağlam token dağılımını aç",
+		"heading": "Bağlam kullanımı (tahmini)",
+		"summarize_now": "Şimdi özetle",
+		"summarize_now_tooltip": "Eski mesajları şimdi özetle",
+		"nothing_to_summarize": "Henüz özetlenecek bir şey yok"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "Bana hangi konularda yardımcı olabilirsin?",
+		"suggestion_summarize_recent": "Son notlarımı özetle",
+		"suggestion_find_notes": "Bir konuyla ilgili notları bul",
+		"suggestion_find_notes_query": "Şu konudaki notlarımı bul: ",
+		"suggestion_tasknotes": "Bu hafta hangi görevlerin son tarihi var?",
+		"suggestion_tasks": "Hangi görevlerin süresi geçti?",
+		"suggestion_dataview": "Notlarımı etikete göre bir tabloda göster",
+		"skills_initializing": "Beceriler hâlâ başlatılıyor — birazdan yeniden deneyin.",
+		"skill_create_failed_detail": "{name} için beceri oluşturulamadı: {error}",
+		"skill_create_failed": "{name} için beceri oluşturulamadı.",
+		"open_agent_skills": "Ajan becerilerini aç",
+		"enabled_notice": "{name}, {agent} için etkinleştirildi.",
+		"greeting_title": "Yeni bir konuşma başlatın",
+		"greeting_sub": "Notlarınızla ilgili bana her şeyi sorun.",
+		"add_provider_title": "Bir yapay zekâ sağlayıcısı ekleyin",
+		"add_provider_sub": "Sohbete başlamak için bir sağlayıcı bağlayın.",
+		"select_model_title": "Bir sohbet modeli seçin",
+		"select_model_sub": "Sohbete başlamak için bir model seçin.",
+		"dismiss_suggestion_aria": "\"{label}\" önerisini kapat",
+		"stale_not_updated": "Varsayılan {label} değişti, ancak kopyanız otomatik olarak güncellenemedi.",
+		"stale_kept": "Varsayılan {label} değişti. Özelleştirdiğiniz sürüm korundu.",
+		"review": "Gözden geçir",
+		"dismiss_notice_aria": "{label} güncelleme bildirimini kapat",
+		"dismiss_notice": "Bu bildirimi kapat",
+		"dismiss_all_nudges_aria": "{count} eklenti entegrasyonu önerisinin tümünü kapat",
+		"dismiss_all_nudges_tooltip": "{count} önerinin tümünü kapat",
+		"dismiss_all": "Tümünü kapat",
+		"enable": "Etkinleştir",
+		"dismiss_nudge_aria": "{name} önerisini kapat",
+		"dismiss_nudge": "Bu öneriyi kapat",
+		"show_less": "Daha az göster",
+		"dismiss_all_aria": "Tüm önerileri kapat",
+		"stale_label": {
+			"system_prompt": "sistem istemi",
+			"skill": "{name} becerisi"
+		},
+		"nudge": "Bu ajan için {skill} becerisini etkinleştirin.",
+		"nudges_summary": {
+			"one": "Bu ajan için {number} eklenti entegrasyonu kullanılabilir.",
+			"other": "Bu ajan için {number} eklenti entegrasyonu kullanılabilir."
+		},
+		"stale_agent_kept": "Varsayılan {label} değişti. {agent} ajanının özelleştirilmiş sürümü korundu.",
+		"stale_agent_not_updated": "Varsayılan {label} değişti, ancak {agent} ajanının kopyası otomatik olarak güncellenemedi."
+	},
+	"context_tray": {
+		"attachment_open": "{path} (açmak için tıklayın)",
+		"remove_attachment": "Eki kaldır",
+		"remove_attachment_aria": "{name} kaldır",
+		"note_excluded": "{path} (hariç tutuldu — başvuru olarak eklemek için tıklayın)",
+		"note_included": "{path} (açık not — hariç tutmak için tıklayın)",
+		"attach_full_content": "Tam içeriği mesaja ekle",
+		"graph_collapse": "Graf seçimi — daraltmak için tıklayın",
+		"graph_topic_expand": "{topic} — genişletmek için tıklayın",
+		"graph_notes_expand": {
+			"one": "Graftan {count} not — genişletmek için tıklayın",
+			"other": "Graftan {count} not — genişletmek için tıklayın"
+		},
+		"graph_notes_label": {
+			"one": "{count} graf notu",
+			"other": "{count} graf notu"
+		},
+		"remove_graph_notes": "Tüm graf notlarını kaldır",
+		"graph_member": "{path} (graftan — hariç tutmak için tıklayın)",
+		"selection": "{path} içinden seçilen metin (kapatmak için tıklayın)\n\n{text}",
+		"selection_long": "Uzun seçim — modelin bağlamına sığacak şekilde kısaltılacak"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "Notlarda {target} aranıyor",
+				"done": "Notlarda {target} arandı"
+			},
+			"recent_notes": {
+				"running": "Son notlara bakılıyor",
+				"done": "Son notlara bakıldı"
+			},
+			"search_notes": {
+				"running": "Notlarda aranıyor",
+				"done": "Notlarda arandı"
+			},
+			"grep_for": {
+				"running": "{target} metni aranıyor",
+				"done": "{target} metni arandı"
+			},
+			"grep": {
+				"running": "Not metninde aranıyor",
+				"done": "Not metninde arandı"
+			},
+			"list_folder": {
+				"running": "{target} klasörü listeleniyor",
+				"done": "{target} klasörü listelendi"
+			},
+			"list_vault": {
+				"running": "Kasa listeleniyor",
+				"done": "Kasa listelendi"
+			},
+			"read_target": {
+				"running": "{target} okunuyor",
+				"done": "{target} okundu"
+			},
+			"read_note": {
+				"running": "Bir not okunuyor",
+				"done": "Bir not okundu"
+			},
+			"edit_notes": {
+				"running": "Notlar düzenleniyor",
+				"done": "Notlar düzenlendi"
+			},
+			"edit_note": {
+				"running": "Bir not düzenleniyor",
+				"done": "Bir not düzenlendi"
+			},
+			"run_javascript": {
+				"running": "JavaScript çalıştırılıyor",
+				"done": "JavaScript çalıştırıldı"
+			},
+			"list_tags": {
+				"running": "Tüm etiketler listeleniyor",
+				"done": "Tüm etiketler listelendi"
+			},
+			"read_properties_of": {
+				"running": "{target} özellikleri okunuyor",
+				"done": "{target} özellikleri okundu"
+			},
+			"read_properties": {
+				"running": "Not özellikleri okunuyor",
+				"done": "Not özellikleri okundu"
+			},
+			"fetch_target": {
+				"running": "{target} getiriliyor",
+				"done": "{target} getirildi"
+			},
+			"fetch_page": {
+				"running": "Bir sayfa getiriliyor",
+				"done": "Bir sayfa getirildi"
+			},
+			"web_search_for": {
+				"running": "Web'de {target} aranıyor",
+				"done": "Web'de {target} arandı"
+			},
+			"web_search": {
+				"running": "Web'de aranıyor",
+				"done": "Web'de arandı"
+			},
+			"load_skill_target": {
+				"running": "{target} becerisi yükleniyor",
+				"done": "{target} becerisi yüklendi"
+			},
+			"load_skill": {
+				"running": "Bir beceri yükleniyor",
+				"done": "Bir beceri yüklendi"
+			},
+			"update_todos": {
+				"running": "Görev listesi güncelleniyor",
+				"done": "Görev listesi güncellendi"
+			},
+			"clear_todos": {
+				"running": "Görev listesi temizleniyor",
+				"done": "Görev listesi temizlendi"
+			},
+			"ask_target": {
+				"running": "Soruluyor: {target}",
+				"done": "Soruldu: {target}"
+			},
+			"generic_target": {
+				"running": "{name} kullanılıyor: {target}",
+				"done": "{name} kullanıldı: {target}"
+			},
+			"generic": {
+				"running": "{name} kullanılıyor",
+				"done": "{name} kullanıldı"
+			}
+		},
+		"count": {
+			"note": {
+				"one": "{count} not",
+				"other": "{count} not"
+			},
+			"match": {
+				"one": "{count} eşleşme",
+				"other": "{count} eşleşme"
+			},
+			"file": {
+				"one": "{count} dosya",
+				"other": "{count} dosya"
+			},
+			"folder": {
+				"one": "{count} klasör",
+				"other": "{count} klasör"
+			},
+			"line": {
+				"one": "{count} satır",
+				"other": "{count} satır"
+			},
+			"tag": {
+				"one": "{count} etiket",
+				"other": "{count} etiket"
+			},
+			"result": {
+				"one": "{count} sonuç",
+				"other": "{count} sonuç"
+			},
+			"question": {
+				"one": "{count} soru",
+				"other": "{count} soru"
+			},
+			"operation": {
+				"one": "{count} işlem",
+				"other": "{count} işlem"
+			},
+			"item": {
+				"one": "{count} öğe",
+				"other": "{count} öğe"
+			},
+			"row": {
+				"one": "{count} satır",
+				"other": "{count} satır"
+			},
+			"field": {
+				"one": "{count} alan",
+				"other": "{count} alan"
+			}
+		},
+		"found": "{items} bulundu",
+		"found_no_matches": "eşleşme bulunamadı",
+		"found_in": "{files} içinde {items} bulundu",
+		"found_folders_and_files": "{folders} ve {files} bulundu",
+		"truncated": "{lines} (kısaltıldı)",
+		"operations_across": "{notes} genelinde {operations}",
+		"errored": "hata verdi",
+		"logged": "{lines} günlüğe yazıldı",
+		"returned_value": "bir değer döndürdü",
+		"duration_ms": "{ms} ms içinde",
+		"todos_done": "{total} adımdan {done} tanesi tamamlandı",
+		"dismissed": "kapatıldı",
+		"answered_in_chat": "sohbette yanıtlandı",
+		"answered": "yanıtlandı",
+		"failed": "başarısız",
+		"lines_total": "toplam {lines}",
+		"list_separator": ", ",
+		"list_and": "{list} ve {last}",
+		"list_and_more": "{list} ve {count} tane daha",
+		"tool_fallback": "Araç"
+	},
+	"tool_output": {
+		"key_count": {
+			"one": "{count} anahtar",
+			"other": "{count} anahtar"
+		}
+	},
+	"tools": {
+		"review_accepted": "{count} kabul edildi",
+		"review_partial": "{count} kısmen uygulandı",
+		"review_rejected": "{count} reddedildi",
+		"review_pending": "{count} inceleme bekliyor",
+		"label_with_outcome": "{label}, {outcome}",
+		"source_note": "Not",
+		"phase_summarizing": "Önceki mesajlar özetleniyor",
+		"phase_running_tools": {
+			"one": "{count} araç çalıştırılıyor",
+			"other": "{count} araç çalıştırılıyor"
+		},
+		"phase_loading_model": "Model yükleniyor",
+		"phase_waiting": "Model bekleniyor",
+		"phase_writing": "Yazıyor",
+		"phase_thinking": "Düşünüyor",
+		"running_label": "{phase}… {seconds} sn",
+		"settled_label": "{seconds} sn düşündü",
+		"via_subagent": "{name} aracılığıyla",
+		"input": "Girdi",
+		"output": "Çıktı",
+		"no_output": "(çıktı yok)",
+		"result": "Sonuç",
+		"tree_more_files": {
+			"one": "+{count} dosya daha",
+			"other": "+{count} dosya daha"
+		},
+		"tree_unlisted_files": {
+			"one": "{count} dosya listelenmedi",
+			"other": "{count} dosya listelenmedi"
+		},
+		"no_answer": "Yanıt yok",
+		"dismissed_without_answer": "Yanıtlanmadan kapatıldı.",
+		"chip_query": "sorgu: {value}",
+		"chip_algorithm": "algoritma: {value}",
+		"chip_results": "sonuçlar: {value}",
+		"chip_shown": "gösterilen: {value}",
+		"chip_recent_only": "yalnızca son",
+		"chip_skipped_private": "atlanan gizli: {value}",
+		"untitled": "Başlıksız",
+		"more_results": {
+			"one": "+{count} sonuç daha",
+			"other": "+{count} sonuç daha"
+		},
+		"chip_root": "kök: {value}",
+		"chip_folders": "klasörler: {value}",
+		"chip_files": "dosyalar: {value}",
+		"chip_depth": "derinlik: {value}",
+		"chip_folders_only": "yalnızca klasörler",
+		"chip_collapsed": "daraltıldı",
+		"tree": "Ağaç",
+		"chip_operations": "işlemler: {value}",
+		"chip_paths": "yollar: {value}",
+		"chip_truncated": "kısaltıldı",
+		"chip_logs": "günlükler: {value}",
+		"chip_error": "hata",
+		"chip_return_value": "dönüş değeri",
+		"console_output": "Konsol çıktısı",
+		"return_value": "Dönüş değeri",
+		"executed_code": "Çalıştırılan kod",
+		"raw_output": "Ham çıktı"
+	},
+	"input": {
+		"drop_files": "Dosyaları buraya bırakın",
+		"send_shortcut_hint": "↵ · listede {shortcut}",
+		"edit_attachment_missing": "\"{name}\" eki artık kasada yok — düzenlenen mesaja dahil edilmeyecek.",
+		"select_model_to_send": "Bunu göndermek için bir sohbet modeli seçin.",
+		"placeholder": "Notlarınız hakkında sorun...",
+		"wait_for_attachments": "Lütfen eklerin kaydedilmesinin bitmesini bekleyin",
+		"select_model_before_sending": "Göndermeden önce bir sohbet modeli seçin.",
+		"empty_before_sending": "Göndermeden önce metin ekleyin veya bir dosya ekleyin",
+		"empty_before_saving": "Kaydetmeden önce metin ekleyin veya bir dosya ekleyin",
+		"select_model_before_saving": "Kaydetmeden önce bir sohbet modeli seçin.",
+		"save_edit_failed": "Düzenleme kaydedilemedi",
+		"not_ready": "Sohbet henüz hazır değil",
+		"question_blocks_attachments": "Dosya eklemeden önce ajanın sorusunu yanıtlayın veya kapatın",
+		"send_failed": "Mesaj gönderilemedi",
+		"summarize_failed": "Geçmiş özetlenemedi",
+		"unsupported_file_type": "Desteklenmeyen dosya türü: .{ext}",
+		"the_selected_model": "seçili model",
+		"vision_required_switch": "Görsel ekleri, görüntü destekli bir model gerektirir. Görsel eklemek için model değiştirin (geçerli: {model}).",
+		"vision_unknown": "Modelin görüntü desteği bilinmiyor; bu model için görsel analizi başarısız olabilir.",
+		"file_too_large": "Dosya çok büyük: {name}, dosya başına 15 MB sınırını aşıyor.",
+		"total_too_large": "Toplam ek boyutu, tek bir mesaj için 25 MB sınırını aşıyor.",
+		"attach_failed": "Dosya eklenemedi: {error}",
+		"vision_required": "Görsel ekleri, görüntü destekli bir model gerektirir (geçerli: {model}).",
+		"switch_model": "Model değiştir",
+		"already_attached": "{name} zaten eklendi.",
+		"wait_for_current_attachments": "Lütfen geçerli eklerin kaydedilmesinin bitmesini bekleyin.",
+		"file_not_found": "Dosya bulunamadı: {path}",
+		"only_files": "Yalnızca dosyalar eklenebilir: {path}",
+		"picker_placeholder": "Eklemek için kasa dosyalarında ara...",
+		"picker_verb": "Ekle",
+		"current_model": "geçerli model",
+		"drag_images_unsupported": "{model} görselleri desteklemiyor. Görüntü destekli bir modele geçin.",
+		"drag_some_unsupported": "Bazı dosyalar desteklenmiyor olabilir (kabul edilenler: txt, md, csv, json, görseller, pdf).",
+		"retry_connection": "Bağlantıyı yeniden denemek için tıklayın",
+		"provider_unreachable": "{provider} sağlayıcısına bağlanılamıyor — yeniden denemek için tıklayın",
+		"saving": "Kaydediliyor...",
+		"save_edit_aria": "düzenlemeyi kaydet",
+		"send_aria": "mesaj gönder",
+		"select_model_first": "Önce bir sohbet modeli seçin",
+		"save_edit_with_hint": "Düzenlemeyi kaydet ({hint})",
+		"save_edit": "Düzenlemeyi kaydet",
+		"send_with_hint": "Mesaj gönder ({hint})",
+		"send": "Mesaj gönder",
+		"stop_aria": "akışı durdur",
+		"stop": "Akışı durdur"
+	},
+	"view": {
+		"session_unavailable": "Sohbet oturumu henüz kullanılamıyor. Eklentinin başlatılması tamamlandıktan sonra bu görünümü yeniden açın."
+	}
+}

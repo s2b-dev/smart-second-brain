@@ -1,6 +1,7 @@
 <script lang="ts">
 import { Notice, type TFolder } from "obsidian";
 import { AgentEditorModal } from "../../components/modal/AgentEditorModal";
+import { t } from "../../i18n";
 import FolderSuggest from "../../components/modal/FolderSuggest.svelte";
 import ManagedEntityItem from "../../components/settings/ManagedEntityItem.svelte";
 import ManagedEntitySection from "../../components/settings/ManagedEntitySection.svelte";
@@ -23,9 +24,9 @@ const pluginData = getData();
 const plugin = getPlugin();
 
 const chatOpenLocationOptions: { display: string; value: ChatOpenLocation }[] = [
-	{ display: "Main area (tab)", value: "tab" },
-	{ display: "Left sidebar", value: "left" },
-	{ display: "Right sidebar", value: "right" },
+	{ display: t("agents.settings.open_location.tab"), value: "tab" },
+	{ display: t("agents.settings.open_location.left"), value: "left" },
+	{ display: t("agents.settings.open_location.right"), value: "right" },
 ];
 
 function suggestFolders(): TFolder[] {
@@ -66,7 +67,7 @@ function duplicateAgent(agentId: string) {
 
 async function deleteAgent(agentId: string) {
 	if (agentId === DEFAULT_AGENT_ID) {
-		new Notice("Cannot delete the built-in default agent");
+		new Notice(t("agents.settings.cannot_delete_default"));
 		return;
 	}
 	const agent = agents[agentId];
@@ -81,7 +82,7 @@ async function deleteAgent(agentId: string) {
 		pluginData.deleteAgent(agentId);
 		plugin.agentManager?.invalidateAgentRunnable(agentId);
 	} catch (error) {
-		new Notice(error instanceof Error ? error.message : "Failed to delete agent");
+		new Notice(error instanceof Error ? error.message : t("agents.settings.delete_failed"));
 	}
 }
 
@@ -93,7 +94,7 @@ function selectDefaultAgent(agentId: string) {
 function getAgentModelSummary(agentId: string): string {
 	const agent = agents[agentId];
 	if (!agent?.chatModel) {
-		return "No chat model selected";
+		return t("agents.settings.no_chat_model");
 	}
 	const providerDef = getProviderDefinition(agent.chatModel.provider, pluginData.getAllProviderMeta());
 	return `${providerDef?.displayName ?? agent.chatModel.provider} · ${agent.chatModel.model}`;
@@ -115,13 +116,13 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
 
 <div class="agents-settings">
   <ManagedEntitySection
-    heading="Agents"
-    description="Agents combine a model, system prompt, skills, tools, and MCP servers into reusable assistants for different workflows."
-    emptyMessage="No agents configured."
+    heading={t("agents.settings.heading")}
+    description={t("agents.settings.description")}
+    emptyMessage={t("agents.settings.empty")}
     hasItems={agentIds.length > 0}
   >
     {#snippet actions()}
-      <Button buttonText="Add agent" cta={true} onClick={createNewAgent} />
+      <Button buttonText={t("agents.settings.add_agent")} cta={true} onClick={createNewAgent} />
     {/snippet}
 
     {#each agentIds as agentId (agentId)}
@@ -134,7 +135,7 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
           ? {
               selected: pluginData.defaultAgentId === agentId,
               onclick: () => selectDefaultAgent(agentId),
-              ariaLabel: `Set ${agent.name} as default agent`,
+              ariaLabel: t("agents.settings.set_default_aria", { name: agent.name }),
             }
           : undefined}
       >
@@ -146,7 +147,7 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
 
         {#snippet badges()}
           {#if agentId === DEFAULT_AGENT_ID}
-            <Badge label="Built-in" tone="muted" />
+            <Badge label={t("agents.settings.built_in_badge")} tone="muted" />
           {/if}
         {/snippet}
 
@@ -170,21 +171,21 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
           {#if agentId !== DEFAULT_AGENT_ID}
             <Button
               iconId="trash"
-              ariaLabel="Delete agent"
-              tooltip="Delete agent"
+              ariaLabel={t("agents.settings.delete_agent")}
+              tooltip={t("agents.settings.delete_agent")}
               onClick={() => deleteAgent(agentId)}
             />
           {/if}
           <Button
             iconId="settings"
-            ariaLabel="Edit agent"
-            tooltip="Edit agent"
+            ariaLabel={t("agents.settings.edit_agent")}
+            tooltip={t("agents.settings.edit_agent")}
             onClick={() => openAgentEditor(agentId)}
           />
           <Button
             iconId="copy"
-            ariaLabel="Duplicate agent"
-            tooltip="Duplicate agent"
+            ariaLabel={t("agents.settings.duplicate_agent")}
+            tooltip={t("agents.settings.duplicate_agent")}
             onClick={() => duplicateAgent(agentId)}
           />
         {/snippet}
@@ -192,10 +193,10 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     {/each}
   </ManagedEntitySection>
 
-  <SettingGroup heading="Agents storage">
+  <SettingGroup heading={t("agents.settings.storage_heading")}>
     <SettingItem
-      name="Agents folder"
-      desc="Vault folder holding agent context — skills, memories, and base prompts. Changing it seeds the new location; existing files are left in place."
+      name={t("agents.settings.agents_folder_name")}
+      desc={t("agents.settings.agents_folder_desc")}
     >
       <FolderSuggest
         app={plugin.app}
@@ -211,8 +212,8 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     </SettingItem>
   </SettingGroup>
 
-  <SettingGroup heading="Chats">
-    <SettingItem name="Chats folder" desc="Folder to store chat files and related data">
+  <SettingGroup heading={t("agents.settings.chats_heading")}>
+    <SettingItem name={t("agents.settings.chats_folder_name")} desc={t("agents.settings.chats_folder_desc")}>
       <FolderSuggest
         app={plugin.app}
         value={pluginData.targetFolder}
@@ -227,8 +228,8 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     </SettingItem>
 
     <SettingItem
-      name="Attachment folder"
-      desc="Folder for chat file attachments. Leave empty to use Obsidian's attachment folder."
+      name={t("agents.settings.attachment_folder_name")}
+      desc={t("agents.settings.attachment_folder_desc")}
     >
       <FolderSuggest
         app={plugin.app}
@@ -243,7 +244,7 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
       />
     </SettingItem>
 
-    <SettingItem name="Open new chat in" desc="Where to open new chat windows">
+    <SettingItem name={t("agents.settings.open_chat_in_name")} desc={t("agents.settings.open_chat_in_desc")}>
       <Dropdown
         type="options"
         dropdown={chatOpenLocationOptions}
@@ -256,8 +257,8 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
          toggle would control nothing. Hide it rather than offering a dead switch. -->
     {#if !isMobileUI()}
       <SettingItem
-        name="Show active agents in status bar"
-        desc="Display a clickable indicator in the status bar for each chat with a running agent."
+        name={t("agents.settings.status_bar_name")}
+        desc={t("agents.settings.status_bar_desc")}
       >
         <Toggle
           checked={pluginData.showActiveAgentsInStatusBar}
@@ -267,10 +268,10 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
     {/if}
   </SettingGroup>
 
-  <SettingGroup heading="Widgets">
+  <SettingGroup heading={t("agents.settings.widgets_heading")}>
     <SettingItem
-      name="Widgets folder"
-      desc="Where a widget generated in chat is saved when you click its save button."
+      name={t("agents.settings.widgets_folder_name")}
+      desc={t("agents.settings.widgets_folder_desc")}
     >
       <FolderSuggest
         app={plugin.app}

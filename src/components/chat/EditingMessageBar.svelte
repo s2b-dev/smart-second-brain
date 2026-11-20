@@ -2,6 +2,7 @@
 import type { SessionRegistry } from "../../stores/chatStore.svelte";
 import { isMobileUI } from "../../utils/platform";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 interface Props {
 	registry: SessionRegistry;
@@ -24,8 +25,8 @@ const isEditing = $derived(!isMobileUI() && Boolean(session?.editingPairId));
 {#if isEditing}
   <div class="emb-row s2b-text-xs s2b-text-text-muted">
     <div class="emb-icon" use:icon={"pencil"} style="--icon-size: 11px"></div>
-    <span>Editing message</span>
-    <button class="emb-cancel clickable-icon" onclick={onCancel} title="Cancel edit" aria-label="Cancel edit" type="button">
+    <span>{t("chat.editing.label")}</span>
+    <button class="emb-cancel clickable-icon" onclick={onCancel} title={t("chat.editing.cancel")} aria-label={t("chat.editing.cancel")} type="button">
       <div use:icon={"x"} style="--icon-size: 12px"></div>
     </button>
   </div>

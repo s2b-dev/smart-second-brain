@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "Redimensionner le panneau"
+	},
+	"docs_link": {
+		"subject_label": "Documentation : {subject}",
+		"open_label": "Ouvrir la documentation"
+	},
+	"markdown": {
+		"copy_code": "Copier le code"
+	},
+	"search": {
+		"placeholder": "Rechercher…"
+	}
+}

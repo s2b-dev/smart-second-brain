@@ -1,5 +1,6 @@
 <script lang="ts">
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import { icon } from "../../utils/utils";
 
 interface Props {
@@ -19,8 +20,8 @@ const isTrusted = $derived(data.isProviderTrusted(provider));
 {#if isTrusted}
   <span
     class="provider-icon-indicator provider-icon-indicator-accent"
-    title="Trusted with private notes"
-    aria-label="Trusted with private notes"
+    title={t("onboarding.provider_setup.trusted_indicator")}
+    aria-label={t("onboarding.provider_setup.trusted_indicator")}
   >
     <span class="provider-status-icon" use:icon={"shield-check"}></span>
   </span>

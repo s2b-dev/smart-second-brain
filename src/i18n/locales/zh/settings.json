@@ -1,0 +1,227 @@
+{
+	"tabs": {
+		"general": "常规",
+		"search": "搜索",
+		"agents": "智能体",
+		"graph": "关系图谱",
+		"troubleshooting": "故障排除",
+		"developer": "开发者"
+	},
+	"general": {
+		"providers": {
+			"heading": "提供商",
+			"description": "提供商将 Smart Second Brain 连接到用于对话、嵌入及其他模型驱动功能的 AI 服务。",
+			"empty": "尚未配置任何提供商实例。",
+			"add": "添加提供商"
+		},
+		"privacy": {
+			"heading": "隐私",
+			"note_access": "笔记访问策略",
+			"note_access_desc": "选择不受信任的提供商默认看不到任何内容还是能看到全部内容，然后管理对应的文件列表。",
+			"manage": "管理",
+			"check_updates": "检查更新",
+			"check_updates_desc": "每天从 GitHub 获取一次此插件的版本号，有新版本时显示通知。不会发送任何关于你或你的仓库的信息。Obsidian 自身的插件自动更新检查开启时会跳过。"
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "显示",
+			"result_details": "结果详情",
+			"result_details_desc": "选择每条搜索结果中显示哪些元数据和上下文。当前：{summary}。",
+			"configure": "配置",
+			"label_path": "路径",
+			"label_tags": "标签",
+			"label_match_badges": "匹配标记",
+			"label_content_snippets": "内容摘录",
+			"nothing_extra": "无额外内容",
+			"navbar_search": "在导航栏中使用 S2B 搜索",
+			"navbar_search_desc": "让底部导航栏中的放大镜按钮打开 Smart Second Brain 搜索，而不是 Obsidian 的快速切换。只有这个按钮会改变——快速切换仍可从命令面板及其快捷键打开。"
+		},
+		"indexed_content": {
+			"heading": "索引内容",
+			"heading_desc": "笔记、白板和小组件始终会被索引。选择还有哪些文件的内容需要为搜索和嵌入建立索引——其余文件仍可按标题和路径找到，智能体也仍可按需读取它们。",
+			"pdfs": "PDF",
+			"pdfs_desc": "提取并索引 PDF 的文本。在大型文献库中较慢，而且长 PDF 的大部分内容很少相关。长 PDF 最多只索引大约前 80 页（移动端为 4 页）。",
+			"chats": "对话",
+			"chats_desc": "索引过去的对话。其中大部分是模型自己的回答，之后可能会被当作来源再次出现。",
+			"data_files": "数据文件",
+			"data_files_desc": "索引 CSV、JSON 和 YAML 文件。结构化数据很难按语义搜索，而且一次导出就可能增加数千个条目。"
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "主题名称",
+			"naming_model": "主题命名模型",
+			"naming_model_desc": "用于为主题命名的模型。未设置时，主题以其中连接最多的笔记命名。",
+			"naming_model_desc_withheld": "用于为主题命名的模型。未设置时，主题以其中连接最多的笔记命名。此提供商不可访问私密笔记，因此命名时会隐去私密笔记的标题。",
+			"configure_provider": "配置提供商",
+			"configure_models": "配置模型",
+			"no_provider": "尚未配置任何 AI 提供商。",
+			"select_model": "选择模型",
+			"clear": "清除",
+			"auto_name": "自动为主题命名",
+			"auto_name_desc": "主题变化时自动命名。关闭后，只能从关系图谱的“主题”面板中运行命名。"
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "新手引导",
+			"replay": "重新播放新手引导",
+			"replay_desc": "重置启动动画和完成标记——欢迎视图会重新播放引导，并像首次运行一样在启动时自动打开（直到配置了提供商）。",
+			"reset": "重置引导",
+			"reset_notice": "新手引导已重置并重新打开——引导将从头播放。"
+		},
+		"chat": {
+			"heading": "对话",
+			"raw_tool_io": "显示原始工具输入/输出",
+			"raw_tool_io_desc": "在对话的工具调用行中显示确切的工具参数和原始输出。默认关闭——用户只会看到通俗的摘要和友好的结构化结果。",
+			"restore": "恢复",
+			"restore_recommendations": "恢复已关闭的推荐",
+			"restore_recommendations_desc": "恢复在新对话空白页中关闭的所有建议问题、插件技能提示和默认值更新通知。",
+			"restored_recommendations": {
+				"other": "已恢复 {count} 条已关闭的推荐。"
+			},
+			"no_recommendations": "没有可恢复的已关闭推荐。",
+			"restore_privacy_warning": "恢复集成隐私警告",
+			"restore_privacy_warning_desc": "撤销在启用插件集成的代码执行工具前所显示警告上的“不再询问”（该工具会绕过按提供商设置的隐私规则）。",
+			"privacy_warning_restored": "集成隐私警告已恢复——下次启用集成时会再次显示。",
+			"privacy_warning_not_suppressed": "集成隐私警告未被隐藏。"
+		},
+		"observability": {
+			"heading": "可观测性",
+			"langsmith": "LangSmith 集成",
+			"langsmith_desc": "启用 LangSmith 遥测以进行调试和追踪",
+			"api_key": "API 密钥",
+			"api_key_desc": "选择一个用于 LangSmith 身份验证的 Obsidian 钥匙串密钥",
+			"project": "项目名称",
+			"project_desc": "运行记录所归属的项目名称",
+			"endpoint": "端点 URL",
+			"endpoint_desc": "覆盖 LangSmith API 的基础 URL（可选）",
+			"check_aria": "检查 LangSmith API 密钥和端点",
+			"check_idle": "检查 LangSmith 连接",
+			"check_no_key": "请先选择 LangSmith API 密钥",
+			"check_invalid_url": "LangSmith 端点 URL 无效",
+			"check_pending": "正在检查 LangSmith 连接…",
+			"check_success": "LangSmith 连接成功",
+			"check_rejected": "LangSmith 拒绝了该 API 密钥",
+			"check_not_found": "LangSmith 端点未提供预期的 API",
+			"check_failed_body": "LangSmith 检查失败（{status}）：{body}",
+			"check_failed_status": "LangSmith 检查失败，状态码 {status}",
+			"check_unreachable": "无法连接到 LangSmith",
+			"check_failed_notice": "LangSmith 检查失败：{message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "诊断",
+		"maintenance_heading": "维护",
+		"release_notes": "更新说明",
+		"release_notes_desc": "当前版本为 {version}。查看近期版本的变更内容。",
+		"show_release_notes": "显示更新说明",
+		"guide": "故障排除指南",
+		"guide_desc": "常见问题及解决方法——智能体无响应、搜索结果不理想、笔记被隐去、MCP 工具缺失，以及移动端特有的问题。",
+		"open_guide": "打开指南",
+		"still_stuck": "仍未解决？",
+		"still_stuck_desc": "浏览 GitHub 上已有的 issue，看看问题是否已被跟踪。如果没有，请新建一个 issue，并附上你尝试过的操作、任何错误信息以及复现步骤。",
+		"view_issues": "查看已有 issue",
+		"new_issue": "新建 issue",
+		"clear": "清理插件数据",
+		"clear_desc": "删除插件设置和生成的索引数据。密钥、技能文件以及仓库中的对话文件会被保留。",
+		"clear_label": "清理",
+		"clear_modal": {
+			"title": "清理插件数据",
+			"description": "要删除插件设置和生成的索引数据吗？密钥、技能文件以及仓库中的对话文件会被保留。"
+		},
+		"verbose": "开发者控制台日志",
+		"verbose_desc": "在开发者控制台中启用详细日志。",
+		"cleared": "插件数据已清理。",
+		"cleared_partial": "插件数据已清理，但无法删除 {indexes} 的已存储向量。详情请查看控制台。",
+		"clear_failed": "清理插件数据失败"
+	},
+	"providers": {
+		"auth_failed": "身份验证失败",
+		"checking_auth": "正在检查身份验证",
+		"authenticated": "已通过身份验证。点击重试连接",
+		"auth_error_retry": "{message}。点击重试连接",
+		"trusted": "可访问私密笔记",
+		"configure": "配置提供商",
+		"remove": "移除提供商",
+		"remove_failed": "移除提供商失败",
+		"delete_embeddings": "同时删除使用此提供商构建的嵌入",
+		"delete_embeddings_desc": {
+			"other": "释放 {formatted} 篇已索引笔记所占用的存储空间。保持关闭则保留它们——重新添加此提供商时会复用这些嵌入，而无需重新嵌入（重新嵌入可能既慢又昂贵）。"
+		},
+		"embeddings_kept_starting": "提供商已移除。其嵌入已保留——索引服务仍在启动中。",
+		"embeddings_delete_failed": {
+			"other": "提供商已移除，但 {count} 个嵌入索引中有 {failed} 个删除失败：{ids}。详情请查看控制台。"
+		},
+		"advanced": "高级"
+	},
+	"embedding_index": {
+		"heading": "嵌入索引",
+		"description_search": "嵌入索引为你的笔记提供语义搜索能力。",
+		"description_graph": "嵌入索引为你的笔记提供语义关系图谱功能。",
+		"group_search": "搜索嵌入索引",
+		"group_graph": "关系图谱嵌入索引",
+		"empty": "尚未配置任何嵌入索引。",
+		"add": "添加索引",
+		"notes_indexed": {
+			"other": "已索引 {count} 篇笔记"
+		},
+		"use_as_search": "将 {model} 用作搜索索引",
+		"use_as_graph": "将 {model} 用作关系图谱索引",
+		"view_report": "查看索引报告",
+		"export": "将索引导出到文件",
+		"delete": "删除索引",
+		"delete_failed": "无法删除此索引：{error}",
+		"memory_on_mobile": "移动端内存占用"
+	},
+	"orphaned": {
+		"name": "孤立的向量数据库",
+		"legacy": "{label}（旧版关系图谱数据）",
+		"chunks": {
+			"other": "{id}（{count} 个分块）"
+		},
+		"summary": {
+			"other": "{count} 个已存储的数据库不再属于任何已配置的嵌入索引{size}：{list}。"
+		},
+		"size": "（至少 {size} 的向量）",
+		"origin_usage": "此设备上 Obsidian 所有仓库的存储总量为 {size}。",
+		"confirm_title": "删除孤立的索引？",
+		"confirm_desc": {
+			"other": "这将永久删除 {count} 个未被任何已配置嵌入索引使用的已存储数据库。之后若重新添加其中某个模型，将从头重建其索引。"
+		},
+		"deleted": {
+			"other": "已删除 {count} 个孤立索引。"
+		},
+		"deleted_partial": "已删除 {deleted}，无法删除 {failed}：{reason}",
+		"delete_button": "删除孤立索引"
+	},
+	"secret_select": {
+		"nothing_selected": "（未选择）",
+		"add_tooltip": "添加新密钥",
+		"missing": "在 Obsidian 钥匙串中找不到密钥“{id}”。",
+		"add_action": "添加密钥"
+	},
+	"model_control": {
+		"loading": "正在加载模型…"
+	},
+	"managed_entity": {
+		"select": "选择 {name}"
+	},
+	"filter": {
+		"type_folder": "文件夹",
+		"type_tag": "标签",
+		"type_extension": "扩展名",
+		"type_property": "属性",
+		"all_of": "满足全部",
+		"any_of": "满足任一",
+		"none_of": "全部不满足",
+		"remove_condition": "移除条件",
+		"property_placeholder": "属性名称",
+		"any_value": "任意值",
+		"no_properties": "仓库中未找到属性——仍可输入名称来使用。",
+		"live_placeholder": "请在关系图谱中进行选择",
+		"add_condition": "条件",
+		"add_group": "条件组"
+	}
+}

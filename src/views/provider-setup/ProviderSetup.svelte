@@ -32,6 +32,7 @@ import {
 	getProviderDefinition,
 } from "../../providers/index";
 import { getData, slugifyProviderName } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import { icon } from "../../utils/utils";
 import type { ProviderSetupModal } from "./ProviderSetup";
 
@@ -72,7 +73,7 @@ const PICKER_ORDER: ProviderTemplateId[] = [
 ];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
 const providerTemplates = [...getAllProviderTemplates()]
-	.filter((t) => t.id !== "omlx" || Platform.isMacOS)
+	.filter((tpl) => tpl.id !== "omlx" || Platform.isMacOS)
 	.sort((a, b) => {
 		const ai = PICKER_ORDER.indexOf(a.id);
 		const bi = PICKER_ORDER.indexOf(b.id);
@@ -339,7 +340,7 @@ async function handleDisplayNameBlur(nextName: string) {
 		displayNameError = null;
 		modal.refreshTitle(trimmedName);
 	} catch (e) {
-		displayNameError = e instanceof Error ? e.message : "Invalid name";
+		displayNameError = e instanceof Error ? e.message : t("onboarding.provider_setup.invalid_name");
 	} finally {
 		pendingDisplayNameSaves -= 1;
 	}
@@ -473,7 +474,9 @@ const connectionStatus = $derived.by<ConnectionStatus>(() => {
 });
 const connectionError = $derived(
 	(connectionStatus === "failed" ? signInError : null) ??
-		(query.data && !query.data.success ? (query.data.message ?? "Authentication failed") : "Authentication failed"),
+		(query.data && !query.data.success
+			? (query.data.message ?? t("onboarding.provider_setup.auth_failed"))
+			: t("onboarding.provider_setup.auth_failed")),
 );
 
 // Done must track the *commit*, not just the connection. A valid connection alone isn't
@@ -495,10 +498,10 @@ const canFinish = $derived(
          things a new user stalls on before they can tell whether a failure is their
          endpoint, their key, or their model choice. -->
     <p class="provider-picker-desc">
-      Choose a provider to connect. <DocsLink
+      {t("onboarding.provider_setup.picker_desc")} <DocsLink
         variant="inline"
         doc="providers"
-        label="Setup guide"
+        label={t("onboarding.provider_setup.setup_guide")}
       />
     </p>
     <div class="provider-picker-grid">
@@ -520,8 +523,8 @@ const canFinish = $derived(
 {:else}
   <div class="modal-content">
     <SettingItem
-      name="Provider name"
-      desc="Name this provider instance so you can distinguish it later."
+      name={t("onboarding.provider_setup.name_label")}
+      desc={t("onboarding.provider_setup.name_desc")}
     >
       <!-- Disabled while the commit runs: it derives the provider's permanent ID from this
            name, so editing it mid-flight has nothing sensible to mean. Note this is not
@@ -533,7 +536,7 @@ const canFinish = $derived(
         inputType="text"
         value={displayName}
         disabled={isCommitting}
-        placeholder={providerDefinition?.displayName ?? "New Provider"}
+        placeholder={providerDefinition?.displayName ?? t("onboarding.provider_setup.name_placeholder")}
         onblur={(value: string) => void handleDisplayNameBlur(value)}
       />
     </SettingItem>
@@ -554,7 +557,7 @@ const canFinish = $derived(
 
         <div class="auth-alt-toggle">
           <button type="button" class="auth-alt-link" onclick={toggleApiKey}>
-            {revealApiKey ? "Hide API key field" : "Use an API key instead →"}
+            {revealApiKey ? t("onboarding.provider_setup.hide_api_key") : t("onboarding.provider_setup.use_api_key")}
           </button>
         </div>
 
@@ -580,7 +583,7 @@ const canFinish = $derived(
       {:else}
         <div class="setting-item">
           <div class="setting-item-description">
-            {oauth.label} sign-in is only available on desktop.
+            {t("onboarding.provider_setup.sign_in_desktop_only", { provider: oauth.label })}
           </div>
         </div>
       {/if}
@@ -601,33 +604,33 @@ const canFinish = $derived(
     <div class="provider-connection-status" role="status" aria-live="polite">
       {#if connectionStatus === "checking"}
         <CircularLoader size={16} color="var(--text-muted)" />
-        <span class="provider-connection-text">Checking connection…</span>
+        <span class="provider-connection-text">{t("onboarding.provider_setup.checking_connection")}</span>
       {:else if connectionStatus === "connected"}
         <span class="provider-connection-icon is-success" use:icon={"check-circle"}></span>
-        <span class="provider-connection-text is-success">Connected</span>
+        <span class="provider-connection-text is-success">{t("onboarding.provider_setup.connected")}</span>
         {#if displayNameError}
           <!-- Connected, but the commit is blocked: say why, so a disabled Done isn't a
                dead end the user has to guess at. -->
-          <span class="provider-connection-text is-muted">— fix the provider name to finish</span>
+          <span class="provider-connection-text is-muted">{t("onboarding.provider_setup.fix_name_to_finish")}</span>
         {/if}
       {:else if connectionStatus === "failed"}
         <span class="provider-connection-icon is-error" use:icon={"x-circle"}></span>
         <span class="provider-connection-text is-error">{connectionError}</span>
       {:else}
         <span class="provider-connection-text is-muted">
-          Enter your credentials above — the connection is checked automatically.
+          {t("onboarding.provider_setup.enter_credentials")}
         </span>
       {/if}
     </div>
 
-    <Button buttonText="Done" cta={canFinish} disabled={!canFinish} onClick={() => modal.close()} />
+    <Button buttonText={t("common.done")} cta={canFinish} disabled={!canFinish} onClick={() => modal.close()} />
   </div>
 {/snippet}
 
 {#snippet trustedToggle()}
   <SettingItem
-    name="Trusted with private notes"
-    desc="Allow this provider to access notes that remain private for untrusted providers."
+    name={t("onboarding.provider_setup.trusted_label")}
+    desc={t("onboarding.provider_setup.trusted_desc")}
   >
     <Toggle checked={isTrusted} onchange={handleTrustedChange} />
   </SettingItem>
@@ -635,27 +638,27 @@ const canFinish = $derived(
 
 {#snippet oauthSignIn()}
   {#if oauth}
-    <SettingItem name={`${oauth.label} Sign-In`} desc={oauth.description ?? ""}>
+    <SettingItem name={t("onboarding.provider_setup.oauth_sign_in_label", { provider: oauth.label })} desc={oauth.description ?? ""}>
       <div class="s2b-flex s2b-gap-2 s2b-items-center">
         {#if isSigningIn && oauth.cancelSignIn}
           <!-- While a sign-in is pending, let the user abort it (e.g. they closed the
                browser tab) and retry, instead of waiting out the timeout. -->
-          <Button buttonText="Cancel sign-in" onClick={handleCancelSignIn} />
+          <Button buttonText={t("onboarding.provider_setup.cancel_sign_in")} onClick={handleCancelSignIn} />
         {:else if oauthConnected && !oauth.disconnect}
           <!-- API-key-backed OAuth (e.g. OpenRouter): the minted key doesn't expire, so
                reconnecting is needless. Show a plain connected status, no button. -->
-          <span class="oauth-connected-label">Connected via {oauth.label}</span>
+          <span class="oauth-connected-label">{t("onboarding.provider_setup.connected_via", { provider: oauth.label })}</span>
         {:else if oauthConnected}
           <!-- Session-backed OAuth (e.g. Codex/ChatGPT): tokens can expire or be revoked,
                so keep Reconnect (re-auth) and Disconnect available. -->
-          <span class="oauth-connected-label">Connected via {oauth.label}</span>
-          <Button buttonText="Reconnect" disabled={isSigningIn} onClick={() => void handleOAuthSignIn()} />
+          <span class="oauth-connected-label">{t("onboarding.provider_setup.connected_via", { provider: oauth.label })}</span>
+          <Button buttonText={t("onboarding.provider_setup.reconnect")} disabled={isSigningIn} onClick={() => void handleOAuthSignIn()} />
           {#if oauth.disconnect}
-            <Button buttonText="Disconnect" onClick={handleOAuthDisconnect} />
+            <Button buttonText={t("onboarding.provider_setup.disconnect")} onClick={handleOAuthDisconnect} />
           {/if}
         {:else}
           <Button
-            buttonText={`Sign in with ${oauth.label}`}
+            buttonText={t("onboarding.provider_setup.sign_in_with", { provider: oauth.label })}
             disabled={isSigningIn}
             cta={true}
             onClick={() => void handleOAuthSignIn()}
@@ -668,12 +671,12 @@ const canFinish = $derived(
            authorization code in the browser and the user pastes it here. On desktop this
            is a fallback if the browser doesn't return to Obsidian automatically. -->
       <SettingItem
-        name="Paste authorization code"
-        desc="Copy the authorization code shown in the browser and paste it here to finish connecting."
+        name={t("onboarding.provider_setup.paste_code_label")}
+        desc={t("onboarding.provider_setup.paste_code_desc")}
       >
         <div class="s2b-flex s2b-gap-2 s2b-items-center" onfocusin={scrollManualCodeIntoView}>
-          <Text inputType="text" bind:value={manualCode} placeholder="Authorization code" />
-          <Button buttonText="Submit" disabled={!manualCode.trim()} onClick={handleSubmitManualCode} />
+          <Text inputType="text" bind:value={manualCode} placeholder={t("onboarding.provider_setup.code_placeholder")} />
+          <Button buttonText={t("onboarding.provider_setup.submit")} disabled={!manualCode.trim()} onClick={handleSubmitManualCode} />
         </div>
       </SettingItem>
     {/if}

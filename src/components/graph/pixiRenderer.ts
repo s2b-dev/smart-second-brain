@@ -13,6 +13,7 @@
 import "pixi.js/unsafe-eval";
 import { Application, CanvasSource, Container, Graphics, Sprite, Text, TextStyle, Texture, Ticker } from "pixi.js";
 import { Viewport } from "pixi-viewport";
+import { t } from "../../i18n";
 import { edgeAlphaZoomLift, nodeDrawRadius, zoomNodeScale } from "../../utils/graphUtils";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -1490,19 +1491,20 @@ export class PixiRenderer {
 			const notes = node.memberPaths?.length ?? 0;
 			const links = node.degree ?? 0;
 			lines.push(
-				`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}  ·  ${links.toLocaleString()} ${links === 1 ? "link" : "links"}`,
+				`${t("graph.node_tooltip.notes", { count: notes, n: notes.toLocaleString() })}  ·  ${t("graph.node_tooltip.links", { count: links, n: links.toLocaleString() })}`,
 			);
 		} else if (node.kind === "tag") {
 			const notes = node.degree ?? 0;
-			lines.push(`${notes.toLocaleString()} ${notes === 1 ? "note" : "notes"}`);
+			lines.push(t("graph.node_tooltip.notes", { count: notes, n: notes.toLocaleString() }));
 		} else if (node.cluster != null) {
-			const clusterLabel = clusterLabels[node.cluster] ?? `Cluster ${node.cluster}`;
-			lines.push(`${clusterLabel}  ·  ${node.degree ?? 0} connections`);
+			const clusterLabel =
+				clusterLabels[node.cluster] ?? t("graph.node_tooltip.cluster_fallback", { id: node.cluster });
+			lines.push(`${clusterLabel}  ·  ${t("graph.node_tooltip.connections", { count: node.degree ?? 0 })}`);
 		} else {
-			lines.push(`${node.degree ?? 0} connections`);
+			lines.push(t("graph.node_tooltip.connections", { count: node.degree ?? 0 }));
 		}
 		if (isForceMode && isPinned) {
-			lines.push("📌 Pinned");
+			lines.push(t("graph.node_tooltip.pinned"));
 		}
 
 		const fontSize = 11;

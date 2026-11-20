@@ -2,6 +2,7 @@
 import { Tabs } from "bits-ui";
 import { consumePendingSettingsTab } from "../../stores/state.svelte";
 import SlidingTabs, { type SlidingTab } from "../../components/ui/SlidingTabs.svelte";
+import { t } from "../../i18n";
 import AgentsSettings from "./AgentsSettings.svelte";
 import DeveloperSettings from "./DeveloperSettings.svelte";
 import GeneralSettings from "./GeneralSettings.svelte";
@@ -14,12 +15,12 @@ const pendingTab = consumePendingSettingsTab();
 let activeTab = $state(pendingTab ?? "general");
 
 const SETTINGS_TABS: SlidingTab<string>[] = [
-	{ id: "general", label: "General", icon: "settings" },
-	{ id: "search", label: "Search", icon: "search" },
-	{ id: "agents", label: "Agents", icon: "brain" },
-	{ id: "graph", label: "Graph", icon: "git-fork" },
-	{ id: "troubleshooting", label: "Troubleshooting", icon: "wrench" },
-	...(import.meta.env.DEV ? [{ id: "developer", label: "Developer", icon: "code" }] : []),
+	{ id: "general", label: t("settings.tabs.general"), icon: "settings" },
+	{ id: "search", label: t("settings.tabs.search"), icon: "search" },
+	{ id: "agents", label: t("settings.tabs.agents"), icon: "brain" },
+	{ id: "graph", label: t("settings.tabs.graph"), icon: "git-fork" },
+	{ id: "troubleshooting", label: t("settings.tabs.troubleshooting"), icon: "wrench" },
+	...(import.meta.env.DEV ? [{ id: "developer", label: t("settings.tabs.developer"), icon: "code" }] : []),
 ];
 </script>
 

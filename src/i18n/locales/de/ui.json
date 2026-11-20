@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "Bereich anpassen"
+	},
+	"docs_link": {
+		"subject_label": "Dokumentation: {subject}",
+		"open_label": "Dokumentation öffnen"
+	},
+	"markdown": {
+		"copy_code": "Code kopieren"
+	},
+	"search": {
+		"placeholder": "Suchen…"
+	}
+}

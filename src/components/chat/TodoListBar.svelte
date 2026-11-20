@@ -3,6 +3,7 @@ import type { SessionRegistry } from "../../stores/chatStore.svelte";
 import { MessageState } from "../../stores/chatTimeline";
 import { latestTodos, shouldShowTodos, type TodoStatus } from "../../utils/todoList";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 interface Props {
 	registry: SessionRegistry;
@@ -17,12 +18,12 @@ const visible = $derived(shouldShowTodos(snapshot, messages.length));
 const running = $derived(session?.messageState === MessageState.answering);
 
 const todos = $derived(snapshot?.todos ?? []);
-const doneCount = $derived(todos.filter((t) => t.status === "completed").length);
-const current = $derived(todos.find((t) => t.status === "in_progress"));
+const doneCount = $derived(todos.filter((todo) => todo.status === "completed").length);
+const current = $derived(todos.find((todo) => todo.status === "in_progress"));
 const allDone = $derived(todos.length > 0 && doneCount === todos.length);
 /** What the collapsed row names: the step in progress, else the next one still open. */
 const headline = $derived(
-	allDone ? "All steps done" : ((current ?? todos.find((t) => t.status === "pending"))?.content ?? ""),
+	allDone ? t("chat.todos.all_done") : ((current ?? todos.find((todo) => todo.status === "pending"))?.content ?? ""),
 );
 
 let isExpanded = $state(false);
@@ -33,9 +34,9 @@ const STATUS_ICON: Record<TodoStatus, string> = {
 	completed: "circle-check",
 };
 const STATUS_LABEL: Record<TodoStatus, string> = {
-	pending: "Not started",
-	in_progress: "In progress",
-	completed: "Done",
+	pending: t("chat.todos.status_pending"),
+	in_progress: t("chat.todos.status_in_progress"),
+	completed: t("common.done"),
 };
 </script>
 
@@ -45,7 +46,7 @@ const STATUS_LABEL: Record<TodoStatus, string> = {
       class="s2b-todo-summary"
       type="button"
       aria-expanded={isExpanded}
-      aria-label={isExpanded ? "Collapse task list" : "Expand task list"}
+      aria-label={isExpanded ? t("chat.todos.collapse") : t("chat.todos.expand")}
       onclick={() => (isExpanded = !isExpanded)}
     >
       <div
@@ -54,7 +55,7 @@ const STATUS_LABEL: Record<TodoStatus, string> = {
         use:icon={allDone ? "list-checks" : "list-todo"}
         style="--icon-size: var(--icon-xs)"
       ></div>
-      <span class="s2b-todo-count">{doneCount} of {todos.length}</span>
+      <span class="s2b-todo-count">{t("chat.todos.progress", { done: doneCount, total: todos.length })}</span>
       <span class="s2b-todo-headline">{headline}</span>
       <div
         class="s2b-todo-chevron"

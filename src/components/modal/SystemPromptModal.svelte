@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import { t } from "../../i18n";
 import { diffWords } from "diff";
 import type SecondBrainPlugin from "../../main";
 import Button from "../ui/Button.svelte";
@@ -65,21 +66,21 @@ function handleOpenNote() {
   <p class="system-prompt-description">{description}</p>
 
   {#if isLoading}
-    <div class="system-prompt-loading">Loading prompt…</div>
+    <div class="system-prompt-loading">{t("agents.system_prompt.loading")}</div>
   {:else if readOnly}
     <div class="system-prompt-preview-container">
       <pre class="system-prompt-preview">{promptValue}</pre>
     </div>
   {:else if isAtDefault}
-    <div class="system-prompt-loading">This note matches the current default.</div>
+    <div class="system-prompt-loading">{t("agents.system_prompt.matches_default")}</div>
   {:else}
     <div class="prompt-diff-container">
       <div class="prompt-diff-pane">
-        <div class="prompt-diff-pane-label">Yours</div>
+        <div class="prompt-diff-pane-label">{t("agents.system_prompt.yours")}</div>
         <pre class="prompt-diff-text">{@html renderDiffSide(promptValue, defaultPrompt, "old")}</pre>
       </div>
       <div class="prompt-diff-pane">
-        <div class="prompt-diff-pane-label">Default</div>
+        <div class="prompt-diff-pane-label">{t("common.default")}</div>
         <pre class="prompt-diff-text">{@html renderDiffSide(promptValue, defaultPrompt, "new")}</pre>
       </div>
     </div>
@@ -87,13 +88,13 @@ function handleOpenNote() {
 
   {#if !readOnly}
     <div class="system-prompt-actions">
-      <Button buttonText="Cancel" onClick={() => modal.close()} />
+      <Button buttonText={t("common.cancel")} onClick={() => modal.close()} />
       <div class="s2b-flex-1"></div>
       {#if accessors.notePath}
-        <Button buttonText="Open note" onClick={handleOpenNote} />
+        <Button buttonText={t("agents.system_prompt.open_note")} onClick={handleOpenNote} />
       {/if}
       {#if !isLoading && !isAtDefault}
-        <Button buttonText="Use default" cta={true} onClick={handleUseDefault} />
+        <Button buttonText={t("agents.system_prompt.use_default")} cta={true} onClick={handleUseDefault} />
       {/if}
     </div>
   {/if}

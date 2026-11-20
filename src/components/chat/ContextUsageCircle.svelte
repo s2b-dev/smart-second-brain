@@ -3,6 +3,7 @@ import PickerPopover from "../ui/PickerPopover.svelte";
 import Button from "../ui/Button.svelte";
 import type { ContextUsageBreakdown } from "../../utils/tokenEstimator";
 import { getSummarizationTriggerTokens } from "../../agent/summarization";
+import { formatNumber, t } from "../../i18n";
 
 /**
  * Displays estimated context usage as a small circular progress indicator.
@@ -64,11 +65,11 @@ const scaleTokens = $derived(limit !== undefined && limit > 0 ? limit : Math.max
 // than a footnote; its neutral swatch says "not sent yet".
 const usageRows = $derived.by(() => {
 	return [
-		{ id: "system", label: "System prompt", tokens: breakdown.systemPromptTokens },
-		{ id: "human", label: "Your messages", tokens: breakdown.humanTokens },
-		{ id: "assistant", label: "Assistant", tokens: breakdown.assistantTokens },
-		{ id: "tool", label: "Tool results", tokens: breakdown.toolTokens },
-		{ id: "draft", label: "Draft & pending", tokens: breakdown.draftAndPendingTokens },
+		{ id: "system", label: t("chat.context_usage.row_system"), tokens: breakdown.systemPromptTokens },
+		{ id: "human", label: t("chat.context_usage.row_human"), tokens: breakdown.humanTokens },
+		{ id: "assistant", label: t("chat.context_usage.row_assistant"), tokens: breakdown.assistantTokens },
+		{ id: "tool", label: t("chat.context_usage.row_tool"), tokens: breakdown.toolTokens },
+		{ id: "draft", label: t("chat.context_usage.row_draft"), tokens: breakdown.draftAndPendingTokens },
 	]
 		.filter((row) => row.tokens > 0)
 		.map((row) => ({ ...row, share: (row.tokens / scaleTokens) * 100 }));
@@ -93,22 +94,22 @@ const tooltipText = $derived.by(() => {
 	const percent = usagePercent.toFixed(0);
 	if (limit === undefined) {
 		const usedK = Math.round(used / 1000);
-		return `Context usage (est.): ${usedK}k tokens (limit unknown)`;
+		return t("chat.context_usage.tooltip_unknown_limit", { used: usedK });
 	}
 	const usedK = Math.round(used / 1000);
 	const limitK = Math.round(limit / 1000);
-	return `Context usage (est.): ${percent}% (${usedK}k / ${limitK}k)`;
+	return t("chat.context_usage.tooltip", { percent, used: usedK, limit: limitK });
 });
-
-function formatNumber(value: number): string {
-	return value.toLocaleString();
-}
 
 const usageLine = $derived.by(() => {
 	// Tested directly rather than via `hasKnownLimit`: narrowing does not flow through a
 	// derived boolean, which is the only reason this needed an assertion. Same condition.
-	if (limit === undefined || limit <= 0) return `${formatNumber(breakdown.totalTokens)} tokens · limit unknown`;
-	return `${formatNumber(breakdown.totalTokens)} of ${formatNumber(limit)} tokens`;
+	if (limit === undefined || limit <= 0)
+		return t("chat.context_usage.line_unknown_limit", { tokens: formatNumber(breakdown.totalTokens) });
+	return t("chat.context_usage.line", {
+		tokens: formatNumber(breakdown.totalTokens),
+		limit: formatNumber(limit),
+	});
 });
 
 // The trigger as a token count beside its share of the window. The footer
@@ -118,14 +119,14 @@ const compaction = $derived.by(() => {
 	const trigger = getSummarizationTriggerTokens(limit);
 	if (trigger === null || limit === undefined) {
 		return {
-			short: "Auto-compaction needs a known limit",
-			long: "Automatic summarization needs a model with a known context limit.",
+			short: t("chat.context_usage.compaction_unknown_short"),
+			long: t("chat.context_usage.compaction_unknown_long"),
 		};
 	}
 	const withPercent = ` (${Math.round((trigger / limit) * 100)}%)`;
 	return {
-		short: `Auto-compacts at ${formatCompact(trigger)}${withPercent}`,
-		long: `Older messages are summarized automatically at ${formatNumber(trigger)} tokens${withPercent}.`,
+		short: t("chat.context_usage.compaction_short", { tokens: formatCompact(trigger), percent: withPercent }),
+		long: t("chat.context_usage.compaction_long", { tokens: formatNumber(trigger), percent: withPercent }),
 	};
 });
 
@@ -143,7 +144,7 @@ function formatCompact(value: number): string {
   sideOffset={6}
 >
   {#snippet trigger()}
-    <svg class="s2b-w-full s2b-h-full -s2b-rotate-90" viewBox="0 0 100 100" aria-label="Open context token distribution">
+    <svg class="s2b-w-full s2b-h-full -s2b-rotate-90" viewBox="0 0 100 100" aria-label={t("chat.context_usage.trigger_aria")}>
       <!-- Track -->
       <circle class="s2b-context-ring-track" fill="none" stroke-width={strokeWidth} cx="50" cy="50" r={radius} />
       <!-- Usage arc -->
@@ -172,7 +173,7 @@ function formatCompact(value: number): string {
 
   <div class="context-usage-panel">
     <div class="context-usage-header">
-      <span class="context-usage-heading">Context usage (est.)</span>
+      <span class="context-usage-heading">{t("chat.context_usage.heading")}</span>
       <span class="context-usage-percent">{hasKnownLimit ? centerLabel : "—"}</span>
     </div>
     <div class="context-usage-line">{usageLine}</div>
@@ -204,9 +205,9 @@ function formatCompact(value: number): string {
     <div class="context-usage-footer">
       <span class="context-usage-note" aria-label={compaction.long}>{compaction.short}</span>
       <Button
-        buttonText="Summarize now"
+        buttonText={t("chat.context_usage.summarize_now")}
         disabled={!canSummarizeNow}
-        tooltip={canSummarizeNow ? "Summarize older messages now" : "Nothing to summarize yet"}
+        tooltip={canSummarizeNow ? t("chat.context_usage.summarize_now_tooltip") : t("chat.context_usage.nothing_to_summarize")}
         onClick={() => onSummarizeNow?.()}
       />
     </div>

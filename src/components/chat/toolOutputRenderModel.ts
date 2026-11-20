@@ -1,4 +1,5 @@
 import { type AskQuestionResult, parseAskQuestionResult } from "../../utils/askQuestion";
+import { t } from "../../i18n";
 
 interface SearchNotesResult {
 	rank?: number;
@@ -583,12 +584,12 @@ function formatCellValue(value: unknown): string {
 
 function summarizeValue(value: unknown): string {
 	if (Array.isArray(value)) {
-		return `${value.length} item${value.length === 1 ? "" : "s"}`;
+		return t("chat.tool_summary.count.item", { count: value.length });
 	}
 
 	if (isPlainObject(value)) {
 		const keyCount = Object.keys(value).length;
-		return `${keyCount} key${keyCount === 1 ? "" : "s"}`;
+		return t("chat.tool_output.key_count", { count: keyCount });
 	}
 
 	if (isScalar(value)) return formatScalar(value);

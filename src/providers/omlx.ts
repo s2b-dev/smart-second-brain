@@ -29,6 +29,7 @@ import {
 	createTransportedChatOpenAI,
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
+import { t } from "../i18n";
 
 // =============================================================================
 // Constants
@@ -191,7 +192,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 			],
 			link: {
 				url: "https://omlx.ai",
-				text: "oMLX Website",
+				text: t("plugin.providers.omlx.link"),
 			},
 		},
 
@@ -200,22 +201,21 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 		// =====================================================================
 		auth: {
 			baseUrl: {
-				label: "Server URL",
-				description: "The URL where your oMLX server is running",
+				label: t("plugin.providers.fields.server_url"),
+				description: t("plugin.providers.omlx.server_url_desc"),
 				kind: "text",
 				required: true,
 				placeholder: DEFAULT_BASE_URL,
 			},
 			apiKey: {
-				label: "API Key",
-				description:
-					"oMLX requires an API key by default (find it in the admin panel's global settings). Leave empty only if you disabled key verification.",
+				label: t("plugin.providers.fields.api_key"),
+				description: t("plugin.providers.omlx.api_key_desc"),
 				kind: "secret",
 				required: true,
 			},
 			headers: {
-				label: "Custom Headers",
-				description: "Additional headers as JSON (optional)",
+				label: t("plugin.providers.fields.custom_headers"),
+				description: t("plugin.providers.fields.custom_headers_desc"),
 				kind: "textarea",
 				required: false,
 				placeholder: '{"X-Custom-Header": "value"}',
@@ -282,13 +282,16 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 				}
 
 				if (response.status === 401 || response.status === 403) {
-					return { valid: false, error: errorMessage || "Authentication failed" };
+					return { valid: false, error: errorMessage || t("plugin.provider_auth.auth_failed") };
 				}
 
-				return { valid: false, error: errorMessage || `Request failed with status ${response.status}` };
+				return {
+					valid: false,
+					error: errorMessage || t("plugin.provider_auth.request_failed_status", { status: response.status }),
+				};
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
-				return { valid: false, error: `Connection failed: ${message}` };
+				return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 			}
 		},
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import type SecondBrainPlugin from "../../main";
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type ToolConfig } from "../../types/plugin";
 import {
@@ -71,7 +72,7 @@ const activeSubAgents = $derived.by(() => {
 	return (agent.subAgentIds ?? [])
 		.map((id) => pluginData.agents[id])
 		.filter((ref): ref is NonNullable<typeof ref> => !!ref)
-		.map((ref) => (ref.id === agentId ? `${ref.name} (isolated)` : ref.name));
+		.map((ref) => (ref.id === agentId ? t("agents.tools.isolated_subagent", { name: ref.name }) : ref.name));
 });
 
 function notifyChange() {
@@ -106,39 +107,38 @@ function openToolConfig(toolId: BuiltInToolId) {
   {#if selectedAgent}
     <div class="tools-modal-scroll">
       <ManagedEntitySection
-        heading="Configurable"
-        description="Enable, rename, and configure the individual tools your skills attach. A tool is only usable when at least one enabled skill provides it."
+        heading={t("agents.tools.configurable_heading")}
+        description={t("agents.tools.configurable_description")}
         hasItems={true}
       >
         {#each BUILT_IN_TOOL_IDS as toolId (toolId)}
-          {@const config = selectedAgent.toolsConfig[toolId]}
           {@const skills = attachingSkills.get(toolId) ?? []}
           {@const alwaysAttached = ALWAYS_ATTACHED_TOOL_IDS.has(toolId)}
           {@const attached = alwaysAttached || skills.length > 0}
           {@const enabled = isToolEnabled(toolId)}
-          {@const displayName = getToolDisplayName(toolId, config?.name)}
+          {@const displayName = getToolDisplayName(toolId)}
           <ManagedEntityItem
             name={displayName}
-            desc={getToolDescription(toolId, config?.description)}
+            desc={getToolDescription(toolId)}
             disabled={!attached}
           >
             {#snippet badges()}
               {#if alwaysAttached}
-                <Badge label="Built in" tone="accent" />
+                <Badge label={t("agents.tools.built_in_badge")} tone="accent" />
               {:else if attached}
                 {#each skills as skillName (skillName)}
                   <Badge label={skillName} tone="accent" />
                 {/each}
               {:else}
-                <Badge label="Not attached by any enabled skill" tone="warning" />
+                <Badge label={t("agents.tools.not_attached_badge")} tone="warning" />
               {/if}
             {/snippet}
             {#snippet actions()}
               {#if toolHasConfigurableSettings(toolId)}
                 <Button
                   iconId="settings"
-                  ariaLabel={`Configure ${displayName}`}
-                  tooltip="Configure tool"
+                  ariaLabel={t("agents.tools.configure_aria", { name: displayName })}
+                  tooltip={t("agents.tools.configure_tooltip")}
                   onClick={() => openToolConfig(toolId)}
                 />
               {/if}
@@ -150,31 +150,31 @@ function openToolConfig(toolId: BuiltInToolId) {
 
       {#if activeIntegrations.length > 0 || activeSubAgents.length > 0}
         <ManagedEntitySection
-          heading="Always available"
-          description="Bound outside the skills system, so they aren't configured here — each is controlled by its own setting."
+          heading={t("agents.tools.always_available_heading")}
+          description={t("agents.tools.always_available_description")}
           hasItems={true}
         >
           <ManagedEntityItem
-            name="Load skill"
-            desc="Lets the agent load a skill's full instructions on demand. Always available whenever any skill exists."
+            name={t("agents.tools.load_skill_name")}
+            desc={t("agents.tools.load_skill_desc")}
           />
           {#each activeIntegrations as integ (integ.pluginId)}
             <ManagedEntityItem
-              name={`Execute Plugin API — ${integ.displayName}`}
-              desc={`Lets the agent script against the ${integ.displayName} plugin's api. Controlled in this agent's Integrations section above.`}
+              name={t("agents.tools.exec_plugin_name", { plugin: integ.displayName })}
+              desc={t("agents.tools.exec_plugin_desc", { plugin: integ.displayName })}
             >
               {#snippet badges()}
-                <Badge label="Integrations" tone="accent" />
+                <Badge label={t("agents.tools.integrations_badge")} tone="accent" />
               {/snippet}
             </ManagedEntityItem>
           {/each}
           {#each activeSubAgents as name (name)}
             <ManagedEntityItem
-              name={`Task — ${name}`}
-              desc="Lets the agent delegate a subtask to this subagent. Controlled in this agent's Subagents section above."
+              name={t("agents.tools.task_name", { name })}
+              desc={t("agents.tools.task_desc")}
             >
               {#snippet badges()}
-                <Badge label="Subagents" tone="accent" />
+                <Badge label={t("agents.tools.subagents_badge")} tone="accent" />
               {/snippet}
             </ManagedEntityItem>
           {/each}
@@ -185,7 +185,7 @@ function openToolConfig(toolId: BuiltInToolId) {
 
   <div class="tools-modal-footer">
     <div class="s2b-flex-1"></div>
-    <Button buttonText="Done" cta={true} onClick={() => modal.close()} />
+    <Button buttonText={t("common.done")} cta={true} onClick={() => modal.close()} />
   </div>
 </div>
 

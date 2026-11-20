@@ -1,0 +1,342 @@
+{
+	"commands": {
+		"open_chat": "Ouvrir le chat",
+		"new_chat": "Nouveau chat",
+		"search_notes": "Rechercher dans les notes",
+		"open_smart_graph": "Ouvrir le graphe intelligent",
+		"show_welcome": "Afficher l’écran de bienvenue",
+		"show_release_notes": "Afficher les notes de version",
+		"next_pending_change": "Modification en attente suivante",
+		"previous_pending_change": "Modification en attente précédente"
+	},
+	"chat_file_menu": {
+		"rename": "Renommer le chat",
+		"rename_button": "Renommer",
+		"delete": "Supprimer le chat",
+		"rename_failed": "Échec du renommage du chat : {error}",
+		"delete_failed": "Échec de la suppression du chat : {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Ajouter {count} fichier au chat",
+			"many": "Ajouter {count} fichiers au chat",
+			"other": "Ajouter {count} fichiers au chat"
+		},
+		"add_file_failed": "Échec de l’ajout du fichier au chat : {error}",
+		"add_files_failed": "Échec de l’ajout des fichiers au chat : {error}",
+		"no_supported_files": "Aucun fichier pris en charge sélectionné. Formats pris en charge : txt, md, csv, json, images, pdf.",
+		"chat_not_initialized": "Le chat n’est pas encore initialisé. Ouvrez le chat et réessayez.",
+		"queued": {
+			"one": "{count} fichier mis en file pour le chat.",
+			"many": "{count} fichiers mis en file pour le chat.",
+			"other": "{count} fichiers mis en file pour le chat."
+		},
+		"skipped_unsupported": {
+			"one": "{count} fichier non pris en charge ignoré.",
+			"many": "{count} fichiers non pris en charge ignorés.",
+			"other": "{count} fichiers non pris en charge ignorés."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "Aucun chat n’est ouvert",
+		"no_pending_changes": "Aucune modification en attente dans ce chat",
+		"new_file_nothing_to_open": "Cette modification crée un nouveau fichier — rien à ouvrir pour l’instant."
+	},
+	"huggingface_connected": "Connecté à Hugging Face.",
+	"update": {
+		"available": "Smart Second Brain {version} est disponible.",
+		"update_link": "Mettre à jour",
+		"updated": "Smart Second Brain a été mis à jour vers la version {version}.",
+		"whats_new_link": "Voir les nouveautés"
+	},
+	"settings_save_failed": "Smart Second Brain n’a pas pu enregistrer vos paramètres : {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain : environ {tokens} tokens de l’historique le plus ancien du chat ne tenaient pas dans la fenêtre de contexte du modèle de résumé et ont été laissés hors du résumé.",
+		"repeated_failure": "Smart Second Brain : le résumé de l’historique de ce chat a échoué {failures} fois de suite ; l’historique complet est donc toujours envoyé et peut dépasser la limite de contexte du modèle. Vérifiez le modèle de résumé de l’agent ; l’erreur figure dans la console développeur."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Mémoire trop volumineuse pour ce modèle{window} : {names} n’est plus chargée dans chaque message. L’agent ne la lit qu’en cas de besoin. Raccourcissez la note ou utilisez un modèle avec une fenêtre de contexte plus grande.",
+			"many": "Mémoire trop volumineuse pour ce modèle{window} : {names} ne sont plus chargées dans chaque message. L’agent ne les lit qu’en cas de besoin. Raccourcissez les notes ou utilisez un modèle avec une fenêtre de contexte plus grande.",
+			"other": "Mémoire trop volumineuse pour ce modèle{window} : {names} ne sont plus chargées dans chaque message. L’agent ne les lit qu’en cas de besoin. Raccourcissez les notes ou utilisez un modèle avec une fenêtre de contexte plus grande."
+		},
+		"memory_window": "({k} k tokens)",
+		"save_prompt_failed": "Impossible d’enregistrer le prompt système : {error}",
+		"open_agent_note": "Ouvrir la note de l’agent",
+		"prompt_modal_title": "Prompt système — {name}",
+		"save_skill_failed": "Impossible d’enregistrer la compétence « {skill} » : {error}",
+		"open_skill_note": "Ouvrir la note de la compétence",
+		"skill_modal_title": "Compétence — {skill}",
+		"cannot_connect": "Connexion impossible à : {providers}. Vérifiez que le service est en cours d’exécution.",
+		"review_providers": "Vérifier les fournisseurs",
+		"provider_unavailable": "Le fournisseur « {provider} » n’est plus disponible.",
+		"select_new_model": "Sélectionner un nouveau modèle",
+		"withdrew_changes": {
+			"one": "{count} modification de note en attente, proposée par la réponse remplacée, a été retirée.",
+			"many": "{count} modifications de note en attente, proposées par la réponse remplacée, ont été retirées.",
+			"other": "{count} modifications de note en attente, proposées par la réponse remplacée, ont été retirées."
+		},
+		"kept_partial_changes": {
+			"one": "{count} modification partiellement appliquée a été conservée — résolvez-la dans la barre de révision.",
+			"many": "{count} modifications partiellement appliquées ont été conservées — résolvez-les dans la barre de révision.",
+			"other": "{count} modifications partiellement appliquées ont été conservées — résolvez-les dans la barre de révision."
+		}
+	},
+	"errors": {
+		"request_failed": "La requête au modèle a échoué.",
+		"context_overflow": "Ce chat ne tient plus dans la fenêtre de contexte du modèle.",
+		"context_overflow_hint": "Commencez un nouveau chat, ou vérifiez la fenêtre de contexte configurée pour ce modèle.",
+		"refusal": "Le modèle a refusé de répondre à cette demande.",
+		"refusal_hint": "Reformuler la demande ou passer à un autre modèle peut aider."
+	},
+	"provider_auth": {
+		"unknown_provider": "Fournisseur inconnu : {provider}",
+		"invalid_api_key": "Clé API invalide",
+		"invalid_endpoint": "URL de base invalide ou point de terminaison injoignable",
+		"configuration_failed": "Échec de la configuration du fournisseur",
+		"no_auth_config": "Aucune configuration d’authentification trouvée pour {provider}",
+		"discovery_failed": "Échec de la découverte des modèles : {error}",
+		"server_url_required": "L’URL du serveur est obligatoire",
+		"api_key_required": "La clé API est obligatoire",
+		"connection_failed": "Échec de la connexion : {error}",
+		"auth_failed_status": "Échec de l’authentification ({status})",
+		"auth_failed": "Échec de l’authentification",
+		"request_failed_status": "La requête a échoué avec le statut {status}",
+		"codex_sign_in_required": "Connectez-vous avec ChatGPT pour utiliser Codex",
+		"openai_codex_sign_in_required": "Connectez-vous avec ChatGPT pour utiliser OpenAI via Codex",
+		"huggingface_token_rejected": "Hugging Face a refusé ce jeton d’accès",
+		"huggingface_status": "Hugging Face a renvoyé le statut {status}",
+		"huggingface_sign_in_required": "Connectez-vous avec Hugging Face pour vous connecter"
+	},
+	"providers": {
+		"templates": {
+			"openai": "Modèles OpenAI via la connexion ChatGPT ou une clé API.",
+			"openai_compatible": "Fournisseur flexible de type OpenAI pour OpenAI et les points de terminaison compatibles.",
+			"anthropic": "Modèles Claude via l’API d’Anthropic.",
+			"ollama": "Modèles Ollama locaux via l’API Ollama.",
+			"omlx": "Modèles MLX locaux sur votre Mac via le serveur compatible OpenAI d’oMLX.",
+			"openrouter": "Compte et catalogue de modèles OpenRouter.",
+			"huggingface": "Modèles ouverts via les fournisseurs d’inférence de Hugging Face."
+		},
+		"fields": {
+			"api_key": "Clé API",
+			"base_url": "URL de base",
+			"server_url": "URL du serveur",
+			"access_token": "Jeton d’accès",
+			"custom_headers": "En-têtes personnalisés",
+			"custom_headers_desc": "En-têtes supplémentaires au format JSON (facultatif)",
+			"chatgpt_sign_in": "Connexion ChatGPT"
+		},
+		"openai": {
+			"link": "Tableau de bord OpenAI",
+			"oauth_desc": "Ouvre une fenêtre de navigateur pour terminer l’autorisation ChatGPT/Codex.",
+			"api_key_desc": "Votre clé API OpenAI pour l’authentification",
+			"base_url_desc": "Point de terminaison API personnalisé (laisser vide pour OpenAI par défaut)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Ce fournisseur utilise une connexion ChatGPT/Codex dans le navigateur.",
+			"sign_in_placeholder": "Autorisé via la connexion ChatGPT"
+		},
+		"openai_compatible": {
+			"base_url_desc": "L’URL de base du point de terminaison API compatible OpenAI",
+			"api_key_desc": "Clé API pour l’authentification (laisser vide si votre point de terminaison n’en exige pas)"
+		},
+		"anthropic": {
+			"link": "Console Anthropic",
+			"api_key_desc": "Votre clé API Anthropic pour l’authentification",
+			"base_url_desc": "L’URL de base du point de terminaison API compatible Anthropic"
+		},
+		"ollama": {
+			"link": "Site web d’Ollama",
+			"server_url_desc": "L’URL à laquelle votre serveur Ollama est accessible",
+			"api_key_desc": "Clé API pour l’authentification (généralement inutile pour Ollama en local)"
+		},
+		"omlx": {
+			"link": "Site web d’oMLX",
+			"server_url_desc": "L’URL à laquelle votre serveur oMLX est accessible",
+			"api_key_desc": "oMLX exige une clé API par défaut (elle se trouve dans les paramètres globaux du panneau d’administration). Ne laissez ce champ vide que si vous avez désactivé la vérification de clé."
+		},
+		"openrouter": {
+			"link": "Clés OpenRouter",
+			"oauth_desc": "Autorisez l’accès dans votre navigateur pour vous connecter sans créer manuellement de clé API.",
+			"api_key_desc": "Votre clé API OpenRouter pour l’authentification"
+		},
+		"huggingface": {
+			"link": "Jetons d’accès Hugging Face",
+			"oauth_desc": "Approuvez l’accès dans votre navigateur pour vous connecter, sans créer de jeton d’accès."
+		}
+	},
+	"indexing": {
+		"status": "Indexation : {status}",
+		"cancelled_chunks": {
+			"one": "Indexation annulée ({count} fragment mis à jour)",
+			"many": "Indexation annulée ({count} fragments mis à jour)",
+			"other": "Indexation annulée ({count} fragments mis à jour)"
+		},
+		"updated_chunks": {
+			"one": "✓ Index mis à jour : {count} fragment",
+			"many": "✓ Index mis à jour : {count} fragments",
+			"other": "✓ Index mis à jour : {count} fragments"
+		},
+		"cancelled_notes": {
+			"one": "Indexation annulée ({count} note indexée jusqu’ici)",
+			"many": "Indexation annulée ({count} notes indexées jusqu’ici)",
+			"other": "Indexation annulée ({count} notes indexées jusqu’ici)"
+		},
+		"indexed_notes": {
+			"one": "✓ {count} note indexée",
+			"many": "✓ {count} notes indexées",
+			"other": "✓ {count} notes indexées"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ {count} note indexée, ignorées : {skipped}",
+			"many": "✓ {count} notes indexées, ignorées : {skipped}",
+			"other": "✓ {count} notes indexées, ignorées : {skipped}"
+		},
+		"no_embedding_model": "Aucun modèle d’embedding configuré. Définissez un modèle d’embedding par défaut.",
+		"invalid_config": "Configuration d’index d’embeddings invalide.",
+		"provider_not_configured": "Le fournisseur « {provider} » n’est pas configuré.",
+		"embedding_init_failed": "Échec de l’initialisation du modèle d’embedding.",
+		"open_search_settings": "Ouvrir les paramètres de recherche",
+		"open_provider_settings": "Ouvrir les paramètres du fournisseur",
+		"provider_unreachable": "Indexation arrêtée — le fournisseur d’embeddings est injoignable. Vérifiez la connexion, puis reprenez.",
+		"rate_limited": "Indexation en pause — la limite de débit du fournisseur d’embeddings a été atteinte. Elle reprendra au prochain démarrage, ou reprenez-la plus tard depuis les paramètres de recherche.",
+		"already_in_progress": "Indexation déjà en cours…",
+		"embed_failed": "Échec de l’embedding de {file} : {error}",
+		"embed_empty": "Échec de l’embedding de {file} : résultat vide renvoyé par le modèle",
+		"semantic_unreachable": "Recherche sémantique indisponible — le fournisseur d’embeddings est injoignable. Aucun résultat sémantique affiché.",
+		"semantic_failed": "Échec de la recherche sémantique : {error}",
+		"cancelling": "Annulation de l’indexation…",
+		"export_empty": "L’index est vide — rien à exporter.",
+		"export_dialog_title": "Exporter l’index d’embeddings",
+		"exported": "{count} embeddings exportés.",
+		"export_failed": "Échec de l’export de l’index.",
+		"import_dialog_title": "Importer un index d’embeddings",
+		"import_invalid_version": "Le champ de version du fichier d’export est invalide ou absent. Réindexez pour générer un export compatible.",
+		"import_outdated": "Le schéma v{version} du fichier d’export est obsolète (actuel : v{current}). Réindexez pour générer un export compatible.",
+		"import_newer": "Le fichier d’export a été créé avec une version plus récente du plugin (schéma v{version}). Mettez à jour le plugin pour l’importer.",
+		"import_missing_metadata": "Il manque au fichier d’export les métadonnées du fournisseur ou du modèle.",
+		"imported": "{count} embeddings importés ({model}).",
+		"import_failed": "Échec de l’import de l’index. Le fichier est peut-être corrompu.",
+		"reindex": "Réindexer"
+	},
+	"search_index": {
+		"status": "Indexation des notes pour la recherche : {status}",
+		"updated": "✓ Index de recherche mis à jour : {count} notes"
+	},
+	"bulk_progress": {
+		"skipped": "({count} ignorés)",
+		"eta": "(~{eta} restant)",
+		"pdfs_progress": "PDF {done}/{total}",
+		"then": "puis {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"many": "{count} PDF",
+			"other": "{count} PDF"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Le panneau de recherche s’est ouvert, mais la requête de tag n’a pas pu être définie",
+		"open_failed": "Impossible d’ouvrir le panneau de recherche pour le tag : {tag}"
+	},
+	"models": {
+		"no_embedding_models": "Aucun modèle d’embedding trouvé pour vos fournisseurs. Vérifiez qu’au moins un fournisseur propose des embeddings.",
+		"no_models": "Aucun modèle trouvé. Vérifiez que votre fournisseur est en cours d’exécution et joignable."
+	},
+	"actions": {
+		"open_settings": "Ouvrir les paramètres",
+		"add_provider": "Ajouter un fournisseur",
+		"check_provider_settings": "Vérifier les paramètres du fournisseur",
+		"select_model": "Sélectionner un modèle",
+		"configure_embedding_index": "Configurer l’index d’embeddings",
+		"edit_agent": "Modifier l’agent",
+		"view_report": "Voir le rapport",
+		"open_note": "Ouvrir la note",
+		"open_chat": "Ouvrir le chat",
+		"agent_gone_pick_model": "Cet agent n’existe plus. Choisissez un modèle depuis l’agent que vous voulez utiliser.",
+		"agent_gone_not_saved": "Cet agent n’existe plus : le modèle n’a donc pas été enregistré."
+	},
+	"diff": {
+		"pending_change": "Modification en attente",
+		"previous": "Modification en attente précédente",
+		"next": "Modification en attente suivante",
+		"toggle_view": "Afficher/masquer la vue des différences",
+		"accept": "Accepter",
+		"accept_aria": "Accepter la modification",
+		"reject": "Rejeter",
+		"reject_aria": "Rejeter la modification",
+		"stale_tooltip": "Impossible d’accepter — la note a changé depuis cette proposition. Rejetez-la et demandez à l’agent de la reproposer.",
+		"cross_thread_banner": {
+			"one": "{count} autre chat a une modification en attente sur ce fichier. Seule la plus récente est affichée ici ; la première acceptée l’emporte et les autres risquent ensuite de ne pas pouvoir s’appliquer.",
+			"many": "{count} autres chats ont une modification en attente sur ce fichier. Seule la plus récente est affichée ici ; la première acceptée l’emporte et les autres risquent ensuite de ne pas pouvoir s’appliquer.",
+			"other": "{count} autres chats ont une modification en attente sur ce fichier. Seule la plus récente est affichée ici ; la première acceptée l’emporte et les autres risquent ensuite de ne pas pouvoir s’appliquer."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Appel d’outils",
+		"reasoning": "Raisonnement étendu",
+		"vision": "Vision / pièces jointes",
+		"structured_output": "Sortie structurée (schéma JSON)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Rechercher dans les notes",
+			"summary": "Recherche par mot-clé dans vos notes Obsidian. Renvoie les noms de fichiers correspondants et leurs métadonnées."
+		},
+		"list_directory": {
+			"name": "Lister le dossier",
+			"summary": "Liste la structure des dossiers du coffre : une vue d’ensemble avec le nombre de fichiers à la racine, les fichiers et sous-dossiers à l’intérieur d’un dossier. La sortie est condensée pour tenir dans le budget de contexte."
+		},
+		"read_content": {
+			"name": "Lire le contenu",
+			"summary": "Lit les notes et fichiers du coffre par chemin ou lien wiki. Prend en charge les fichiers Markdown/texte et l’extraction du texte des PDF. Les images doivent être jointes dans le chat."
+		},
+		"grep_notes": {
+			"name": "Grep dans les notes",
+			"summary": "Trouve une sous-chaîne exacte ou une expression régulière dans les notes et renvoie les lignes correspondantes avec leurs numéros et leur contexte. Contrairement à Rechercher dans les notes, il cherche des chaînes littérales. Limitez-le à une note avec un chemin, ou paginez les grands ensembles de résultats."
+		},
+		"get_all_tags": {
+			"name": "Obtenir tous les tags",
+			"summary": "Récupère la liste de tous les tags utilisés dans le coffre."
+		},
+		"get_properties": {
+			"name": "Obtenir les propriétés",
+			"summary": "Récupère les propriétés du frontmatter des notes ou liste toutes les clés de propriétés du coffre."
+		},
+		"execute_javascript": {
+			"name": "Exécuter du JavaScript",
+			"summary": "Exécute du JavaScript isolé pour des calculs et des transformations de données. Utilisez return pour la valeur finale et console.log pour les sorties intermédiaires."
+		},
+		"manage_notes": {
+			"name": "Gérer les notes",
+			"summary": "Crée, met à jour ou supprime des notes Markdown en un seul lot soumis à validation. Des opérations liées peuvent être proposées ensemble pour approbation."
+		},
+		"fetch_url": {
+			"name": "Récupérer une URL",
+			"summary": "Récupère une page web publique ou une ressource texte via HTTP(S) et renvoie son contenu principal sous forme de Markdown nettoyé. À utiliser uniquement avec des URL fournies par l’utilisateur ou des références clairement publiques."
+		},
+		"web_search": {
+			"name": "Recherche web",
+			"summary": "Recherche sur le web et renvoie des résultats (titre, URL, extrait). Configurez le fournisseur et la clé API dans le panneau Configurer de l’outil. Privilégiez d’abord la recherche dans le coffre."
+		},
+		"manage_skills": {
+			"name": "Gérer les compétences",
+			"summary": "Crée de nouvelles compétences, révise les compétences rattachées à l’agent, ou supprime une compétence quand vous le lui demandez. Les modifications s’appliquent immédiatement. Le nom et le lien de plugin d’une compétence sont verrouillés une fois créée."
+		},
+		"write_todos": {
+			"name": "Liste de tâches",
+			"summary": "Permet à l’agent de planifier un travail en plusieurs étapes sous forme de liste de contrôle et de la cocher au fur et à mesure. La liste s’affiche au-dessus du champ de saisie du chat."
+		},
+		"ask_question": {
+			"name": "Poser une question",
+			"summary": "Permet à l’agent de faire une pause et de vous poser une question à choix multiples lorsqu’une demande n’est pas claire. La question s’affiche au-dessus du champ de saisie du chat."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (sans clé)",
+		"firecrawl_key_help": "Facultatif — ajoutez une clé API Firecrawl (fc-…) pour des limites de débit plus élevées. Laissez vide pour utiliser l’offre sans clé.",
+		"brave_key_help": "Clé API Brave Search, disponible sur api.search.brave.com.",
+		"tavily_key_help": "Clé API Tavily, disponible sur app.tavily.com.",
+		"keenable_key_help": "Facultatif — ajoutez une clé API Keenable pour des limites de débit plus élevées. Laissez vide pour utiliser le point de terminaison public gratuit."
+	}
+}

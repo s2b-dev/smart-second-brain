@@ -5,6 +5,7 @@ import { suggestSecretId } from "../../lib/secretStorage";
 import { type AuthFieldDefinition, getProviderDefinition } from "../../providers/index";
 import { getPlugin } from "../../stores/state.svelte";
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import Text from "../ui/Text.svelte";
 import SecretSelect from "./SecretSelect.svelte";
 import SettingItem from "./SettingItem.svelte";
@@ -173,7 +174,7 @@ function getFieldStyles(fieldKey: string): string {
     <!-- Advanced disclosure (only if there are optional fields) -->
     {#if hasOptionalFields}
         <details class="auth-advanced" bind:open={showAdvanced}>
-            <summary class="auth-advanced-summary">Advanced</summary>
+            <summary class="auth-advanced-summary">{t("settings.providers.advanced")}</summary>
             {#each optionalFields() as [fieldKey, field]}
                 {@render fieldRenderer(fieldKey, field)}
             {/each}

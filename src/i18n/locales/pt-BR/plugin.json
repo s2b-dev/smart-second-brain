@@ -1,0 +1,342 @@
+{
+	"commands": {
+		"open_chat": "Abrir chat",
+		"new_chat": "Novo chat",
+		"search_notes": "Pesquisar notas",
+		"open_smart_graph": "Abrir grafo inteligente",
+		"show_welcome": "Mostrar boas-vindas",
+		"show_release_notes": "Mostrar notas da versão",
+		"next_pending_change": "Próxima alteração pendente",
+		"previous_pending_change": "Alteração pendente anterior"
+	},
+	"chat_file_menu": {
+		"rename": "Renomear chat",
+		"rename_button": "Renomear",
+		"delete": "Excluir chat",
+		"rename_failed": "Falha ao renomear o chat: {error}",
+		"delete_failed": "Falha ao excluir o chat: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Adicionar {count} arquivo ao chat",
+			"many": "Adicionar {count} arquivos ao chat",
+			"other": "Adicionar {count} arquivos ao chat"
+		},
+		"add_file_failed": "Falha ao adicionar o arquivo ao chat: {error}",
+		"add_files_failed": "Falha ao adicionar os arquivos ao chat: {error}",
+		"no_supported_files": "Nenhum arquivo compatível selecionado. Compatíveis: txt, md, csv, json, imagens, pdf.",
+		"chat_not_initialized": "O chat ainda não foi inicializado. Abra o chat e tente novamente.",
+		"queued": {
+			"one": "{count} arquivo na fila para o chat.",
+			"many": "{count} arquivos na fila para o chat.",
+			"other": "{count} arquivos na fila para o chat."
+		},
+		"skipped_unsupported": {
+			"one": "{count} arquivo incompatível ignorado.",
+			"many": "{count} arquivos incompatíveis ignorados.",
+			"other": "{count} arquivos incompatíveis ignorados."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "Nenhum chat aberto no momento",
+		"no_pending_changes": "Nenhuma alteração pendente neste chat",
+		"new_file_nothing_to_open": "Esta alteração cria um novo arquivo — ainda não há nada para abrir."
+	},
+	"huggingface_connected": "Conectado ao Hugging Face.",
+	"update": {
+		"available": "O Smart Second Brain {version} está disponível.",
+		"update_link": "Atualizar",
+		"updated": "Smart Second Brain atualizado para a versão {version}.",
+		"whats_new_link": "Ver novidades"
+	},
+	"settings_save_failed": "O Smart Second Brain não conseguiu salvar suas configurações: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: cerca de {tokens} tokens do histórico mais antigo do chat não couberam na janela de contexto do modelo de resumo e ficaram de fora do resumo.",
+		"repeated_failure": "Smart Second Brain: o resumo do histórico deste chat falhou {failures} vezes seguidas, então o histórico completo ainda é enviado e pode exceder o limite de contexto do modelo. Verifique o modelo de resumo do agente; o console do desenvolvedor mostra o erro."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Memória grande demais para este modelo{window}: {names} não é mais carregada em todas as mensagens. O agente só a lê quando necessário. Encurte a nota ou use um modelo com uma janela de contexto maior.",
+			"many": "Memória grande demais para este modelo{window}: {names} não são mais carregadas em todas as mensagens. O agente só as lê quando necessário. Encurte as notas ou use um modelo com uma janela de contexto maior.",
+			"other": "Memória grande demais para este modelo{window}: {names} não são mais carregadas em todas as mensagens. O agente só as lê quando necessário. Encurte as notas ou use um modelo com uma janela de contexto maior."
+		},
+		"memory_window": "({k} mil tokens)",
+		"save_prompt_failed": "Não foi possível salvar o prompt do sistema: {error}",
+		"open_agent_note": "Abrir a nota do agente",
+		"prompt_modal_title": "Prompt do sistema — {name}",
+		"save_skill_failed": "Não foi possível salvar a habilidade “{skill}”: {error}",
+		"open_skill_note": "Abrir a nota da habilidade",
+		"skill_modal_title": "Habilidade — {skill}",
+		"cannot_connect": "Não foi possível conectar a: {providers}. Verifique se o serviço está em execução.",
+		"review_providers": "Revisar provedores",
+		"provider_unavailable": "O provedor “{provider}” não está mais disponível.",
+		"select_new_model": "Selecionar um novo modelo",
+		"withdrew_changes": {
+			"one": "{count} alteração pendente em notas, proposta pela resposta substituída, foi retirada.",
+			"many": "{count} alterações pendentes em notas, propostas pela resposta substituída, foram retiradas.",
+			"other": "{count} alterações pendentes em notas, propostas pela resposta substituída, foram retiradas."
+		},
+		"kept_partial_changes": {
+			"one": "{count} alteração aplicada parcialmente foi mantida — resolva-a na barra de revisão.",
+			"many": "{count} alterações aplicadas parcialmente foram mantidas — resolva-as na barra de revisão.",
+			"other": "{count} alterações aplicadas parcialmente foram mantidas — resolva-as na barra de revisão."
+		}
+	},
+	"errors": {
+		"request_failed": "A solicitação ao modelo falhou.",
+		"context_overflow": "Este chat não cabe mais na janela de contexto do modelo.",
+		"context_overflow_hint": "Inicie um novo chat ou verifique a janela de contexto configurada para este modelo.",
+		"refusal": "O modelo se recusou a responder a esta solicitação.",
+		"refusal_hint": "Reformular a solicitação ou trocar de modelo pode ajudar."
+	},
+	"provider_auth": {
+		"unknown_provider": "Provedor desconhecido: {provider}",
+		"invalid_api_key": "Chave de API inválida",
+		"invalid_endpoint": "URL base inválida ou endpoint inacessível",
+		"configuration_failed": "Falha na configuração do provedor",
+		"no_auth_config": "Nenhuma configuração de autenticação encontrada para {provider}",
+		"discovery_failed": "Falha ao descobrir modelos: {error}",
+		"server_url_required": "A URL do servidor é obrigatória",
+		"api_key_required": "A chave de API é obrigatória",
+		"connection_failed": "Falha na conexão: {error}",
+		"auth_failed_status": "Falha na autenticação ({status})",
+		"auth_failed": "Falha na autenticação",
+		"request_failed_status": "A solicitação falhou com o status {status}",
+		"codex_sign_in_required": "Entre com o ChatGPT para usar o Codex",
+		"openai_codex_sign_in_required": "Entre com o ChatGPT para usar a OpenAI via Codex",
+		"huggingface_token_rejected": "O Hugging Face rejeitou este token de acesso",
+		"huggingface_status": "O Hugging Face retornou o status {status}",
+		"huggingface_sign_in_required": "Entre com o Hugging Face para conectar"
+	},
+	"providers": {
+		"templates": {
+			"openai": "Modelos da OpenAI via login no ChatGPT ou chave de API.",
+			"openai_compatible": "Provedor flexível no estilo OpenAI para a OpenAI e endpoints compatíveis.",
+			"anthropic": "Modelos Claude via API da Anthropic.",
+			"ollama": "Modelos locais do Ollama pela API do Ollama.",
+			"omlx": "Modelos MLX locais no seu Mac via servidor compatível com OpenAI do oMLX.",
+			"openrouter": "Conta e catálogo de modelos do OpenRouter.",
+			"huggingface": "Modelos abertos dos provedores de inferência do Hugging Face."
+		},
+		"fields": {
+			"api_key": "Chave de API",
+			"base_url": "URL base",
+			"server_url": "URL do servidor",
+			"access_token": "Token de acesso",
+			"custom_headers": "Cabeçalhos personalizados",
+			"custom_headers_desc": "Cabeçalhos adicionais em JSON (opcional)",
+			"chatgpt_sign_in": "Login no ChatGPT"
+		},
+		"openai": {
+			"link": "Painel da OpenAI",
+			"oauth_desc": "Abre uma janela do navegador para concluir a autorização do ChatGPT/Codex.",
+			"api_key_desc": "Sua chave de API da OpenAI para autenticação",
+			"base_url_desc": "Endpoint de API personalizado (deixe vazio para usar o padrão da OpenAI)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Este provedor usa um fluxo de login do ChatGPT/Codex pelo navegador.",
+			"sign_in_placeholder": "Autorizado via login no ChatGPT"
+		},
+		"openai_compatible": {
+			"base_url_desc": "A URL base do endpoint da API compatível com OpenAI",
+			"api_key_desc": "Chave de API para autenticação (deixe vazio se o seu endpoint não precisar)"
+		},
+		"anthropic": {
+			"link": "Console da Anthropic",
+			"api_key_desc": "Sua chave de API da Anthropic para autenticação",
+			"base_url_desc": "A URL base do endpoint da API compatível com Anthropic"
+		},
+		"ollama": {
+			"link": "Site do Ollama",
+			"server_url_desc": "A URL onde seu servidor Ollama está em execução",
+			"api_key_desc": "Chave de API para autenticação (geralmente não é necessária para o Ollama local)"
+		},
+		"omlx": {
+			"link": "Site do oMLX",
+			"server_url_desc": "A URL onde seu servidor oMLX está em execução",
+			"api_key_desc": "O oMLX exige uma chave de API por padrão (encontre-a nas configurações globais do painel de administração). Deixe vazio apenas se você desativou a verificação da chave."
+		},
+		"openrouter": {
+			"link": "Chaves do OpenRouter",
+			"oauth_desc": "Autorize no seu navegador para conectar sem criar uma chave de API manualmente.",
+			"api_key_desc": "Sua chave de API do OpenRouter para autenticação"
+		},
+		"huggingface": {
+			"link": "Tokens de acesso do Hugging Face",
+			"oauth_desc": "Aprove o acesso no seu navegador para conectar, sem criar um token de acesso."
+		}
+	},
+	"indexing": {
+		"status": "Indexando: {status}",
+		"cancelled_chunks": {
+			"one": "Indexação cancelada ({count} trecho atualizado)",
+			"many": "Indexação cancelada ({count} trechos atualizados)",
+			"other": "Indexação cancelada ({count} trechos atualizados)"
+		},
+		"updated_chunks": {
+			"one": "✓ Índice atualizado: {count} trecho",
+			"many": "✓ Índice atualizado: {count} trechos",
+			"other": "✓ Índice atualizado: {count} trechos"
+		},
+		"cancelled_notes": {
+			"one": "Indexação cancelada ({count} nota indexada até agora)",
+			"many": "Indexação cancelada ({count} notas indexadas até agora)",
+			"other": "Indexação cancelada ({count} notas indexadas até agora)"
+		},
+		"indexed_notes": {
+			"one": "✓ {count} nota indexada",
+			"many": "✓ {count} notas indexadas",
+			"other": "✓ {count} notas indexadas"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ {count} nota indexada, ignoradas: {skipped}",
+			"many": "✓ {count} notas indexadas, ignoradas: {skipped}",
+			"other": "✓ {count} notas indexadas, ignoradas: {skipped}"
+		},
+		"no_embedding_model": "Nenhum modelo de embedding configurado. Defina um modelo de embedding padrão.",
+		"invalid_config": "Configuração do índice de embeddings inválida.",
+		"provider_not_configured": "O provedor “{provider}” não está configurado.",
+		"embedding_init_failed": "Falha ao inicializar o modelo de embedding.",
+		"open_search_settings": "Abrir configurações de pesquisa",
+		"open_provider_settings": "Abrir configurações do provedor",
+		"provider_unreachable": "Indexação interrompida — o provedor de embeddings está inacessível. Verifique a conexão e retome.",
+		"rate_limited": "Indexação pausada — o limite de requisições do provedor de embeddings foi atingido. Ela será retomada na próxima inicialização, ou retome-a depois pelas configurações de pesquisa.",
+		"already_in_progress": "A indexação já está em andamento...",
+		"embed_failed": "Falha ao gerar embedding de {file}: {error}",
+		"embed_empty": "Falha ao gerar embedding de {file}: resultado vazio do modelo",
+		"semantic_unreachable": "Pesquisa semântica indisponível — o provedor de embeddings está inacessível. Nenhum resultado semântico exibido.",
+		"semantic_failed": "A pesquisa semântica falhou: {error}",
+		"cancelling": "Cancelando indexação…",
+		"export_empty": "O índice está vazio — nada para exportar.",
+		"export_dialog_title": "Exportar índice de embeddings",
+		"exported": "{count} embeddings exportados.",
+		"export_failed": "Falha ao exportar o índice.",
+		"import_dialog_title": "Importar índice de embeddings",
+		"import_invalid_version": "O arquivo exportado tem um campo de versão inválido ou ausente. Reindexe para gerar uma exportação compatível.",
+		"import_outdated": "O esquema v{version} do arquivo exportado está desatualizado (atual: v{current}). Reindexe para gerar uma exportação compatível.",
+		"import_newer": "O arquivo exportado foi criado com uma versão mais recente do plugin (esquema v{version}). Atualize o plugin para importá-lo.",
+		"import_missing_metadata": "O arquivo exportado não tem os metadados de provedor ou modelo.",
+		"imported": "{count} embeddings importados ({model}).",
+		"import_failed": "Falha ao importar o índice. O arquivo pode estar corrompido.",
+		"reindex": "Reindexar"
+	},
+	"search_index": {
+		"status": "Indexando notas para pesquisa: {status}",
+		"updated": "✓ Índice de pesquisa atualizado: {count} notas"
+	},
+	"bulk_progress": {
+		"skipped": "({count} ignorados)",
+		"eta": "(~{eta} restantes)",
+		"pdfs_progress": "PDFs {done}/{total}",
+		"then": "depois {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"many": "{count} PDFs",
+			"other": "{count} PDFs"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "O painel de pesquisa foi aberto, mas não foi possível definir a consulta da tag",
+		"open_failed": "Falha ao abrir o painel de pesquisa para a tag: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "Nenhum modelo de embedding encontrado para seus provedores. Verifique se algum deles oferece embeddings.",
+		"no_models": "Nenhum modelo encontrado. Verifique se seu provedor está em execução e acessível."
+	},
+	"actions": {
+		"open_settings": "Abrir configurações",
+		"add_provider": "Adicionar um provedor",
+		"check_provider_settings": "Verificar configurações do provedor",
+		"select_model": "Selecionar um modelo",
+		"configure_embedding_index": "Configurar índice de embeddings",
+		"edit_agent": "Editar agente",
+		"view_report": "Ver relatório",
+		"open_note": "Abrir nota",
+		"open_chat": "Abrir chat",
+		"agent_gone_pick_model": "Esse agente não existe mais. Escolha um modelo no agente que você quer usar.",
+		"agent_gone_not_saved": "Esse agente não existe mais, então o modelo não foi salvo."
+	},
+	"diff": {
+		"pending_change": "Alteração pendente",
+		"previous": "Alteração pendente anterior",
+		"next": "Próxima alteração pendente",
+		"toggle_view": "Alternar visualização de diferenças",
+		"accept": "Aceitar",
+		"accept_aria": "Aceitar alteração",
+		"reject": "Rejeitar",
+		"reject_aria": "Rejeitar alteração",
+		"stale_tooltip": "Não é possível aceitar — a nota mudou depois desta proposta. Rejeite-a e peça ao agente para propô-la de novo.",
+		"cross_thread_banner": {
+			"one": "{count} outro chat tem uma edição pendente neste arquivo. Apenas a mais recente é exibida aqui; a que for aceita primeiro prevalece, e as outras podem então falhar ao serem aplicadas.",
+			"many": "{count} outros chats têm uma edição pendente neste arquivo. Apenas a mais recente é exibida aqui; a que for aceita primeiro prevalece, e as outras podem então falhar ao serem aplicadas.",
+			"other": "{count} outros chats têm uma edição pendente neste arquivo. Apenas a mais recente é exibida aqui; a que for aceita primeiro prevalece, e as outras podem então falhar ao serem aplicadas."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Chamada de ferramentas",
+		"reasoning": "Raciocínio estendido",
+		"vision": "Visão / anexos de arquivos",
+		"structured_output": "Saída estruturada (JSON schema)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Pesquisar notas",
+			"summary": "Pesquisa suas notas do Obsidian por palavra-chave. Retorna os nomes dos arquivos correspondentes e os metadados."
+		},
+		"list_directory": {
+			"name": "Listar diretório",
+			"summary": "Lista a estrutura de pastas do cofre: uma visão geral com a contagem de arquivos na raiz, e arquivos e subpastas dentro de uma pasta. A saída é condensada para caber no orçamento de contexto."
+		},
+		"read_content": {
+			"name": "Ler conteúdo",
+			"summary": "Lê notas e arquivos do cofre por caminho ou wikilink. Suporta arquivos markdown/texto e extração de texto de PDFs. Imagens precisam ser anexadas no chat."
+		},
+		"grep_notes": {
+			"name": "Grep nas notas",
+			"summary": "Encontra uma substring exata ou um padrão regex nas notas, retornando as linhas correspondentes com números de linha e contexto. Ao contrário de Pesquisar notas, corresponde a strings literais. Restrinja a uma nota com um caminho ou pagine conjuntos grandes de resultados."
+		},
+		"get_all_tags": {
+			"name": "Obter todas as tags",
+			"summary": "Obtém uma lista de todas as tags usadas no cofre."
+		},
+		"get_properties": {
+			"name": "Obter propriedades",
+			"summary": "Obtém as propriedades do frontmatter das notas ou lista todas as chaves de propriedades do cofre."
+		},
+		"execute_javascript": {
+			"name": "Executar JavaScript",
+			"summary": "Executa JavaScript isolado para cálculos e transformação de dados. Use return para o valor final e console.log para a saída intermediária."
+		},
+		"manage_notes": {
+			"name": "Gerenciar notas",
+			"summary": "Cria, atualiza ou exclui notas markdown em um único lote para revisão. Operações relacionadas em notas podem ser propostas juntas para aprovação do usuário."
+		},
+		"fetch_url": {
+			"name": "Buscar URL",
+			"summary": "Busca uma página web pública ou um recurso de texto via HTTP(S) e retorna o conteúdo principal como markdown limpo. Use apenas com URLs fornecidas pelo usuário ou referências claramente públicas."
+		},
+		"web_search": {
+			"name": "Pesquisa na web",
+			"summary": "Pesquisa na web e retorna resultados (título, URL, trecho). Configure o provedor e a chave de API no painel Configurar da ferramenta. Prefira pesquisar no cofre primeiro."
+		},
+		"manage_skills": {
+			"name": "Gerenciar habilidades",
+			"summary": "Cria novas habilidades, revisa as habilidades anexadas ao próprio agente ou exclui uma habilidade quando você pede. As alterações são aplicadas imediatamente. O nome e o link de plugin de uma habilidade ficam bloqueados após a criação."
+		},
+		"write_todos": {
+			"name": "Lista de tarefas",
+			"summary": "Permite que o agente planeje trabalhos de várias etapas como uma lista de verificação e marque os itens conforme avança. A lista aparece acima do campo de entrada do chat."
+		},
+		"ask_question": {
+			"name": "Fazer pergunta",
+			"summary": "Permite que o agente pause e faça uma pergunta de múltipla escolha quando uma solicitação não estiver clara. A pergunta aparece acima do campo de entrada do chat."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (sem chave)",
+		"firecrawl_key_help": "Opcional — adicione uma chave de API do Firecrawl (fc-…) para limites de requisições maiores. Deixe vazio para usar o nível sem chave.",
+		"brave_key_help": "Chave de API do Brave Search em api.search.brave.com.",
+		"tavily_key_help": "Chave de API do Tavily em app.tavily.com.",
+		"keenable_key_help": "Opcional — adicione uma chave de API do Keenable para limites de requisições maiores. Deixe vazio para usar o endpoint público gratuito."
+	}
+}

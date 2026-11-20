@@ -1,0 +1,109 @@
+{
+	"view": {
+		"tab_title": "Dobrodošli"
+	},
+	"welcome": {
+		"title": "Dobrodošli v Smart Second Brain",
+		"subtitle": "Spremenite svoj sef v drugi možgan s pomočjo umetne inteligence – iščite pametneje, raziskujte povezave v grafu in klepetajte s svojimi zapiski.",
+		"hotkeys_unavailable_notice": "Bližnjic ni bilo mogoče odpreti – odprite Nastavitve → Bližnjice in poiščite »Search notes«.",
+		"search": {
+			"title": "Pametnejše iskanje",
+			"desc": "Poiščite zapiske po naslovu, vsebini, oznakah in mapah – z mehkim ujemanjem. Nastavitev ni potrebna. Za pomensko iskanje lahko pozneje dodate model za vdelave.",
+			"hotkey_link": "nastavite bližnjico",
+			"navbar_toggle": "Odpri iz povečevalnega stekla v navigacijski vrstici namesto hitrega preklopnika",
+			"hotkey": "Ali pa {link} za takojšen dostop."
+		},
+		"graph": {
+			"title": "Pametnejši graf",
+			"desc": "Oglejte si, kako se vaši zapiski povezujejo in združujejo v teme. Nastavitev ni potrebna."
+		},
+		"chat": {
+			"title": "Klepetajte s svojimi zapiski",
+			"desc": "Postavljajte vprašanja, ki temeljijo na vašem sefu, s spletnim iskanjem in vgrajeno podporo za vtičnike, kot sta Dataview in Tasks. Potreben je ponudnik AI – nastavite ga spodaj."
+		},
+		"provider_step": {
+			"title": "Povežite ponudnika AI",
+			"done_desc": "Ponudnik je povezan. Ponudnike lahko dodajate ali upravljate v nastavitvah.",
+			"desc": "Povežite OpenAI, Anthropic, Ollama, OpenRouter ali katero koli končno točko, združljivo z OpenAI.",
+			"add_another": "Dodaj še enega",
+			"connect": "Poveži ponudnika"
+		},
+		"model_step": {
+			"title": "Izberite model za klepet",
+			"needs_provider_desc": "Najprej povežite ponudnika, nato izberite model za klepet.",
+			"desc": "Izberite model povezanega ponudnika, da omogočite klepet.",
+			"change": "Zamenjaj model",
+			"choose": "Izberi model",
+			"using": "Uporabljate {model}. Vse je pripravljeno za klepet."
+		},
+		"privacy": {
+			"public_title": "Vaši zapiski so privzeto deljeni",
+			"all_trusted_title": "Dostop do zapiskov je odobren",
+			"untrusted_title": "Vaši zapiski so še vedno zasebni",
+			"no_provider_title": "Dostop do zapiskov je privzeto zaseben",
+			"no_provider_strong": "ne",
+			"public_strong": "privzeto javno",
+			"review_access": "Preglejte dostop do zapiskov",
+			"trusted": "zaupanja vreden",
+			"change_access": "spremenite dostop do zapiskov",
+			"no_provider": "Vaši zapiski se {not} delijo s ponudniki AI, razen če to dovolite. Ko zgoraj povežete ponudnika, mu lahko odobrite dostop – do takrat nič ne zapusti vašega sefa.",
+			"public": "Dostop do zapiskov je nastavljen na {mode}, zato lahko ponudniki berejo vaše zapiske, razen tistih, ki jih izključite. {review}.",
+			"all_trusted": {
+				"one": "Vaš ponudnik ima oznako {trusted}, zato lahko agent bere vaše zapiske. {review}, če želite nekatere zapiske ohraniti zasebne.",
+				"two": "Vaša ponudnika imata oznako {trusted}, zato lahko agent bere vaše zapiske. {review}, če želite nekatere zapiske ohraniti zasebne.",
+				"few": "Vaši ponudniki imajo oznako {trusted}, zato lahko agent bere vaše zapiske. {review}, če želite nekatere zapiske ohraniti zasebne.",
+				"other": "Vaši ponudniki imajo oznako {trusted}, zato lahko agent bere vaše zapiske. {review}, če želite nekatere zapiske ohraniti zasebne."
+			},
+			"untrusted": {
+				"one": "{providers} še ne more brati vaših zapiskov – klepet bo deloval, vendar odgovori ne bodo temeljili na vašem sefu. V nastavitvah ponudnika mu dodelite oznako {trusted} ali pa {change}, da dovolite vsem ponudnikom.",
+				"two": "{providers} še ne moreta brati vaših zapiskov – klepet bo deloval, vendar odgovori ne bodo temeljili na vašem sefu. V nastavitvah ponudnika jima dodelite oznako {trusted} ali pa {change}, da dovolite vsem ponudnikom.",
+				"few": "{providers} še ne morejo brati vaših zapiskov – klepet bo deloval, vendar odgovori ne bodo temeljili na vašem sefu. V nastavitvah ponudnika jim dodelite oznako {trusted} ali pa {change}, da dovolite vsem ponudnikom.",
+				"other": "{providers} še ne morejo brati vaših zapiskov – klepet bo deloval, vendar odgovori ne bodo temeljili na vašem sefu. V nastavitvah ponudnika jim dodelite oznako {trusted} ali pa {change}, da dovolite vsem ponudnikom."
+			}
+		},
+		"skip": "Preskoči",
+		"documentation": "Dokumentacija ↗",
+		"explore_graph": "Raziščite graf",
+		"start_chatting": "Začnite klepetati",
+		"start_chatting_disabled": "Najprej povežite ponudnika in dodajte model za klepet"
+	},
+	"provider_setup": {
+		"title_add": "Dodaj ponudnika",
+		"title_setup": "Nastavi ponudnika",
+		"title_edit": "Uredi {name}",
+		"trusted_indicator": "Zaupanja vreden za zasebne zapiske",
+		"invalid_name": "Neveljavno ime",
+		"auth_failed": "Preverjanje pristnosti ni uspelo",
+		"picker_desc": "Izberite ponudnika, ki ga želite povezati.",
+		"setup_guide": "Vodnik za nastavitev",
+		"name_label": "Ime ponudnika",
+		"name_desc": "Poimenujte ta primerek ponudnika, da ga boste pozneje lahko ločili od drugih.",
+		"name_placeholder": "Nov ponudnik",
+		"hide_api_key": "Skrij polje za ključ API",
+		"use_api_key": "Namesto tega uporabite ključ API →",
+		"sign_in_desktop_only": "Prijava z računom {provider} je na voljo samo v namizni različici.",
+		"checking_connection": "Preverjanje povezave …",
+		"connected": "Povezano",
+		"fix_name_to_finish": "– za dokončanje popravite ime ponudnika",
+		"enter_credentials": "Zgoraj vnesite svoje poverilnice – povezava se preveri samodejno.",
+		"trusted_label": "Zaupanja vreden za zasebne zapiske",
+		"trusted_desc": "Dovoli temu ponudniku dostop do zapiskov, ki ostanejo zasebni za ponudnike, ki niso zaupanja vredni.",
+		"oauth_sign_in_label": "Prijava z računom {provider}",
+		"cancel_sign_in": "Prekliči prijavo",
+		"connected_via": "Povezano prek {provider}",
+		"reconnect": "Znova poveži",
+		"disconnect": "Prekini povezavo",
+		"sign_in_with": "Prijava z računom {provider}",
+		"paste_code_label": "Prilepite avtorizacijsko kodo",
+		"paste_code_desc": "Kopirajte avtorizacijsko kodo, prikazano v brskalniku, in jo prilepite sem, da dokončate povezovanje.",
+		"code_placeholder": "Avtorizacijska koda",
+		"submit": "Pošlji"
+	},
+	"release_notes": {
+		"tab_title": "Novosti",
+		"title": "Novosti v različici {version}",
+		"released_on": "Izdano {date}",
+		"earlier_releases": "Starejše izdaje",
+		"all_releases": "Vse izdaje na GitHubu"
+	}
+}

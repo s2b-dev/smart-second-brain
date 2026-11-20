@@ -2,6 +2,7 @@
 import Icon from "../ui/Icon.svelte";
 import PickerPopover from "../ui/PickerPopover.svelte";
 import PickerOptionRow from "../ui/PickerOptionRow.svelte";
+import { t } from "../../i18n";
 
 interface Props {
 	/** Attach files from the local computer (opens the OS file picker). */
@@ -27,7 +28,7 @@ function pick(action: () => void) {
 <PickerPopover
   bind:open={isOpen}
   bind:element={anchor}
-  tooltip="Add context"
+  tooltip={t("chat.attach.tooltip")}
   dataTestId="attach-context-button"
   triggerStyles="clickable-icon s2b-attach-context-button"
   contentClass="s2b-attach-context-popover"
@@ -44,7 +45,7 @@ function pick(action: () => void) {
       <Icon name="paperclip" size="xs" />
     {/snippet}
     {#snippet content()}
-      From device
+      {t("chat.attach.from_device")}
     {/snippet}
   </PickerOptionRow>
 
@@ -54,7 +55,7 @@ function pick(action: () => void) {
         <Icon name="camera" size="xs" />
       {/snippet}
       {#snippet content()}
-        Take photo
+        {t("chat.attach.take_photo")}
       {/snippet}
     </PickerOptionRow>
   {/if}
@@ -64,7 +65,7 @@ function pick(action: () => void) {
       <Icon name="vault" size="xs" />
     {/snippet}
     {#snippet content()}
-      From vault
+      {t("chat.attach.from_vault")}
     {/snippet}
   </PickerOptionRow>
 </PickerPopover>

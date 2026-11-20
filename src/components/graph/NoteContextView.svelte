@@ -25,6 +25,7 @@ import Icon from "../ui/Icon.svelte";
 import PickerPopover from "../ui/PickerPopover.svelte";
 import Toggle from "../ui/Toggle.svelte";
 import GraphCanvas from "./GraphCanvas.svelte";
+import { t } from "../../i18n";
 import {
 	DEFAULT_NOTE_CONTEXT_SEMANTIC_THRESHOLD,
 	buildNoteContextSemanticGraph,
@@ -61,7 +62,7 @@ let controlsOpen = $state(false);
 let buildVersion = 0;
 let workspaceRefs: EventRef[] = [];
 
-const semanticHint = "Semantic neighbors appear once a graph embedding index is configured.";
+const semanticHint = t("graph.note_context.semantic_hint");
 function mergeDirection(
 	current: NoteContextDirection | undefined,
 	next: "incoming" | "outgoing",
@@ -74,11 +75,11 @@ function mergeDirection(
 function getDirectionLabel(direction: NoteContextDirection): string | null {
 	switch (direction) {
 		case "incoming":
-			return "In";
+			return t("graph.note_context.direction_in");
 		case "outgoing":
-			return "Out";
+			return t("graph.note_context.direction_out");
 		case "both":
-			return "Both";
+			return t("graph.note_context.direction_both");
 		default:
 			return null;
 	}
@@ -312,7 +313,7 @@ onDestroy(() => {
         <div class="s2b-note-context__status">
           <div class="s2b-note-context__loading" data-testid="note-context-loading">
             <LoadingAnimation />
-            <span>Updating…</span>
+            <span>{t("graph.note_context.updating")}</span>
           </div>
         </div>
       {/if}
@@ -321,8 +322,8 @@ onDestroy(() => {
         {#if viewMode === "graph" && showFitButton}
           <Button
             iconId="scan-search"
-            ariaLabel="Fit graph to view"
-            tooltip="Fit graph to view"
+            ariaLabel={t("graph.note_context.fit")}
+            tooltip={t("graph.note_context.fit")}
             class="s2b-note-context__floating-button"
             dataTestId="note-context-fit"
             onClick={() => {
@@ -337,7 +338,7 @@ onDestroy(() => {
           bind:open={controlsOpen}
           triggerStyles="clickable-icon"
           triggerClass="s2b-note-context__floating-button s2b-note-context__floating-button--quiet"
-          tooltip="Note Context options"
+          tooltip={t("graph.note_context.options")}
           dataTestId="note-context-controls"
           contentClass="s2b-note-context__menu"
           side="bottom"
@@ -350,11 +351,11 @@ onDestroy(() => {
 
           <div class="s2b-note-context__menu-section" data-testid="note-context-view-mode">
             <div class="s2b-note-context__menu-section-header">
-              <span class="s2b-note-context__menu-label">View</span>
+              <span class="s2b-note-context__menu-label">{t("graph.note_context.view")}</span>
               <Button
                 iconId="x"
-                ariaLabel="Close Note Context options"
-                tooltip="Close"
+                ariaLabel={t("graph.note_context.close_options")}
+                tooltip={t("common.close")}
                 class="s2b-note-context__menu-close"
                 dataTestId="note-context-controls-close"
                 onClick={() => {
@@ -364,14 +365,14 @@ onDestroy(() => {
             </div>
             <div class="s2b-note-context__menu-buttons">
               <Button
-                buttonText="Graph"
+                buttonText={t("graph.note_context.mode_graph")}
                 cta={viewMode === "graph"}
                 class="s2b-note-context__button"
                 dataTestId="note-context-mode-graph"
                 onClick={() => setViewMode("graph")}
               />
               <Button
-                buttonText="List"
+                buttonText={t("graph.note_context.mode_list")}
                 cta={viewMode === "list"}
                 class="s2b-note-context__button"
                 dataTestId="note-context-mode-list"
@@ -383,17 +384,17 @@ onDestroy(() => {
           <div class="s2b-picker-popover-separator menu-separator"></div>
 
           <div class="s2b-note-context__menu-section" data-testid="note-context-relationship-mode">
-            <span class="s2b-note-context__menu-label">Show</span>
+            <span class="s2b-note-context__menu-label">{t("graph.note_context.show")}</span>
             <div class="s2b-note-context__menu-buttons">
               <Button
-                buttonText="Linked"
+                buttonText={t("graph.note_context.linked")}
                 cta={relationshipMode === "linked"}
                 class="s2b-note-context__button"
                 dataTestId="note-context-mode-linked"
                 onClick={() => setRelationshipMode("linked")}
               />
               <Button
-                buttonText="Semantic"
+                buttonText={t("graph.note_context.semantic")}
                 cta={relationshipMode === "semantic"}
                 class={`s2b-note-context__button ${!hasSemanticIndex ? "s2b-note-context__button--unavailable" : ""}`}
                 dataTestId="note-context-mode-semantic"
@@ -401,7 +402,7 @@ onDestroy(() => {
                 onClick={() => setRelationshipMode("semantic")}
               />
               <Button
-                buttonText="Both"
+                buttonText={t("graph.note_context.both")}
                 cta={relationshipMode === "both"}
                 class={`s2b-note-context__button ${!hasSemanticIndex ? "s2b-note-context__button--unavailable" : ""}`}
                 dataTestId="note-context-mode-both"
@@ -414,9 +415,9 @@ onDestroy(() => {
           <div class="s2b-picker-popover-separator menu-separator"></div>
 
           <div class="s2b-note-context__menu-section" data-testid="note-context-display-settings">
-            <span class="s2b-note-context__menu-label">Display</span>
+            <span class="s2b-note-context__menu-label">{t("graph.note_context.display")}</span>
             <div class="s2b-note-context__toggle-row">
-              <span class="s2b-note-context__toggle-label">Direction arrows</span>
+              <span class="s2b-note-context__toggle-label">{t("graph.note_context.direction_arrows")}</span>
               <Toggle
                 checked={data.smartGraphSettings.directedWikiEdges}
                 onchange={setDirectedWikiEdges}
@@ -479,9 +480,9 @@ onDestroy(() => {
     {:else}
       <div class="s2b-note-context__empty" data-testid="note-context-empty">
         {#if activePath}
-          No neighbors.
+          {t("graph.note_context.no_neighbors")}
         {:else}
-          Open a note.
+          {t("graph.note_context.open_a_note")}
         {/if}
       </div>
     {/if}

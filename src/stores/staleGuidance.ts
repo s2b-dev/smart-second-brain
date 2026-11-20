@@ -1,4 +1,5 @@
 import { SHIPPED_AGENT_PROMPTS } from "../agent/prompts";
+import { t } from "../i18n";
 import { currentSkillVersion } from "../skills/shippedSkills";
 import type { AgentConfig, AgentsConfig, PromptFileReader, PromptFileSnapshot, StaleGuidance } from "../types/plugin";
 import { type ShippedHistory, currentShippedVersion, shippedVersion } from "../utils/shippedDefaults";
@@ -12,7 +13,7 @@ import { type ShippedHistory, currentShippedVersion, shippedVersion } from "../u
 const PROMPT_SURFACES = [
 	{
 		kind: "system-prompt",
-		label: "system prompt",
+		label: t("chat.recommendations.stale_label.system_prompt"),
 		history: SHIPPED_AGENT_PROMPTS,
 		read: (reader: PromptFileReader, agentId: string) => reader.getAgentPromptFile(agentId),
 	},
@@ -101,7 +102,7 @@ export function computeStaleGuidance(
 	for (const skillName of staleSkills) {
 		stale.push({
 			kind: "skill",
-			label: `${skillName} skill`,
+			label: t("chat.recommendations.stale_label.skill", { name: skillName }),
 			skillName,
 			currentVersion: currentSkillVersion(skillName),
 			// A skill is only reported when its body matches NO shipped version — the user

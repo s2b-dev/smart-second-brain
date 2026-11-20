@@ -49,6 +49,7 @@ import {
 	type MessagePair,
 	type ToolCallStatus,
 } from "./chatTimeline";
+import { t } from "../i18n";
 export type { ThreadError };
 
 /* -----------------------------------------------------------------------------
@@ -522,9 +523,9 @@ export class ChatSession {
 			if (withdrawn > 0) {
 				const kept =
 					keptPartiallyApplied > 0
-						? ` ${keptPartiallyApplied} partially applied change(s) were kept — resolve them in the review bar.`
+						? ` ${t("plugin.agent.kept_partial_changes", { count: keptPartiallyApplied })}`
 						: "";
-				new Notice(`Withdrew ${withdrawn} pending note change(s) proposed by the replaced response.${kept}`);
+				new Notice(`${t("plugin.agent.withdrew_changes", { count: withdrawn })}${kept}`);
 			}
 		} catch {
 			// store not initialized (e.g. very early in startup) — nothing staged yet

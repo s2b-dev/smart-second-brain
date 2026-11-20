@@ -8,6 +8,7 @@ import {
 	resolveActiveCheckpointId,
 } from "../../stores/chatTimeline";
 import { Logger } from "../../utils/logging";
+import { t } from "../../i18n";
 
 /** Yield to the browser so it can paint/handle input before continuing. */
 const yieldToMain = (): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -130,7 +131,7 @@ class ChatEmbed extends MarkdownRenderChild {
 				void unmount(this.component);
 				this.component = undefined;
 			}
-			this.containerEl.setText("Could not load chat preview.");
+			this.containerEl.setText(t("chat.embed.load_failed"));
 		}
 	}
 

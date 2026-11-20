@@ -7,6 +7,7 @@ import { getPendingChangesStore } from "../../stores/pendingChangesStore.svelte"
 import type { PendingChangeEntry } from "../../types/shared";
 import type { RevertSkip } from "../../stores/pendingChangesStore.svelte";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 import { ConfirmModal } from "../modal/ConfirmModal";
 import { isWidgetFilePath } from "../../widget/widgetSpec";
@@ -71,11 +72,11 @@ const summaryLabel = $derived.by(() => {
 		for (const e of pendingEntries) counts[e.change.type]++;
 		const composition = (Object.keys(counts) as Array<keyof typeof counts>)
 			.filter((type) => counts[type] > 0)
-			.map((type) => `${counts[type]} ${type}${counts[type] !== 1 ? "s" : ""}`)
+			.map((type) => typeCountLabel(type, counts[type]))
 			.join(", ");
-		parts.push(`${composition} pending`);
+		parts.push(t("chat.pending.summary_pending", { composition }));
 	}
-	if (appliedCount > 0) parts.push(`${appliedCount} partially applied`);
+	if (appliedCount > 0) parts.push(t("chat.pending.summary_partially_applied", { count: appliedCount }));
 	return parts.join(", ");
 });
 
@@ -245,16 +246,30 @@ function toggleSourceDiff(entryId: string) {
 	sourceDiffEntryIds = next;
 }
 
+/** "2 creates"-style count for the summary row, one plural message per change type. */
+function typeCountLabel(type: PendingChangeEntry["change"]["type"], count: number): string {
+	switch (type) {
+		case "create":
+			return t("chat.pending.count_create", { count });
+		case "update":
+			return t("chat.pending.count_update", { count });
+		case "delete":
+			return t("chat.pending.count_delete", { count });
+		case "move":
+			return t("chat.pending.count_move", { count });
+	}
+}
+
 function changeTypeLabel(entry: PendingChangeEntry): string {
 	switch (entry.change.type) {
 		case "create":
-			return "Create";
+			return t("chat.pending.type_create");
 		case "update":
-			return "Update";
+			return t("chat.pending.type_update");
 		case "delete":
-			return "Delete";
+			return t("common.delete");
 		case "move":
-			return "Move";
+			return t("chat.pending.type_move");
 	}
 }
 
@@ -305,15 +320,15 @@ function otherThreadCount(entry: PendingChangeEntry): number {
 async function handleAccept(entry: PendingChangeEntry) {
 	try {
 		await store.acceptChange(entry.id);
-		new Notice(`Applied: ${changePathLabel(entry)}`);
+		new Notice(t("chat.pending.notice_applied", { path: changePathLabel(entry) }));
 	} catch (e) {
-		new Notice(`Failed to apply change: ${e instanceof Error ? e.message : String(e)}`);
+		new Notice(t("chat.pending.notice_apply_failed", { error: e instanceof Error ? e.message : String(e) }));
 	}
 }
 
 function handleReject(entry: PendingChangeEntry) {
 	store.rejectChange(entry.id);
-	new Notice(`Rejected: ${changePathLabel(entry)}`);
+	new Notice(t("chat.pending.notice_rejected", { path: changePathLabel(entry) }));
 }
 
 /** Restore a note whose diff groups were partially accepted, for an entry that is
@@ -321,7 +336,7 @@ function handleReject(entry: PendingChangeEntry) {
 async function handleUndoApplied(entry: PendingChangeEntry) {
 	const skipped = await store.undoAppliedGroups(entry.id);
 	if (!skipped) {
-		new Notice(`Restored: ${changePathLabel(entry)}`);
+		new Notice(t("chat.pending.notice_restored", { path: changePathLabel(entry) }));
 		return;
 	}
 	new Notice(describeSkip(skipped));
@@ -331,11 +346,11 @@ async function handleUndoApplied(entry: PendingChangeEntry) {
 function describeSkip(skip: RevertSkip): string {
 	switch (skip.reason) {
 		case "conflict":
-			return `Left "${skip.path}" as-is — it changed after the change was partially applied.`;
+			return t("chat.pending.skip_conflict", { path: skip.path });
 		case "missing":
-			return `Could not restore "${skip.path}" — that note no longer exists. Any applied content moved with it.`;
+			return t("chat.pending.skip_missing", { path: skip.path });
 		case "failed":
-			return `Failed to restore "${skip.path}". See the console for details.`;
+			return t("chat.pending.skip_failed", { path: skip.path });
 	}
 }
 
@@ -347,9 +362,7 @@ async function handleAcceptAll() {
 	const staleCount = pendingCount - acceptable.length;
 	const count = acceptable.length;
 	if (count === 0) {
-		new Notice(
-			"All pending changes are stale — the notes changed after they were proposed. Reject them and ask the agent to re-stage.",
-		);
+		new Notice(t("chat.pending.notice_all_stale"));
 		return;
 	}
 
@@ -359,15 +372,19 @@ async function handleAcceptAll() {
 	const deletes = acceptable.filter((e) => e.change.type === "delete").length;
 	const deprivatizing = acceptable.filter((e) => store.isDeprivatizingMove(e.change)).length;
 	if (deletes > 0 || deprivatizing > 0) {
-		const risks: string[] = [];
-		if (deletes > 0) risks.push(`${deletes} note deletion${deletes !== 1 ? "s" : ""}`);
-		if (deprivatizing > 0)
-			risks.push(`${deprivatizing} move${deprivatizing !== 1 ? "s" : ""} out of a private location`);
+		const deletionRisk = t("chat.pending.risk_deletions", { count: deletes });
+		const moveRisk = t("chat.pending.risk_deprivatizing_moves", { count: deprivatizing });
+		const risks =
+			deletes > 0 && deprivatizing > 0
+				? t("chat.pending.risk_join", { first: deletionRisk, second: moveRisk })
+				: deletes > 0
+					? deletionRisk
+					: moveRisk;
 		const modal = new ConfirmModal(
 			getPlugin().app,
-			"Accept all changes?",
-			`This batch includes ${risks.join(" and ")}. Apply all ${count} change${count !== 1 ? "s" : ""}?`,
-			"Accept All",
+			t("chat.pending.confirm_accept_all_title"),
+			t("chat.pending.confirm_accept_all_message", { risks, count }),
+			t("chat.pending.accept_all"),
 		);
 		modal.open();
 		if (!(await modal.promise).confirmed) return;
@@ -376,16 +393,25 @@ async function handleAcceptAll() {
 	batchRunning = true;
 	try {
 		const failures = await store.acceptAll(threadId, staleEntryIds);
-		const skippedNote = staleCount > 0 ? `, skipped ${staleCount} stale` : "";
+		const skippedNote = staleCount > 0 ? t("chat.pending.skipped_stale_suffix", { count: staleCount }) : "";
 		if (failures.length === 0) {
-			new Notice(`Applied ${count === 1 ? "the change" : `all ${count} changes`}${skippedNote}`);
+			new Notice(
+				count === 1
+					? t("chat.pending.notice_applied_one", { skipped: skippedNote })
+					: t("chat.pending.notice_applied_all", { count, skipped: skippedNote }),
+			);
 		} else {
 			new Notice(
-				`Applied ${count - failures.length} changes${skippedNote}, ${failures.length} failed: ${failures.join(", ")}`,
+				t("chat.pending.notice_applied_partial", {
+					applied: count - failures.length,
+					skipped: skippedNote,
+					failed: failures.length,
+					paths: failures.join(", "),
+				}),
 			);
 		}
 	} catch (e) {
-		new Notice(`Error applying changes: ${e instanceof Error ? e.message : String(e)}`);
+		new Notice(t("chat.pending.notice_apply_error", { error: e instanceof Error ? e.message : String(e) }));
 	} finally {
 		batchRunning = false;
 	}
@@ -399,12 +425,14 @@ async function handleRejectAll() {
 	try {
 		const skipped = await store.rejectAll(threadId);
 		if (skipped.length === 0) {
-			new Notice(hadPending ? "Rejected all pending changes" : "Restored the partially applied notes");
+			new Notice(hadPending ? t("chat.pending.notice_rejected_all") : t("chat.pending.notice_restored_partial"));
 		} else {
 			// A partially-accepted note that couldn't be restored is left as it is. Say
 			// so per reason — otherwise "Rejected all" reads as "everything was undone"
 			// while those files still hold the accepted groups.
-			const head = hadPending ? "Rejected all pending changes." : "Finished undoing applied changes.";
+			const head = hadPending
+				? t("chat.pending.notice_rejected_all_head")
+				: t("chat.pending.notice_undo_finished_head");
 			new Notice(`${head} ${skipped.map(describeSkip).join(" ")}`);
 		}
 	} finally {
@@ -417,7 +445,7 @@ async function handleRejectAll() {
  * and the button is only shown for updates. */
 async function handleJump(entry: PendingChangeEntry) {
 	const opened = await revealAndScroll(getPlugin(), entry.change.path, firstChangedLine(entry.change));
-	if (!opened) new Notice("Could not open the note for this change.");
+	if (!opened) new Notice(t("chat.pending.notice_open_failed"));
 }
 
 /** Fire Obsidian's native page-preview hover for this change's note. The Page
@@ -454,7 +482,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
       role="button"
       tabindex="0"
       aria-expanded={isExpanded}
-      aria-label={isExpanded ? "Collapse pending changes" : "Expand pending changes"}
+      aria-label={isExpanded ? t("chat.pending.collapse") : t("chat.pending.expand")}
       onclick={() => (isExpanded = !isExpanded)}
       onkeydown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -474,9 +502,9 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
           class="clickable-icon pcb-diff-toggle"
           onclick={toggleDiffViewMode}
           title={diffViewMode === "word-diff"
-            ? "Switch in-note diffs to two-pane view"
-            : "Switch in-note diffs to inline word diff"}
-          aria-label="Toggle diff view mode"
+            ? t("chat.pending.diff_mode_to_split")
+            : t("chat.pending.diff_mode_to_word")}
+          aria-label={t("chat.pending.diff_mode_toggle")}
           type="button"
         >
           <div use:icon={diffViewMode === "word-diff" ? "columns-2" : "file-diff"} style="--icon-size: 12px"></div>
@@ -488,12 +516,12 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
               e.stopPropagation();
               handleAcceptAll();
             }}
-            title="Accept all changes"
+            title={t("chat.pending.accept_all_tooltip")}
             type="button"
             disabled={batchRunning}
           >
             <div use:icon={"check"} style="--icon-size: 12px"></div>
-            <span>Accept All</span>
+            <span>{t("chat.pending.accept_all")}</span>
           </button>
         {/if}
         <button
@@ -503,13 +531,13 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
             handleRejectAll();
           }}
           title={pendingCount > 0
-            ? "Reject all changes, restoring any partially applied notes"
-            : "Restore the partially applied notes to their original content"}
+            ? t("chat.pending.reject_all_tooltip")
+            : t("chat.pending.undo_applied_tooltip")}
           type="button"
           disabled={batchRunning}
         >
           <div use:icon={"x"} style="--icon-size: 12px"></div>
-          <span>{pendingCount > 0 ? "Reject All" : "Undo Applied"}</span>
+          <span>{pendingCount > 0 ? t("chat.pending.reject_all") : t("chat.pending.undo_applied")}</span>
         </button>
         <div class="pcb-chevron" class:pcb-chevron-open={isExpanded}>▸</div>
       </div>
@@ -533,26 +561,26 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     onclick={() => togglePreview(entry.id)}
                     title={widgetContent !== null
                       ? isPreviewOpen
-                        ? "Hide widget preview"
-                        : "Preview widget"
+                        ? t("chat.pending.hide_widget_preview")
+                        : t("chat.pending.preview_widget")
                       : showsDiff
                         ? isPreviewOpen
-                          ? "Hide changes"
-                          : "Show changes"
+                          ? t("chat.pending.hide_changes")
+                          : t("chat.pending.show_changes")
                         : isPreviewOpen
-                          ? "Hide content"
-                          : "Show content"}
+                          ? t("chat.pending.hide_content")
+                          : t("chat.pending.show_content")}
                     aria-label={widgetContent !== null
                       ? isPreviewOpen
-                        ? `Hide preview of ${entry.change.path}`
-                        : `Preview ${entry.change.path}`
+                        ? t("chat.pending.hide_widget_preview_aria", { path: entry.change.path })
+                        : t("chat.pending.preview_widget_aria", { path: entry.change.path })
                       : showsDiff
                         ? isPreviewOpen
-                          ? `Hide changes to ${entry.change.path}`
-                          : `Show changes to ${entry.change.path}`
+                          ? t("chat.pending.hide_changes_aria", { path: entry.change.path })
+                          : t("chat.pending.show_changes_aria", { path: entry.change.path })
                         : isPreviewOpen
-                          ? `Hide content of ${entry.change.path}`
-                          : `Show content of ${entry.change.path}`}
+                          ? t("chat.pending.hide_content_aria", { path: entry.change.path })
+                          : t("chat.pending.show_content_aria", { path: entry.change.path })}
                     aria-expanded={isPreviewOpen}
                     type="button"
                   >
@@ -563,8 +591,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                   {changeTypeLabel(entry)}
                 </span>
                 {#if entry.status !== "pending"}
-                  {@const appliedText =
-                    "Some of this change was applied to the note. Undo it to restore the note's original content."}
+                  {@const appliedText = t("chat.pending.partly_applied_explanation")}
                   <!-- Not a proposal awaiting review: its groups were all resolved
                        individually and some accepted text is still in the note. -->
                   <span
@@ -576,14 +603,14 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     onkeydown={(e) => e.key === "Enter" && explainBadge(e, appliedText)}
                   >
                     <span use:icon={"circle-alert"} style="--icon-size: 11px"></span>
-                    Partly applied
+                    {t("chat.pending.partly_applied")}
                   </span>
                 {/if}
                 {#if staleEntryIds.has(entry.id)}
                   {@const staleText =
                     entry.change.type === "delete"
-                      ? "This note changed after the delete was proposed — the preview no longer matches what would be deleted. Accepting will fail; reject and ask the agent to re-stage it."
-                      : "This note changed after the change was proposed, so accepting it will fail. Reject it and ask the agent to re-apply its edit on the current content."}
+                      ? t("chat.pending.stale_delete_explanation")
+                      : t("chat.pending.stale_explanation")}
                   <span
                     class="pcb-stale"
                     title={staleText}
@@ -593,7 +620,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     onkeydown={(e) => e.key === "Enter" && explainBadge(e, staleText)}
                   >
                     <span use:icon={"triangle-alert"} style="--icon-size: 11px"></span>
-                    Stale
+                    {t("chat.pending.stale")}
                   </span>
                 {/if}
                 {#if entry.change.type !== "create"}
@@ -617,8 +644,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                   <span class="pcb-path">{changePathLabel(entry)}</span>
                 {/if}
                 {#if isDeprivatizing(entry)}
-                  {@const deprivatizingText =
-                    "This note is currently private. Moving it to this location takes it out of the privacy filter, so it will be indexed, searchable, and available to untrusted providers from then on."}
+                  {@const deprivatizingText = t("chat.pending.deprivatizing_explanation")}
                   <span
                     class="pcb-deprivatizing"
                     title={deprivatizingText}
@@ -628,11 +654,11 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     onkeydown={(e) => e.key === "Enter" && explainBadge(e, deprivatizingText)}
                   >
                     <span use:icon={"shield-off"} style="--icon-size: 11px"></span>
-                    Leaves private
+                    {t("chat.pending.deprivatizing")}
                   </span>
                 {/if}
                 {#if otherThreadCount(entry) > 0}
-                  {@const crossThreadText = `${otherThreadCount(entry)} other chat${otherThreadCount(entry) !== 1 ? "s" : ""} also ${otherThreadCount(entry) !== 1 ? "have" : "has"} a pending edit to this file. Whichever is accepted first wins; the others may then fail to apply.`}
+                  {@const crossThreadText = t("chat.pending.cross_thread_explanation", { count: otherThreadCount(entry) })}
                   <span
                     class="pcb-cross-thread"
                     title={crossThreadText}
@@ -659,9 +685,9 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                       handleAccept(entry);
                     }}
                     title={staleEntryIds.has(entry.id)
-                      ? "Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage."
-                      : "Accept change"}
-                    aria-label="Accept change to {entry.change.path}"
+                      ? t("chat.pending.stale_accept_disabled")
+                      : t("chat.pending.accept_change")}
+                    aria-label={t("chat.pending.accept_change_aria", { path: entry.change.path })}
                     type="button"
                     disabled={staleEntryIds.has(entry.id)}
                   >
@@ -673,8 +699,8 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                       e.stopPropagation();
                       handleReject(entry);
                     }}
-                    title="Reject change"
-                    aria-label="Reject change to {entry.change.path}"
+                    title={t("chat.pending.reject_change")}
+                    aria-label={t("chat.pending.reject_change_aria", { path: entry.change.path })}
                     type="button"
                   >
                     <div use:icon={"x"} style="--icon-size: 12px"></div>
@@ -689,8 +715,8 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                       e.stopPropagation();
                       handleUndoApplied(entry);
                     }}
-                    title="Restore this note to its content from before the proposal"
-                    aria-label="Undo applied change to {entry.change.path}"
+                    title={t("chat.pending.undo_applied_change_tooltip")}
+                    aria-label={t("chat.pending.undo_applied_change_aria", { path: entry.change.path })}
                     type="button"
                   >
                     <div use:icon={"undo-2"} style="--icon-size: 12px"></div>
@@ -713,7 +739,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
                     type="button"
                   >
                     <span use:icon={"file-diff"} style="--icon-size: 11px"></span>
-                    {sourceDiffOpen ? "Hide source changes" : "Show source changes"}
+                    {sourceDiffOpen ? t("chat.pending.hide_source_changes") : t("chat.pending.show_source_changes")}
                   </button>
                   {#if sourceDiffOpen}
                     <PendingDiffHunks {entry} stale={staleEntryIds.has(entry.id)} />
@@ -727,7 +753,7 @@ function previewChange(evt: Event, entry: PendingChangeEntry) {
             {:else if isPreviewOpen && previewContent !== null}
               <div class="pcb-preview">
                 {#if previewContent.trim() === ""}
-                  <div class="pcb-preview-empty">This note is empty.</div>
+                  <div class="pcb-preview-empty">{t("chat.pending.note_empty")}</div>
                 {:else}
                   <MarkdownRenderer content={previewContent} class="pcb-preview-body" />
                 {/if}

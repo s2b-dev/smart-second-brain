@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "Spremeni velikost plošče"
+	},
+	"docs_link": {
+		"subject_label": "Dokumentacija: {subject}",
+		"open_label": "Odpri dokumentacijo"
+	},
+	"markdown": {
+		"copy_code": "Kopiraj kodo"
+	},
+	"search": {
+		"placeholder": "Iskanje ..."
+	}
+}

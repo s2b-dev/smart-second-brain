@@ -1,0 +1,105 @@
+{
+	"view": {
+		"tab_title": "Hoş geldiniz"
+	},
+	"welcome": {
+		"title": "Smart Second Brain'e hoş geldiniz",
+		"subtitle": "Kasanızı yapay zekâ destekli ikinci bir beyne dönüştürün — daha akıllı arayın, bağlantıları bir grafta keşfedin ve notlarınızla sohbet edin.",
+		"hotkeys_unavailable_notice": "Kısayol tuşları açılamadı — Ayarlar → Kısayol tuşları'nı açıp “Search notes” için arama yapın.",
+		"search": {
+			"title": "Daha akıllı arama",
+			"desc": "Notları başlığa, içeriğe, etiketlere ve klasörlere göre bulanık eşleşmeyle bulun. Kurulum gerekmez. Anlamsal arama için daha sonra bir embedding modeli ekleyebilirsiniz.",
+			"hotkey_link": "bir kısayol tuşu atayın",
+			"navbar_toggle": "Hızlı geçiş yerine gezinme çubuğundaki büyüteçten aç",
+			"hotkey": "Ya da anında erişim için {link}."
+		},
+		"graph": {
+			"title": "Daha akıllı graf",
+			"desc": "Notlarınızın nasıl bağlandığını ve konulara göre nasıl kümelendiğini görün. Kurulum gerekmez."
+		},
+		"chat": {
+			"title": "Notlarınızla sohbet edin",
+			"desc": "Kasanıza dayanan sorular sorun; web araması ve Dataview, Tasks gibi eklentiler entegre. Bir yapay zekâ sağlayıcısı gerekir — aşağıdan bir tane ayarlayın."
+		},
+		"provider_step": {
+			"title": "Bir yapay zekâ sağlayıcısı bağlayın",
+			"done_desc": "Sağlayıcı bağlandı. Sağlayıcıları ayarlardan ekleyebilir veya yönetebilirsiniz.",
+			"desc": "OpenAI, Anthropic, Ollama, OpenRouter veya OpenAI uyumlu herhangi bir uç noktayı bağlayın.",
+			"add_another": "Başka ekle",
+			"connect": "Sağlayıcı bağla"
+		},
+		"model_step": {
+			"title": "Bir sohbet modeli seçin",
+			"needs_provider_desc": "Önce bir sağlayıcı bağlayın, ardından sohbet edeceğiniz modeli seçin.",
+			"desc": "Sohbeti etkinleştirmek için bağlı sağlayıcınızdan bir model seçin.",
+			"change": "Modeli değiştir",
+			"choose": "Model seç",
+			"using": "{model} kullanılıyor. Sohbete başlamak için her şey hazır."
+		},
+		"privacy": {
+			"public_title": "Notlarınız varsayılan olarak paylaşılıyor",
+			"all_trusted_title": "Not erişimi verildi",
+			"untrusted_title": "Notlarınız hâlâ gizli",
+			"no_provider_title": "Not erişimi varsayılan olarak gizli",
+			"no_provider_strong": "paylaşılmaz",
+			"public_strong": "varsayılan olarak herkese açık",
+			"review_access": "Not erişimini gözden geçirin",
+			"trusted": "güvenilir",
+			"change_access": "not erişimini değiştirin",
+			"no_provider": "Siz izin vermedikçe notlarınız yapay zekâ sağlayıcılarıyla {not}. Yukarıdan bir sağlayıcı bağladıktan sonra ona erişim verebilirsiniz — o zamana kadar hiçbir şey kasanızdan çıkmaz.",
+			"public": "Not erişimi {mode} olarak ayarlı, bu yüzden sağlayıcılar hariç tuttuklarınız dışındaki notlarınızı okuyabilir. {review}.",
+			"all_trusted": {
+				"one": "Sağlayıcınız {trusted} olarak işaretli, bu yüzden ajan notlarınızı okuyabilir. Belirli notları gizli tutmak için {review}.",
+				"other": "Sağlayıcılarınız {trusted} olarak işaretli, bu yüzden ajan notlarınızı okuyabilir. Belirli notları gizli tutmak için {review}."
+			},
+			"untrusted": {
+				"one": "{providers} henüz notlarınızı okuyamıyor — sohbet çalışır, ancak yanıtlar kasanıza dayanmaz. Sağlayıcı ayarlarından {trusted} olarak işaretleyin veya tüm sağlayıcılara izin vermek için {change}.",
+				"other": "{providers} henüz notlarınızı okuyamıyor — sohbet çalışır, ancak yanıtlar kasanıza dayanmaz. Sağlayıcı ayarlarından {trusted} olarak işaretleyin veya tüm sağlayıcılara izin vermek için {change}."
+			}
+		},
+		"skip": "Atla",
+		"documentation": "Belgelendirme ↗",
+		"explore_graph": "Grafı keşfet",
+		"start_chatting": "Sohbete başla",
+		"start_chatting_disabled": "Önce bir sağlayıcı bağlayın ve bir sohbet modeli ekleyin"
+	},
+	"provider_setup": {
+		"title_add": "Sağlayıcı ekle",
+		"title_setup": "Sağlayıcıyı ayarla",
+		"title_edit": "{name} düzenle",
+		"trusted_indicator": "Gizli notlar için güvenilir",
+		"invalid_name": "Geçersiz ad",
+		"auth_failed": "Kimlik doğrulama başarısız",
+		"picker_desc": "Bağlanacak bir sağlayıcı seçin.",
+		"setup_guide": "Kurulum kılavuzu",
+		"name_label": "Sağlayıcı adı",
+		"name_desc": "Daha sonra ayırt edebilmek için bu sağlayıcı örneğine bir ad verin.",
+		"name_placeholder": "Yeni sağlayıcı",
+		"hide_api_key": "API anahtarı alanını gizle",
+		"use_api_key": "Bunun yerine API anahtarı kullan →",
+		"sign_in_desktop_only": "{provider} ile oturum açma yalnızca masaüstünde kullanılabilir.",
+		"checking_connection": "Bağlantı denetleniyor…",
+		"connected": "Bağlandı",
+		"fix_name_to_finish": "— bitirmek için sağlayıcı adını düzeltin",
+		"enter_credentials": "Kimlik bilgilerinizi yukarıya girin — bağlantı otomatik olarak denetlenir.",
+		"trusted_label": "Gizli notlar için güvenilir",
+		"trusted_desc": "Bu sağlayıcının, güvenilmeyen sağlayıcılar için gizli kalan notlara erişmesine izin ver.",
+		"oauth_sign_in_label": "{provider} ile oturum açma",
+		"cancel_sign_in": "Oturum açmayı iptal et",
+		"connected_via": "{provider} üzerinden bağlandı",
+		"reconnect": "Yeniden bağlan",
+		"disconnect": "Bağlantıyı kes",
+		"sign_in_with": "{provider} ile oturum aç",
+		"paste_code_label": "Yetkilendirme kodunu yapıştır",
+		"paste_code_desc": "Tarayıcıda gösterilen yetkilendirme kodunu kopyalayıp bağlantıyı tamamlamak için buraya yapıştırın.",
+		"code_placeholder": "Yetkilendirme kodu",
+		"submit": "Gönder"
+	},
+	"release_notes": {
+		"tab_title": "Yenilikler",
+		"title": "{version} sürümündeki yenilikler",
+		"released_on": "Yayınlanma tarihi: {date}",
+		"earlier_releases": "Önceki sürümler",
+		"all_releases": "GitHub'daki tüm sürümler"
+	}
+}

@@ -9,6 +9,7 @@
 import type { App, View } from "obsidian";
 import { Notice } from "obsidian";
 import { Logger } from "./logging";
+import { t } from "../i18n";
 
 // Internal Obsidian types not in public API
 interface ObsidianApp {
@@ -98,7 +99,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 			}
 		} else {
 			Logger.warn("[TagSearch] Could not find method to set search query");
-			new Notice("Search pane opened but could not set tag query");
+			new Notice(t("plugin.tag_search.query_not_set"));
 			return false;
 		}
 
@@ -109,7 +110,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 		return true;
 	} catch (error) {
 		Logger.error("[TagSearch] Error opening search pane with tag:", error);
-		new Notice(`Failed to open search pane for tag: ${bareTag}`);
+		new Notice(t("plugin.tag_search.open_failed", { tag: bareTag }));
 		return false;
 	}
 }

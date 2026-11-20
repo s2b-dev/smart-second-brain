@@ -1,7 +1,9 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { Notice } from "obsidian";
 import { onMount } from "svelte";
+import { t } from "../../i18n";
 import { installObsidianFetch } from "../../lib/obsidianFetch";
 import type SecondBrainPlugin from "../../main";
 import type { MCPServerConfig } from "../../types/plugin";
@@ -182,7 +184,11 @@ $effect(() => {
 });
 
 onMount(() => {
-	modal.setTitle(isEditing ? `Edit MCP Server: ${capturedExistingConfig?.displayName}` : "Add MCP Server");
+	modal.setTitle(
+		isEditing
+			? t("agents.mcp.edit_title", { name: capturedExistingConfig?.displayName ?? "" })
+			: t("agents.mcp.add_title"),
+	);
 });
 
 function parseHeaders(input: string): Record<string, string> {
@@ -217,16 +223,18 @@ function parseHeaders(input: string): Record<string, string> {
  */
 function applyImportedJson(text: string): string | null {
 	const raw = text.trim();
-	if (!raw) return "Paste a configuration first";
+	if (!raw) return t("agents.mcp.import_error.empty");
 
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(raw);
 	} catch (err) {
-		return `Invalid JSON: ${err instanceof Error ? err.message : "could not parse"}`;
+		return t("agents.mcp.import_error.invalid_json", {
+			error: err instanceof Error ? err.message : t("agents.mcp.import_error.could_not_parse"),
+		});
 	}
 	if (!parsed || typeof parsed !== "object") {
-		return "Configuration must be a JSON object";
+		return t("agents.mcp.import_error.not_object");
 	}
 
 	const root = parsed as Record<string, unknown>;
@@ -246,10 +254,10 @@ function applyImportedJson(text: string): string | null {
 			([, v]) => v && typeof v === "object",
 		);
 		if (entries.length === 0) {
-			return "No server entries found in the configuration";
+			return t("agents.mcp.import_error.no_entries");
 		}
 		if (entries.length > 1) {
-			return "Configuration contains multiple servers — paste one at a time";
+			return t("agents.mcp.import_error.multiple");
 		}
 		entryKey = entries[0][0];
 		entry = entries[0][1] as Record<string, unknown>;
@@ -257,7 +265,7 @@ function applyImportedJson(text: string): string | null {
 		// Bare single-server object with no wrapper.
 		entry = scope;
 	} else {
-		return "Could not find an MCP server definition (expected an `mcpServers` or `servers` object)";
+		return t("agents.mcp.import_error.no_definition");
 	}
 
 	// `transport` is ours, `type` is VS Code's; fall back to inferring from
@@ -270,10 +278,10 @@ function applyImportedJson(text: string): string | null {
 	const isStdio = declared === "stdio" || (!declared && !hasUrl && hasCommand);
 
 	if (isStdio) {
-		return "This is a local command (stdio) server. Smart Second Brain only connects to MCP servers over HTTP.";
+		return t("agents.mcp.import_error.stdio");
 	}
 	if (!hasUrl) {
-		return "Remote server entry is missing a `url`";
+		return t("agents.mcp.import_error.missing_url");
 	}
 
 	// Only name an unnamed form — never clobber a name the user already typed.
@@ -349,9 +357,7 @@ function handleConfigPaste(event: ClipboardEvent): boolean {
 
 	importError = null;
 	importUndo = before;
-	importNotice = name.trim()
-		? "Imported from pasted JSON."
-		: "Imported from pasted JSON — enter a name for this server.";
+	importNotice = name.trim() ? t("agents.mcp.imported") : t("agents.mcp.imported_needs_name");
 	return true;
 }
 
@@ -365,28 +371,28 @@ function undoImport() {
 
 function validateForm(): string | null {
 	if (!name.trim()) {
-		return "Name is required";
+		return t("agents.mcp.validation.name_required");
 	}
 
 	const newServerId = generateServerId(name);
 	if (!newServerId) {
-		return "Name must contain at least one letter or number";
+		return t("agents.mcp.validation.name_alphanumeric");
 	}
 
 	// Check for duplicate ID (only when creating new or changing name)
 	if (!isEditing || newServerId !== capturedServerId) {
 		if (accessors.hasServer(newServerId)) {
-			return "A server with this name already exists";
+			return t("agents.mcp.validation.duplicate");
 		}
 	}
 
 	if (!url.trim()) {
-		return "URL is required";
+		return t("agents.mcp.validation.url_required");
 	}
 	try {
 		new URL(url.trim());
 	} catch {
-		return "Invalid URL format";
+		return t("agents.mcp.validation.url_invalid");
 	}
 
 	return null;
@@ -431,7 +437,7 @@ async function handleDelete() {
 function describeProbeError(err: unknown): string {
 	const message = err instanceof Error ? err.message : String(err);
 	const cause = message.replace(/^Failed to connect to [^"]*"[^"]*":\s*/, "").replace(/^Error:\s*/, "");
-	return cause.trim() || "Connection failed";
+	return cause.trim() || t("agents.mcp.status.failed");
 }
 
 /**
@@ -460,7 +466,10 @@ async function probeConnection(key: string, target: string, headerText: string):
 			result = {
 				key,
 				ok: true,
-				tools: tools.map((t) => ({ name: t.name, description: (t as { description?: string }).description })),
+				tools: tools.map((tool) => ({
+					name: tool.name,
+					description: (tool as { description?: string }).description,
+				})),
 			};
 		} finally {
 			// Close the client so the open session doesn't dangle after a one-off probe.
@@ -491,7 +500,7 @@ async function probeConnection(key: string, target: string, headerText: string):
       <Icon name="check-circle" />
       <span>{importNotice}</span>
       {#if importUndo}
-        <button type="button" class="mcp-banner-action" onclick={undoImport}>Undo</button>
+        <button type="button" class="mcp-banner-action" onclick={undoImport}>{t("agents.mcp.undo")}</button>
       {/if}
     </div>
   {:else if importError}
@@ -499,7 +508,7 @@ async function probeConnection(key: string, target: string, headerText: string):
       <Icon name="alert-circle" />
       <span>{importError}</span>
       <button type="button" class="mcp-banner-action" onclick={() => (importError = null)}>
-        Dismiss
+        {t("agents.mcp.dismiss")}
       </button>
     </div>
   {/if}
@@ -510,12 +519,12 @@ async function probeConnection(key: string, target: string, headerText: string):
        right-hand column — the reason the old markup reached for ModalField,
        whose larger label weight made those fields read as headings. -->
   <SettingGroup>
-    <SettingContainer name="Name" desc="A name for this MCP server">
+    <SettingContainer name={t("agents.mcp.name_label")} desc={t("agents.mcp.name_desc")}>
       <Text
         id="mcp-server-name"
         inputType="text"
         value={name}
-        placeholder="My MCP Server"
+        placeholder={t("agents.mcp.name_placeholder")}
         onblur={(v) => (name = v)}
       />
     </SettingContainer>
@@ -525,8 +534,8 @@ async function probeConnection(key: string, target: string, headerText: string):
            space to duplicate a shortcut people reach for by reflex. -->
       <SettingContainer
         class="s2b-mcp-row--stacked"
-        name="Server URL"
-        desc="The URL of the MCP server — or paste the server's JSON config to fill this form"
+        name={t("agents.mcp.url_label")}
+        desc={t("agents.mcp.url_desc")}
       >
         <!-- Committed on blur/Enter, not per keystroke — see the probe notes in
              the script for why the connection check must not chase typing. -->
@@ -542,8 +551,8 @@ async function probeConnection(key: string, target: string, headerText: string):
 
       <SettingContainer
         class="s2b-mcp-row--stacked"
-        name="Headers"
-        desc="Optional — one per line, Header-Name: value"
+        name={t("agents.mcp.headers_label")}
+        desc={t("agents.mcp.headers_desc")}
       >
         <TextArea
           id="mcp-server-headers"
@@ -580,40 +589,40 @@ async function probeConnection(key: string, target: string, headerText: string):
        button, so a destructive click isn't adjacent to the one people aim for. -->
   <div class="modal-button-container mcp-actions">
     {#if isEditing}
-      <Button buttonText="Delete" styles="mod-warning" onClick={handleDelete} />
+      <Button buttonText={t("common.delete")} styles="mod-warning" onClick={handleDelete} />
     {/if}
     <div class="mcp-connection-status" role="status" aria-live="polite">
       {#if connectionStatus === "held"}
         <span class="mcp-connection-icon is-muted"><Icon name="shield-alert" size="xs" /></span>
         <span class="mcp-connection-text is-muted">
-          Different host than the saved server — headers are not sent until you
-          <button type="button" class="mcp-connection-link" onclick={() => (heldKeyReleased = probeKey)}>
-            check now
-          </button>
-          or save.
+          <I18nText message={t("agents.mcp.status.held")}>
+            {#snippet check()}<button type="button" class="mcp-connection-link" onclick={() => (heldKeyReleased = probeKey)}
+                >{t("agents.mcp.status.held_link")}</button
+              >{/snippet}
+          </I18nText>
         </span>
       {:else if connectionStatus === "checking"}
         <CircularLoader size={16} color="var(--text-muted)" />
-        <span class="mcp-connection-text">Checking connection…</span>
+        <span class="mcp-connection-text">{t("agents.mcp.status.checking")}</span>
       {:else if connectionStatus === "connected"}
         <span class="mcp-connection-icon is-success"><Icon name="check-circle" size="xs" /></span>
         <span class="mcp-connection-text is-success">
           {discoveredTools.length === 0
-            ? "Connected — no tools offered"
-            : `Connected — ${discoveredTools.length} tool${discoveredTools.length === 1 ? "" : "s"}`}
+            ? t("agents.mcp.status.connected_no_tools")
+            : t("agents.mcp.status.connected_tools", { count: discoveredTools.length })}
         </span>
       {:else if connectionStatus === "failed"}
         <span class="mcp-connection-icon is-error"><Icon name="x-circle" size="xs" /></span>
-        <span class="mcp-connection-text is-error">{probe?.error ?? "Connection failed"}</span>
+        <span class="mcp-connection-text is-error">{probe?.error ?? t("agents.mcp.status.failed")}</span>
       {:else}
-        <span class="mcp-connection-text is-muted">Enter the server URL — the connection is checked automatically.</span>
+        <span class="mcp-connection-text is-muted">{t("agents.mcp.status.idle")}</span>
       {/if}
     </div>
     <!-- Kept together so a long status wraps its own text instead of splitting
          the confirm pair onto two lines. -->
     <div class="mcp-actions-primary">
-      <Button buttonText="Cancel" onClick={() => modal.close()} />
-      <Button buttonText={isEditing ? "Save" : "Add Server"} cta={canSave} disabled={!canSave} onClick={handleSave} />
+      <Button buttonText={t("common.cancel")} onClick={() => modal.close()} />
+      <Button buttonText={isEditing ? t("common.save") : t("agents.mcp.add_server")} cta={canSave} disabled={!canSave} onClick={handleSave} />
     </div>
   </div>
 </div>

@@ -1,0 +1,47 @@
+{
+	"fallback_title": "ウィジェット",
+	"block": {
+		"unbundled_library": "このウィジェットは同梱されていないライブラリを要求しています: {libs}。利用可能: {available}。",
+		"generating": "ウィジェットを生成中…",
+		"expand": "展開",
+		"copy_tooltip": "ノートに貼り付けられるブロックとしてコピー",
+		"copied_notice": "ウィジェットブロックをコピーしました。任意のノートに貼り付けてください。",
+		"save_tooltip": "ウィジェットファイルとして保存して開く",
+		"save_failed": "ウィジェットを保存できませんでした: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "このウィジェットはサンドボックス外へ移動しようとしたため停止されました。"
+	},
+	"embed": {
+		"load_failed": "ウィジェットを読み込めませんでした。"
+	},
+	"rename": {
+		"title": "ウィジェットの名前を変更",
+		"name": "名前",
+		"button": "名前を変更",
+		"empty_name": "名前を入力してください。",
+		"invalid_chars": "名前に次の文字は使用できません: \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "「{name}」はこのフォルダにすでに存在します。",
+		"failed": "名前を変更できませんでした: {error}"
+	},
+	"view": {
+		"menu_show_widget": "ウィジェットを表示",
+		"menu_edit_source": "ソースを編集",
+		"menu_rename": "名前を変更...",
+		"review_showing_proposed": "チャットからの保留中の変更 — 提案されたウィジェットを表示中",
+		"review_showing_current": "チャットからの保留中の変更 — 現在のウィジェットを表示中",
+		"show_current": "現在の内容を表示",
+		"show_proposed": "提案を表示",
+		"accept": "承認",
+		"reject": "却下",
+		"rejected_notice": "このウィジェットへの変更案を却下しました",
+		"conflict_tooltip": "承認できません — 提案後にウィジェットが変更されました。却下して、エージェントに再提案を依頼してください。",
+		"applied_notice": "このウィジェットへの変更案を適用しました",
+		"apply_failed": "変更を適用できませんでした: {error}",
+		"source_aria": "ウィジェットのソース",
+		"source_hint": "フロントマター(title、height、queries、libs)の後に HTML を記述します。",
+		"source_stale_hint": "編集中にディスク上で変更されました — キャンセルして再読み込みしてください。保存は無効です。",
+		"source_stale_notice": "編集中にこのウィジェットがディスク上で変更されました。キャンセルして再読み込みしてから、もう一度編集してください。",
+		"save_failed": "ウィジェットを保存できませんでした: {error}"
+	}
+}

@@ -1,0 +1,105 @@
+{
+	"view": {
+		"tab_title": "Willkommen"
+	},
+	"welcome": {
+		"title": "Willkommen bei Smart Second Brain",
+		"subtitle": "Mach deinen Vault zu einem KI-gestützten Second Brain – suche smarter, entdecke Verbindungen im Graphen und chatte mit deinen Notizen.",
+		"hotkeys_unavailable_notice": "Tastenkürzel konnten nicht geöffnet werden – öffne Einstellungen → Tastenkürzel und suche nach „Notizen durchsuchen“.",
+		"search": {
+			"title": "Smartere Suche",
+			"desc": "Finde Notizen nach Titel, Inhalt, Tags und Ordnern – mit unscharfer Suche. Keine Einrichtung nötig. Füge später ein Embedding-Modell für die semantische Suche hinzu.",
+			"hotkey_link": "lege ein Tastenkürzel fest",
+			"navbar_toggle": "Über die Lupe in der Navigationsleiste statt über den Schnellwechsler öffnen",
+			"hotkey": "Oder {link} für den Sofortzugriff."
+		},
+		"graph": {
+			"title": "Smarterer Graph",
+			"desc": "Sieh, wie deine Notizen zusammenhängen und sich zu Themen gruppieren. Keine Einrichtung nötig."
+		},
+		"chat": {
+			"title": "Mit deinen Notizen chatten",
+			"desc": "Stelle Fragen, die auf deinem Vault basieren – mit Websuche und integrierten Plugins wie Dataview und Tasks. Benötigt einen KI-Anbieter – richte unten einen ein."
+		},
+		"provider_step": {
+			"title": "KI-Anbieter verbinden",
+			"done_desc": "Anbieter verbunden. In den Einstellungen kannst du weitere Anbieter hinzufügen oder verwalten.",
+			"desc": "Verbinde OpenAI, Anthropic, Ollama, OpenRouter oder einen beliebigen OpenAI-kompatiblen Endpunkt.",
+			"add_another": "Weiteren hinzufügen",
+			"connect": "Anbieter verbinden"
+		},
+		"model_step": {
+			"title": "Chat-Modell wählen",
+			"needs_provider_desc": "Verbinde zuerst einen Anbieter und wähle dann ein Modell zum Chatten.",
+			"desc": "Wähle ein Modell deines verbundenen Anbieters, um den Chat zu aktivieren.",
+			"change": "Modell ändern",
+			"choose": "Modell wählen",
+			"using": "Aktives Modell: {model}. Du kannst jetzt loschatten."
+		},
+		"privacy": {
+			"public_title": "Deine Notizen werden standardmäßig geteilt",
+			"all_trusted_title": "Notizzugriff ist gewährt",
+			"untrusted_title": "Deine Notizen sind noch privat",
+			"no_provider_title": "Notizzugriff ist standardmäßig privat",
+			"no_provider_strong": "nicht",
+			"public_strong": "standardmäßig öffentlich",
+			"review_access": "Notizzugriff prüfen",
+			"trusted": "vertrauenswürdig",
+			"change_access": "ändere den Notizzugriff",
+			"no_provider": "Deine Notizen werden {not} mit KI-Anbietern geteilt, außer du erlaubst es. Sobald du oben einen Anbieter verbindest, kannst du ihm Zugriff gewähren – bis dahin verlässt nichts deinen Vault.",
+			"public": "Der Notizzugriff ist {mode}, daher können Anbieter deine Notizen lesen – außer denen, die du ausschließt. {review}.",
+			"all_trusted": {
+				"one": "Dein Anbieter ist als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten.",
+				"other": "Deine Anbieter sind als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten."
+			},
+			"untrusted": {
+				"one": "{providers} kann deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Vault. Markiere ihn als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter.",
+				"other": "{providers} können deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Vault. Markiere sie als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter."
+			}
+		},
+		"skip": "Überspringen",
+		"documentation": "Dokumentation ↗",
+		"explore_graph": "Graph erkunden",
+		"start_chatting": "Chat starten",
+		"start_chatting_disabled": "Verbinde zuerst einen Anbieter und füge ein Chat-Modell hinzu"
+	},
+	"provider_setup": {
+		"title_add": "Anbieter hinzufügen",
+		"title_setup": "Anbieter einrichten",
+		"title_edit": "{name} bearbeiten",
+		"trusted_indicator": "Vertrauenswürdig für private Notizen",
+		"invalid_name": "Ungültiger Name",
+		"auth_failed": "Authentifizierung fehlgeschlagen",
+		"picker_desc": "Wähle einen Anbieter zum Verbinden.",
+		"setup_guide": "Einrichtungsanleitung",
+		"name_label": "Anbietername",
+		"name_desc": "Benenne diese Anbieterinstanz, damit du sie später unterscheiden kannst.",
+		"name_placeholder": "Neuer Anbieter",
+		"hide_api_key": "API-Schlüsselfeld ausblenden",
+		"use_api_key": "Stattdessen einen API-Schlüssel verwenden →",
+		"sign_in_desktop_only": "Die Anmeldung bei {provider} ist nur auf dem Desktop verfügbar.",
+		"checking_connection": "Verbindung wird geprüft…",
+		"connected": "Verbunden",
+		"fix_name_to_finish": "– korrigiere den Anbieternamen, um abzuschließen",
+		"enter_credentials": "Gib oben deine Zugangsdaten ein – die Verbindung wird automatisch geprüft.",
+		"trusted_label": "Vertrauenswürdig für private Notizen",
+		"trusted_desc": "Erlaubt diesem Anbieter den Zugriff auf Notizen, die für nicht vertrauenswürdige Anbieter privat bleiben.",
+		"oauth_sign_in_label": "{provider}-Anmeldung",
+		"cancel_sign_in": "Anmeldung abbrechen",
+		"connected_via": "Verbunden über {provider}",
+		"reconnect": "Erneut verbinden",
+		"disconnect": "Trennen",
+		"sign_in_with": "Mit {provider} anmelden",
+		"paste_code_label": "Autorisierungscode einfügen",
+		"paste_code_desc": "Kopiere den im Browser angezeigten Autorisierungscode und füge ihn hier ein, um die Verbindung abzuschließen.",
+		"code_placeholder": "Autorisierungscode",
+		"submit": "Absenden"
+	},
+	"release_notes": {
+		"tab_title": "Neuigkeiten",
+		"title": "Neu in {version}",
+		"released_on": "Veröffentlicht am {date}",
+		"earlier_releases": "Frühere Versionen",
+		"all_releases": "Alle Versionen auf GitHub"
+	}
+}

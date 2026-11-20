@@ -1,4 +1,5 @@
 <script lang="ts">
+import { getLocale, t } from "../../i18n";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import { extractVendor, logUnclassifiedModelsInfo } from "../../lib/modelVendorClassification";
 import type { UiClassifiableModel } from "../../lib/modelVendorClassification";
@@ -204,7 +205,7 @@ function getModelBranding(model: HydratedModel): {
 // Format cost (per 1M tokens)
 function formatCost(costPer1M?: number): string {
 	if (costPer1M === undefined) return "—";
-	if (costPer1M === 0) return "Free";
+	if (costPer1M === 0) return t("modals.model_selection.free");
 	if (costPer1M < 0.01) return `$${costPer1M.toFixed(4)}`;
 	return `$${costPer1M.toFixed(2)}`;
 }
@@ -300,17 +301,15 @@ function openProviderSetup() {
 
 function getProviderListDisplay(): string {
 	const names = configuredProviders.map((id) => getProviderDisplayName(id));
-	if (names.length === 0) return "your provider";
-	if (names.length === 1) return names[0];
-	if (names.length === 2) return `${names[0]} and ${names[1]}`;
-	return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+	if (names.length === 0) return t("modals.model_selection.your_provider");
+	return new Intl.ListFormat(getLocale(), { style: "long", type: "conjunction" }).format(names);
 }
 </script>
 
 <div class="model-selection-container">
   <div class="model-selection-layout">
     {#if availableVendors.length > 0}
-      <div class="model-provider-sidebar" aria-label="AI vendor filters">
+      <div class="model-provider-sidebar" aria-label={t("modals.model_selection.vendor_filters_label")}>
         <button
           type="button"
           class="clickable-icon model-provider-btn"
@@ -319,8 +318,8 @@ function getProviderListDisplay(): string {
             showFavorites = !showFavorites;
             if (showFavorites) selectedConfiguredProvider = null;
           }}
-          title="Favorites"
-          aria-label="Favorites"
+          title={t("modals.model_selection.favorites")}
+          aria-label={t("modals.model_selection.favorites")}
           aria-pressed={showFavorites}
         >
           <Icon name="star" size="m" />
@@ -352,8 +351,8 @@ function getProviderListDisplay(): string {
           bind:this={searchInputEl}
           type="text"
           placeholder={modelType === "chat"
-            ? "Search chat models…"
-            : "Search embedding models…"}
+            ? t("modals.model_selection.search_chat_placeholder")
+            : t("modals.model_selection.search_embedding_placeholder")}
           bind:value={searchQuery}
           onkeydown={handleSearchKeydown}
           class="search-input"
@@ -362,7 +361,7 @@ function getProviderListDisplay(): string {
           <button
             type="button"
             class="clickable-icon clear-search"
-            aria-label="Clear search"
+            aria-label={t("modals.model_selection.clear_search")}
             onclick={() => (searchQuery = "")}
           >
             <Icon name="x" size="xs" />
@@ -374,15 +373,15 @@ function getProviderListDisplay(): string {
           class:is-loading={isLoadingModels}
           onclick={refreshModels}
           disabled={isLoadingModels}
-          aria-label="Re-fetch models from your configured providers"
-          title="Re-fetch models from your configured providers"
+          aria-label={t("modals.model_selection.refetch_models")}
+          title={t("modals.model_selection.refetch_models")}
         >
           <Icon name="refresh-cw" size="s" />
         </button>
       </div>
 
       {#if showConfiguredProviderFilters}
-        <div class="provider-filter-bar" aria-label="Configured provider filters">
+        <div class="provider-filter-bar" aria-label={t("modals.model_selection.provider_filters_label")}>
           {#each availableConfiguredProviders as providerFilter (providerFilter.id)}
             {@const ProviderLogo = providerFilter.logo}
             <button
@@ -448,8 +447,8 @@ function getProviderListDisplay(): string {
                           pluginData.toggleFavoriteModel(model.provider, model.variantKey);
                         }}
                         aria-pressed={isFavorite}
-                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                        title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        aria-label={isFavorite ? t("modals.model_selection.remove_favorite") : t("modals.model_selection.add_favorite")}
+                        title={isFavorite ? t("modals.model_selection.remove_favorite") : t("modals.model_selection.add_favorite")}
                       >
                         <Icon name="star" size="s" />
                       </button>
@@ -463,28 +462,28 @@ function getProviderListDisplay(): string {
 
                   <div class="model-meta">
                     {#if model.kind === "chat"}
-                      <span class="meta-tag" title="Context window">
-                        {formatTokenLimit(model.contextWindow)} ctx
+                      <span class="meta-tag" title={t("modals.model_selection.context_window")}>
+                        {t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) })}
                       </span>
                     {:else}
-                      <span class="meta-tag" title="Max input tokens">
-                        {formatTokenLimit(model.maxInputTokens)} max input
+                      <span class="meta-tag" title={t("modals.model_selection.max_input_tokens")}>
+                        {t("modals.model_selection.max_input_tag", { tokens: formatTokenLimit(model.maxInputTokens) })}
                       </span>
                     {/if}
 
                     {#if model.paramSize}
-                      <span class="meta-tag" title="Parameter size">
+                      <span class="meta-tag" title={t("modals.model_selection.parameter_size")}>
                         {model.paramSize}
                       </span>
                     {/if}
                     {#if model.quantization}
-                      <span class="meta-tag" title="Quantization level">
+                      <span class="meta-tag" title={t("modals.model_selection.quantization")}>
                         {model.quantization}
                       </span>
                     {/if}
 
                     {#if model.kind === "chat" && (model.pricing?.inputUsdPer1M !== undefined || model.pricing?.outputUsdPer1M !== undefined)}
-                      <span class="meta-tag" title="Cost per 1M tokens (in/out)">
+                      <span class="meta-tag" title={t("modals.model_selection.cost_in_out")}>
                         {formatCost(model.pricing?.inputUsdPer1M)}/{formatCost(
                           model.pricing?.outputUsdPer1M,
                         )}
@@ -492,7 +491,7 @@ function getProviderListDisplay(): string {
                     {/if}
 
                     {#if model.kind === "embedding" && model.pricing?.inputUsdPer1M !== undefined}
-                      <span class="meta-tag" title="Cost per 1M input tokens">
+                      <span class="meta-tag" title={t("modals.model_selection.cost_input")}>
                         {formatCost(model.pricing.inputUsdPer1M)}
                       </span>
                     {/if}
@@ -528,33 +527,30 @@ function getProviderListDisplay(): string {
           </div>
         {:else}
           {#if showFavorites}
-            <div class="no-models">No favorite models yet. Click the star on any model to add it.</div>
+            <div class="no-models">{t("modals.model_selection.no_favorites")}</div>
           {:else if searchQuery || selectedVendor || selectedConfiguredProvider}
-            <div class="no-models">No models match your filters</div>
+            <div class="no-models">{t("modals.model_selection.no_matches")}</div>
           {:else if configuredProviders.length === 0}
             <div class="no-models-guide">
-              <div class="no-models-title">No provider configured</div>
+              <div class="no-models-title">{t("modals.model_selection.no_provider_title")}</div>
               <div class="no-models-desc">
-                Add an AI provider to discover {modelType === "embedding"
-                  ? "embedding"
-                  : "chat"} models.
+                {modelType === "embedding"
+                  ? t("modals.model_selection.no_provider_desc_embedding")
+                  : t("modals.model_selection.no_provider_desc_chat")}
               </div>
               <button type="button" class="mod-cta no-models-cta" onclick={openProviderSetup}>
                 <Icon name="plus" size="s" />
-                Add provider
+                {t("modals.model_selection.add_provider")}
               </button>
             </div>
           {:else}
             <div class="no-models-guide">
-              <div class="no-models-title">No models found</div>
+              <div class="no-models-title">{t("modals.model_selection.no_models_title")}</div>
               <div class="no-models-desc">
                 {#if modelType === "embedding"}
-                  No embedding models were discovered for {getProviderListDisplay()}. Add embedding
-                  models to your provider (for local providers like Ollama, pull them first), then
-                  refresh.
+                  {t("modals.model_selection.no_models_desc_embedding", { providers: getProviderListDisplay() })}
                 {:else}
-                  No chat models were discovered for {getProviderListDisplay()}. Add models to your
-                  provider (for local providers like Ollama, pull them first), then refresh.
+                  {t("modals.model_selection.no_models_desc_chat", { providers: getProviderListDisplay() })}
                 {/if}
               </div>
               <button
@@ -565,7 +561,7 @@ function getProviderListDisplay(): string {
                 disabled={isLoadingModels}
               >
                 <Icon name="refresh-cw" size="s" />
-                {isLoadingModels ? "Refreshing…" : "Refresh models"}
+                {isLoadingModels ? t("modals.model_selection.refreshing") : t("modals.model_selection.refresh_models")}
               </button>
             </div>
           {/if}

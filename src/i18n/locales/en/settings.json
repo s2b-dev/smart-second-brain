@@ -1,0 +1,235 @@
+{
+	"tabs": {
+		"general": "General",
+		"search": "Search",
+		"agents": "Agents",
+		"graph": "Graph",
+		"troubleshooting": "Troubleshooting",
+		"developer": "Developer"
+	},
+	"general": {
+		"providers": {
+			"heading": "Providers",
+			"description": "Providers connect Smart Second Brain to the AI services used for chat, embeddings, and other model-powered features.",
+			"empty": "No provider instances configured yet.",
+			"add": "Add provider"
+		},
+		"privacy": {
+			"heading": "Privacy",
+			"note_access": "Note access policy",
+			"note_access_desc": "Choose whether untrusted providers see nothing or everything by default, then manage the matching file list.",
+			"manage": "Manage",
+			"check_updates": "Check for updates",
+			"check_updates_desc": "Once a day, fetch this plugin's version number from GitHub and show a notice when a newer one is available. Nothing about you or your vault is sent. Skipped while Obsidian's own automatic plugin update check is on."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "Display",
+			"result_details": "Result details",
+			"result_details_desc": "Choose which metadata and context appear in each search result. Currently: {summary}.",
+			"configure": "Configure",
+			"label_path": "Path",
+			"label_tags": "Tags",
+			"label_match_badges": "Match badges",
+			"label_content_snippets": "Content snippets",
+			"nothing_extra": "Nothing extra",
+			"navbar_search": "Use S2B search in the navbar",
+			"navbar_search_desc": "Make the magnifier button in the bottom navbar open Smart Second Brain search instead of Obsidian's quick switcher. Only that button changes — the quick switcher still opens from the command palette and its hotkey."
+		},
+		"indexed_content": {
+			"heading": "Indexed content",
+			"heading_desc": "Notes, canvases and widgets are always indexed. Choose which other files have their contents indexed for search and embeddings — the rest are still found by title and path, and the agent can still read them on demand.",
+			"pdfs": "PDFs",
+			"pdfs_desc": "Extract and index the text of PDFs. Slow on large libraries, and most of a long PDF is rarely relevant. Long PDFs are indexed up to roughly their first 80 pages (4 on mobile).",
+			"chats": "Chats",
+			"chats_desc": "Index past conversations. They are mostly the model's own answers, which can then come back as if they were sources.",
+			"data_files": "Data files",
+			"data_files_desc": "Index CSV, JSON and YAML files. Structured data searches poorly by meaning, and a single export can add thousands of entries."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "Topic names",
+			"naming_model": "Topic naming model",
+			"naming_model_desc": "Model used to name topics. Without one, a topic is named after its best-connected note.",
+			"naming_model_desc_withheld": "Model used to name topics. Without one, a topic is named after its best-connected note. This provider isn't trusted for private notes, so private titles are withheld from naming.",
+			"configure_provider": "Configure Provider",
+			"configure_models": "Configure Models",
+			"no_provider": "No AI provider is configured yet.",
+			"select_model": "Select a model",
+			"clear": "Clear",
+			"auto_name": "Name topics automatically",
+			"auto_name_desc": "Name topics whenever they change. Off means naming only runs from the graph's Topics panel."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "Onboarding",
+			"replay": "Replay onboarding intro",
+			"replay_desc": "Reset the splash animation and completion flags — the Welcome view plays its intro again, and auto-opens on startup as if this were a first run (until a provider is configured).",
+			"reset": "Reset intro",
+			"reset_notice": "Onboarding reset and reopened — the intro will replay from the start."
+		},
+		"chat": {
+			"heading": "Chat",
+			"raw_tool_io": "Show raw tool input/output",
+			"raw_tool_io_desc": "Reveal the exact tool arguments and raw output blob in chat tool-call rows. Off by default — users see only the plain-language summary and the friendly structured result.",
+			"restore": "Restore",
+			"restore_recommendations": "Restore dismissed recommendations",
+			"restore_recommendations_desc": "Bring back every suggested query, plugin skill nudge, and updated-default notice dismissed from a new chat's empty state.",
+			"restored_recommendations": {
+				"one": "Restored {count} dismissed recommendation.",
+				"other": "Restored {count} dismissed recommendations."
+			},
+			"no_recommendations": "No dismissed recommendations to restore.",
+			"restore_privacy_warning": "Restore integration privacy warning",
+			"restore_privacy_warning_desc": "Undo 'Don't ask again' on the warning shown before enabling a plugin integration's code-exec tool (it bypasses per-provider privacy rules).",
+			"privacy_warning_restored": "Integration privacy warning restored — it will show again next time an integration is enabled.",
+			"privacy_warning_not_suppressed": "Integration privacy warning was not suppressed."
+		},
+		"observability": {
+			"heading": "Observability",
+			"langsmith": "LangSmith integration",
+			"langsmith_desc": "Enable LangSmith telemetry for debugging and tracing",
+			"api_key": "API key",
+			"api_key_desc": "Select an Obsidian keychain secret for LangSmith authentication",
+			"project": "Project name",
+			"project_desc": "Project name to attribute runs",
+			"endpoint": "Endpoint URL",
+			"endpoint_desc": "Override LangSmith API base URL (optional)",
+			"check_aria": "Check LangSmith API key and endpoint",
+			"check_idle": "Check LangSmith connection",
+			"check_no_key": "Select a LangSmith API key secret first",
+			"check_invalid_url": "Invalid LangSmith endpoint URL",
+			"check_pending": "Checking LangSmith connection...",
+			"check_success": "LangSmith connection successful",
+			"check_rejected": "LangSmith rejected the API key",
+			"check_not_found": "LangSmith endpoint did not expose the expected API",
+			"check_failed_body": "LangSmith check failed ({status}): {body}",
+			"check_failed_status": "LangSmith check failed with status {status}",
+			"check_unreachable": "Failed to reach LangSmith",
+			"check_failed_notice": "LangSmith check failed: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "Diagnostics",
+		"maintenance_heading": "Maintenance",
+		"release_notes": "Release notes",
+		"release_notes_desc": "You are on version {version}. See what changed in recent releases.",
+		"show_release_notes": "Show release notes",
+		"guide": "Troubleshooting guide",
+		"guide_desc": "Common problems and how to resolve them — the agent not responding, unhelpful search results, withheld notes, missing MCP tools, and mobile-specific issues.",
+		"open_guide": "Open guide",
+		"still_stuck": "Still stuck?",
+		"still_stuck_desc": "Look through existing GitHub issues to see whether the problem is already tracked. If it is not, open a new issue and include what you tried, any error messages, and steps to reproduce it.",
+		"view_issues": "View existing issues",
+		"new_issue": "Open new issue",
+		"clear": "Clean up plugin data",
+		"clear_desc": "Deletes plugin settings and generated index data. Secrets, skill files, and chat files inside your vault are kept.",
+		"clear_label": "Cleanup",
+		"clear_modal": {
+			"title": "Clean up plugin data",
+			"description": "Delete plugin settings and generated index data? Secrets, skill files, and chat files inside your vault will be kept."
+		},
+		"verbose": "Developer Console logging",
+		"verbose_desc": "Enable verbose logging in the Developer Console.",
+		"cleared": "Plugin data cleared.",
+		"cleared_partial": "Plugin data cleared, but the stored vectors for {indexes} could not be deleted. See the console for details.",
+		"clear_failed": "Failed to clean plugin data"
+	},
+	"providers": {
+		"auth_failed": "Authentication failed",
+		"checking_auth": "Checking auth",
+		"authenticated": "Authenticated. Click to retry connection",
+		"auth_error_retry": "{message}. Click to retry connection",
+		"trusted": "Trusted with private notes",
+		"configure": "Configure provider",
+		"remove": "Remove provider",
+		"remove_failed": "Failed to remove provider",
+		"delete_embeddings": "Also delete the embeddings built with this provider",
+		"delete_embeddings_desc": {
+			"one": "Frees the storage used by {formatted} indexed note. Leave this off to keep them — re-adding this provider reuses them instead of re-embedding, which can be slow and costly.",
+			"other": "Frees the storage used by {formatted} indexed notes. Leave this off to keep them — re-adding this provider reuses them instead of re-embedding, which can be slow and costly."
+		},
+		"embeddings_kept_starting": "Provider removed. Its embeddings were kept — the index service is still starting up.",
+		"embeddings_delete_failed": {
+			"one": "Provider removed, but deleting {failed} of {count} embedding index failed: {ids}. See the console for details.",
+			"other": "Provider removed, but deleting {failed} of {count} embedding indexes failed: {ids}. See the console for details."
+		},
+		"advanced": "Advanced"
+	},
+	"embedding_index": {
+		"heading": "Embedding indexes",
+		"description_search": "Embedding indexes power semantic search across your notes.",
+		"description_graph": "Embedding indexes power semantic graph features across your notes.",
+		"group_search": "Search embedding index",
+		"group_graph": "Graph embedding index",
+		"empty": "No embedding indexes configured yet.",
+		"add": "Add index",
+		"notes_indexed": {
+			"one": "{count} note indexed",
+			"other": "{count} notes indexed"
+		},
+		"use_as_search": "Use {model} as search index",
+		"use_as_graph": "Use {model} as graph index",
+		"view_report": "View indexing report",
+		"export": "Export index to file",
+		"delete": "Delete index",
+		"delete_failed": "Could not delete this index: {error}",
+		"memory_on_mobile": "Memory on mobile"
+	},
+	"orphaned": {
+		"name": "Orphaned vector databases",
+		"legacy": "{label} (legacy graph data)",
+		"chunks": {
+			"one": "{id} ({count} chunk)",
+			"other": "{id} ({count} chunks)"
+		},
+		"summary": {
+			"one": "{count} stored database no longer belongs to a configured embedding index{size}: {list}.",
+			"other": "{count} stored databases no longer belong to a configured embedding index{size}: {list}."
+		},
+		"size": " (at least {size} of vectors)",
+		"origin_usage": "Obsidian's storage on this device totals {size} across all vaults.",
+		"confirm_title": "Delete orphaned indexes?",
+		"confirm_desc": {
+			"one": "This permanently removes {count} stored database that no configured embedding index uses. Re-adding one of these models later will rebuild its index from scratch.",
+			"other": "This permanently removes {count} stored databases that no configured embedding index uses. Re-adding one of these models later will rebuild its index from scratch."
+		},
+		"deleted": {
+			"one": "Deleted {count} orphaned index.",
+			"other": "Deleted {count} orphaned indexes."
+		},
+		"deleted_partial": "Deleted {deleted}, could not delete {failed}: {reason}",
+		"delete_button": "Delete orphaned indexes"
+	},
+	"secret_select": {
+		"nothing_selected": "(Nothing selected)",
+		"add_tooltip": "Add new secret",
+		"missing": "Secret \"{id}\" not found in Obsidian Keychain.",
+		"add_action": "Add a secret"
+	},
+	"model_control": {
+		"loading": "Loading models…"
+	},
+	"managed_entity": {
+		"select": "Select {name}"
+	},
+	"filter": {
+		"type_folder": "Folder",
+		"type_tag": "Tag",
+		"type_extension": "Extension",
+		"type_property": "Property",
+		"all_of": "ALL of",
+		"any_of": "ANY of",
+		"none_of": "NONE of",
+		"remove_condition": "Remove condition",
+		"property_placeholder": "property name",
+		"any_value": "any value",
+		"no_properties": "No properties found in vault — type a name to use it anyway.",
+		"live_placeholder": "Make a selection in the graph",
+		"add_condition": "Condition",
+		"add_group": "Group"
+	}
+}

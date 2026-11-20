@@ -1,0 +1,47 @@
+{
+	"fallback_title": "小组件",
+	"block": {
+		"unbundled_library": "此小组件请求了未内置的库：{libs}。可用的库：{available}。",
+		"generating": "正在生成小组件…",
+		"expand": "展开",
+		"copy_tooltip": "复制为代码块，以便粘贴到笔记中",
+		"copied_notice": "小组件代码块已复制，可粘贴到任意笔记中。",
+		"save_tooltip": "保存为小组件文件并打开",
+		"save_failed": "无法保存小组件：{error}"
+	},
+	"frame": {
+		"navigation_blocked": "此小组件试图跳转到沙盒之外，已被停止。"
+	},
+	"embed": {
+		"load_failed": "无法加载小组件。"
+	},
+	"rename": {
+		"title": "重命名小组件",
+		"name": "名称",
+		"button": "重命名",
+		"empty_name": "请输入名称。",
+		"invalid_chars": "名称不能包含 \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "此文件夹中已存在“{name}”。",
+		"failed": "无法重命名：{error}"
+	},
+	"view": {
+		"menu_show_widget": "显示小组件",
+		"menu_edit_source": "编辑源码",
+		"menu_rename": "重命名…",
+		"review_showing_proposed": "来自对话的待处理更改——正在显示提议的小组件",
+		"review_showing_current": "来自对话的待处理更改——正在显示当前的小组件",
+		"show_current": "显示当前版本",
+		"show_proposed": "显示提议版本",
+		"accept": "接受",
+		"reject": "拒绝",
+		"rejected_notice": "已拒绝对此小组件的提议更改",
+		"conflict_tooltip": "无法接受——此提议生成后小组件已被修改。请拒绝它，并让智能体重新提交。",
+		"applied_notice": "已应用对此小组件的提议更改",
+		"apply_failed": "应用更改失败：{error}",
+		"source_aria": "小组件源码",
+		"source_hint": "先是 Frontmatter（title、height、queries、libs），然后是 HTML。",
+		"source_stale_hint": "编辑期间磁盘上的文件已更改——点击“取消”重新加载；“保存”已禁用。",
+		"source_stale_notice": "你编辑期间此小组件在磁盘上已被更改。请点击“取消”重新加载，然后再编辑。",
+		"save_failed": "无法保存小组件：{error}"
+	}
+}

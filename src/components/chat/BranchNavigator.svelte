@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { BranchInfo } from "../../stores/chatTimeline";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 interface Props {
 	/** Branch information for navigation */
@@ -37,8 +38,8 @@ function navigateRight() {
 			class="clickable-icon s2b-branch-nav-btn"
 			disabled={!canGoLeft}
 			onclick={navigateLeft}
-			aria-label="Previous branch"
-			title="Previous branch"
+			aria-label={t("chat.branch.previous")}
+			title={t("chat.branch.previous")}
 		>
 			<div
 				class="s2b-w-3 s2b-h-3"
@@ -53,8 +54,8 @@ function navigateRight() {
 			class="clickable-icon s2b-branch-nav-btn"
 			disabled={!canGoRight}
 			onclick={navigateRight}
-			aria-label="Next branch"
-			title="Next branch"
+			aria-label={t("chat.branch.next")}
+			title={t("chat.branch.next")}
 		>
 			<div
 				class="s2b-w-3 s2b-h-3"

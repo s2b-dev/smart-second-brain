@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import { Notice } from "obsidian";
 import { editAgentAction, showActionNotice } from "../../utils/actionNotice";
 import { buildPersistedChatModel } from "../../utils/persistedChatModel";
@@ -18,6 +19,7 @@ import { extractErrorMessage } from "../../utils/errorMessage";
 import { ModelSelectionModal } from "../modal/ModelSelectionModal";
 import { ProviderSetupModal } from "../../views/provider-setup/ProviderSetup";
 import { isMobileUI } from "../../utils/platform";
+import { t } from "../../i18n";
 import {
 	DISMISS_ALL_ID,
 	filterIntegrationSuggestions,
@@ -160,9 +162,38 @@ const integrationSuggestions = $derived.by<SuggestedQuery[]>(() => {
 // with several integrations can't undo the deliberate trim of the generic catalog.
 const suggestions = $derived(
 	!noModelSelected
-		? mergeSuggestions(filterSuggestions(ctx, data.dismissedRecommendations), integrationSuggestions)
+		? mergeSuggestions(filterSuggestions(ctx, data.dismissedRecommendations), integrationSuggestions).map(
+				localizeSuggestion,
+			)
 		: [],
 );
+
+/**
+ * The catalog in `chatRecommendations.ts` stays English and import-free (it is unit-tested
+ * in isolation); chip text and prefilled query are localized here, keyed by the stable id.
+ */
+function localizeSuggestion(s: SuggestedQuery): SuggestedQuery {
+	switch (s.id) {
+		case "help-overview":
+			return { ...s, label: t("chat.recommendations.suggestion_help_overview") };
+		case "summarize-recent":
+			return { ...s, label: t("chat.recommendations.suggestion_summarize_recent") };
+		case "find-notes":
+			return {
+				...s,
+				label: t("chat.recommendations.suggestion_find_notes"),
+				query: t("chat.recommendations.suggestion_find_notes_query"),
+			};
+		case "int-tasknotes":
+			return { ...s, label: t("chat.recommendations.suggestion_tasknotes") };
+		case "int-tasks":
+			return { ...s, label: t("chat.recommendations.suggestion_tasks") };
+		case "int-dataview":
+			return { ...s, label: t("chat.recommendations.suggestion_dataview") };
+		default:
+			return s;
+	}
+}
 
 // Installed+enabled plugins whose S2B integration isn't switched on for the
 // selected agent yet. Not dismissed = eligible to nudge.
@@ -248,7 +279,7 @@ async function enablePlugin(nudge: PluginNudge): Promise<void> {
 	if (!skillId) {
 		const service = plugin.skillsService;
 		if (!service) {
-			new Notice("Skills are still initializing — try again in a moment.");
+			new Notice(t("chat.recommendations.skills_initializing"));
 			return;
 		}
 		try {
@@ -256,15 +287,18 @@ async function enablePlugin(nudge: PluginNudge): Promise<void> {
 		} catch (error) {
 			Logger.error(`[ChatRecommendations] seedIntegrationSkill failed for ${nudge.pluginId}:`, error);
 			showActionNotice(
-				`Could not create skill for ${nudge.displayName}: ${extractErrorMessage(error)}`,
-				editAgentAction(agent.id, "Open agent skills"),
+				t("chat.recommendations.skill_create_failed_detail", {
+					name: nudge.displayName,
+					error: extractErrorMessage(error),
+				}),
+				editAgentAction(agent.id, t("chat.recommendations.open_agent_skills")),
 			);
 			return;
 		}
 		if (!skillId) {
 			showActionNotice(
-				`Could not create skill for ${nudge.displayName}.`,
-				editAgentAction(agent.id, "Open agent skills"),
+				t("chat.recommendations.skill_create_failed", { name: nudge.displayName }),
+				editAgentAction(agent.id, t("chat.recommendations.open_agent_skills")),
 			);
 			return;
 		}
@@ -275,7 +309,7 @@ async function enablePlugin(nudge: PluginNudge): Promise<void> {
 	}
 	data.setAgentSkillEnabled(agent.id, skillId, true);
 	data.setAgentPluginExecEnabled(agent.id, toExecToolId(nudge.pluginId), true);
-	new Notice(`Enabled ${nudge.displayName} for ${agent.name}.`);
+	new Notice(t("chat.recommendations.enabled_notice", { name: nudge.displayName, agent: agent.name }));
 	// pluginNudges recomputes off the persisted agent state and drops this entry.
 }
 
@@ -324,8 +358,8 @@ function reviewNotice(notice: UpdateNotice): void {
        it visibly jumps to centre the moment that happens. A fixed position reads
        as stable. -->
   <div class="greeting">
-    <p class="greeting-title">Start a new conversation</p>
-    <p class="greeting-sub">Ask me anything about your notes.</p>
+    <p class="greeting-title">{t("chat.recommendations.greeting_title")}</p>
+    <p class="greeting-sub">{t("chat.recommendations.greeting_sub")}</p>
   </div>
 
   {#if noModelSelected}
@@ -335,11 +369,11 @@ function reviewNotice(notice: UpdateNotice): void {
         ></span>
         <span class="model-cta-text">
           {#if noProviderConfigured}
-            <span class="model-cta-title">Add an AI provider</span>
-            <span class="model-cta-sub">Connect a provider to start chatting.</span>
+            <span class="model-cta-title">{t("chat.recommendations.add_provider_title")}</span>
+            <span class="model-cta-sub">{t("chat.recommendations.add_provider_sub")}</span>
           {:else}
-            <span class="model-cta-title">Select a chat model</span>
-            <span class="model-cta-sub">Choose a model to start chatting.</span>
+            <span class="model-cta-title">{t("chat.recommendations.select_model_title")}</span>
+            <span class="model-cta-sub">{t("chat.recommendations.select_model_sub")}</span>
           {/if}
         </span>
       </button>
@@ -364,7 +398,7 @@ function reviewNotice(notice: UpdateNotice): void {
           <button
             type="button"
             class="dismiss-chip"
-            aria-label={`Dismiss "${s.label}"`}
+            aria-label={t("chat.recommendations.dismiss_suggestion_aria", { label: s.label })}
             onclick={() => dismiss(s.id)}
           >
             <span use:icon={"x"} style="--icon-size: 13px"></span>
@@ -385,26 +419,28 @@ function reviewNotice(notice: UpdateNotice): void {
                  assert an edit the user never made. -->
             {#if notice.customized === false}
               {#if notice.agentName}
-                The default {notice.label} changed, but <strong>{notice.agentName}</strong>'s copy
-                couldn't be updated automatically.
+                <I18nText message={t("chat.recommendations.stale_agent_not_updated", { label: notice.label })}>
+                  {#snippet agent()}<strong>{notice.agentName}</strong>{/snippet}
+                </I18nText>
               {:else}
-                The default {notice.label} changed, but your copy couldn't be updated automatically.
+                {t("chat.recommendations.stale_not_updated", { label: notice.label })}
               {/if}
             {:else if notice.agentName}
-              The default {notice.label} changed. <strong>{notice.agentName}</strong>'s customized
-              version was kept.
+              <I18nText message={t("chat.recommendations.stale_agent_kept", { label: notice.label })}>
+                {#snippet agent()}<strong>{notice.agentName}</strong>{/snippet}
+              </I18nText>
             {:else}
-              The default {notice.label} changed. Your customized version was kept.
+              {t("chat.recommendations.stale_kept", { label: notice.label })}
             {/if}
           </span>
           <button type="button" class="s2b-notice-action" onclick={() => reviewNotice(notice)}>
-            Review
+            {t("chat.recommendations.review")}
           </button>
           <button
             type="button"
             class="dismiss-chip clickable-icon"
-            aria-label={`Dismiss ${notice.label} update notice`}
-            title="Dismiss this notice"
+            aria-label={t("chat.recommendations.dismiss_notice_aria", { label: notice.label })}
+            title={t("chat.recommendations.dismiss_notice")}
             onclick={() => dismiss(notice.id)}
           >
             <span use:icon={"x"} style="--icon-size: 13px"></span>
@@ -434,7 +470,9 @@ function reviewNotice(notice: UpdateNotice): void {
               {/each}
             </span>
             <span class="s2b-notice-text">
-              <strong>{pluginNudges.length}</strong> plugin integrations available for this agent.
+              <I18nText message={t("chat.recommendations.nudges_summary", { count: pluginNudges.length })}>
+                {#snippet number()}<strong>{pluginNudges.length}</strong>{/snippet}
+              </I18nText>
             </span>
             <button
               type="button"
@@ -445,7 +483,7 @@ function reviewNotice(notice: UpdateNotice): void {
                 nudgesExpanded = true;
               }}
             >
-              Review
+              {t("chat.recommendations.review")}
             </button>
             <!-- Bulk action, so it is NOT the bare `×` every other row uses: a chip
                  identical to the per-row dismiss would give no hint that it clears the
@@ -453,11 +491,11 @@ function reviewNotice(notice: UpdateNotice): void {
             <button
               type="button"
               class="nudge-dismiss-all"
-              aria-label={`Dismiss all ${pluginNudges.length} plugin integration suggestions`}
-              title={`Dismiss all ${pluginNudges.length} suggestions`}
+              aria-label={t("chat.recommendations.dismiss_all_nudges_aria", { count: pluginNudges.length })}
+              title={t("chat.recommendations.dismiss_all_nudges_tooltip", { count: pluginNudges.length })}
               onclick={dismissAllPluginNudges}
             >
-              Dismiss all
+              {t("chat.recommendations.dismiss_all")}
             </button>
           </div>
         {:else}
@@ -465,16 +503,18 @@ function reviewNotice(notice: UpdateNotice): void {
             <div class="s2b-notice">
               <span class="s2b-notice-icon" use:icon={nudge.icon} style="--icon-size: 14px"></span>
               <span class="s2b-notice-text">
-                Enable the <strong>{nudge.displayName}</strong> skill for this agent.
+                <I18nText message={t("chat.recommendations.nudge")}>
+                  {#snippet skill()}<strong>{nudge.displayName}</strong>{/snippet}
+                </I18nText>
               </span>
               <button type="button" class="s2b-notice-action" onclick={() => void enablePlugin(nudge)}>
-                Enable
+                {t("chat.recommendations.enable")}
               </button>
               <button
                 type="button"
                 class="dismiss-chip clickable-icon"
-                aria-label={`Dismiss ${nudge.displayName} suggestion`}
-                title="Dismiss this suggestion"
+                aria-label={t("chat.recommendations.dismiss_nudge_aria", { name: nudge.displayName })}
+                title={t("chat.recommendations.dismiss_nudge")}
                 onclick={() => dismiss(nudge.id)}
               >
                 <span use:icon={"x"} style="--icon-size: 13px"></span>
@@ -494,7 +534,7 @@ function reviewNotice(notice: UpdateNotice): void {
                 nudgesExpanded = false;
               }}
             >
-              Show less
+              {t("chat.recommendations.show_less")}
             </button>
           {/if}
         {/if}
@@ -506,10 +546,10 @@ function reviewNotice(notice: UpdateNotice): void {
     <button
       type="button"
       class="dismiss-all"
-      aria-label="Dismiss all suggestions"
+      aria-label={t("chat.recommendations.dismiss_all_aria")}
       onclick={() => dismiss(DISMISS_ALL_ID)}
     >
-      Dismiss all
+      {t("chat.recommendations.dismiss_all")}
     </button>
   {/if}
 </div>

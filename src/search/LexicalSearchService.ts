@@ -41,6 +41,7 @@ import {
 } from "../vectorstore/MiniSearchService";
 import type { SearchFilter, SearchMatchBadge, SearchMatchExplanation, VectorSearchResult } from "../vectorstore/types";
 import { getData } from "../stores/dataStore.svelte";
+import { t } from "../i18n";
 
 const MAX_SNIPPET_LENGTH = 180;
 
@@ -309,7 +310,7 @@ export class LexicalSearchService {
 			await this.miniSearch.flush();
 			this.bulkAttempts.clear();
 			if (notice) {
-				notice.setMessage(`✓ Search index updated: ${added} notes`);
+				notice.setMessage(t("plugin.search_index.updated", { count: added }));
 				window.setTimeout(() => notice.hide(), 3000);
 			}
 		} catch (error) {
@@ -381,7 +382,7 @@ export class LexicalSearchService {
 		const container = el.createDiv({ cls: "s2b-indexing-notice" });
 		container.createDiv({
 			cls: "s2b-indexing-status",
-			text: `Indexing notes for search: ${status}`,
+			text: t("plugin.search_index.status", { status }),
 		});
 
 		const progressContainer = container.createDiv({ cls: "s2b-indexing-progress" });

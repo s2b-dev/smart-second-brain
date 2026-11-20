@@ -5,6 +5,7 @@ import { createProviderStateQuery, invalidateProviderState, removeProviderQuerie
 import { type LogoProps, getProviderDefinition } from "../../providers/index";
 import { getData } from "../../stores/dataStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
+import { formatNumber, t } from "../../i18n";
 import ManagedEntityItem from "./ManagedEntityItem.svelte";
 import GenericAIIcon from "../ui/logos/GenericAIIcon.svelte";
 import CircularLoader from "../ui/CircularLoader.svelte";
@@ -29,7 +30,7 @@ let isCheckingAuth = $derived(query.isPending || query.isFetching);
 let displayName = $derived(providerDefinition?.displayName ?? provider);
 let isTrusted = $derived(data.isProviderTrusted(provider));
 let authFailureMessage = $derived(
-	query.data && !query.data.auth.success ? query.data.auth.message : "Authentication failed",
+	query.data && !query.data.auth.success ? query.data.auth.message : t("settings.providers.auth_failed"),
 );
 let Logo: Component<LogoProps> = $derived.by(() => {
 	if (providerDefinition?.logo) {
@@ -61,10 +62,11 @@ async function handleRemoveProvider() {
 	}
 
 	const { confirmed, checked } = await confirmDeleteWithOption(plugin.app, displayName, {
-		label: "Also delete the embeddings built with this provider",
-		description: `Frees the storage used by ${indexedNotes.toLocaleString()} indexed ${
-			indexedNotes === 1 ? "note" : "notes"
-		}. Leave this off to keep them — re-adding this provider reuses them instead of re-embedding, which can be slow and costly.`,
+		label: t("settings.providers.delete_embeddings"),
+		description: t("settings.providers.delete_embeddings_desc", {
+			count: indexedNotes,
+			formatted: formatNumber(indexedNotes),
+		}),
 	});
 	if (!confirmed) return;
 	await removeProvider(checked);
@@ -78,7 +80,7 @@ async function removeProvider(purgeEmbeddings = false) {
 		// the same slug ID doesn't inherit this one's stale "connected" verdict from cache.
 		removeProviderQueries(provider);
 	} catch (error) {
-		new Notice(error instanceof Error ? error.message : "Failed to remove provider");
+		new Notice(error instanceof Error ? error.message : t("settings.providers.remove_failed"));
 		return;
 	}
 
@@ -94,7 +96,7 @@ async function removeProvider(purgeEmbeddings = false) {
 	// the dialog would leave every vector on disk with no sign anything was skipped.
 	const vectorStore = plugin.vectorStoreService;
 	if (!vectorStore) {
-		new Notice("Provider removed. Its embeddings were kept — the index service is still starting up.");
+		new Notice(t("settings.providers.embeddings_kept_starting"));
 		return;
 	}
 
@@ -115,9 +117,11 @@ async function removeProvider(purgeEmbeddings = false) {
 
 	if (failed.length > 0) {
 		new Notice(
-			`Provider removed, but deleting ${failed.length} of ${orphanedIndexIds.length} embedding ${
-				orphanedIndexIds.length === 1 ? "index" : "indexes"
-			} failed: ${failed.join(", ")}. See the console for details.`,
+			t("settings.providers.embeddings_delete_failed", {
+				count: orphanedIndexIds.length,
+				failed: failed.length,
+				ids: failed.join(", "),
+			}),
 		);
 	}
 }
@@ -134,8 +138,8 @@ async function removeProvider(purgeEmbeddings = false) {
         <button
           type="button"
           class="s2b-provider-icon-button provider-status-indicator"
-          title="Checking auth"
-          aria-label="Checking auth"
+          title={t("settings.providers.checking_auth")}
+          aria-label={t("settings.providers.checking_auth")}
           disabled
         >
           <CircularLoader size={12} color="var(--text-muted)" />
@@ -144,8 +148,8 @@ async function removeProvider(purgeEmbeddings = false) {
         <button
           type="button"
           class="s2b-provider-icon-button provider-status-indicator provider-icon-indicator-success"
-          title="Authenticated. Click to retry connection"
-          aria-label="Authenticated. Click to retry connection"
+          title={t("settings.providers.authenticated")}
+          aria-label={t("settings.providers.authenticated")}
           onclick={refetch}
         >
           <span class="provider-status-icon" use:icon={"check-circle"}></span>
@@ -154,8 +158,8 @@ async function removeProvider(purgeEmbeddings = false) {
         <button
           type="button"
           class="s2b-provider-icon-button provider-status-indicator provider-icon-indicator-error"
-          title={`${authFailureMessage}. Click to retry connection`}
-          aria-label={`${authFailureMessage}. Click to retry connection`}
+          title={t("settings.providers.auth_error_retry", { message: authFailureMessage })}
+          aria-label={t("settings.providers.auth_error_retry", { message: authFailureMessage })}
           onclick={refetch}
         >
           <span class="provider-status-icon" use:icon={"x-circle"}></span>
@@ -165,8 +169,8 @@ async function removeProvider(purgeEmbeddings = false) {
       {#if isTrusted}
         <span
           class="provider-trust-tooltip"
-          title="Trusted with private notes"
-          aria-label="Trusted with private notes"
+          title={t("settings.providers.trusted")}
+          aria-label={t("settings.providers.trusted")}
         >
           <span class="provider-icon-indicator provider-icon-indicator-accent">
             <span class="provider-trust-icon" use:icon={"shield-check"}></span>
@@ -179,14 +183,14 @@ async function removeProvider(purgeEmbeddings = false) {
   {#snippet actions()}
     <Button
       iconId="settings"
-      ariaLabel="Configure provider"
-      tooltip="Configure provider"
+      ariaLabel={t("settings.providers.configure")}
+      tooltip={t("settings.providers.configure")}
       onClick={handleOpenSettings}
     />
     <Button
       iconId="trash"
-      ariaLabel="Remove provider"
-      tooltip="Remove provider"
+      ariaLabel={t("settings.providers.remove")}
+      tooltip={t("settings.providers.remove")}
       onClick={() => void handleRemoveProvider()}
     />
   {/snippet}

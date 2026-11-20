@@ -1,5 +1,6 @@
 import { SuggestModal, setIcon } from "obsidian";
 import type { App } from "obsidian";
+import { t } from "../../i18n";
 import { MODEL_CAPABILITY_ICONS } from "../../lib/modelCapabilityIcons";
 import { stripVendorPrefix } from "../../lib/modelMetadataNormalizer";
 import { extractVendor } from "../../lib/modelVendorClassification";
@@ -15,7 +16,7 @@ type HydratedModel = HydratedChatModelMetadata | HydratedEmbeddingModelMetadata;
 
 function formatCost(costPer1M?: number): string {
 	if (costPer1M === undefined) return "—";
-	if (costPer1M === 0) return "Free";
+	if (costPer1M === 0) return t("modals.model_selection.free");
 	if (costPer1M < 0.01) return `$${costPer1M.toFixed(4)}`;
 	return `$${costPer1M.toFixed(2)}`;
 }
@@ -69,7 +70,11 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		this.openRouterModels = openRouterModels;
 
 		this.modalEl.addClass("s2b-model-suggest-modal");
-		this.setPlaceholder(modelType === "chat" ? "Search chat models…" : "Search embedding models…");
+		this.setPlaceholder(
+			modelType === "chat"
+				? t("modals.model_selection.search_chat_placeholder")
+				: t("modals.model_selection.search_embedding_placeholder"),
+		);
 		this.limit = 200;
 	}
 
@@ -123,7 +128,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		favIcon.className = "s2b-model-filter-icon";
 		setIcon(favIcon, "star");
 		favBtn.appendChild(favIcon);
-		favBtn.appendChild(document.createTextNode("Favorites"));
+		favBtn.appendChild(document.createTextNode(t("modals.model_selection.favorites")));
 		// Favorites and a vendor combine ("my favourite Qwen models"), matching
 		// the desktop modal's filter algebra — the two surfaces used to disagree.
 		favBtn.addEventListener("click", (evt) => {
@@ -234,7 +239,10 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		const favBtn = actions.createEl("button", { cls: "clickable-icon s2b-model-suggestion-fav" });
 		favBtn.type = "button";
 		favBtn.toggleClass("is-favorite", isFavorite);
-		favBtn.setAttribute("aria-label", isFavorite ? "Remove from favorites" : "Add to favorites");
+		favBtn.setAttribute(
+			"aria-label",
+			isFavorite ? t("modals.model_selection.remove_favorite") : t("modals.model_selection.add_favorite"),
+		);
 		favBtn.setAttribute("aria-pressed", String(isFavorite));
 		setIcon(favBtn, "star");
 		// The row itself selects the model, so the star must not bubble.
@@ -245,7 +253,10 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 			const nowFavorite = this.pluginData.isFavoriteModel(model.provider, model.variantKey);
 			favBtn.toggleClass("is-favorite", nowFavorite);
 			favBtn.setAttribute("aria-pressed", String(nowFavorite));
-			favBtn.setAttribute("aria-label", nowFavorite ? "Remove from favorites" : "Add to favorites");
+			favBtn.setAttribute(
+				"aria-label",
+				nowFavorite ? t("modals.model_selection.remove_favorite") : t("modals.model_selection.add_favorite"),
+			);
 		});
 
 		if (isSelected) {
@@ -269,7 +280,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		tag(this.getProviderDisplayName(model.provider), "s2b-model-suggestion-tag--provider");
 
 		if (model.kind === "chat") {
-			tag(`${formatTokenLimit(model.contextWindow)} ctx`);
+			tag(t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) }));
 			if (model.pricing?.inputUsdPer1M !== undefined || model.pricing?.outputUsdPer1M !== undefined) {
 				tag(`${formatCost(model.pricing?.inputUsdPer1M)}/${formatCost(model.pricing?.outputUsdPer1M)}`);
 			}
@@ -282,7 +293,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 			if (model.capabilities.structuredOutput)
 				iconTag(MODEL_CAPABILITY_ICONS.structuredOutput.icon, MODEL_CAPABILITY_ICONS.structuredOutput.label);
 		} else {
-			tag(`${formatTokenLimit(model.maxInputTokens)} max input`);
+			tag(t("modals.model_selection.max_input_tag", { tokens: formatTokenLimit(model.maxInputTokens) }));
 			if (model.pricing?.inputUsdPer1M !== undefined) {
 				tag(formatCost(model.pricing.inputUsdPer1M));
 			}

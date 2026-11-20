@@ -1,6 +1,7 @@
 <script lang="ts" generics="T extends TAbstractFile">
 import { type App, type TAbstractFile } from "obsidian";
 import { onDestroy, onMount } from "svelte";
+import { t } from "../../i18n";
 import { type FileFolderSuggest, createFileFolderSuggest } from "./folderSuggest";
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
 
 let {
 	app,
-	placeholder = "Search folders...",
+	placeholder = t("modals.folder_suggest.placeholder"),
 	suggestionLength = 10,
 	onSubmit,
 	suggestionFn,

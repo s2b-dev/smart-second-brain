@@ -2,6 +2,7 @@ import type { ToolCallStatus } from "../../stores/chatTimeline";
 import { parseAskQuestions } from "../../utils/askQuestion";
 import type { ToolOutputRenderModel } from "./toolOutputRenderModel";
 import { parseTodos } from "../../utils/todoList";
+import { type MessageKey, t } from "../../i18n";
 
 /**
  * A compact, one-line description of a tool call: a plain-language `label` and an
@@ -28,21 +29,23 @@ export interface ToolSummary {
  * lives in one place ({@link renderLabel}).
  */
 interface Verb {
-	/** Present continuous, shown while running — e.g. "Reading", "Searching notes for". */
-	running: string;
-	/** Past tense, shown when done/failed — e.g. "Read", "Searched notes for". */
-	done: string;
+	/** Present continuous, shown while running — e.g. "Reading {target}", "Searching notes for {target}". */
+	running: MessageKey;
+	/** Past tense, shown when done/failed — e.g. "Read {target}", "Searched notes for {target}". */
+	done: MessageKey;
+	/** Extra placeholders the messages use besides `{target}` (the generic tool's `{name}`). */
+	vars?: Record<string, string>;
 }
 
 /** A tense-aware label: a status-driven {@link Verb} plus optional trailing text. */
 interface Label {
 	verb: Verb;
-	/** Text appended after the verb (e.g. a quoted query or a note name). */
+	/** The verb message's `{target}` (e.g. a quoted query or a note name). */
 	rest?: string;
 }
 
-function verb(running: string, done: string): Verb {
-	return { running, done };
+function verb(running: MessageKey, done: MessageKey, vars?: Record<string, string>): Verb {
+	return { running, done, vars };
 }
 
 /**
@@ -53,8 +56,8 @@ function verb(running: string, done: string): Verb {
  */
 function renderLabel(label: Label, status: ToolCallStatus): string {
 	const inFlight = status === "running" || status === "pending";
-	const v = inFlight ? label.verb.running : label.verb.done;
-	return label.rest ? `${v} ${label.rest}` : v;
+	const key = inFlight ? label.verb.running : label.verb.done;
+	return t(key, { ...label.verb.vars, target: label.rest ?? "" });
 }
 
 /**
@@ -104,8 +107,53 @@ function asBuiltIn(toolName: string): BuiltInTool | undefined {
 
 /* ── Small formatting helpers ── */
 
-function pluralize(count: number, singular: string, plural = `${singular}s`): string {
-	return `${count} ${count === 1 ? singular : plural}`;
+/** A counted noun ("3 notes"), one plural message per noun. */
+type CountNoun =
+	| "note"
+	| "match"
+	| "file"
+	| "folder"
+	| "line"
+	| "tag"
+	| "result"
+	| "question"
+	| "operation"
+	| "item"
+	| "row"
+	| "field";
+
+function pluralize(count: number, noun: CountNoun): string {
+	switch (noun) {
+		case "note":
+			return t("chat.tool_summary.count.note", { count });
+		case "match":
+			return t("chat.tool_summary.count.match", { count });
+		case "file":
+			return t("chat.tool_summary.count.file", { count });
+		case "folder":
+			return t("chat.tool_summary.count.folder", { count });
+		case "line":
+			return t("chat.tool_summary.count.line", { count });
+		case "tag":
+			return t("chat.tool_summary.count.tag", { count });
+		case "result":
+			return t("chat.tool_summary.count.result", { count });
+		case "question":
+			return t("chat.tool_summary.count.question", { count });
+		case "operation":
+			return t("chat.tool_summary.count.operation", { count });
+		case "item":
+			return t("chat.tool_summary.count.item", { count });
+		case "row":
+			return t("chat.tool_summary.count.row", { count });
+		case "field":
+			return t("chat.tool_summary.count.field", { count });
+	}
+}
+
+/** "found 3 notes" — the common outcome clause. */
+function found(counted: string): string {
+	return t("chat.tool_summary.found", { items: counted });
 }
 
 /** Truncate a target string so the phrase stays a single tidy line. */
@@ -128,7 +176,7 @@ function stringInput(input: Record<string, unknown> | null | undefined, key: str
 
 /** Title-case a raw tool name as a fallback label (`get_all_tags` → `Get All Tags`). */
 function titleCaseToolName(name: string): string {
-	if (!name) return "Tool";
+	if (!name) return t("chat.tool_summary.tool_fallback");
 	return name
 		.replace(/_/g, " ")
 		.replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -157,14 +205,20 @@ function summarizeSearchNotes(
 	const query = stringInput(input, "query");
 	const recentOnly = input?.recentOnly === true;
 	const label: Label = query
-		? { verb: verb("Searching notes for", "Searched notes for"), rest: `“${truncateTarget(query)}”` }
+		? {
+				verb: verb(
+					"chat.tool_summary.verb.search_notes_for.running",
+					"chat.tool_summary.verb.search_notes_for.done",
+				),
+				rest: `“${truncateTarget(query)}”`,
+			}
 		: recentOnly
-			? { verb: verb("Looking at recent notes", "Looked at recent notes") }
-			: { verb: verb("Searching notes", "Searched notes") };
+			? { verb: verb("chat.tool_summary.verb.recent_notes.running", "chat.tool_summary.verb.recent_notes.done") }
+			: { verb: verb("chat.tool_summary.verb.search_notes.running", "chat.tool_summary.verb.search_notes.done") };
 
 	if (model?.kind !== "search_notes") return { label, summary: "" };
 	const total = model.payload.totalResults ?? model.payload.results?.length ?? 0;
-	return { label, summary: total === 0 ? "found no matches" : `found ${pluralize(total, "note")}` };
+	return { label, summary: total === 0 ? t("chat.tool_summary.found_no_matches") : found(pluralize(total, "note")) };
 }
 
 function summarizeGrepNotes(
@@ -173,8 +227,11 @@ function summarizeGrepNotes(
 ): RawSummary {
 	const pattern = stringInput(input, "pattern");
 	const label: Label = pattern
-		? { verb: verb("Searching for text", "Searched for text"), rest: `“${truncateTarget(pattern)}”` }
-		: { verb: verb("Searching note text", "Searched note text") };
+		? {
+				verb: verb("chat.tool_summary.verb.grep_for.running", "chat.tool_summary.verb.grep_for.done"),
+				rest: `“${truncateTarget(pattern)}”`,
+			}
+		: { verb: verb("chat.tool_summary.verb.grep.running", "chat.tool_summary.verb.grep.done") };
 
 	// grep_notes returns generic JSON — pull totals straight off the raw payload.
 	const payload = parseRawJson(model?.rawText);
@@ -182,9 +239,15 @@ function summarizeGrepNotes(
 		const total = numberProp(payload, "total_matches");
 		const files = numberProp(payload, "files_searched");
 		if (total !== undefined) {
-			if (total === 0) return { label, summary: "found no matches" };
-			const filePart = files !== undefined ? ` in ${pluralize(files, "file")}` : "";
-			return { label, summary: `found ${pluralize(total, "match", "matches")}${filePart}` };
+			if (total === 0) return { label, summary: t("chat.tool_summary.found_no_matches") };
+			const matches = pluralize(total, "match");
+			return {
+				label,
+				summary:
+					files !== undefined
+						? t("chat.tool_summary.found_in", { items: matches, files: pluralize(files, "file") })
+						: found(matches),
+			};
 		}
 	}
 	return { label, summary: "" };
@@ -197,16 +260,26 @@ function summarizeListDirectory(
 	const path = stringInput(input, "path") ?? stringInput(input, "root");
 	const label: Label =
 		path && path !== "/"
-			? { verb: verb("Listing folder", "Listed folder"), rest: truncateTarget(basename(path)) }
-			: { verb: verb("Listing the vault", "Listed the vault") };
+			? {
+					verb: verb("chat.tool_summary.verb.list_folder.running", "chat.tool_summary.verb.list_folder.done"),
+					rest: truncateTarget(basename(path)),
+				}
+			: { verb: verb("chat.tool_summary.verb.list_vault.running", "chat.tool_summary.verb.list_vault.done") };
 
 	if (model?.kind !== "list_directory") return { label, summary: "" };
 	const folders = model.payload.totalFolders ?? 0;
 	const files = model.payload.totalFiles ?? 0;
-	const parts: string[] = [];
-	if (folders > 0) parts.push(pluralize(folders, "folder"));
-	parts.push(pluralize(files, "file"));
-	return { label, summary: `found ${parts.join(" and ")}` };
+	const filesPart = pluralize(files, "file");
+	return {
+		label,
+		summary:
+			folders > 0
+				? t("chat.tool_summary.found_folders_and_files", {
+						folders: pluralize(folders, "folder"),
+						files: filesPart,
+					})
+				: found(filesPart),
+	};
 }
 
 function summarizeReadContent(
@@ -215,57 +288,93 @@ function summarizeReadContent(
 ): RawSummary {
 	const target = stringInput(input, "target") ?? stringInput(input, "path");
 	const label: Label = target
-		? { verb: verb("Reading", "Read"), rest: truncateTarget(basename(target)) }
-		: { verb: verb("Reading a note", "Read a note") };
+		? {
+				verb: verb("chat.tool_summary.verb.read_target.running", "chat.tool_summary.verb.read_target.done"),
+				rest: truncateTarget(basename(target)),
+			}
+		: { verb: verb("chat.tool_summary.verb.read_note.running", "chat.tool_summary.verb.read_note.done") };
 
 	if (model?.kind !== "read_content") return { label, summary: "" };
 	const lines = countLines(model.payload.content);
-	const summary = model.payload.truncated ? `${pluralize(lines, "line")} (truncated)` : pluralize(lines, "line");
+	const summary = model.payload.truncated
+		? t("chat.tool_summary.truncated", { lines: pluralize(lines, "line") })
+		: pluralize(lines, "line");
 	return { label, summary };
 }
 
 function summarizeManageNotes(model: ToolOutputRenderModel | undefined): RawSummary {
 	// The operation set can be large; a plain "Edited notes" reads cleaner than a list.
-	if (model?.kind !== "manage_notes") return { label: { verb: verb("Editing notes", "Edited notes") }, summary: "" };
+	if (model?.kind !== "manage_notes")
+		return {
+			label: {
+				verb: verb("chat.tool_summary.verb.edit_notes.running", "chat.tool_summary.verb.edit_notes.done"),
+			},
+			summary: "",
+		};
 	const { operations, paths } = model.summary;
 	const label: Label =
 		paths === 1
-			? { verb: verb("Editing a note", "Edited a note") }
-			: { verb: verb("Editing notes", "Edited notes") };
-	return { label, summary: `${pluralize(operations, "operation")} across ${pluralize(paths, "note")}` };
+			? { verb: verb("chat.tool_summary.verb.edit_note.running", "chat.tool_summary.verb.edit_note.done") }
+			: { verb: verb("chat.tool_summary.verb.edit_notes.running", "chat.tool_summary.verb.edit_notes.done") };
+	return {
+		label,
+		summary: t("chat.tool_summary.operations_across", {
+			operations: pluralize(operations, "operation"),
+			notes: pluralize(paths, "note"),
+		}),
+	};
 }
 
 function summarizeExecuteJavaScript(model: ToolOutputRenderModel | undefined): RawSummary {
-	const label: Label = { verb: verb("Running JavaScript", "Ran JavaScript") };
+	const label: Label = {
+		verb: verb("chat.tool_summary.verb.run_javascript.running", "chat.tool_summary.verb.run_javascript.done"),
+	};
 	if (model?.kind !== "execute_javascript") return { label, summary: "" };
-	if (model.payload.state === "error") return { label, summary: "errored" };
+	if (model.payload.state === "error") return { label, summary: t("chat.tool_summary.errored") };
 	const logs = model.payload.logs.length;
 	const parts: string[] = [];
-	if (logs > 0) parts.push(`logged ${pluralize(logs, "line")}`);
-	if (model.payload.resultText) parts.push("returned a value");
-	if (model.payload.durationMs !== undefined) parts.push(`in ${model.payload.durationMs}ms`);
+	if (logs > 0) parts.push(t("chat.tool_summary.logged", { lines: pluralize(logs, "line") }));
+	if (model.payload.resultText) parts.push(t("chat.tool_summary.returned_value"));
+	if (model.payload.durationMs !== undefined)
+		parts.push(t("chat.tool_summary.duration_ms", { ms: model.payload.durationMs }));
 	return { label, summary: parts.join(" ") };
 }
 
 function summarizeGetAllTags(model: ToolOutputRenderModel | undefined): RawSummary {
-	const label: Label = { verb: verb("Listing all tags", "Listed all tags") };
+	const label: Label = {
+		verb: verb("chat.tool_summary.verb.list_tags.running", "chat.tool_summary.verb.list_tags.done"),
+	};
 	const count = listLength(model);
-	return { label, summary: count !== undefined ? `found ${pluralize(count, "tag")}` : "" };
+	return { label, summary: count !== undefined ? found(pluralize(count, "tag")) : "" };
 }
 
 function summarizeGetProperties(input: Record<string, unknown> | null | undefined): RawSummary {
 	const target = stringInput(input, "path") ?? stringInput(input, "target");
 	const label: Label = target
-		? { verb: verb("Reading properties of", "Read properties of"), rest: truncateTarget(basename(target)) }
-		: { verb: verb("Reading note properties", "Read note properties") };
+		? {
+				verb: verb(
+					"chat.tool_summary.verb.read_properties_of.running",
+					"chat.tool_summary.verb.read_properties_of.done",
+				),
+				rest: truncateTarget(basename(target)),
+			}
+		: {
+				verb: verb(
+					"chat.tool_summary.verb.read_properties.running",
+					"chat.tool_summary.verb.read_properties.done",
+				),
+			};
 	return { label, summary: "" };
 }
 
 function summarizeFetchUrl(input: Record<string, unknown> | null | undefined): RawSummary {
 	const url = stringInput(input, "url");
 	const label: Label = url
-		? { verb: verb("Fetching", "Fetched"), rest: truncateTarget(hostOf(url)) }
-		: { verb: verb("Fetching a page", "Fetched a page") };
+		? {
+				verb: verb("chat.tool_summary.verb.fetch_target.running", "chat.tool_summary.verb.fetch_target.done"),
+				rest: truncateTarget(hostOf(url)),
+			}
+		: { verb: verb("chat.tool_summary.verb.fetch_page.running", "chat.tool_summary.verb.fetch_page.done") };
 	return { label, summary: "" };
 }
 
@@ -275,27 +384,47 @@ function summarizeWebSearch(
 ): RawSummary {
 	const query = stringInput(input, "query");
 	const label: Label = query
-		? { verb: verb("Searching the web for", "Searched the web for"), rest: `“${truncateTarget(query)}”` }
-		: { verb: verb("Searching the web", "Searched the web") };
+		? {
+				verb: verb(
+					"chat.tool_summary.verb.web_search_for.running",
+					"chat.tool_summary.verb.web_search_for.done",
+				),
+				rest: `“${truncateTarget(query)}”`,
+			}
+		: { verb: verb("chat.tool_summary.verb.web_search.running", "chat.tool_summary.verb.web_search.done") };
 	const count = listLength(model);
-	return { label, summary: count !== undefined ? `found ${pluralize(count, "result")}` : "" };
+	return { label, summary: count !== undefined ? found(pluralize(count, "result")) : "" };
 }
 
 function summarizeLoadSkill(input: Record<string, unknown> | null | undefined): RawSummary {
 	const name = stringInput(input, "skillName");
 	const label: Label = name
-		? { verb: verb("Loading skill", "Loaded skill"), rest: truncateTarget(name) }
-		: { verb: verb("Loading a skill", "Loaded a skill") };
+		? {
+				verb: verb(
+					"chat.tool_summary.verb.load_skill_target.running",
+					"chat.tool_summary.verb.load_skill_target.done",
+				),
+				rest: truncateTarget(name),
+			}
+		: { verb: verb("chat.tool_summary.verb.load_skill.running", "chat.tool_summary.verb.load_skill.done") };
 	return { label, summary: "" };
 }
 
 function summarizeWriteTodos(input: Record<string, unknown> | null | undefined): RawSummary {
-	const label: Label = { verb: verb("Updating task list", "Updated task list") };
+	const label: Label = {
+		verb: verb("chat.tool_summary.verb.update_todos.running", "chat.tool_summary.verb.update_todos.done"),
+	};
 	const todos = parseTodos(input);
 	if (!todos) return { label, summary: "" };
-	if (todos.length === 0) return { label: { verb: verb("Clearing task list", "Cleared task list") }, summary: "" };
-	const done = todos.filter((t) => t.status === "completed").length;
-	return { label, summary: `${done} of ${todos.length} done` };
+	if (todos.length === 0)
+		return {
+			label: {
+				verb: verb("chat.tool_summary.verb.clear_todos.running", "chat.tool_summary.verb.clear_todos.done"),
+			},
+			summary: "",
+		};
+	const done = todos.filter((todo) => todo.status === "completed").length;
+	return { label, summary: t("chat.tool_summary.todos_done", { done, total: todos.length }) };
 }
 
 function summarizeAskQuestion(
@@ -305,14 +434,20 @@ function summarizeAskQuestion(
 	const questions = parseAskQuestions(input);
 	const label: Label =
 		questions.length === 1
-			? { verb: verb("Asking", "Asked"), rest: `“${truncateTarget(questions[0].question)}”` }
-			: { verb: verb("Asking", "Asked"), rest: pluralize(questions.length, "question") };
+			? {
+					verb: verb("chat.tool_summary.verb.ask_target.running", "chat.tool_summary.verb.ask_target.done"),
+					rest: `“${truncateTarget(questions[0].question)}”`,
+				}
+			: {
+					verb: verb("chat.tool_summary.verb.ask_target.running", "chat.tool_summary.verb.ask_target.done"),
+					rest: pluralize(questions.length, "question"),
+				};
 	if (model?.kind !== "ask_question") return { label, summary: "" };
 	const result = model.result;
-	if (result.status === "dismissed") return { label, summary: "dismissed" };
-	if (result.status === "replied") return { label, summary: "answered in chat" };
+	if (result.status === "dismissed") return { label, summary: t("chat.tool_summary.dismissed") };
+	if (result.status === "replied") return { label, summary: t("chat.tool_summary.answered_in_chat") };
 	const only = result.answers.length === 1 ? result.answers[0].answer.join(", ") : "";
-	return { label, summary: only ? truncateTarget(only) : "answered" };
+	return { label, summary: only ? truncateTarget(only) : t("chat.tool_summary.answered") };
 }
 
 /* ── Generic fallback (unknown / renamed tools) ── */
@@ -328,21 +463,30 @@ function summarizeGeneric(
 	const primary = firstStringInput(input);
 	const rest = primary ? truncateTarget(primary) : name;
 	const label: Label = primary
-		? { verb: verb(`Using ${name}:`, `Used ${name}:`), rest }
-		: { verb: verb(`Using ${name}`, `Used ${name}`) };
+		? {
+				verb: verb(
+					"chat.tool_summary.verb.generic_target.running",
+					"chat.tool_summary.verb.generic_target.done",
+					{
+						name,
+					},
+				),
+				rest,
+			}
+		: { verb: verb("chat.tool_summary.verb.generic.running", "chat.tool_summary.verb.generic.done", { name }) };
 
 	// Pull a light outcome hint from the shape the render model already computed.
 	let summary = "";
 	if (model) {
 		switch (model.kind) {
 			case "list":
-				summary = `found ${pluralize(model.items.length, "item")}`;
+				summary = found(pluralize(model.items.length, "item"));
 				break;
 			case "table":
-				summary = `found ${pluralize(model.rows.length, "row")}`;
+				summary = found(pluralize(model.rows.length, "row"));
 				break;
 			case "keyValue":
-				summary = `found ${pluralize(model.entries.length, "field")}`;
+				summary = found(pluralize(model.entries.length, "field"));
 				break;
 			default:
 				summary = "";
@@ -449,7 +593,7 @@ export function buildToolSummary(
 	// While running with nothing decoded yet, a failed tool should still read as
 	// failed rather than showing a stale summary from a prior render.
 	if (status === "failed" && !model) {
-		return { label, summary: "failed" };
+		return { label, summary: t("chat.tool_summary.failed") };
 	}
 	return { label, summary: raw.summary };
 }
@@ -495,7 +639,7 @@ function sumBy(calls: MergedCall[], pick: (c: MergedCall) => number | undefined)
 
 const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 	search_notes: {
-		verb: verb("Searching notes for", "Searched notes for"),
+		verb: verb("chat.tool_summary.verb.search_notes_for.running", "chat.tool_summary.verb.search_notes_for.done"),
 		target: (input) => stringInput(input, "query"),
 		quoted: true,
 		aggregate: (calls) => {
@@ -504,11 +648,15 @@ const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 					? (c.model.payload.totalResults ?? c.model.payload.results?.length ?? 0)
 					: undefined,
 			);
-			return total === undefined ? "" : total === 0 ? "found no matches" : `found ${pluralize(total, "note")}`;
+			return total === undefined
+				? ""
+				: total === 0
+					? t("chat.tool_summary.found_no_matches")
+					: found(pluralize(total, "note"));
 		},
 	},
 	grep_notes: {
-		verb: verb("Searching for text", "Searched for text"),
+		verb: verb("chat.tool_summary.verb.grep_for.running", "chat.tool_summary.verb.grep_for.done"),
 		target: (input) => stringInput(input, "pattern"),
 		quoted: true,
 		aggregate: (calls) => {
@@ -519,34 +667,37 @@ const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 			return total === undefined
 				? ""
 				: total === 0
-					? "found no matches"
-					: `found ${pluralize(total, "match", "matches")}`;
+					? t("chat.tool_summary.found_no_matches")
+					: found(pluralize(total, "match"));
 		},
 	},
 	read_content: {
-		verb: verb("Reading", "Read"),
+		verb: verb("chat.tool_summary.verb.read_target.running", "chat.tool_summary.verb.read_target.done"),
 		target: (input) => {
-			const t = stringInput(input, "target") ?? stringInput(input, "path");
-			return t ? basename(t) : undefined;
+			const target = stringInput(input, "target") ?? stringInput(input, "path");
+			return target ? basename(target) : undefined;
 		},
 		quoted: false,
 		aggregate: (calls) => {
 			const total = sumBy(calls, (c) =>
 				c.model?.kind === "read_content" ? countLines(c.model.payload.content) : undefined,
 			);
-			return total === undefined ? "" : `${pluralize(total, "line")} total`;
+			return total === undefined ? "" : t("chat.tool_summary.lines_total", { lines: pluralize(total, "line") });
 		},
 	},
 	get_properties: {
-		verb: verb("Reading properties of", "Read properties of"),
+		verb: verb(
+			"chat.tool_summary.verb.read_properties_of.running",
+			"chat.tool_summary.verb.read_properties_of.done",
+		),
 		target: (input) => {
-			const t = stringInput(input, "path") ?? stringInput(input, "target");
-			return t ? basename(t) : undefined;
+			const target = stringInput(input, "path") ?? stringInput(input, "target");
+			return target ? basename(target) : undefined;
 		},
 		quoted: false,
 	},
 	fetch_url: {
-		verb: verb("Fetching", "Fetched"),
+		verb: verb("chat.tool_summary.verb.fetch_target.running", "chat.tool_summary.verb.fetch_target.done"),
 		target: (input) => {
 			const url = stringInput(input, "url");
 			return url ? hostOf(url) : undefined;
@@ -554,12 +705,12 @@ const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 		quoted: false,
 	},
 	web_search: {
-		verb: verb("Searching the web for", "Searched the web for"),
+		verb: verb("chat.tool_summary.verb.web_search_for.running", "chat.tool_summary.verb.web_search_for.done"),
 		target: (input) => stringInput(input, "query"),
 		quoted: true,
 	},
 	load_skill: {
-		verb: verb("Loading skill", "Loaded skill"),
+		verb: verb("chat.tool_summary.verb.load_skill_target.running", "chat.tool_summary.verb.load_skill_target.done"),
 		target: (input) => stringInput(input, "skillName"),
 		quoted: false,
 	},
@@ -567,15 +718,19 @@ const MERGE_SPECS: Partial<Record<BuiltInTool, MergeSpec>> = {
 
 /** Joins listed targets into "a, b and c", capping the tail as "a, b and N more". */
 function joinTargets(targets: string[], quoted: boolean): string {
-	const wrap = (t: string) => (quoted ? `“${truncateTarget(t, 32)}”` : truncateTarget(t, 32));
+	const wrap = (target: string) => (quoted ? `“${truncateTarget(target, 32)}”` : truncateTarget(target, 32));
+	const separator = t("chat.tool_summary.list_separator");
 	if (targets.length <= MAX_LISTED_TARGETS) {
 		const wrapped = targets.map(wrap);
 		if (wrapped.length === 1) return wrapped[0];
-		return `${wrapped.slice(0, -1).join(", ")} and ${wrapped.at(-1)}`;
+		return t("chat.tool_summary.list_and", {
+			list: wrapped.slice(0, -1).join(separator),
+			last: wrapped.at(-1) ?? "",
+		});
 	}
 	const head = targets.slice(0, MAX_LISTED_TARGETS).map(wrap);
 	const remaining = targets.length - MAX_LISTED_TARGETS;
-	return `${head.join(", ")} and ${remaining} more`;
+	return t("chat.tool_summary.list_and_more", { list: head.join(separator), count: remaining });
 }
 
 /**
@@ -605,12 +760,12 @@ export function buildMergedToolSummary(toolName: string, calls: MergedCall[], st
 		const label = `${base.label} ×${calls.length}`;
 		// Sum the count-based outcomes each call already computed so a merged
 		// generic tool still reports its result (e.g. two get_all_tags → "found N tags").
-		const summary = status === "failed" ? "failed" : mergedGenericSummary(calls);
+		const summary = status === "failed" ? t("chat.tool_summary.failed") : mergedGenericSummary(calls);
 		return { label, summary };
 	}
 
-	const targets = calls.map((c) => spec.target(c.input)).filter((t): t is string => !!t);
-	const noun = builtIn === "read_content" || builtIn === "get_properties" ? "note" : "item";
+	const targets = calls.map((c) => spec.target(c.input)).filter((target): target is string => !!target);
+	const noun: CountNoun = builtIn === "read_content" || builtIn === "get_properties" ? "note" : "item";
 
 	let rest: string;
 	if (targets.length === calls.length && targets.length > 0) {
@@ -624,7 +779,7 @@ export function buildMergedToolSummary(toolName: string, calls: MergedCall[], st
 	const label = renderLabel({ verb: spec.verb, rest }, status);
 	// A failed group must not display a positive aggregate ("found 3 notes") in red —
 	// mirror the single-call failed guard. Aggregates are also empty while running.
-	if (status === "failed") return { label, summary: "failed" };
+	if (status === "failed") return { label, summary: t("chat.tool_summary.failed") };
 	const summary = status === "running" || status === "pending" ? "" : (spec.aggregate?.(calls) ?? "");
 	return { label, summary };
 }
@@ -636,7 +791,7 @@ export function buildMergedToolSummary(toolName: string, calls: MergedCall[], st
  */
 function mergedGenericSummary(calls: MergedCall[]): string {
 	let total = 0;
-	let noun: string | undefined;
+	let noun: CountNoun | undefined;
 	for (const c of calls) {
 		switch (c.model?.kind) {
 			case "list":
@@ -653,5 +808,5 @@ function mergedGenericSummary(calls: MergedCall[]): string {
 				break;
 		}
 	}
-	return noun ? `found ${pluralize(total, noun)}` : "";
+	return noun ? found(pluralize(total, noun)) : "";
 }

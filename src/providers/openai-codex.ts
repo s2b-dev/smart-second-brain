@@ -15,6 +15,7 @@ import {
 } from "./openaiCodex";
 import { getCodexSession } from "../stores/providerRuntime.svelte";
 import { fetchOpenRouterModels, isEmbeddingModel, type OpenRouterModelInfo } from "./openrouterModels";
+import { t } from "../i18n";
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
@@ -60,7 +61,7 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 		oauth: {
 			label: "ChatGPT",
 			icon: "log-in",
-			description: "Open a browser window to complete ChatGPT/Codex authorization.",
+			description: t("plugin.providers.openai.oauth_desc"),
 			signIn: async () => {
 				await signInWithOpenAICodex();
 				return { kind: "session" };
@@ -72,11 +73,11 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 		},
 		auth: {
 			apiKey: {
-				label: "ChatGPT Sign-In",
-				description: "This provider uses a browser-based ChatGPT/Codex sign-in flow.",
+				label: t("plugin.providers.fields.chatgpt_sign_in"),
+				description: t("plugin.providers.openai_codex.sign_in_desc"),
 				kind: "text",
 				required: true,
-				placeholder: "Authorized via ChatGPT sign-in",
+				placeholder: t("plugin.providers.openai_codex.sign_in_placeholder"),
 			},
 		},
 		createChatInstance: (_auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) =>
@@ -98,7 +99,7 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 		validateAuth: async (_auth: AuthObject): Promise<AuthValidationResult> => {
 			const session = await getValidOpenAICodexSession();
 			if (!session) {
-				return { valid: false, error: "Sign in with ChatGPT to use Codex" };
+				return { valid: false, error: t("plugin.provider_auth.codex_sign_in_required") };
 			}
 			return { valid: true };
 		},

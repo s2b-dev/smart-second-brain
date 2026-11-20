@@ -1,0 +1,329 @@
+{
+	"commands": {
+		"open_chat": "Chat öffnen",
+		"new_chat": "Neuer Chat",
+		"search_notes": "Notizen durchsuchen",
+		"open_smart_graph": "Smart Graph öffnen",
+		"show_welcome": "Willkommensseite anzeigen",
+		"show_release_notes": "Versionshinweise anzeigen",
+		"next_pending_change": "Nächste ausstehende Änderung",
+		"previous_pending_change": "Vorherige ausstehende Änderung"
+	},
+	"chat_file_menu": {
+		"rename": "Chat umbenennen",
+		"rename_button": "Umbenennen",
+		"delete": "Chat löschen",
+		"rename_failed": "Chat konnte nicht umbenannt werden: {error}",
+		"delete_failed": "Chat konnte nicht gelöscht werden: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Zum Chat hinzufügen",
+			"other": "{count} Dateien zum Chat hinzufügen"
+		},
+		"add_file_failed": "Datei konnte nicht zum Chat hinzugefügt werden: {error}",
+		"add_files_failed": "Dateien konnten nicht zum Chat hinzugefügt werden: {error}",
+		"no_supported_files": "Keine unterstützten Dateien ausgewählt. Unterstützt: txt, md, csv, json, Bilder, pdf.",
+		"chat_not_initialized": "Der Chat ist noch nicht initialisiert. Öffne den Chat und versuche es erneut.",
+		"queued": {
+			"one": "{count} Datei für den Chat vorgemerkt.",
+			"other": "{count} Dateien für den Chat vorgemerkt."
+		},
+		"skipped_unsupported": {
+			"one": "{count} nicht unterstützte Datei übersprungen.",
+			"other": "{count} nicht unterstützte Dateien übersprungen."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "Derzeit ist kein Chat geöffnet",
+		"no_pending_changes": "Keine ausstehenden Änderungen in diesem Chat",
+		"new_file_nothing_to_open": "Diese Änderung erstellt eine neue Datei – es gibt noch nichts zu öffnen."
+	},
+	"huggingface_connected": "Mit Hugging Face verbunden.",
+	"update": {
+		"available": "Smart Second Brain {version} ist verfügbar.",
+		"update_link": "Aktualisieren",
+		"updated": "Smart Second Brain wurde auf {version} aktualisiert.",
+		"whats_new_link": "Neuigkeiten ansehen"
+	},
+	"settings_save_failed": "Smart Second Brain konnte deine Einstellungen nicht speichern: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: Etwa {tokens} Tokens des ältesten Chatverlaufs passten nicht in das Kontextfenster des Zusammenfassungsmodells und wurden in der Zusammenfassung ausgelassen.",
+		"repeated_failure": "Smart Second Brain: Das Zusammenfassen des Verlaufs dieses Chats ist {failures}-mal in Folge fehlgeschlagen, daher wird weiterhin der vollständige Verlauf gesendet, der das Kontextlimit des Modells überschreiten kann. Prüfe das Zusammenfassungsmodell des Agenten; der Fehler steht in der Entwicklerkonsole."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Gedächtnis zu groß für dieses Modell{window}: {names} wird nicht mehr in jede Nachricht geladen. Der Agent liest es nur bei Bedarf. Kürze die Notiz oder verwende ein Modell mit größerem Kontextfenster.",
+			"other": "Gedächtnis zu groß für dieses Modell{window}: {names} werden nicht mehr in jede Nachricht geladen. Der Agent liest sie nur bei Bedarf. Kürze die Notizen oder verwende ein Modell mit größerem Kontextfenster."
+		},
+		"memory_window": "({k}k Tokens)",
+		"save_prompt_failed": "Der System-Prompt konnte nicht gespeichert werden: {error}",
+		"open_agent_note": "Agenten-Notiz öffnen",
+		"prompt_modal_title": "System-Prompt – {name}",
+		"save_skill_failed": "Der Skill „{skill}“ konnte nicht gespeichert werden: {error}",
+		"open_skill_note": "Skill-Notiz öffnen",
+		"skill_modal_title": "Skill – {skill}",
+		"cannot_connect": "Keine Verbindung zu: {providers}. Prüfe, ob der Dienst läuft.",
+		"review_providers": "Anbieter prüfen",
+		"provider_unavailable": "Anbieter „{provider}“ ist nicht mehr verfügbar.",
+		"select_new_model": "Neues Modell auswählen",
+		"withdrew_changes": {
+			"one": "{count} ausstehende Notizänderung der ersetzten Antwort zurückgezogen.",
+			"other": "{count} ausstehende Notizänderungen der ersetzten Antwort zurückgezogen."
+		},
+		"kept_partial_changes": {
+			"one": "{count} teilweise übernommene Änderung wurde behalten – kläre sie in der Prüfleiste.",
+			"other": "{count} teilweise übernommene Änderungen wurden behalten – kläre sie in der Prüfleiste."
+		}
+	},
+	"errors": {
+		"request_failed": "Die Anfrage an das Modell ist fehlgeschlagen.",
+		"context_overflow": "Dieser Chat passt nicht mehr in das Kontextfenster des Modells.",
+		"context_overflow_hint": "Starte einen neuen Chat oder prüfe das für dieses Modell konfigurierte Kontextfenster.",
+		"refusal": "Das Modell hat die Antwort auf diese Anfrage verweigert.",
+		"refusal_hint": "Die Anfrage umzuformulieren oder zu einem anderen Modell zu wechseln, kann helfen."
+	},
+	"provider_auth": {
+		"unknown_provider": "Unbekannter Anbieter: {provider}",
+		"invalid_api_key": "Ungültiger API-Schlüssel",
+		"invalid_endpoint": "Ungültige Basis-URL oder Endpunkt nicht erreichbar",
+		"configuration_failed": "Anbieterkonfiguration fehlgeschlagen",
+		"no_auth_config": "Keine Authentifizierungskonfiguration für {provider} gefunden",
+		"discovery_failed": "Modellsuche fehlgeschlagen: {error}",
+		"server_url_required": "Server-URL ist erforderlich",
+		"api_key_required": "API-Schlüssel ist erforderlich",
+		"connection_failed": "Verbindung fehlgeschlagen: {error}",
+		"auth_failed_status": "Authentifizierung fehlgeschlagen ({status})",
+		"auth_failed": "Authentifizierung fehlgeschlagen",
+		"request_failed_status": "Anfrage fehlgeschlagen mit Status {status}",
+		"codex_sign_in_required": "Melde dich mit ChatGPT an, um Codex zu verwenden",
+		"openai_codex_sign_in_required": "Melde dich mit ChatGPT an, um OpenAI über Codex zu verwenden",
+		"huggingface_token_rejected": "Hugging Face hat dieses Zugriffstoken abgelehnt",
+		"huggingface_status": "Hugging Face hat Status {status} zurückgegeben",
+		"huggingface_sign_in_required": "Melde dich mit Hugging Face an, um die Verbindung herzustellen"
+	},
+	"providers": {
+		"templates": {
+			"openai": "OpenAI-Modelle per ChatGPT-Anmeldung oder API-Schlüssel.",
+			"openai_compatible": "Flexibler Anbieter im OpenAI-Stil für OpenAI und kompatible Endpunkte.",
+			"anthropic": "Claude-Modelle über die API von Anthropic.",
+			"ollama": "Lokale Ollama-Modelle über die Ollama-API.",
+			"omlx": "Lokale MLX-Modelle auf deinem Mac über den OpenAI-kompatiblen Server von oMLX.",
+			"openrouter": "OpenRouter-Konto und Modellkatalog.",
+			"huggingface": "Offene Modelle über die Inferenzanbieter von Hugging Face."
+		},
+		"fields": {
+			"api_key": "API-Schlüssel",
+			"base_url": "Basis-URL",
+			"server_url": "Server-URL",
+			"access_token": "Zugriffstoken",
+			"custom_headers": "Benutzerdefinierte Header",
+			"custom_headers_desc": "Zusätzliche Header als JSON (optional)",
+			"chatgpt_sign_in": "ChatGPT-Anmeldung"
+		},
+		"openai": {
+			"link": "OpenAI-Dashboard",
+			"oauth_desc": "Öffnet ein Browserfenster, um die ChatGPT/Codex-Autorisierung abzuschließen.",
+			"api_key_desc": "Dein OpenAI-API-Schlüssel zur Authentifizierung",
+			"base_url_desc": "Benutzerdefinierter API-Endpunkt (leer lassen für den OpenAI-Standard)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Dieser Anbieter verwendet eine browserbasierte ChatGPT/Codex-Anmeldung.",
+			"sign_in_placeholder": "Über ChatGPT-Anmeldung autorisiert"
+		},
+		"openai_compatible": {
+			"base_url_desc": "Die Basis-URL des OpenAI-kompatiblen API-Endpunkts",
+			"api_key_desc": "API-Schlüssel zur Authentifizierung (leer lassen, wenn dein Endpunkt keinen benötigt)"
+		},
+		"anthropic": {
+			"link": "Anthropic Console",
+			"api_key_desc": "Dein Anthropic-API-Schlüssel zur Authentifizierung",
+			"base_url_desc": "Die Basis-URL des Anthropic-kompatiblen API-Endpunkts"
+		},
+		"ollama": {
+			"link": "Ollama-Website",
+			"server_url_desc": "Die URL, unter der dein Ollama-Server läuft",
+			"api_key_desc": "API-Schlüssel zur Authentifizierung (für lokales Ollama meist nicht nötig)"
+		},
+		"omlx": {
+			"link": "oMLX-Website",
+			"server_url_desc": "Die URL, unter der dein oMLX-Server läuft",
+			"api_key_desc": "oMLX verlangt standardmäßig einen API-Schlüssel (zu finden in den globalen Einstellungen des Admin-Panels). Nur leer lassen, wenn du die Schlüsselprüfung deaktiviert hast."
+		},
+		"openrouter": {
+			"link": "OpenRouter-Schlüssel",
+			"oauth_desc": "Autorisiere im Browser, um die Verbindung herzustellen, ohne manuell einen API-Schlüssel zu erstellen.",
+			"api_key_desc": "Dein OpenRouter-API-Schlüssel zur Authentifizierung"
+		},
+		"huggingface": {
+			"link": "Hugging Face-Zugriffstokens",
+			"oauth_desc": "Bestätige den Zugriff im Browser, um die Verbindung herzustellen, ohne ein Zugriffstoken zu erstellen."
+		}
+	},
+	"indexing": {
+		"status": "Indexierung: {status}",
+		"cancelled_chunks": {
+			"one": "Indexierung abgebrochen ({count} Chunk aktualisiert)",
+			"other": "Indexierung abgebrochen ({count} Chunks aktualisiert)"
+		},
+		"updated_chunks": {
+			"one": "✓ Index aktualisiert: {count} Chunk",
+			"other": "✓ Index aktualisiert: {count} Chunks"
+		},
+		"cancelled_notes": {
+			"one": "Indexierung abgebrochen (bisher {count} Notiz indexiert)",
+			"other": "Indexierung abgebrochen (bisher {count} Notizen indexiert)"
+		},
+		"indexed_notes": {
+			"one": "✓ {count} Notiz indexiert",
+			"other": "✓ {count} Notizen indexiert"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ {count} Notiz indexiert, {skipped} übersprungen",
+			"other": "✓ {count} Notizen indexiert, {skipped} übersprungen"
+		},
+		"no_embedding_model": "Kein Embedding-Modell konfiguriert. Lege ein Standard-Embedding-Modell fest.",
+		"invalid_config": "Ungültige Konfiguration des Embedding-Index.",
+		"provider_not_configured": "Anbieter „{provider}“ ist nicht konfiguriert.",
+		"embedding_init_failed": "Embedding-Modell konnte nicht initialisiert werden.",
+		"open_search_settings": "Sucheinstellungen öffnen",
+		"open_provider_settings": "Anbietereinstellungen öffnen",
+		"provider_unreachable": "Indexierung gestoppt – der Embedding-Anbieter ist nicht erreichbar. Prüfe die Verbindung und setze dann fort.",
+		"rate_limited": "Indexierung pausiert – das Ratenlimit des Embedding-Anbieters wurde erreicht. Sie wird beim nächsten Start fortgesetzt, oder du setzt sie später in den Sucheinstellungen fort.",
+		"already_in_progress": "Indexierung läuft bereits…",
+		"embed_failed": "Einbetten von {file} fehlgeschlagen: {error}",
+		"embed_empty": "Einbetten von {file} fehlgeschlagen: leeres Ergebnis vom Modell",
+		"semantic_unreachable": "Semantische Suche nicht verfügbar – der Embedding-Anbieter ist nicht erreichbar. Es werden keine semantischen Ergebnisse angezeigt.",
+		"semantic_failed": "Semantische Suche fehlgeschlagen: {error}",
+		"cancelling": "Indexierung wird abgebrochen…",
+		"export_empty": "Der Index ist leer – nichts zu exportieren.",
+		"export_dialog_title": "Embedding-Index exportieren",
+		"exported": "{count} Embeddings exportiert.",
+		"export_failed": "Index konnte nicht exportiert werden.",
+		"import_dialog_title": "Embedding-Index importieren",
+		"import_invalid_version": "Die Exportdatei hat ein ungültiges oder fehlendes Versionsfeld. Indexiere neu, um einen kompatiblen Export zu erzeugen.",
+		"import_outdated": "Das Schema v{version} der Exportdatei ist veraltet (aktuell: v{current}). Indexiere neu, um einen kompatiblen Export zu erzeugen.",
+		"import_newer": "Die Exportdatei wurde mit einer neueren Plugin-Version erstellt (Schema v{version}). Aktualisiere das Plugin, um sie zu importieren.",
+		"import_missing_metadata": "Der Exportdatei fehlen Anbieter- oder Modell-Metadaten.",
+		"imported": "{count} Embeddings importiert ({model}).",
+		"import_failed": "Index konnte nicht importiert werden. Die Datei ist möglicherweise beschädigt.",
+		"reindex": "Neu indexieren"
+	},
+	"search_index": {
+		"status": "Notizen werden für die Suche indexiert: {status}",
+		"updated": "✓ Suchindex aktualisiert: {count} Notizen"
+	},
+	"bulk_progress": {
+		"skipped": "({count} übersprungen)",
+		"eta": "(noch ca. {eta})",
+		"pdfs_progress": "PDFs {done}/{total}",
+		"then": "danach {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"other": "{count} PDFs"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Suchbereich geöffnet, aber die Tag-Abfrage konnte nicht gesetzt werden",
+		"open_failed": "Suchbereich für Tag konnte nicht geöffnet werden: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "Für deine Anbieter wurden keine Embedding-Modelle gefunden. Prüfe, ob einer Embeddings anbietet.",
+		"no_models": "Keine Modelle gefunden. Prüfe, ob dein Anbieter läuft und erreichbar ist."
+	},
+	"actions": {
+		"open_settings": "Einstellungen öffnen",
+		"add_provider": "Anbieter hinzufügen",
+		"check_provider_settings": "Anbietereinstellungen prüfen",
+		"select_model": "Modell auswählen",
+		"configure_embedding_index": "Embedding-Index konfigurieren",
+		"edit_agent": "Agent bearbeiten",
+		"view_report": "Bericht ansehen",
+		"open_note": "Notiz öffnen",
+		"open_chat": "Chat öffnen",
+		"agent_gone_pick_model": "Dieser Agent existiert nicht mehr. Wähle ein Modell beim Agenten, den du verwenden möchtest.",
+		"agent_gone_not_saved": "Dieser Agent existiert nicht mehr, daher wurde das Modell nicht gespeichert."
+	},
+	"diff": {
+		"pending_change": "Ausstehende Änderung",
+		"previous": "Vorherige ausstehende Änderung",
+		"next": "Nächste ausstehende Änderung",
+		"toggle_view": "Diff-Ansicht umschalten",
+		"accept": "Annehmen",
+		"accept_aria": "Änderung annehmen",
+		"reject": "Ablehnen",
+		"reject_aria": "Änderung ablehnen",
+		"stale_tooltip": "Annehmen nicht möglich – die Notiz wurde nach dem Vorschlag geändert. Lehne ihn ab und bitte den Agenten, die Änderung neu vorzuschlagen.",
+		"cross_thread_banner": {
+			"one": "{count} weiterer Chat hat eine ausstehende Bearbeitung dieser Datei. Hier wird nur die neueste angezeigt; die zuerst angenommene gewinnt, die anderen lassen sich danach möglicherweise nicht mehr übernehmen.",
+			"other": "{count} weitere Chats haben eine ausstehende Bearbeitung dieser Datei. Hier wird nur die neueste angezeigt; die zuerst angenommene gewinnt, die anderen lassen sich danach möglicherweise nicht mehr übernehmen."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Tool-Aufrufe",
+		"reasoning": "Erweitertes Reasoning",
+		"vision": "Bilderkennung / Dateianhänge",
+		"structured_output": "Strukturierte Ausgabe (JSON-Schema)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Notizen durchsuchen",
+			"summary": "Durchsucht deine Obsidian-Notizen nach Stichwörtern. Gibt passende Dateinamen und Metadaten zurück."
+		},
+		"list_directory": {
+			"name": "Verzeichnis auflisten",
+			"summary": "Listet die Ordnerstruktur des Vaults auf: eine Übersicht mit Dateianzahlen auf oberster Ebene, Dateien und Unterordner innerhalb eines Ordners. Die Ausgabe wird gekürzt dargestellt, damit sie ins Kontextbudget passt."
+		},
+		"read_content": {
+			"name": "Inhalt lesen",
+			"summary": "Liest Notizen und Dateien im Vault per Pfad oder Wikilink. Unterstützt Markdown-/Textdateien und Textextraktion aus PDFs. Bilder müssen im Chat angehängt werden."
+		},
+		"grep_notes": {
+			"name": "Notizen greppen",
+			"summary": "Findet eine exakte Zeichenfolge oder ein Regex-Muster in Notizen und gibt passende Zeilen mit Zeilennummern und Kontext zurück. Anders als „Notizen durchsuchen“ findet es wörtliche Zeichenfolgen. Mit einem Pfad auf eine Notiz beschränkbar; große Ergebnismengen werden seitenweise ausgegeben."
+		},
+		"get_all_tags": {
+			"name": "Alle Tags abrufen",
+			"summary": "Ruft eine Liste aller im Vault verwendeten Tags ab."
+		},
+		"get_properties": {
+			"name": "Eigenschaften abrufen",
+			"summary": "Ruft Frontmatter-Eigenschaften aus Notizen ab oder listet alle Eigenschaftsschlüssel im Vault auf."
+		},
+		"execute_javascript": {
+			"name": "JavaScript ausführen",
+			"summary": "Führt isoliertes JavaScript für Berechnungen und Datenumwandlung aus. Verwende return für den Endwert und console.log für Zwischenausgaben."
+		},
+		"manage_notes": {
+			"name": "Notizen verwalten",
+			"summary": "Erstellt, aktualisiert oder löscht Markdown-Notizen in einem gemeinsam vorgemerkten Paket. Zusammengehörige Notizoperationen können gemeinsam zur Freigabe vorgeschlagen werden."
+		},
+		"fetch_url": {
+			"name": "URL abrufen",
+			"summary": "Ruft eine öffentliche Webseite oder Textressource über HTTP(S) ab und gibt ihren Hauptinhalt als bereinigtes Markdown zurück. Nur mit URLs verwenden, die der Nutzer angegeben hat, oder mit eindeutig öffentlichen Quellen."
+		},
+		"web_search": {
+			"name": "Websuche",
+			"summary": "Durchsucht das Web und gibt Ergebnisse zurück (Titel, URL, Ausschnitt). Anbieter und API-Schlüssel legst du im Konfigurationsbereich des Tools fest. Bevorzugt zuerst die Suche im Vault."
+		},
+		"manage_skills": {
+			"name": "Skills verwalten",
+			"summary": "Erstellt neue Skills, überarbeitet die eigenen angehängten Skills des Agenten oder löscht einen Skill, wenn du darum bittest. Änderungen gelten sofort. Name und Plugin-Verknüpfung eines Skills sind nach dem Erstellen festgelegt."
+		},
+		"write_todos": {
+			"name": "Aufgabenliste",
+			"summary": "Lässt den Agenten mehrstufige Arbeit als Checkliste planen und unterwegs abhaken. Die Liste erscheint über dem Chat-Eingabefeld."
+		},
+		"ask_question": {
+			"name": "Frage stellen",
+			"summary": "Lässt den Agenten pausieren und dir eine Multiple-Choice-Frage stellen, wenn eine Anfrage unklar ist. Die Frage erscheint über dem Chat-Eingabefeld."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (ohne Schlüssel)",
+		"firecrawl_key_help": "Optional – füge einen Firecrawl-API-Schlüssel (fc-…) für höhere Ratenlimits hinzu. Leer lassen, um die schlüssellose Stufe zu verwenden.",
+		"brave_key_help": "Brave-Search-API-Schlüssel von api.search.brave.com.",
+		"tavily_key_help": "Tavily-API-Schlüssel von app.tavily.com.",
+		"keenable_key_help": "Optional – füge einen Keenable-API-Schlüssel für höhere Ratenlimits hinzu. Leer lassen, um den kostenlosen öffentlichen Endpunkt zu verwenden."
+	}
+}
