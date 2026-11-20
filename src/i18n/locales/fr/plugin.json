@@ -18,7 +18,7 @@
 	},
 	"attach": {
 		"menu_label": {
-			"one": "Ajouter au chat",
+			"one": "Ajouter {count} fichier au chat",
 			"many": "Ajouter {count} fichiers au chat",
 			"other": "Ajouter {count} fichiers au chat"
 		},

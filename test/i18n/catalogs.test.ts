@@ -85,6 +85,23 @@ describe("i18n catalogs", () => {
 					});
 				expect(broken).toEqual([]);
 			});
+
+			// A form may leave the number out only if it is selected for exactly 1. Russian `one`
+			// also covers 21, 31, …; Slovenian `two` covers 102: dropping `{count}` there hides it.
+			it("plural forms that cover more than the count 1 show {count}", () => {
+				const rules = new Intl.PluralRules(locale);
+				const coversOtherCounts = (category: string) =>
+					Array.from({ length: 1001 }, (_, n) => n).some((n) => n !== 1 && rules.select(n) === category);
+				const hidden = Object.keys(english)
+					.filter((k) => k in localized && typeof english[k] !== "string")
+					.filter((k) => (english[k] as Record<string, string>).other.includes("{count}"))
+					.flatMap((k) =>
+						Object.entries(localized[k] as Record<string, string>)
+							.filter(([category, text]) => !text.includes("{count}") && coversOtherCounts(category))
+							.map(([category]) => `${k}.${category}`),
+					);
+				expect(hidden).toEqual([]);
+			});
 		});
 	}
 

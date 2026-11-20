@@ -172,7 +172,7 @@
 		"expand_topic": "Razširi temo",
 		"open_all_notes": {
 			"one": "Odpri {count} zapisek",
-			"two": "Odpri oba zapiska",
+			"two": "Odpri {count} zapiska",
 			"few": "Odpri vse {count} zapiske",
 			"other": "Odpri vseh {count} zapiskov"
 		},

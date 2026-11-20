@@ -18,7 +18,7 @@
 	},
 	"attach": {
 		"menu_label": {
-			"one": "Dodaj v klepet",
+			"one": "Dodaj {count} datoteko v klepet",
 			"two": "Dodaj {count} datoteki v klepet",
 			"few": "Dodaj {count} datoteke v klepet",
 			"other": "Dodaj {count} datotek v klepet"
