@@ -1,5 +1,6 @@
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import ModalProvider from "../../lib/QueryClientProvider.svelte";
+import { t } from "../../i18n";
 import type SecondBrainPlugin from "../../main";
 import { isMobileUI } from "../../utils/platform";
 import ModelSelectionModalComponent from "./ModelSelectionModal.svelte";
@@ -59,7 +60,11 @@ export class ModelSelectionModal extends SvelteModal {
 
 	onOpen() {
 		// Sentence case per Obsidian's plugin UI guidelines.
-		this.setTitle(this.modelType === "chat" ? "Select chat model" : "Select embedding model");
+		this.setTitle(
+			this.modelType === "chat"
+				? t("modals.model_selection.title_chat")
+				: t("modals.model_selection.title_embedding"),
+		);
 		this.mountComponent(
 			ModalProvider<{
 				modal: ModelSelectionModal;

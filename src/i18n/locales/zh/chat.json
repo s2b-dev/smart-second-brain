@@ -1,0 +1,548 @@
+{
+	"editing": {
+		"label": "正在编辑消息",
+		"cancel": "取消编辑"
+	},
+	"branch": {
+		"previous": "上一个分支",
+		"next": "下一个分支"
+	},
+	"message": {
+		"collapse": "折叠消息",
+		"expand": "展开消息",
+		"wait_before_edit": "请等待当前回复完成后再编辑",
+		"regenerate_failed": "重新生成失败：{error}",
+		"retry_failed": "重试失败：{error}",
+		"branch_switch_failed": "切换分支失败：{error}",
+		"unknown_error": "未知错误",
+		"copied": "已复制到剪贴板",
+		"edit": "编辑消息",
+		"copy": "复制消息",
+		"compaction_manual": "手动压缩对话",
+		"compaction_automatic": "自动压缩对话",
+		"regenerate": "重新生成回复",
+		"copy_response": "复制回复",
+		"jump_to_bottom": "跳到底部"
+	},
+	"model_select": {
+		"tooltip": "选择模型"
+	},
+	"attach": {
+		"tooltip": "添加上下文",
+		"from_device": "从设备",
+		"take_photo": "拍照",
+		"from_vault": "从仓库"
+	},
+	"running": {
+		"go_to": "转到正在运行的对话：{name}"
+	},
+	"status": {
+		"request_failed": "模型请求失败。",
+		"error_title": "出错了",
+		"retry_aria": "重试此请求",
+		"retry_tooltip": "重新运行失败的请求",
+		"stopped": "已停止"
+	},
+	"embed": {
+		"open_chat": "打开对话",
+		"fallback_title": "对话",
+		"empty": "此对话还没有消息。",
+		"load_failed": "无法加载对话预览。"
+	},
+	"agent": {
+		"configure": "配置智能体",
+		"options": "智能体选项",
+		"edit": "编辑智能体",
+		"default_badge": "默认",
+		"create": "创建智能体",
+		"new": "新智能体"
+	},
+	"todos": {
+		"all_done": "所有步骤已完成",
+		"status_pending": "未开始",
+		"status_in_progress": "进行中",
+		"collapse": "折叠任务清单",
+		"expand": "展开任务清单",
+		"progress": "{done}/{total}"
+	},
+	"pending": {
+		"count_create": {
+			"other": "{count} 项创建"
+		},
+		"count_update": {
+			"other": "{count} 项更新"
+		},
+		"count_delete": {
+			"other": "{count} 项删除"
+		},
+		"count_move": {
+			"other": "{count} 项移动"
+		},
+		"summary_pending": "待处理：{composition}",
+		"summary_partially_applied": "{count} 项已部分应用",
+		"type_create": "创建",
+		"type_update": "更新",
+		"type_move": "移动",
+		"notice_applied": "已应用：{path}",
+		"notice_apply_failed": "应用更改失败：{error}",
+		"notice_rejected": "已拒绝：{path}",
+		"notice_restored": "已恢复：{path}",
+		"skip_conflict": "“{path}”保持原样——它在更改部分应用后又被修改了。",
+		"skip_missing": "无法恢复“{path}”——该笔记已不存在。已应用的内容也随之移走了。",
+		"skip_failed": "恢复“{path}”失败。详情请查看控制台。",
+		"notice_all_stale": "所有待处理更改都已过时——笔记在提议生成后被修改了。请拒绝它们，并让智能体重新提交。",
+		"risk_deletions": {
+			"other": "{count} 项笔记删除"
+		},
+		"risk_deprivatizing_moves": {
+			"other": "{count} 项移出私密位置的移动"
+		},
+		"risk_join": "{first}和{second}",
+		"confirm_accept_all_title": "接受所有更改？",
+		"confirm_accept_all_message": {
+			"other": "此批次包含{risks}。要应用全部 {count} 项更改吗？"
+		},
+		"accept_all": "全部接受",
+		"skipped_stale_suffix": "，跳过 {count} 项过时更改",
+		"notice_applied_one": "已应用更改{skipped}",
+		"notice_applied_all": "已应用全部 {count} 项更改{skipped}",
+		"notice_applied_partial": "已应用 {applied} 项更改{skipped}，{failed} 项失败：{paths}",
+		"notice_apply_error": "应用更改时出错：{error}",
+		"notice_rejected_all": "已拒绝所有待处理更改",
+		"notice_restored_partial": "已恢复部分应用的笔记",
+		"notice_rejected_all_head": "已拒绝所有待处理更改。",
+		"notice_undo_finished_head": "已完成撤销已应用的更改。",
+		"notice_open_failed": "无法打开此更改对应的笔记。",
+		"collapse": "折叠待处理更改",
+		"expand": "展开待处理更改",
+		"diff_mode_to_split": "将笔记内差异切换为双栏视图",
+		"diff_mode_to_word": "将笔记内差异切换为行内逐词差异",
+		"diff_mode_toggle": "切换差异视图模式",
+		"accept_all_tooltip": "接受所有更改",
+		"reject_all_tooltip": "拒绝所有更改，并恢复所有部分应用的笔记",
+		"undo_applied_tooltip": "将部分应用的笔记恢复为原始内容",
+		"reject_all": "全部拒绝",
+		"undo_applied": "撤销已应用",
+		"hide_widget_preview": "隐藏小组件预览",
+		"preview_widget": "预览小组件",
+		"hide_changes": "隐藏更改",
+		"show_changes": "显示更改",
+		"hide_content": "隐藏内容",
+		"show_content": "显示内容",
+		"hide_widget_preview_aria": "隐藏 {path} 的预览",
+		"preview_widget_aria": "预览 {path}",
+		"hide_changes_aria": "隐藏对 {path} 的更改",
+		"show_changes_aria": "显示对 {path} 的更改",
+		"hide_content_aria": "隐藏 {path} 的内容",
+		"show_content_aria": "显示 {path} 的内容",
+		"partly_applied_explanation": "此更改的一部分已应用到笔记。撤销即可恢复笔记的原始内容。",
+		"partly_applied": "部分应用",
+		"stale_delete_explanation": "删除提议生成后此笔记被修改了——预览已与将被删除的内容不符。接受将会失败；请拒绝并让智能体重新提交。",
+		"stale_explanation": "更改提议生成后此笔记被修改了，因此接受将会失败。请拒绝它，并让智能体基于当前内容重新编辑。",
+		"stale": "已过时",
+		"deprivatizing_explanation": "此笔记当前为私密。将其移动到此位置会使其脱离隐私筛选，此后它将被索引、可被搜索，并可被不受信任的提供商访问。",
+		"deprivatizing": "将不再私密",
+		"cross_thread_explanation": {
+			"other": "另有 {count} 个对话也对此文件有待处理的编辑。最先被接受的编辑生效；其他编辑之后可能无法应用。"
+		},
+		"stale_accept_disabled": "无法接受——此提议生成后笔记已被修改。请拒绝它，并让智能体重新提交。",
+		"accept_change": "接受更改",
+		"accept_change_aria": "接受对 {path} 的更改",
+		"reject_change": "拒绝更改",
+		"reject_change_aria": "拒绝对 {path} 的更改",
+		"undo_applied_change_tooltip": "将此笔记恢复为提议之前的内容",
+		"undo_applied_change_aria": "撤销对 {path} 已应用的更改",
+		"hide_source_changes": "隐藏源码更改",
+		"show_source_changes": "显示源码更改",
+		"note_empty": "此笔记为空。",
+		"no_remaining_differences": "没有剩余的差异。",
+		"accept_hunk": "接受此处更改",
+		"accept_hunk_aria": "接受第 {index} 处更改（共 {total} 处）",
+		"reject_hunk": "拒绝此处更改",
+		"reject_hunk_aria": "拒绝第 {index} 处更改（共 {total} 处）",
+		"hunk_too_large": "此更改过大，无法在此预览——请打开笔记进行审阅。"
+	},
+	"question": {
+		"send_failed": "无法发送你的回答",
+		"group_aria": "来自智能体的问题",
+		"position": "第 {index} 个问题（共 {total} 个）",
+		"label": "问题",
+		"dismiss_aria": "忽略问题",
+		"dismiss_tooltip": "不回答直接忽略",
+		"multi_hint": "选择所有适用项",
+		"custom_placeholder": "其他…",
+		"answer_placeholder": "输入你的回答…",
+		"custom_aria": "你自己的回答",
+		"send_answers": "发送回答",
+		"send_answer": "发送回答",
+		"unrenderable": "智能体提出了一个无法显示的问题。",
+		"retry": "让它重试"
+	},
+	"context_usage": {
+		"row_system": "系统提示词",
+		"row_human": "你的消息",
+		"row_assistant": "助手",
+		"row_tool": "工具结果",
+		"row_draft": "草稿与待发送",
+		"tooltip_unknown_limit": "上下文用量（估算）：{used}k token（上限未知）",
+		"tooltip": "上下文用量（估算）：{percent}%（{used}k / {limit}k）",
+		"line_unknown_limit": "{tokens} token · 上限未知",
+		"line": "{tokens} / {limit} token",
+		"compaction_unknown_short": "自动压缩需要已知的上限",
+		"compaction_unknown_long": "自动摘要需要使用上下文上限已知的模型。",
+		"compaction_short": "在 {tokens}{percent} 时自动压缩",
+		"compaction_long": "达到 {tokens} token{percent} 时，较早的消息会被自动摘要。",
+		"trigger_aria": "打开上下文 token 分布",
+		"heading": "上下文用量（估算）",
+		"summarize_now": "立即摘要",
+		"summarize_now_tooltip": "立即对较早的消息进行摘要",
+		"nothing_to_summarize": "暂无可摘要的内容"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "你能帮我做什么？",
+		"suggestion_summarize_recent": "总结我最近的笔记",
+		"suggestion_find_notes": "查找某个主题的笔记",
+		"suggestion_find_notes_query": "查找我关于以下主题的笔记：",
+		"suggestion_tasknotes": "本周有哪些到期的任务？",
+		"suggestion_tasks": "有哪些逾期的任务？",
+		"suggestion_dataview": "按标签以表格显示我的笔记",
+		"skills_initializing": "技能仍在初始化——请稍后再试。",
+		"skill_create_failed_detail": "无法为 {name} 创建技能：{error}",
+		"skill_create_failed": "无法为 {name} 创建技能。",
+		"open_agent_skills": "打开智能体技能",
+		"enabled_notice": "已为 {agent} 启用 {name}。",
+		"greeting_title": "开始新对话",
+		"greeting_sub": "关于你的笔记，尽管问我。",
+		"add_provider_title": "添加 AI 提供商",
+		"add_provider_sub": "连接提供商即可开始对话。",
+		"select_model_title": "选择对话模型",
+		"select_model_sub": "选择一个模型即可开始对话。",
+		"dismiss_suggestion_aria": "忽略“{label}”",
+		"stale_agent_not_updated_before": "默认的{label}已更改，但",
+		"stale_agent_not_updated_after": "的副本无法自动更新。",
+		"stale_not_updated": "默认的{label}已更改，但你的副本无法自动更新。",
+		"stale_agent_kept_before": "默认的{label}已更改。",
+		"stale_agent_kept_after": "的自定义版本已保留。",
+		"stale_kept": "默认的{label}已更改。你的自定义版本已保留。",
+		"review": "查看",
+		"dismiss_notice_aria": "忽略{label}更新通知",
+		"dismiss_notice": "忽略此通知",
+		"nudges_summary_before": "此智能体有 ",
+		"nudges_summary_after": {
+			"other": " 个可用的插件集成。"
+		},
+		"dismiss_all_nudges_aria": "忽略全部 {count} 条插件集成建议",
+		"dismiss_all_nudges_tooltip": "忽略全部 {count} 条建议",
+		"dismiss_all": "全部忽略",
+		"nudge_before": "为此智能体启用 ",
+		"nudge_after": " 技能。",
+		"enable": "启用",
+		"dismiss_nudge_aria": "忽略 {name} 建议",
+		"dismiss_nudge": "忽略此建议",
+		"show_less": "收起",
+		"dismiss_all_aria": "忽略所有建议",
+		"stale_label": {
+			"system_prompt": "系统提示词",
+			"skill": "“{name}”技能"
+		}
+	},
+	"context_tray": {
+		"attachment_open": "{path}（点击打开）",
+		"remove_attachment": "移除附件",
+		"remove_attachment_aria": "移除 {name}",
+		"note_excluded": "{path}（已排除——点击以作为参考包含）",
+		"note_included": "{path}（已打开的笔记——点击以排除）",
+		"attach_full_content": "将完整内容附加到消息",
+		"graph_collapse": "关系图谱选区——点击折叠",
+		"graph_topic_expand": "{topic}——点击展开",
+		"graph_notes_expand": {
+			"other": "来自关系图谱的 {count} 篇笔记——点击展开"
+		},
+		"graph_notes_label": {
+			"other": "{count} 篇关系图谱笔记"
+		},
+		"remove_graph_notes": "移除所有关系图谱笔记",
+		"graph_member": "{path}（来自关系图谱——点击以排除）",
+		"selection": "来自 {path} 的选中文本（点击忽略）\n\n{text}",
+		"selection_long": "选中内容较长——将被截断以适应模型的上下文"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "正在搜索笔记：{target}",
+				"done": "已搜索笔记：{target}"
+			},
+			"recent_notes": {
+				"running": "正在查看最近的笔记",
+				"done": "已查看最近的笔记"
+			},
+			"search_notes": {
+				"running": "正在搜索笔记",
+				"done": "已搜索笔记"
+			},
+			"grep_for": {
+				"running": "正在搜索文本 {target}",
+				"done": "已搜索文本 {target}"
+			},
+			"grep": {
+				"running": "正在搜索笔记文本",
+				"done": "已搜索笔记文本"
+			},
+			"list_folder": {
+				"running": "正在列出文件夹 {target}",
+				"done": "已列出文件夹 {target}"
+			},
+			"list_vault": {
+				"running": "正在列出仓库",
+				"done": "已列出仓库"
+			},
+			"read_target": {
+				"running": "正在读取 {target}",
+				"done": "已读取 {target}"
+			},
+			"read_note": {
+				"running": "正在读取一篇笔记",
+				"done": "已读取一篇笔记"
+			},
+			"edit_notes": {
+				"running": "正在编辑笔记",
+				"done": "已编辑笔记"
+			},
+			"edit_note": {
+				"running": "正在编辑一篇笔记",
+				"done": "已编辑一篇笔记"
+			},
+			"run_javascript": {
+				"running": "正在运行 JavaScript",
+				"done": "已运行 JavaScript"
+			},
+			"list_tags": {
+				"running": "正在列出所有标签",
+				"done": "已列出所有标签"
+			},
+			"read_properties_of": {
+				"running": "正在读取 {target} 的属性",
+				"done": "已读取 {target} 的属性"
+			},
+			"read_properties": {
+				"running": "正在读取笔记属性",
+				"done": "已读取笔记属性"
+			},
+			"fetch_target": {
+				"running": "正在获取 {target}",
+				"done": "已获取 {target}"
+			},
+			"fetch_page": {
+				"running": "正在获取网页",
+				"done": "已获取网页"
+			},
+			"web_search_for": {
+				"running": "正在网上搜索 {target}",
+				"done": "已在网上搜索 {target}"
+			},
+			"web_search": {
+				"running": "正在搜索网络",
+				"done": "已搜索网络"
+			},
+			"load_skill_target": {
+				"running": "正在加载技能 {target}",
+				"done": "已加载技能 {target}"
+			},
+			"load_skill": {
+				"running": "正在加载技能",
+				"done": "已加载技能"
+			},
+			"update_todos": {
+				"running": "正在更新任务清单",
+				"done": "已更新任务清单"
+			},
+			"clear_todos": {
+				"running": "正在清空任务清单",
+				"done": "已清空任务清单"
+			},
+			"ask_target": {
+				"running": "正在提问：{target}",
+				"done": "已提问：{target}"
+			},
+			"generic_target": {
+				"running": "正在使用 {name}：{target}",
+				"done": "已使用 {name}：{target}"
+			},
+			"generic": {
+				"running": "正在使用 {name}",
+				"done": "已使用 {name}"
+			}
+		},
+		"count": {
+			"note": {
+				"other": "{count} 篇笔记"
+			},
+			"match": {
+				"other": "{count} 处匹配"
+			},
+			"file": {
+				"other": "{count} 个文件"
+			},
+			"folder": {
+				"other": "{count} 个文件夹"
+			},
+			"line": {
+				"other": "{count} 行"
+			},
+			"tag": {
+				"other": "{count} 个标签"
+			},
+			"result": {
+				"other": "{count} 条结果"
+			},
+			"question": {
+				"other": "{count} 个问题"
+			},
+			"operation": {
+				"other": "{count} 项操作"
+			},
+			"item": {
+				"other": "{count} 项"
+			},
+			"row": {
+				"other": "{count} 行"
+			},
+			"field": {
+				"other": "{count} 个字段"
+			}
+		},
+		"found": "找到 {items}",
+		"found_no_matches": "未找到匹配项",
+		"found_in": "在 {files} 中找到 {items}",
+		"found_folders_and_files": "找到 {folders}和{files}",
+		"truncated": "{lines}（已截断）",
+		"operations_across": "涉及 {notes} 的 {operations}",
+		"errored": "出错",
+		"logged": "输出了 {lines}",
+		"returned_value": "返回了一个值",
+		"duration_ms": "耗时 {ms}ms",
+		"todos_done": "已完成 {done}/{total}",
+		"dismissed": "已忽略",
+		"answered_in_chat": "已在对话中回答",
+		"answered": "已回答",
+		"failed": "失败",
+		"lines_total": "共 {lines}",
+		"list_separator": "、",
+		"list_and": "{list}和{last}",
+		"list_and_more": "{list}等另外 {count} 个",
+		"tool_fallback": "工具"
+	},
+	"tool_output": {
+		"key_count": {
+			"other": "{count} 个键"
+		}
+	},
+	"tools": {
+		"review_accepted": "{count} 项已接受",
+		"review_partial": "{count} 项部分应用",
+		"review_rejected": "{count} 项已拒绝",
+		"review_pending": "{count} 项待审阅",
+		"label_with_outcome": "{label}，{outcome}",
+		"source_note": "笔记",
+		"phase_summarizing": "正在摘要较早的消息",
+		"phase_running_tools": {
+			"other": "正在运行 {count} 个工具"
+		},
+		"phase_loading_model": "正在加载模型",
+		"phase_waiting": "正在等待模型",
+		"phase_writing": "正在撰写",
+		"phase_thinking": "正在思考",
+		"running_label": "{phase}… {seconds} 秒",
+		"settled_label": "思考了 {seconds} 秒",
+		"via_subagent": "通过 {name}",
+		"input": "输入",
+		"output": "输出",
+		"no_output": "（无输出）",
+		"result": "结果",
+		"tree_more_files": {
+			"other": "还有 {count} 个文件"
+		},
+		"tree_unlisted_files": {
+			"other": "{count} 个文件未列出"
+		},
+		"no_answer": "未回答",
+		"dismissed_without_answer": "未回答即被忽略。",
+		"chip_query": "查询：{value}",
+		"chip_algorithm": "算法：{value}",
+		"chip_results": "结果：{value}",
+		"chip_shown": "已显示：{value}",
+		"chip_recent_only": "仅最近",
+		"chip_skipped_private": "已跳过私密：{value}",
+		"untitled": "未命名",
+		"more_results": {
+			"other": "还有 {count} 条结果"
+		},
+		"chip_root": "根目录：{value}",
+		"chip_folders": "文件夹：{value}",
+		"chip_files": "文件：{value}",
+		"chip_depth": "深度：{value}",
+		"chip_folders_only": "仅文件夹",
+		"chip_collapsed": "已折叠",
+		"tree": "树状图",
+		"chip_operations": "操作：{value}",
+		"chip_paths": "路径：{value}",
+		"chip_truncated": "已截断",
+		"chip_logs": "日志：{value}",
+		"chip_error": "错误",
+		"chip_return_value": "返回值",
+		"console_output": "控制台输出",
+		"return_value": "返回值",
+		"executed_code": "已执行的代码",
+		"raw_output": "原始输出"
+	},
+	"input": {
+		"drop_files": "将文件拖放到此处",
+		"send_shortcut_hint": "↵ · 在列表中按 {shortcut}",
+		"edit_attachment_missing": "附件“{name}”已不在仓库中——它不会包含在编辑后的消息中。",
+		"select_model_to_send": "请选择对话模型后再发送。",
+		"placeholder": "询问关于你笔记的问题…",
+		"wait_for_attachments": "请等待附件保存完成",
+		"select_model_before_sending": "发送前请先选择对话模型。",
+		"empty_before_sending": "发送前请添加文本或附加文件",
+		"empty_before_saving": "保存前请添加文本或附加文件",
+		"select_model_before_saving": "保存前请先选择对话模型。",
+		"save_edit_failed": "保存编辑失败",
+		"not_ready": "对话尚未就绪",
+		"question_blocks_attachments": "附加文件前，请先回答或忽略智能体的问题",
+		"send_failed": "发送消息失败",
+		"summarize_failed": "摘要历史失败",
+		"unsupported_file_type": "不支持的文件类型：.{ext}",
+		"the_selected_model": "所选模型",
+		"vision_required_switch": "图片附件需要支持视觉的模型。请切换模型以附加图片（当前：{model}）。",
+		"vision_unknown": "未知该模型是否支持视觉；此模型的图片分析可能会失败。",
+		"file_too_large": "文件过大：{name} 超过了单个文件 15 MB 的限制。",
+		"total_too_large": "附件总大小超过了单条消息 25 MB 的限制。",
+		"attach_failed": "附加文件失败：{error}",
+		"vision_required": "图片附件需要支持视觉的模型（当前：{model}）。",
+		"switch_model": "切换模型",
+		"already_attached": "{name} 已附加。",
+		"wait_for_current_attachments": "请等待当前附件保存完成。",
+		"file_not_found": "未找到文件：{path}",
+		"only_files": "只能附加文件：{path}",
+		"picker_placeholder": "搜索要附加的仓库文件…",
+		"picker_verb": "附加",
+		"current_model": "当前模型",
+		"drag_images_unsupported": "{model} 不支持图片。请切换到支持视觉的模型。",
+		"drag_some_unsupported": "部分文件可能不受支持（支持：txt、md、csv、json、图片、pdf）。",
+		"retry_connection": "点击重试连接",
+		"provider_unreachable": "无法连接到 {provider}——点击重试",
+		"saving": "正在保存…",
+		"save_edit_aria": "保存编辑",
+		"send_aria": "发送消息",
+		"select_model_first": "请先选择对话模型",
+		"save_edit_with_hint": "保存编辑（{hint}）",
+		"save_edit": "保存编辑",
+		"send_with_hint": "发送消息（{hint}）",
+		"send": "发送消息",
+		"stop_aria": "停止生成",
+		"stop": "停止生成"
+	},
+	"view": {
+		"session_unavailable": "对话会话尚不可用。请在插件初始化完成后重新打开此视图。"
+	}
+}

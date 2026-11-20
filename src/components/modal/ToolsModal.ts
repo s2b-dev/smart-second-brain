@@ -1,4 +1,5 @@
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import { SvelteModal } from "./SvelteModal";
 import ToolsModalComponent from "./ToolsModal.svelte";
 
@@ -15,7 +16,7 @@ export class ToolsModal extends SvelteModal {
 	}
 
 	onOpen() {
-		this.setTitle("Tools");
+		this.setTitle(t("agents.tools.title"));
 		this.mountComponent(
 			ToolsModalComponent,
 			{ modal: this, plugin: this.plugin, agentId: this.agentId, onChange: this.onChange },

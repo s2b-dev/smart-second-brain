@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Snippet } from "svelte";
+import { t } from "../../i18n";
 
 interface RadioProps {
 	selected: boolean;
@@ -130,7 +131,7 @@ function handleRadioClick(event: MouseEvent) {
         class:selected={radio.selected}
         role="radio"
         aria-checked={radio.selected}
-        aria-label={radio.ariaLabel ?? `Select ${name}`}
+        aria-label={radio.ariaLabel ?? t("settings.managed_entity.select", { name })}
         onclick={handleRadioClick}
       ></button>
     </div>

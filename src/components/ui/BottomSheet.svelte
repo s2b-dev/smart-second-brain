@@ -1,6 +1,7 @@
 <script lang="ts">
 import { untrack } from "svelte";
 import type { Snippet } from "svelte";
+import { t } from "../../i18n";
 import { claimTouchGestures } from "../../utils/claimTouchGestures";
 
 interface Props {
@@ -305,7 +306,7 @@ const sheetHeight = $derived.by(() => {
         class="s2b-sheet-handle"
         role="slider"
         aria-orientation="vertical"
-        aria-label="Resize panel"
+        aria-label={t("ui.bottom_sheet.resize_label")}
         aria-valuemin={0}
         aria-valuemax={detents.length - 1}
         aria-valuenow={detentIndex}

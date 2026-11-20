@@ -30,6 +30,7 @@ import {
 	getValidHuggingFaceSession,
 	signInWithHuggingFace,
 } from "./huggingfaceOAuth";
+import { t } from "../i18n";
 
 const HF_WHOAMI_URL = "https://huggingface.co/api/whoami-v2";
 
@@ -74,12 +75,12 @@ async function validatePastedToken(token: string): Promise<AuthValidationResult>
 			return { valid: true };
 		}
 		if (response.status === 401 || response.status === 403) {
-			return { valid: false, error: "Hugging Face rejected this access token" };
+			return { valid: false, error: t("plugin.provider_auth.huggingface_token_rejected") };
 		}
-		return { valid: false, error: `Hugging Face returned status ${response.status}` };
+		return { valid: false, error: t("plugin.provider_auth.huggingface_status", { status: response.status }) };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return { valid: false, error: `Connection failed: ${message}` };
+		return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 	}
 }
 
@@ -96,14 +97,14 @@ export const huggingfaceProvider: BaseProviderDefinition = {
 		],
 		link: {
 			url: "https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained",
-			text: "Hugging Face access tokens",
+			text: t("plugin.providers.huggingface.link"),
 		},
 	},
 
 	oauth: {
 		label: "Hugging Face",
 		icon: "log-in",
-		description: "Approve access in your browser to connect, without creating an access token.",
+		description: t("plugin.providers.huggingface.oauth_desc"),
 		signIn: async () => {
 			await signInWithHuggingFace();
 			return { kind: "session" };
@@ -119,15 +120,15 @@ export const huggingfaceProvider: BaseProviderDefinition = {
 
 	auth: {
 		apiKey: {
-			label: "Access Token",
+			label: t("plugin.providers.fields.access_token"),
 			description: 'A Hugging Face access token with the "Make calls to Inference Providers" permission',
 			kind: "secret",
 			required: true,
 			placeholder: "hf_...",
 		},
 		headers: {
-			label: "Custom Headers",
-			description: "Additional headers as JSON (optional)",
+			label: t("plugin.providers.fields.custom_headers"),
+			description: t("plugin.providers.fields.custom_headers_desc"),
 			kind: "textarea",
 			required: false,
 			placeholder: '{"X-Custom-Header": "value"}',
@@ -145,7 +146,9 @@ export const huggingfaceProvider: BaseProviderDefinition = {
 		if (pasted) return validatePastedToken(pasted);
 		try {
 			const session = await getValidHuggingFaceSession();
-			return session ? { valid: true } : { valid: false, error: "Sign in with Hugging Face to connect" };
+			return session
+				? { valid: true }
+				: { valid: false, error: t("plugin.provider_auth.huggingface_sign_in_required") };
 		} catch (error) {
 			return { valid: false, error: error instanceof Error ? error.message : String(error) };
 		}

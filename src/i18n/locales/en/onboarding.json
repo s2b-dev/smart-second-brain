@@ -1,0 +1,114 @@
+{
+	"view": {
+		"tab_title": "Welcome"
+	},
+	"welcome": {
+		"title": "Welcome to Smart Second Brain",
+		"subtitle": "Turn your vault into an AI-assisted second brain — search smarter, explore connections in a graph, and chat with your notes.",
+		"hotkeys_unavailable_notice": "Couldn't open Hotkeys — open Settings → Hotkeys and search for “Search notes”.",
+		"search": {
+			"title": "Smarter search",
+			"desc": "Find notes by title, content, tags, and folders — with fuzzy matching. No setup needed. Add an embedding model later for semantic search.",
+			"hotkey_before": "Or",
+			"hotkey_link": "set a hotkey",
+			"hotkey_after": "for instant access.",
+			"navbar_toggle": "Open from the navbar magnifier instead of the quick switcher"
+		},
+		"graph": {
+			"title": "Smarter graph",
+			"desc": "See how your notes connect and cluster into topics. No setup needed."
+		},
+		"chat": {
+			"title": "Chat with your notes",
+			"desc": "Ask questions grounded in your vault, with web search and plugins like Dataview and Tasks integrated in. Needs an AI provider — set one up below."
+		},
+		"provider_step": {
+			"title": "Connect an AI provider",
+			"done_desc": "Provider connected. You can add or manage providers in settings.",
+			"desc": "Connect OpenAI, Anthropic, Ollama, OpenRouter, or any OpenAI-compatible endpoint.",
+			"add_another": "Add another",
+			"connect": "Connect provider"
+		},
+		"model_step": {
+			"title": "Choose a chat model",
+			"needs_provider_desc": "Connect a provider first, then pick a model to chat with.",
+			"using_before": "Using",
+			"using_after": ". You're all set to start chatting.",
+			"desc": "Pick a model from your connected provider to enable chat.",
+			"change": "Change model",
+			"choose": "Choose model"
+		},
+		"privacy": {
+			"public_title": "Your notes are shared by default",
+			"all_trusted_title": "Note access is granted",
+			"untrusted_title": "Your notes are still private",
+			"no_provider_title": "Note access is private by default",
+			"no_provider_before": "Your notes are",
+			"no_provider_strong": "not",
+			"no_provider_after": "shared with AI providers unless you allow it. Once you connect a provider above, you can grant it access — nothing leaves your vault before then.",
+			"public_before": "Note access is set to",
+			"public_strong": "public by default",
+			"public_after": ", so providers can read your notes except the ones you exclude.",
+			"public_end": ".",
+			"review_access": "Review note access",
+			"trusted": "trusted",
+			"all_trusted_before": {
+				"one": "Your provider is marked",
+				"other": "Your providers are marked"
+			},
+			"all_trusted_after": ", so the agent can read your notes.",
+			"all_trusted_end": "to keep specific notes private.",
+			"untrusted_before": {
+				"one": "can't read your notes yet — chat will work, but answers won't be grounded in your vault. Mark it as",
+				"other": "can't read your notes yet — chat will work, but answers won't be grounded in your vault. Mark them as"
+			},
+			"untrusted_middle": "in provider settings, or",
+			"change_access": "change note access",
+			"untrusted_end": "to allow all providers."
+		},
+		"skip": "Skip",
+		"documentation": "Documentation ↗",
+		"explore_graph": "Explore the graph",
+		"start_chatting": "Start chatting",
+		"start_chatting_disabled": "Connect a provider and add a chat model first"
+	},
+	"provider_setup": {
+		"title_add": "Add Provider",
+		"title_setup": "Set Up Provider",
+		"title_edit": "Edit {name}",
+		"trusted_indicator": "Trusted with private notes",
+		"invalid_name": "Invalid name",
+		"auth_failed": "Authentication failed",
+		"picker_desc": "Choose a provider to connect.",
+		"setup_guide": "Setup guide",
+		"name_label": "Provider name",
+		"name_desc": "Name this provider instance so you can distinguish it later.",
+		"name_placeholder": "New Provider",
+		"hide_api_key": "Hide API key field",
+		"use_api_key": "Use an API key instead →",
+		"sign_in_desktop_only": "{provider} sign-in is only available on desktop.",
+		"checking_connection": "Checking connection…",
+		"connected": "Connected",
+		"fix_name_to_finish": "— fix the provider name to finish",
+		"enter_credentials": "Enter your credentials above — the connection is checked automatically.",
+		"trusted_label": "Trusted with private notes",
+		"trusted_desc": "Allow this provider to access notes that remain private for untrusted providers.",
+		"oauth_sign_in_label": "{provider} Sign-In",
+		"cancel_sign_in": "Cancel sign-in",
+		"connected_via": "Connected via {provider}",
+		"reconnect": "Reconnect",
+		"disconnect": "Disconnect",
+		"sign_in_with": "Sign in with {provider}",
+		"paste_code_label": "Paste authorization code",
+		"paste_code_desc": "Copy the authorization code shown in the browser and paste it here to finish connecting.",
+		"code_placeholder": "Authorization code",
+		"submit": "Submit"
+	},
+	"release_notes": {
+		"tab_title": "What's new",
+		"title": "What's new in {version}",
+		"released_on": "Released on {date}",
+		"earlier_releases": "Earlier releases",
+		"all_releases": "All releases on GitHub"
+	}
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
 import { Component, Keymap, MarkdownRenderer, loadMathJax } from "obsidian";
 import { onDestroy } from "svelte";
+import { t } from "../../i18n";
 import { getPlugin } from "../../stores/state.svelte";
 import { WIDGET_READY_EVENT } from "../../widget/widgetFrame";
 import { findSealableEnd } from "../../utils/streamingMarkdown";
@@ -124,7 +125,7 @@ function normalizeLinks(containerEl: HTMLElement) {
 	// Copy button styling
 	for (const copyBtn of containerEl.querySelectorAll(".copy-code-button")) {
 		copyBtn.className = "clickable-icon";
-		copyBtn.setAttribute("aria-label", "Copy code");
+		copyBtn.setAttribute("aria-label", t("ui.markdown.copy_code"));
 	}
 
 	// Normalize internal links

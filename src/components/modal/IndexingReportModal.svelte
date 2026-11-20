@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import { getLocale, t } from "../../i18n";
 import type { IndexingReport, SkipReason } from "../../vectorstore/types";
 import { getVectorStoreService, isVectorStoreInitialized } from "../../vectorstore";
 import type { IndexingReportModal } from "./IndexingReportModal";
@@ -16,12 +17,12 @@ let loading = $state(true);
 let activeTab = $state<"indexed" | "skipped">("indexed");
 
 const skipReasonLabels: Record<SkipReason, string> = {
-	excluded: "Excluded by internal rules",
-	privacy: "Private (untrusted provider)",
-	"not-indexed": "Not yet indexed",
-	"read-error": "Failed to read file",
-	"embed-error": "Embedding failed",
-	empty: "No text to embed",
+	excluded: t("modals.indexing_report.reason.excluded"),
+	privacy: t("modals.indexing_report.reason.privacy"),
+	"not-indexed": t("modals.indexing_report.reason.not_indexed"),
+	"read-error": t("modals.indexing_report.reason.read_error"),
+	"embed-error": t("modals.indexing_report.reason.embed_error"),
+	empty: t("modals.indexing_report.reason.empty"),
 };
 
 const skipReasonIcons: Record<SkipReason, string> = {
@@ -58,9 +59,9 @@ onMount(async () => {
 </script>
 
 {#if loading}
-  <div class="s2b-report-loading">Loading report...</div>
+  <div class="s2b-report-loading">{t("modals.indexing_report.loading")}</div>
 {:else if !report}
-  <div class="s2b-report-empty">No indexing data available. Build the index first.</div>
+  <div class="s2b-report-empty">{t("modals.indexing_report.no_data")}</div>
 {:else}
   <div class="s2b-report-tabs">
     <button
@@ -68,21 +69,21 @@ onMount(async () => {
       class:is-active={activeTab === "indexed"}
       onclick={() => (activeTab = "indexed")}
     >
-      Indexed ({totalIndexed})
+      {t("modals.indexing_report.tab_indexed", { count: totalIndexed })}
     </button>
     <button
       class="s2b-report-tab"
       class:is-active={activeTab === "skipped"}
       onclick={() => (activeTab = "skipped")}
     >
-      Skipped ({totalSkipped})
+      {t("modals.indexing_report.tab_skipped", { count: totalSkipped })}
     </button>
   </div>
 
   <div class="s2b-report-content">
     {#if activeTab === "indexed"}
       {#if totalIndexed === 0}
-        <div class="s2b-report-empty">No files indexed yet.</div>
+        <div class="s2b-report-empty">{t("modals.indexing_report.no_indexed")}</div>
       {:else}
         <div class="s2b-report-list">
           {#each report.indexedFiles as filePath}
@@ -93,7 +94,7 @@ onMount(async () => {
         </div>
       {/if}
     {:else if totalSkipped === 0}
-      <div class="s2b-report-empty">No files were skipped.</div>
+      <div class="s2b-report-empty">{t("modals.indexing_report.no_skipped")}</div>
     {:else}
       {#each [...skippedByReason.entries()] as [reason, files]}
         <div class="s2b-report-group">
@@ -115,7 +116,7 @@ onMount(async () => {
 
   {#if report.timestamp}
     <div class="s2b-report-footer">
-      Last updated: {new Date(report.timestamp).toLocaleString()}
+      {t("modals.indexing_report.last_updated", { date: new Date(report.timestamp).toLocaleString(getLocale()) })}
     </div>
   {/if}
 {/if}

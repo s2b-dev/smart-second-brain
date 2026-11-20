@@ -2,6 +2,7 @@
 // Inlined at build time (?raw), like the onboarding wordmark; its fixed fill is
 // overridden to currentColor below so it follows the theme.
 import logoSvg from "../../../assets/logo-light.svg?raw";
+import { getLocale, t } from "../../i18n";
 import { RELEASES_URL, type ReleaseNotesSection, linkifyReferences } from "../../utils/releaseNotes";
 
 let {
@@ -23,7 +24,7 @@ function markdown(el: HTMLElement, body: string) {
 }
 
 function formatDate(date: string): string {
-	return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+	return new Date(`${date}T00:00:00`).toLocaleDateString(getLocale(), {
 		year: "numeric",
 		month: "long",
 		day: "numeric",
@@ -34,15 +35,15 @@ function formatDate(date: string): string {
 <div class="s2b-release-notes">
   <div class="s2b-release-notes-logo" role="presentation">{@html logoSvg}</div>
   {#if latest}
-    <h1 class="s2b-release-notes-title">What's new in {latest.version}</h1>
+    <h1 class="s2b-release-notes-title">{t("onboarding.release_notes.title", { version: latest.version })}</h1>
     {#if latest.date}
-      <p class="s2b-release-notes-date">Released on {formatDate(latest.date)}</p>
+      <p class="s2b-release-notes-date">{t("onboarding.release_notes.released_on", { date: formatDate(latest.date) })}</p>
     {/if}
     <div class="markdown-rendered" use:markdown={latest.body}></div>
   {/if}
 
   {#if earlier.length > 0}
-    <h2 class="s2b-release-notes-earlier">Earlier releases</h2>
+    <h2 class="s2b-release-notes-earlier">{t("onboarding.release_notes.earlier_releases")}</h2>
     {#each earlier as section, index (section.version)}
       <details class="s2b-release-notes-section" open={index + 1 < expanded}>
         <summary>
@@ -56,7 +57,7 @@ function formatDate(date: string): string {
     {/each}
   {/if}
 
-  <p class="s2b-release-notes-footer"><a href={RELEASES_URL}>All releases on GitHub</a></p>
+  <p class="s2b-release-notes-footer"><a href={RELEASES_URL}>{t("onboarding.release_notes.all_releases")}</a></p>
 </div>
 
 <style>

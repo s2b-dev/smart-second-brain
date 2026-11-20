@@ -1,4 +1,5 @@
 import { ContextOverflowError, ModelRefusalError } from "@langchain/core/errors";
+import { t } from "../i18n";
 
 /**
  * Turns a thrown error into a concise, human-readable message suitable for
@@ -15,7 +16,7 @@ import { ContextOverflowError, ModelRefusalError } from "@langchain/core/errors"
  * embedded JSON envelope, and returns a trimmed single-paragraph string.
  */
 export function extractErrorMessage(error: unknown): string {
-	const fallback = "The model request failed.";
+	const fallback = t("plugin.errors.request_failed");
 
 	const refusal = findInCauseChain(error, (e) => ModelRefusalError.isInstance(e));
 	if (refusal) return describeRefusal(refusal.message);
@@ -24,11 +25,7 @@ export function extractErrorMessage(error: unknown): string {
 	const raw = resolveRawMessage(error);
 	if (overflow) {
 		const detail = raw ? stripTroubleshootingUrl(unwrapJsonErrorEnvelope(raw)).trim() : "";
-		return [
-			"This chat no longer fits in the model's context window.",
-			"Start a new chat, or check the context window configured for this model.",
-			detail,
-		]
+		return [t("plugin.errors.context_overflow"), t("plugin.errors.context_overflow_hint"), detail]
 			.filter(Boolean)
 			.join("\n");
 	}
@@ -65,13 +62,7 @@ function describeRefusal(message: string): string {
 		.replace(/^\s*\(category='[^']*'\)/, "")
 		.replace(/^\s*:\s*/, "")
 		.trim();
-	return [
-		"The model declined to answer this request.",
-		explanation,
-		"Rephrasing the request, or switching to another model, may help.",
-	]
-		.filter(Boolean)
-		.join("\n");
+	return [t("plugin.errors.refusal"), explanation, t("plugin.errors.refusal_hint")].filter(Boolean).join("\n");
 }
 
 /** LangChain appends a docs link to some provider errors; it means nothing to a user. */

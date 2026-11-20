@@ -1,0 +1,192 @@
+{
+	"view": {
+		"display_text": "스마트 그래프",
+		"loading": "그래프 생성 중..."
+	},
+	"toolbar": {
+		"exit_immerse": "몰입 종료 — 전체 그래프로 돌아가기",
+		"fit": "그래프를 화면에 맞추기",
+		"fit_with_key": "그래프를 화면에 맞추기 (F)",
+		"lasso": "올가미 선택",
+		"lasso_with_hint": "올가미 선택 (또는 Shift를 누른 채 드래그)",
+		"exit_lasso": "올가미 선택 종료",
+		"hide_topics": "주제 숨기기 — 클러스터링 없이 원래 그래프 표시",
+		"show_topics": "주제 표시 — 감지된 주제별로 노트에 색상 지정",
+		"computing_topics": "주제 계산 중…",
+		"collapse_needs_topics": "주제를 접으려면 주제를 켜세요",
+		"expand_all": "모든 주제를 다시 노트로 펼치기 (S)",
+		"collapse_all": "모든 주제를 단일 노드로 접기 (S) — 또는 주제를 선택하고 접기 사용",
+		"show_panel": "그래프 패널 표시",
+		"hide_panel": "그래프 패널 숨기기"
+	},
+	"controls": {
+		"aria_label": "그래프 설정",
+		"stats": {
+			"notes": {
+				"other": "노트 {count}개"
+			},
+			"unlinked": {
+				"other": "연결 안 됨 {count}개"
+			},
+			"links": {
+				"other": "링크 {count}개"
+			},
+			"inferred": {
+				"other": "추론됨 {count}개"
+			}
+		},
+		"topics": {
+			"heading": "주제",
+			"granularity": "세분성",
+			"granularity_desc": "왼쪽: 소수의 넓은 주제. 오른쪽: 다수의 구체적인 주제. 모든 노트는 계속 표시됩니다.",
+			"granularity_desc_with_keys": "왼쪽: 소수의 넓은 주제. 오른쪽: 다수의 구체적인 주제. 모든 노트는 계속 표시됩니다. (그래프에서 ↑/↓)",
+			"granularity_pending": "이 보관소의 주제 단계를 계산하는 중…",
+			"inferred_links": "추론된 링크"
+		},
+		"inferred_hint": {
+			"no_index": "직접 작성한 링크뿐 아니라 의미로도 노트를 연결합니다. 그래프 임베딩 색인이 필요합니다 — 플러그인의 그래프 설정에서 선택하세요.",
+			"hidden_still_grouping": "숨겨져 있지만 여전히 노트를 그룹화합니다. 주제에서도 제외하려면 두 번 전환하세요.",
+			"off": "꺼짐 — 주제는 직접 작성한 링크로 정해집니다.",
+			"off_coverage": "꺼짐 — 주제는 직접 작성한 링크로 정해집니다. 링크만으로 노트 {total}개 중 {placed}개({percent}%)가 그룹화되며, 나머지 {unlinked}개는 연결되어 있지 않습니다.",
+			"on_no_edges": "직접 작성한 링크뿐 아니라 의미로도 노트를 연결합니다 — 그래프 임베딩 색인이 필요합니다.",
+			"on": "직접 작성한 링크뿐 아니라 의미로도 노트를 연결합니다: 유사도 연결 {inferred}개로 연결되지 않은 노트도 주제를 찾습니다. 끄면 내 링크만으로 어디까지 다뤄지는지 볼 수 있습니다."
+		},
+		"found": {
+			"heading": "찾음 · {count}",
+			"multi_select_hint": "shift/⌘ 다중 선택",
+			"cancel_naming_aria": "주제 이름 짓기 취소",
+			"cancel_naming": "이름 짓기 취소",
+			"name_topics": "AI로 주제 이름 짓기"
+		},
+		"scope": {
+			"heading": "범위",
+			"markdown_only": "Markdown만",
+			"markdown_only_desc": "Markdown 노트만 표시합니다. 끄면 색인 가능한 모든 파일을 표시합니다",
+			"tags": "태그",
+			"tags_desc": "각 태그를 해당 태그가 있는 노트와 연결된 노드로 그립니다. 공유 태그는 주제 형성에도 도움이 됩니다"
+		},
+		"display": {
+			"heading": "표시",
+			"topic_regions": "주제 영역",
+			"topic_regions_desc": "각 주제 뒤 영역에 색을 입혀 그룹을 한눈에 볼 수 있게 합니다",
+			"topic_labels": "주제 레이블",
+			"topic_labels_desc": "그래프 위에 주제 이름 표시",
+			"direction_arrows": "방향 화살표",
+			"direction_arrows_desc": "방향이 있는 위키 링크에 화살표 표시",
+			"highlight_inferred": "추론된 링크 강조",
+			"highlight_inferred_desc_no_index": "추론된 링크를 강조 색상으로 그립니다. 그래프 임베딩 색인이 필요합니다 — 플러그인의 그래프 설정에서 선택하세요.",
+			"highlight_inferred_desc": "추론된 링크를 강조 색상으로 그려 직접 작성한 링크와 구분합니다",
+			"highlight_inferred_desc_off": "추론된 링크를 강조 색상으로 그립니다. 주제 아래의 추론된 링크를 켜야 합니다.",
+			"highlight_isolated": "고립된 노트 강조",
+			"highlight_isolated_desc": "위키 링크가 없는 노트를 강조 색상으로 표시",
+			"highlight_bridges": "연결 노트 강조",
+			"highlight_bridges_desc": "여러 주제를 잇는 노트를 강조 색상으로 표시"
+		}
+	},
+	"selection": {
+		"aria_label": "그래프 선택",
+		"count_selected": {
+			"other": "노트 {count}개 선택됨"
+		},
+		"notes_selected": {
+			"other": "노트 선택됨"
+		},
+		"immersed_suffix": " · 몰입",
+		"notes_immersed": {
+			"other": "노트 · 몰입"
+		},
+		"immersed_into": "몰입 대상:",
+		"immersed_prefix": "몰입 ·",
+		"note_noun": {
+			"other": "노트"
+		},
+		"clear": "선택 해제",
+		"clear_with_key": "선택 해제 (Esc)",
+		"zoom": "선택 항목으로 확대",
+		"zoom_with_key": "선택 항목으로 확대 (F)",
+		"zoom_tooltip": "선택한 노트가 화면에 맞도록 카메라 이동",
+		"collapse": "접기",
+		"expand": "펼치기",
+		"collapse_tooltip": "선택한 주제를 단일 노드로 접기",
+		"expand_tooltip": "선택한 주제를 다시 노트로 펼치기",
+		"immerse": "몰입",
+		"immerse_tooltip": "선택한 노트만으로 그래프 다시 생성",
+		"open_in_chat": "채팅에서 열기",
+		"open_in_chat_tooltip": "채팅을 표시하고 선택한 노트 첨부",
+		"open_all": "모두 열기",
+		"open_all_tooltip": "선택한 모든 노트를 새 탭에서 열기",
+		"exit": "종료",
+		"exit_immerse_tooltip": "몰입 종료 (Esc)"
+	},
+	"open_all_confirm": {
+		"title": "모든 노트 열기",
+		"message": {
+			"other": "노트 {count}개를 새 탭에서 엽니다. 다시 닫을 때는 직접 닫아야 합니다."
+		},
+		"confirm": {
+			"other": "탭 {count}개 열기"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "채팅이 아직 초기화되지 않았습니다. 먼저 채팅을 여세요.",
+		"private_titles_withheld": {
+			"other": "주제 {count}개에서 비공개 노트 제목이 제외되었습니다. 포함하려면 그래프 모델의 제공자를 신뢰하세요."
+		},
+		"open_provider_settings": "제공자 설정 열기",
+		"no_graph_chat_model": "그래프 채팅 모델이 선택되지 않아 주제 이름을 지을 수 없습니다.",
+		"open_graph_settings": "그래프 설정 열기"
+	},
+	"node_menu": {
+		"expand_topic": "주제 펼치기",
+		"open_all_notes": {
+			"other": "노트 {count}개 모두 열기"
+		},
+		"search_tag": "이 태그가 있는 노트 검색",
+		"open_file": "파일 열기",
+		"reveal_in_explorer": "파일 탐색기에서 보기",
+		"focus_cluster": "이 클러스터에 집중",
+		"collapse_topic": "주제 접기",
+		"select_cluster": "이 클러스터 선택"
+	},
+	"node_tooltip": {
+		"notes": {
+			"other": "노트 {n}개"
+		},
+		"links": {
+			"other": "링크 {n}개"
+		},
+		"cluster_fallback": "클러스터 {id}",
+		"connections": {
+			"other": "연결 {count}개"
+		},
+		"pinned": "📌 고정됨"
+	},
+	"note_context": {
+		"title": "컨텍스트",
+		"title_of": "{name}의 컨텍스트",
+		"semantic_hint": "그래프 임베딩 색인을 구성하면 의미상 이웃이 표시됩니다.",
+		"direction_in": "들어옴",
+		"direction_out": "나감",
+		"direction_both": "양방향",
+		"updating": "업데이트 중…",
+		"fit": "그래프를 화면에 맞추기",
+		"options": "노트 컨텍스트 옵션",
+		"close_options": "노트 컨텍스트 옵션 닫기",
+		"view": "보기",
+		"mode_graph": "그래프",
+		"mode_list": "목록",
+		"show": "표시",
+		"linked": "링크됨",
+		"semantic": "의미",
+		"both": "모두",
+		"display": "표시 방식",
+		"direction_arrows": "방향 화살표",
+		"no_neighbors": "이웃이 없습니다.",
+		"open_a_note": "노트를 여세요."
+	},
+	"topic_fallback": {
+		"unsorted": "미분류",
+		"unsorted_with_count": "미분류 · {count}",
+		"topic": "주제 {id}"
+	}
+}

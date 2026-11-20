@@ -1,4 +1,5 @@
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import AddSecretModalComponent from "./AddSecretModal.svelte";
 import { SvelteModal } from "./SvelteModal";
 
@@ -10,7 +11,7 @@ export class AddSecretModal extends SvelteModal {
 		super(plugin.app);
 		this.onSecretAdded = onSecretAdded;
 		this.suggestedId = suggestedId;
-		this.setTitle("Add New Secret");
+		this.setTitle(t("modals.add_secret.title"));
 	}
 
 	onOpen() {

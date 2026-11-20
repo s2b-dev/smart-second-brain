@@ -1,0 +1,316 @@
+{
+	"commands": {
+		"open_chat": "채팅 열기",
+		"new_chat": "새 채팅",
+		"search_notes": "노트 검색",
+		"open_smart_graph": "스마트 그래프 열기",
+		"show_welcome": "시작하기 화면 보기",
+		"show_release_notes": "릴리스 노트 보기",
+		"next_pending_change": "다음 대기 중인 변경",
+		"previous_pending_change": "이전 대기 중인 변경"
+	},
+	"chat_file_menu": {
+		"rename": "채팅 이름 바꾸기",
+		"rename_button": "이름 바꾸기",
+		"delete": "채팅 삭제",
+		"rename_failed": "채팅 이름을 바꾸지 못했습니다: {error}",
+		"delete_failed": "채팅을 삭제하지 못했습니다: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"other": "파일 {count}개를 채팅에 추가"
+		},
+		"add_file_failed": "파일을 채팅에 추가하지 못했습니다: {error}",
+		"add_files_failed": "파일들을 채팅에 추가하지 못했습니다: {error}",
+		"no_supported_files": "지원되는 파일이 선택되지 않았습니다. 지원 형식: txt, md, csv, json, 이미지, pdf.",
+		"chat_not_initialized": "채팅이 아직 초기화되지 않았습니다. 채팅을 연 다음 다시 시도하세요.",
+		"queued": {
+			"other": "파일 {count}개를 채팅 대기열에 추가했습니다."
+		},
+		"skipped_unsupported": {
+			"other": "지원되지 않는 파일 {count}개를 건너뛰었습니다."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "현재 열려 있는 채팅이 없습니다",
+		"no_pending_changes": "이 채팅에 대기 중인 변경이 없습니다",
+		"new_file_nothing_to_open": "이 변경은 새 파일을 만듭니다 — 아직 열 파일이 없습니다."
+	},
+	"huggingface_connected": "Hugging Face에 연결되었습니다.",
+	"update": {
+		"available": "Smart Second Brain {version}을(를) 사용할 수 있습니다.",
+		"update_link": "업데이트",
+		"updated": "Smart Second Brain이 {version}(으)로 업데이트되었습니다.",
+		"whats_new_link": "새로운 기능 보기"
+	},
+	"settings_save_failed": "Smart Second Brain이 설정을 저장하지 못했습니다: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: 가장 오래된 채팅 기록 중 약 {tokens} 토큰이 요약 모델의 컨텍스트 창에 들어가지 않아 요약에서 제외되었습니다.",
+		"repeated_failure": "Smart Second Brain: 이 채팅 기록 요약이 {failures}번 연속 실패하여 전체 기록이 그대로 전송되며, 모델의 컨텍스트 한도를 넘을 수 있습니다. 에이전트의 요약 모델을 확인하세요. 오류는 개발자 콘솔에 있습니다."
+	},
+	"agent": {
+		"memory_too_large": {
+			"other": "이 모델{window}에 비해 메모리가 너무 큽니다: {names}은(는) 더 이상 모든 메시지에 불러오지 않으며, 에이전트가 필요할 때만 읽습니다. 노트를 줄이거나 컨텍스트 창이 더 큰 모델을 사용하세요."
+		},
+		"memory_window": "({k}k 토큰)",
+		"save_prompt_failed": "시스템 프롬프트를 저장할 수 없습니다: {error}",
+		"open_agent_note": "에이전트 노트 열기",
+		"prompt_modal_title": "시스템 프롬프트 — {name}",
+		"save_skill_failed": "\"{skill}\" 스킬을 저장할 수 없습니다: {error}",
+		"open_skill_note": "스킬 노트 열기",
+		"skill_modal_title": "스킬 — {skill}",
+		"cannot_connect": "연결할 수 없음: {providers}. 서비스가 실행 중인지 확인하세요.",
+		"review_providers": "제공자 검토",
+		"provider_unavailable": "제공자 \"{provider}\"을(를) 더 이상 사용할 수 없습니다.",
+		"select_new_model": "새 모델 선택",
+		"withdrew_changes": {
+			"other": "대체된 응답이 제안한 대기 중인 노트 변경 {count}개를 철회했습니다."
+		},
+		"kept_partial_changes": {
+			"other": "일부 적용된 변경 {count}개는 유지되었습니다 — 검토 막대에서 해결하세요."
+		}
+	},
+	"errors": {
+		"request_failed": "모델 요청이 실패했습니다.",
+		"context_overflow": "이 채팅이 더 이상 모델의 컨텍스트 창에 들어가지 않습니다.",
+		"context_overflow_hint": "새 채팅을 시작하거나 이 모델에 구성된 컨텍스트 창을 확인하세요.",
+		"refusal": "모델이 이 요청에 대한 답변을 거부했습니다.",
+		"refusal_hint": "요청을 다르게 표현하거나 다른 모델로 전환하면 도움이 될 수 있습니다."
+	},
+	"provider_auth": {
+		"unknown_provider": "알 수 없는 제공자: {provider}",
+		"invalid_api_key": "잘못된 API 키",
+		"invalid_endpoint": "잘못된 기본 URL이거나 엔드포인트에 연결할 수 없습니다",
+		"configuration_failed": "제공자 구성 실패",
+		"no_auth_config": "{provider}의 인증 구성을 찾을 수 없습니다",
+		"discovery_failed": "모델 검색 실패: {error}",
+		"server_url_required": "서버 URL은 필수입니다",
+		"api_key_required": "API 키는 필수입니다",
+		"connection_failed": "연결 실패: {error}",
+		"auth_failed_status": "인증 실패 ({status})",
+		"auth_failed": "인증 실패",
+		"request_failed_status": "요청 실패, 상태 {status}",
+		"codex_sign_in_required": "Codex를 사용하려면 ChatGPT로 로그인하세요",
+		"openai_codex_sign_in_required": "Codex를 통해 OpenAI를 사용하려면 ChatGPT로 로그인하세요",
+		"huggingface_token_rejected": "Hugging Face가 이 액세스 토큰을 거부했습니다",
+		"huggingface_status": "Hugging Face가 상태 {status}을(를) 반환했습니다",
+		"huggingface_sign_in_required": "연결하려면 Hugging Face로 로그인하세요"
+	},
+	"providers": {
+		"templates": {
+			"openai": "ChatGPT 로그인 또는 API 키로 사용하는 OpenAI 모델.",
+			"openai_compatible": "OpenAI 및 호환 엔드포인트를 위한 유연한 OpenAI 방식 제공자.",
+			"anthropic": "Anthropic API를 통한 Claude 모델.",
+			"ollama": "Ollama API를 통한 로컬 Ollama 모델.",
+			"omlx": "oMLX의 OpenAI 호환 서버를 통해 Mac에서 실행하는 로컬 MLX 모델.",
+			"openrouter": "OpenRouter 계정과 모델 카탈로그.",
+			"huggingface": "Hugging Face 추론 제공자의 오픈 모델."
+		},
+		"fields": {
+			"api_key": "API 키",
+			"base_url": "기본 URL",
+			"server_url": "서버 URL",
+			"access_token": "액세스 토큰",
+			"custom_headers": "사용자 지정 헤더",
+			"custom_headers_desc": "JSON 형식의 추가 헤더 (선택 사항)",
+			"chatgpt_sign_in": "ChatGPT 로그인"
+		},
+		"openai": {
+			"link": "OpenAI 대시보드",
+			"oauth_desc": "브라우저 창을 열어 ChatGPT/Codex 인증을 완료합니다.",
+			"api_key_desc": "인증에 사용할 OpenAI API 키",
+			"base_url_desc": "사용자 지정 API 엔드포인트 (기본 OpenAI를 사용하려면 비워 두세요)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "이 제공자는 브라우저 기반 ChatGPT/Codex 로그인 흐름을 사용합니다.",
+			"sign_in_placeholder": "ChatGPT 로그인으로 인증됨"
+		},
+		"openai_compatible": {
+			"base_url_desc": "OpenAI 호환 API 엔드포인트의 기본 URL",
+			"api_key_desc": "인증용 API 키 (엔드포인트에 필요 없으면 비워 두세요)"
+		},
+		"anthropic": {
+			"link": "Anthropic 콘솔",
+			"api_key_desc": "인증에 사용할 Anthropic API 키",
+			"base_url_desc": "Anthropic 호환 API 엔드포인트의 기본 URL"
+		},
+		"ollama": {
+			"link": "Ollama 웹사이트",
+			"server_url_desc": "Ollama 서버가 실행 중인 URL",
+			"api_key_desc": "인증용 API 키 (로컬 Ollama에서는 보통 필요 없음)"
+		},
+		"omlx": {
+			"link": "oMLX 웹사이트",
+			"server_url_desc": "oMLX 서버가 실행 중인 URL",
+			"api_key_desc": "oMLX는 기본적으로 API 키가 필요합니다(관리자 패널의 전역 설정에서 확인). 키 확인을 비활성화한 경우에만 비워 두세요."
+		},
+		"openrouter": {
+			"link": "OpenRouter 키",
+			"oauth_desc": "브라우저에서 인증하면 API 키를 직접 만들지 않고 연결할 수 있습니다.",
+			"api_key_desc": "인증에 사용할 OpenRouter API 키"
+		},
+		"huggingface": {
+			"link": "Hugging Face 액세스 토큰",
+			"oauth_desc": "브라우저에서 접근을 승인하면 액세스 토큰을 만들지 않고 연결할 수 있습니다."
+		}
+	},
+	"indexing": {
+		"status": "색인 중: {status}",
+		"cancelled_chunks": {
+			"other": "색인 취소됨 (청크 {count}개 업데이트됨)"
+		},
+		"updated_chunks": {
+			"other": "✓ 색인 업데이트됨: 청크 {count}개"
+		},
+		"cancelled_notes": {
+			"other": "색인 취소됨 (지금까지 노트 {count}개 색인됨)"
+		},
+		"indexed_notes": {
+			"other": "✓ 노트 {count}개 색인됨"
+		},
+		"indexed_notes_skipped": {
+			"other": "✓ 노트 {count}개 색인됨, {skipped}개 건너뜀"
+		},
+		"no_embedding_model": "구성된 임베딩 모델이 없습니다. 기본 임베딩 모델을 설정하세요.",
+		"invalid_config": "잘못된 임베딩 색인 구성입니다.",
+		"provider_not_configured": "제공자 \"{provider}\"이(가) 구성되지 않았습니다.",
+		"embedding_init_failed": "임베딩 모델을 초기화하지 못했습니다.",
+		"open_search_settings": "검색 설정 열기",
+		"open_provider_settings": "제공자 설정 열기",
+		"provider_unreachable": "색인이 중지되었습니다 — 임베딩 제공자에 연결할 수 없습니다. 연결을 확인한 다음 재개하세요.",
+		"rate_limited": "색인이 일시 중지되었습니다 — 임베딩 제공자의 요청 한도에 도달했습니다. 다음 시작 시 재개되며, 나중에 검색 설정에서 재개할 수도 있습니다.",
+		"already_in_progress": "이미 색인 중입니다...",
+		"embed_failed": "{file} 임베딩 실패: {error}",
+		"embed_empty": "{file} 임베딩 실패: 모델이 빈 결과를 반환했습니다",
+		"semantic_unreachable": "의미 기반 검색을 사용할 수 없습니다 — 임베딩 제공자에 연결할 수 없어 의미 기반 결과를 표시하지 않습니다.",
+		"semantic_failed": "의미 기반 검색 실패: {error}",
+		"cancelling": "색인 취소 중…",
+		"export_empty": "색인이 비어 있습니다 — 내보낼 것이 없습니다.",
+		"export_dialog_title": "임베딩 색인 내보내기",
+		"exported": "임베딩 {count}개를 내보냈습니다.",
+		"export_failed": "색인을 내보내지 못했습니다.",
+		"import_dialog_title": "임베딩 색인 가져오기",
+		"import_invalid_version": "내보낸 파일의 버전 필드가 잘못되었거나 없습니다. 다시 색인해 호환되는 파일을 생성하세요.",
+		"import_outdated": "내보낸 파일의 스키마 v{version}이(가) 오래되었습니다(현재: v{current}). 다시 색인해 호환되는 파일을 생성하세요.",
+		"import_newer": "내보낸 파일이 더 새로운 플러그인 버전(스키마 v{version})에서 만들어졌습니다. 가져오려면 플러그인을 업데이트하세요.",
+		"import_missing_metadata": "내보낸 파일에 제공자 또는 모델 메타데이터가 없습니다.",
+		"imported": "임베딩 {count}개를 가져왔습니다 ({model}).",
+		"import_failed": "색인을 가져오지 못했습니다. 파일이 손상되었을 수 있습니다.",
+		"reindex": "다시 색인"
+	},
+	"search_index": {
+		"status": "검색용 노트 색인 중: {status}",
+		"updated": "✓ 검색 색인 업데이트됨: 노트 {count}개"
+	},
+	"bulk_progress": {
+		"skipped": "({count}개 건너뜀)",
+		"eta": "(약 {eta} 남음)",
+		"pdfs_progress": "PDF {done}/{total}",
+		"then": "이후 {pdfs}",
+		"pdfs": {
+			"other": "PDF {count}개"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "검색 창은 열렸지만 태그 검색어를 설정할 수 없습니다",
+		"open_failed": "태그 검색 창을 열지 못했습니다: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "제공자에서 임베딩 모델을 찾을 수 없습니다. 임베딩을 제공하는 제공자가 있는지 확인하세요.",
+		"no_models": "모델을 찾을 수 없습니다. 제공자가 실행 중이고 연결 가능한지 확인하세요."
+	},
+	"actions": {
+		"open_settings": "설정 열기",
+		"add_provider": "제공자 추가",
+		"check_provider_settings": "제공자 설정 확인",
+		"select_model": "모델 선택",
+		"configure_embedding_index": "임베딩 색인 구성",
+		"edit_agent": "에이전트 편집",
+		"view_report": "보고서 보기",
+		"open_note": "노트 열기",
+		"open_chat": "채팅 열기",
+		"agent_gone_pick_model": "해당 에이전트가 더 이상 존재하지 않습니다. 사용할 에이전트에서 모델을 고르세요.",
+		"agent_gone_not_saved": "해당 에이전트가 더 이상 존재하지 않아 모델이 저장되지 않았습니다."
+	},
+	"diff": {
+		"pending_change": "대기 중인 변경",
+		"previous": "이전 대기 중인 변경",
+		"next": "다음 대기 중인 변경",
+		"toggle_view": "비교 보기 전환",
+		"accept": "수락",
+		"accept_aria": "변경 수락",
+		"reject": "거부",
+		"reject_aria": "변경 거부",
+		"stale_tooltip": "수락할 수 없습니다 — 제안 후 노트가 변경되었습니다. 거부한 뒤 에이전트에게 다시 제안하도록 요청하세요.",
+		"cross_thread_banner": {
+			"other": "다른 채팅 {count}개에 이 파일에 대한 대기 중인 편집이 있습니다. 여기에는 최신 편집만 표시됩니다. 먼저 수락된 편집이 적용되며, 나머지는 적용에 실패할 수 있습니다."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "도구 호출",
+		"reasoning": "확장 추론",
+		"vision": "비전 / 파일 첨부",
+		"structured_output": "구조화된 출력 (JSON 스키마)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "노트 검색",
+			"summary": "키워드로 Obsidian 노트를 검색합니다. 일치하는 파일 이름과 메타데이터를 반환합니다."
+		},
+		"list_directory": {
+			"name": "디렉터리 목록",
+			"summary": "보관소의 폴더 구조를 나열합니다: 루트에서는 파일 수가 포함된 개요를, 폴더 안에서는 파일과 하위 폴더를 보여줍니다. 출력은 컨텍스트 예산에 맞게 축약됩니다."
+		},
+		"read_content": {
+			"name": "내용 읽기",
+			"summary": "경로나 위키 링크로 노트와 보관소 파일을 읽습니다. Markdown/텍스트 파일과 PDF 텍스트 추출을 지원합니다. 이미지는 채팅에 첨부해야 합니다."
+		},
+		"grep_notes": {
+			"name": "노트 grep",
+			"summary": "노트 전체에서 정확한 부분 문자열이나 정규식 패턴을 찾아 일치하는 줄을 줄 번호 및 주변 내용과 함께 반환합니다. 노트 검색과 달리 문자열을 그대로 일치시킵니다. 경로로 한 노트로 범위를 좁히거나 큰 결과는 페이지로 나눠 볼 수 있습니다."
+		},
+		"get_all_tags": {
+			"name": "모든 태그 가져오기",
+			"summary": "보관소에서 사용된 모든 태그 목록을 가져옵니다."
+		},
+		"get_properties": {
+			"name": "속성 가져오기",
+			"summary": "노트의 프런트매터 속성을 가져오거나 보관소의 모든 속성 키를 나열합니다."
+		},
+		"execute_javascript": {
+			"name": "JavaScript 실행",
+			"summary": "계산과 데이터 변환을 위해 격리된 JavaScript를 실행합니다. 최종 값은 return으로, 중간 출력은 console.log로 내보냅니다."
+		},
+		"manage_notes": {
+			"name": "노트 관리",
+			"summary": "Markdown 노트를 하나의 단계적 묶음으로 만들거나, 업데이트하거나, 삭제합니다. 관련된 노트 작업을 함께 제안해 사용자 승인을 받을 수 있습니다."
+		},
+		"fetch_url": {
+			"name": "URL 가져오기",
+			"summary": "공개 웹 페이지나 텍스트 리소스를 HTTP(S)로 가져와 본문을 정리된 Markdown으로 반환합니다. 사용자가 제공한 URL이나 명백히 공개된 자료에만 사용합니다."
+		},
+		"web_search": {
+			"name": "웹 검색",
+			"summary": "웹을 검색해 결과(제목, URL, 발췌)를 반환합니다. 제공자와 API 키는 도구의 구성 패널에서 설정하세요. 보관소 검색을 먼저 사용하는 것이 좋습니다."
+		},
+		"manage_skills": {
+			"name": "스킬 관리",
+			"summary": "새 스킬을 만들고, 에이전트에 연결된 스킬을 수정하거나, 요청하면 스킬을 삭제합니다. 변경 사항은 즉시 적용됩니다. 스킬의 이름과 플러그인 연결은 만든 후 변경할 수 없습니다."
+		},
+		"write_todos": {
+			"name": "작업 목록",
+			"summary": "에이전트가 여러 단계의 작업을 체크리스트로 계획하고 진행하면서 체크할 수 있게 합니다. 목록은 채팅 입력란 위에 표시됩니다."
+		},
+		"ask_question": {
+			"name": "질문하기",
+			"summary": "요청이 불분명할 때 에이전트가 잠시 멈추고 객관식 질문을 할 수 있게 합니다. 질문은 채팅 입력란 위에 표시됩니다."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (키 없음)",
+		"firecrawl_key_help": "선택 사항 — 더 높은 요청 한도를 원하면 Firecrawl API 키(fc-…)를 추가하세요. 비워 두면 키 없는 등급을 사용합니다.",
+		"brave_key_help": "api.search.brave.com에서 발급받은 Brave Search API 키.",
+		"tavily_key_help": "app.tavily.com에서 발급받은 Tavily API 키.",
+		"keenable_key_help": "선택 사항 — 더 높은 요청 한도를 원하면 Keenable API 키를 추가하세요. 비워 두면 무료 공개 엔드포인트를 사용합니다."
+	}
+}

@@ -1,0 +1,112 @@
+{
+	"view": {
+		"tab_title": "ようこそ"
+	},
+	"welcome": {
+		"title": "Smart Second Brain へようこそ",
+		"subtitle": "保管庫を AI 支援のセカンドブレインに — より賢く検索し、グラフでつながりを探り、ノートとチャットしましょう。",
+		"hotkeys_unavailable_notice": "ホットキーを開けませんでした — 設定 → ホットキー を開き、「Search notes」を検索してください。",
+		"search": {
+			"title": "スマートな検索",
+			"desc": "タイトル、内容、タグ、フォルダからあいまい一致でノートを探せます。設定は不要です。セマンティック検索には後で埋め込みモデルを追加してください。",
+			"hotkey_before": "または",
+			"hotkey_link": "ホットキーを設定",
+			"hotkey_after": "してすぐに呼び出せるようにします。",
+			"navbar_toggle": "クイックスイッチャーの代わりにナビゲーションバーの虫眼鏡から開く"
+		},
+		"graph": {
+			"title": "スマートなグラフ",
+			"desc": "ノートのつながりやトピックごとのまとまりを確認できます。設定は不要です。"
+		},
+		"chat": {
+			"title": "ノートとチャット",
+			"desc": "保管庫に基づいて質問でき、ウェブ検索や Dataview、Tasks などのプラグインとも連携します。AI プロバイダーが必要です — 下で設定してください。"
+		},
+		"provider_step": {
+			"title": "AI プロバイダーを接続",
+			"done_desc": "プロバイダーを接続しました。プロバイダーの追加や管理は設定から行えます。",
+			"desc": "OpenAI、Anthropic、Ollama、OpenRouter、または OpenAI 互換のエンドポイントを接続します。",
+			"add_another": "さらに追加",
+			"connect": "プロバイダーを接続"
+		},
+		"model_step": {
+			"title": "チャットモデルを選択",
+			"needs_provider_desc": "まずプロバイダーを接続してから、チャットに使うモデルを選んでください。",
+			"using_before": "",
+			"using_after": " を使用中です。チャットを始める準備ができました。",
+			"desc": "接続したプロバイダーからモデルを選ぶと、チャットが有効になります。",
+			"change": "モデルを変更",
+			"choose": "モデルを選択"
+		},
+		"privacy": {
+			"public_title": "ノートはデフォルトで共有されます",
+			"all_trusted_title": "ノートへのアクセスが許可されています",
+			"untrusted_title": "ノートはまだ非公開です",
+			"no_provider_title": "ノートへのアクセスはデフォルトで非公開です",
+			"no_provider_before": "許可しない限り、ノートが AI プロバイダーと共有されることは",
+			"no_provider_strong": "ありません",
+			"no_provider_after": "。上でプロバイダーを接続するとアクセスを許可できます — それまでは何も保管庫の外に出ません。",
+			"public_before": "ノートへのアクセスは",
+			"public_strong": "デフォルトで公開",
+			"public_after": "に設定されているため、除外したノート以外はプロバイダーが読み取れます。",
+			"public_end": "。",
+			"review_access": "ノートへのアクセスを確認",
+			"trusted": "信頼済み",
+			"all_trusted_before": {
+				"other": "プロバイダーは"
+			},
+			"all_trusted_after": "に設定されているため、エージェントはノートを読み取れます。",
+			"all_trusted_end": "して、特定のノートを非公開にできます。",
+			"untrusted_before": {
+				"other": "はまだノートを読み取れません — チャットは使えますが、回答は保管庫に基づきません。プロバイダー設定で"
+			},
+			"untrusted_middle": "に設定するか、",
+			"change_access": "ノートへのアクセスを変更",
+			"untrusted_end": "してすべてのプロバイダーを許可してください。"
+		},
+		"skip": "スキップ",
+		"documentation": "ドキュメント ↗",
+		"explore_graph": "グラフを見る",
+		"start_chatting": "チャットを始める",
+		"start_chatting_disabled": "まずプロバイダーを接続し、チャットモデルを追加してください"
+	},
+	"provider_setup": {
+		"title_add": "プロバイダーを追加",
+		"title_setup": "プロバイダーを設定",
+		"title_edit": "{name} を編集",
+		"trusted_indicator": "非公開ノートへのアクセスを信頼済み",
+		"invalid_name": "無効な名前です",
+		"auth_failed": "認証に失敗しました",
+		"picker_desc": "接続するプロバイダーを選択してください。",
+		"setup_guide": "設定ガイド",
+		"name_label": "プロバイダー名",
+		"name_desc": "後で区別できるよう、このプロバイダーインスタンスに名前を付けます。",
+		"name_placeholder": "新しいプロバイダー",
+		"hide_api_key": "API キー欄を隠す",
+		"use_api_key": "代わりに API キーを使う →",
+		"sign_in_desktop_only": "{provider} へのサインインはデスクトップでのみ利用できます。",
+		"checking_connection": "接続を確認中…",
+		"connected": "接続済み",
+		"fix_name_to_finish": "— 完了するにはプロバイダー名を修正してください",
+		"enter_credentials": "上に認証情報を入力してください — 接続は自動的に確認されます。",
+		"trusted_label": "非公開ノートへのアクセスを信頼",
+		"trusted_desc": "信頼されていないプロバイダーには非公開のノートへ、このプロバイダーがアクセスすることを許可します。",
+		"oauth_sign_in_label": "{provider} サインイン",
+		"cancel_sign_in": "サインインをキャンセル",
+		"connected_via": "{provider} で接続済み",
+		"reconnect": "再接続",
+		"disconnect": "切断",
+		"sign_in_with": "{provider} でサインイン",
+		"paste_code_label": "認証コードを貼り付け",
+		"paste_code_desc": "ブラウザに表示された認証コードをコピーし、ここに貼り付けて接続を完了してください。",
+		"code_placeholder": "認証コード",
+		"submit": "送信"
+	},
+	"release_notes": {
+		"tab_title": "新機能",
+		"title": "{version} の新機能",
+		"released_on": "{date} リリース",
+		"earlier_releases": "以前のリリース",
+		"all_releases": "GitHub のすべてのリリース"
+	}
+}

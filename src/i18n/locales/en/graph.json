@@ -1,0 +1,207 @@
+{
+	"view": {
+		"display_text": "Smart graph",
+		"loading": "Building graph..."
+	},
+	"toolbar": {
+		"exit_immerse": "Exit immerse — back to the full graph",
+		"fit": "Fit graph to view",
+		"fit_with_key": "Fit graph to view (F)",
+		"lasso": "Lasso selection",
+		"lasso_with_hint": "Lasso selection (or hold Shift + drag)",
+		"exit_lasso": "Exit lasso selection",
+		"hide_topics": "Hide topics — show the raw graph without clustering",
+		"show_topics": "Show topics — colour notes by their detected topic",
+		"computing_topics": "Computing topics…",
+		"collapse_needs_topics": "Turn topics on to collapse them",
+		"expand_all": "Expand all topics back into notes (S)",
+		"collapse_all": "Collapse all topics into single nodes (S) — or select topics and use Collapse",
+		"show_panel": "Show graph panel",
+		"hide_panel": "Hide graph panel"
+	},
+	"controls": {
+		"aria_label": "Graph settings",
+		"stats": {
+			"notes": {
+				"one": "{count} note",
+				"other": "{count} notes"
+			},
+			"unlinked": {
+				"one": "{count} unlinked",
+				"other": "{count} unlinked"
+			},
+			"links": {
+				"one": "{count} link",
+				"other": "{count} links"
+			},
+			"inferred": {
+				"one": "{count} inferred",
+				"other": "{count} inferred"
+			}
+		},
+		"topics": {
+			"heading": "Topics",
+			"granularity": "Granularity",
+			"granularity_desc": "Left: a few broad topics. Right: many specific ones. Every note stays visible.",
+			"granularity_desc_with_keys": "Left: a few broad topics. Right: many specific ones. Every note stays visible. (↑/↓ on the graph)",
+			"granularity_pending": "Working out this vault's topic levels…",
+			"inferred_links": "Inferred links"
+		},
+		"inferred_hint": {
+			"no_index": "Connect notes by meaning as well as by the links you wrote. Needs a graph embedding index — pick one in the plugin's Graph settings.",
+			"hidden_still_grouping": "Hidden, but still grouping notes. Toggle twice to exclude them from topics as well.",
+			"off": "Off — topics come from the links you wrote.",
+			"off_coverage": "Off — topics come from the links you wrote. Your links alone group {placed} of {total} notes ({percent}%); the other {unlinked} are unlinked.",
+			"on_no_edges": "Connect notes by meaning as well as by the links you wrote — needs a graph embedding index.",
+			"on": "Connect notes by meaning as well as by the links you wrote: {inferred} similarity connections so unlinked notes still find a topic. Turn off to see what your own links cover."
+		},
+		"found": {
+			"heading": "Found · {count}",
+			"multi_select_hint": "shift/⌘ multi-select",
+			"cancel_naming_aria": "Cancel naming topics",
+			"cancel_naming": "Cancel naming",
+			"name_topics": "Name topics with AI"
+		},
+		"scope": {
+			"heading": "Scope",
+			"markdown_only": "Markdown only",
+			"markdown_only_desc": "Show only Markdown notes; off shows all indexable files",
+			"tags": "Tags",
+			"tags_desc": "Draw each tag as a node linked to the notes that carry it; shared tags also help shape topics"
+		},
+		"display": {
+			"heading": "Display",
+			"topic_regions": "Topic regions",
+			"topic_regions_desc": "Tint the area behind each topic so groups read at a glance",
+			"topic_labels": "Topic labels",
+			"topic_labels_desc": "Show the topic name pills over the graph",
+			"direction_arrows": "Direction arrows",
+			"direction_arrows_desc": "Show arrows for directed wiki links",
+			"highlight_inferred": "Highlight inferred links",
+			"highlight_inferred_desc_no_index": "Draw inferred links in the accent color. Needs a graph embedding index — pick one in the plugin's Graph settings.",
+			"highlight_inferred_desc": "Draw inferred links in the accent color so they stand apart from the links you wrote",
+			"highlight_inferred_desc_off": "Draw inferred links in the accent color. Needs Inferred links (under Topics) turned on.",
+			"highlight_isolated": "Highlight isolated",
+			"highlight_isolated_desc": "Mark notes with no wiki links in accent color",
+			"highlight_bridges": "Highlight bridges",
+			"highlight_bridges_desc": "Mark notes that connect multiple topics in accent color"
+		}
+	},
+	"selection": {
+		"aria_label": "Graph selection",
+		"count_selected": {
+			"one": "{count} note selected",
+			"other": "{count} notes selected"
+		},
+		"notes_selected": {
+			"one": "note selected",
+			"other": "notes selected"
+		},
+		"immersed_suffix": " · immersed",
+		"notes_immersed": {
+			"one": "note · immersed",
+			"other": "notes · immersed"
+		},
+		"immersed_into": "Immersed into",
+		"immersed_prefix": "Immersed ·",
+		"note_noun": {
+			"one": "note",
+			"other": "notes"
+		},
+		"clear": "Clear selection",
+		"clear_with_key": "Clear selection (Esc)",
+		"zoom": "Zoom to selection",
+		"zoom_with_key": "Zoom to selection (F)",
+		"zoom_tooltip": "Move the camera to fit the selected notes",
+		"collapse": "Collapse",
+		"expand": "Expand",
+		"collapse_tooltip": "Fold the selected topics into single nodes",
+		"expand_tooltip": "Unfold the selected topics back into notes",
+		"immerse": "Immerse",
+		"immerse_tooltip": "Rebuild graph with selected notes only",
+		"open_in_chat": "Open in chat",
+		"open_in_chat_tooltip": "Reveal the chat and attach the selected notes",
+		"open_all": "Open all",
+		"open_all_tooltip": "Open all selected notes in new tabs",
+		"exit": "Exit",
+		"exit_immerse_tooltip": "Exit immerse (Esc)"
+	},
+	"open_all_confirm": {
+		"title": "Open all notes",
+		"message": {
+			"one": "This opens {count} note in a new tab. Closing it again is manual.",
+			"other": "This opens {count} notes in new tabs. Closing them again is manual."
+		},
+		"confirm": {
+			"one": "Open {count} tab",
+			"other": "Open {count} tabs"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "Chat is not initialized yet. Please open a chat first.",
+		"private_titles_withheld": {
+			"one": "Private note titles were withheld from {count} topic. Trust the graph model's provider to include them.",
+			"other": "Private note titles were withheld from {count} topics. Trust the graph model's provider to include them."
+		},
+		"open_provider_settings": "Open provider settings",
+		"no_graph_chat_model": "No graph chat model selected, so topics can't be named.",
+		"open_graph_settings": "Open graph settings"
+	},
+	"node_menu": {
+		"expand_topic": "Expand topic",
+		"open_all_notes": {
+			"one": "Open {count} note",
+			"other": "Open all {count} notes"
+		},
+		"search_tag": "Search notes with this tag",
+		"open_file": "Open file",
+		"reveal_in_explorer": "Reveal in file explorer",
+		"focus_cluster": "Focus on this cluster",
+		"collapse_topic": "Collapse topic",
+		"select_cluster": "Select this cluster"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} note",
+			"other": "{n} notes"
+		},
+		"links": {
+			"one": "{n} link",
+			"other": "{n} links"
+		},
+		"cluster_fallback": "Cluster {id}",
+		"connections": {
+			"one": "{count} connection",
+			"other": "{count} connections"
+		},
+		"pinned": "📌 Pinned"
+	},
+	"note_context": {
+		"title": "Context",
+		"title_of": "Context of {name}",
+		"semantic_hint": "Semantic neighbors appear once a graph embedding index is configured.",
+		"direction_in": "In",
+		"direction_out": "Out",
+		"direction_both": "Both",
+		"updating": "Updating…",
+		"fit": "Fit graph to view",
+		"options": "Note Context options",
+		"close_options": "Close Note Context options",
+		"view": "View",
+		"mode_graph": "Graph",
+		"mode_list": "List",
+		"show": "Show",
+		"linked": "Linked",
+		"semantic": "Semantic",
+		"both": "Both",
+		"display": "Display",
+		"direction_arrows": "Direction arrows",
+		"no_neighbors": "No neighbors.",
+		"open_a_note": "Open a note."
+	},
+	"topic_fallback": {
+		"unsorted": "Unsorted",
+		"unsorted_with_count": "Unsorted · {count}",
+		"topic": "Topic {id}"
+	}
+}

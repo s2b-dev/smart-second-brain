@@ -10,6 +10,7 @@ import { AgentEditorModal } from "../modal/AgentEditorModal";
 import Button from "../ui/Button.svelte";
 import PickerPopover from "../ui/PickerPopover.svelte";
 import PickerOptionRow from "../ui/PickerOptionRow.svelte";
+import { t } from "../../i18n";
 
 const data = getData();
 const plugin = getPlugin();
@@ -74,13 +75,13 @@ function createNewAgent() {
     onClick={() => openAgentEditor("default-agent")}
     styles="clickable-icon s2b-flex s2b-flex-row s2b-items-center s2b-gap-1"
   >
-    <div class="s2b-text-[--text-muted] s2b-text-xs">Configure Agent</div>
+    <div class="s2b-text-[--text-muted] s2b-text-xs">{t("chat.agent.configure")}</div>
   </Button>
 {:else}
   <PickerPopover
     bind:open={isOpen}
     bind:element={customAnchor}
-    tooltip="Agent options"
+    tooltip={t("chat.agent.options")}
     dataTestId="agent-select-button"
     triggerStyles="clickable-icon s2b-model-select-btn"
     triggerClass="s2b-agent-popover-trigger"
@@ -107,7 +108,7 @@ function createNewAgent() {
         active={isSelected}
         onClick={() => selectAgent(agent)}
         onActionClick={() => openAgentEditor(agent.id)}
-        actionTitle="Edit agent"
+        actionTitle={t("chat.agent.edit")}
       >
         {#snippet leading()}
           <span class="agent-option-icon">
@@ -121,7 +122,7 @@ function createNewAgent() {
 
         {#if isDefault}
           {#snippet meta()}
-            default
+            {t("chat.agent.default_badge")}
           {/snippet}
         {/if}
 
@@ -139,13 +140,13 @@ function createNewAgent() {
 
     <div class="s2b-picker-popover-separator menu-separator"></div>
 
-    <PickerOptionRow onClick={createNewAgent} actionTitle="Create agent">
+    <PickerOptionRow onClick={createNewAgent} actionTitle={t("chat.agent.create")}>
       {#snippet leading()}
         <Icon name="plus" size="xs" />
       {/snippet}
 
       {#snippet content()}
-        New Agent
+        {t("chat.agent.new")}
       {/snippet}
     </PickerOptionRow>
   </PickerPopover>

@@ -1,5 +1,6 @@
 <script lang="ts">
 import { untrack } from "svelte";
+import { t } from "../../i18n";
 import { getPlugin } from "../../stores/state.svelte";
 import { isValidSecretId, setSecret } from "../../lib/secretStorage";
 import SettingContainer from "../settings/SettingContainer.svelte";
@@ -31,17 +32,17 @@ function handleSave() {
 	error = "";
 
 	if (!secretId.trim()) {
-		error = "Secret name is required";
+		error = t("modals.add_secret.error_name_required");
 		return;
 	}
 
 	if (!isValidSecretId(secretId)) {
-		error = "Invalid name. Use lowercase letters, numbers, and dashes only (max 64 chars)";
+		error = t("modals.add_secret.error_name_invalid");
 		return;
 	}
 
 	if (!secretValue.trim()) {
-		error = "Secret value is required";
+		error = t("modals.add_secret.error_value_required");
 		return;
 	}
 
@@ -50,7 +51,7 @@ function handleSave() {
 		onSecretAdded(secretId);
 		modal.close();
 	} catch (e) {
-		error = `Failed to save secret: ${e}`;
+		error = t("modals.add_secret.error_save_failed", { error: String(e) });
 	}
 }
 </script>
@@ -58,17 +59,14 @@ function handleSave() {
 <div class="modal-content">
 	<!-- Description -->
 	<div class="setting-item-description s2b-mb-4">
-		<p>
-			Secrets are stored securely in Obsidian's Keychain, separate from plugin data. This allows you
-			to share API keys across multiple plugins without storing them in plaintext.
-		</p>
+		<p>{t("modals.add_secret.intro")}</p>
 	</div>
 
 	<SettingContainer
-		name="Secret name"
+		name={t("modals.add_secret.name_label")}
 		desc={suggestedId
-			? "Suggested from where you opened this. Edit it to reuse a name across providers."
-			: "Unique name for this secret (lowercase letters, numbers, dashes)"}
+			? t("modals.add_secret.name_desc_suggested")
+			: t("modals.add_secret.name_desc")}
 	>
 		<Text
 			inputType="text"
@@ -78,7 +76,7 @@ function handleSave() {
 		/>
 	</SettingContainer>
 
-	<SettingContainer name="Secret value" desc="The API key or secret value to store securely">
+	<SettingContainer name={t("modals.add_secret.value_label")} desc={t("modals.add_secret.value_desc")}>
 		<Text inputType="password" placeholder="sk-..." bind:value={secretValue} />
 	</SettingContainer>
 
@@ -90,6 +88,6 @@ function handleSave() {
 </div>
 
 <div class="modal-button-container">
-	<Button buttonText="Cancel" onClick={() => modal.close()} />
-	<Button buttonText="Save secret" cta={true} disabled={!isValidId || !secretValue} onClick={handleSave} />
+	<Button buttonText={t("common.cancel")} onClick={() => modal.close()} />
+	<Button buttonText={t("modals.add_secret.save_button")} cta={true} disabled={!isValidId || !secretValue} onClick={handleSave} />
 </div>

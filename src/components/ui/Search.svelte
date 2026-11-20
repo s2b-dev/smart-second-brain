@@ -1,6 +1,7 @@
 <script lang="ts">
 import { SearchComponent } from "obsidian";
 import { onMount } from "svelte";
+import { t } from "../../i18n";
 import { getPlugin } from "../../stores/state.svelte";
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 
 let {
 	value = $bindable(""),
-	placeholder = "Search...",
+	placeholder = t("ui.search.placeholder"),
 	disabled = false,
 	class: className = "",
 	onchange,

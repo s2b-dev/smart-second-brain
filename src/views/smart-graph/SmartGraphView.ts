@@ -1,5 +1,6 @@
 import SmartGraphViewComponent from "../../components/graph/SmartGraphView.svelte";
 import { getSessionRegistry } from "../../stores/chatStore.svelte";
+import { t } from "../../i18n";
 import { SvelteItemView } from "../SvelteItemView";
 
 export const VIEW_TYPE_SMART_GRAPH = "smart-second-brain-graph";
@@ -17,7 +18,7 @@ export class SmartGraphView extends SvelteItemView {
 	}
 
 	getDisplayText(): string {
-		return "Smart graph";
+		return t("graph.view.display_text");
 	}
 
 	getIcon(): string {

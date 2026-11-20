@@ -25,37 +25,37 @@ const PROVIDER_TEMPLATES: readonly ProviderTemplateDefinition[] = [
 	{
 		id: "openai",
 		displayName: "OpenAI",
-		description: "OpenAI models via ChatGPT sign-in or an API key.",
+		description: t("plugin.providers.templates.openai"),
 	},
 	{
 		id: "openai-compatible",
 		displayName: "Custom",
-		description: "Flexible OpenAI-style provider for OpenAI and compatible endpoints.",
+		description: t("plugin.providers.templates.openai_compatible"),
 	},
 	{
 		id: "anthropic",
 		displayName: "Anthropic",
-		description: "Claude models via Anthropic's API.",
+		description: t("plugin.providers.templates.anthropic"),
 	},
 	{
 		id: "ollama",
 		displayName: "Ollama",
-		description: "Local Ollama models over the Ollama API.",
+		description: t("plugin.providers.templates.ollama"),
 	},
 	{
 		id: "omlx",
 		displayName: "oMLX",
-		description: "Local MLX models on your Mac via oMLX's OpenAI-compatible server.",
+		description: t("plugin.providers.templates.omlx"),
 	},
 	{
 		id: "openrouter",
 		displayName: "OpenRouter",
-		description: "OpenRouter account and model catalog.",
+		description: t("plugin.providers.templates.openrouter"),
 	},
 	{
 		id: "huggingface",
 		displayName: "Hugging Face",
-		description: "Open models from Hugging Face's inference providers.",
+		description: t("plugin.providers.templates.huggingface"),
 	},
 ] as const;
 
@@ -160,6 +160,7 @@ export type {
 	ProviderInstanceMeta,
 	ProviderTemplateId,
 } from "../types/provider/index";
+import { t } from "../i18n";
 
 export { isEmbeddingProvider } from "../types/provider/index";
 

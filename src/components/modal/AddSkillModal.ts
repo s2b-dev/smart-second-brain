@@ -1,4 +1,5 @@
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import AddSkillModalComponent from "./AddSkillModal.svelte";
 import { SvelteModal } from "./SvelteModal";
 
@@ -15,7 +16,7 @@ export class AddSkillModal extends SvelteModal {
 	}
 
 	onOpen() {
-		this.setTitle("Add Custom Skill");
+		this.setTitle(t("agents.add_skill.title"));
 		// The modal is just a couple of text fields now (instructions are written in the opened
 		// note), so let it size to its content instead of forcing a tall fixed height.
 		this.mountComponent(

@@ -3,6 +3,7 @@ import { getSessionRegistry } from "../../stores/chatStore.svelte";
 import { getData } from "../../stores/dataStore.svelte";
 import { getPlugin } from "../../stores/state.svelte";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 const registry = $derived(getSessionRegistry());
 const pluginData = getData();
@@ -34,7 +35,7 @@ function openChat(path: string) {
 			type="button"
 			class="s2b-running-go"
 			onclick={() => openChat(chat.path)}
-			title="Go to the running chat: {chat.name}"
+			title={t("chat.running.go_to", { name: chat.name })}
 		>
 			<span class="s2b-running-spinner" use:icon={"loader-circle"}></span>
 			<span class="s2b-running-label">{chat.name}</span>

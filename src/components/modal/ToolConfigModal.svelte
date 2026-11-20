@@ -1,5 +1,6 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import { t } from "../../i18n";
 import type { BuiltInToolId } from "../../types/plugin";
 import type SecondBrainPlugin from "../../main";
 import { getToolDisplayName } from "../../agent/tools/builtInToolDefaults";
@@ -20,7 +21,7 @@ const capturedToolId = (() => toolId)();
 const configuredName = (() => accessors?.getToolConfig()?.name)();
 
 onMount(() => {
-	modal.setTitle(`Configure: ${getToolDisplayName(capturedToolId, configuredName)}`);
+	modal.setTitle(t("agents.tool_config.title", { name: getToolDisplayName(capturedToolId, configuredName) }));
 });
 </script>
 

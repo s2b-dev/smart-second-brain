@@ -1,5 +1,6 @@
 <script lang="ts">
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import {
 	DEFAULT_TOOLS_CONFIG,
 	getReadContentDescription,
@@ -102,20 +103,22 @@ const chatModelSupportsVision = !!chatModel?.modelConfig?.supportsVision;
 const chatModelSupportsPdf = chatModelSupportsVision && !!chatModel && NATIVE_PDF_PROVIDERS.has(chatModel.provider);
 
 function autoLabel(capability: boolean): string {
-	if (!chatModelLabel) return "Auto (no chat model)";
-	return capability ? `Auto (${chatModelLabel})` : `Auto (${chatModelLabel} — not supported)`;
+	if (!chatModelLabel) return t("agents.tool_config.auto_no_model");
+	return capability
+		? t("agents.tool_config.auto_model", { model: chatModelLabel })
+		: t("agents.tool_config.auto_model_unsupported", { model: chatModelLabel });
 }
 
 const imageProcessorModeOptions = $derived<{ display: string; value: ProcessorMode }[]>([
 	{ display: autoLabel(chatModelSupportsVision), value: "auto" },
-	{ display: "Custom", value: "custom" },
-	{ display: "Disabled", value: "disabled" },
+	{ display: t("agents.tool_config.mode_custom"), value: "custom" },
+	{ display: t("common.disabled"), value: "disabled" },
 ]);
 
 const pdfProcessorModeOptions = $derived<{ display: string; value: ProcessorMode }[]>([
 	{ display: autoLabel(chatModelSupportsPdf), value: "auto" },
-	{ display: "Custom", value: "custom" },
-	{ display: "Disabled", value: "disabled" },
+	{ display: t("agents.tool_config.mode_custom"), value: "custom" },
+	{ display: t("common.disabled"), value: "disabled" },
 ]);
 
 function handleImageModeChange(mode: ProcessorMode) {
@@ -328,10 +331,10 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
     -->
   {:else if capturedToolId === "read_content"}
     <SettingGroup
-      heading="Vision processors"
-      headingDesc="Configure how images and PDFs encountered during tool use are processed. Auto uses the chat model if it supports vision."
+      heading={t("agents.tool_config.vision_heading")}
+      headingDesc={t("agents.tool_config.vision_desc")}
     >
-      <SettingContainer name="Image processor" desc="Vision model to analyze images found in notes.">
+      <SettingContainer name={t("agents.tool_config.image_processor_name")} desc={t("agents.tool_config.image_processor_desc")}>
         <div class="processor-control">
           <Dropdown
             type="options"
@@ -352,13 +355,13 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if imageProcessor}
                 <span>{imageProcessor.provider}/{imageProcessor.model}</span>
               {:else}
-                <span class="s2b-text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">{t("agents.tool_config.select_model")}</span>
               {/if}
             </Button>
           {/if}
         </div>
       </SettingContainer>
-      <SettingContainer name="PDF Processor" desc="Vision model for enhanced PDF analysis (charts, tables, diagrams).">
+      <SettingContainer name={t("agents.tool_config.pdf_processor_name")} desc={t("agents.tool_config.pdf_processor_desc")}>
         <div class="processor-control">
           <Dropdown
             type="options"
@@ -379,7 +382,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
               {#if pdfProcessor}
                 <span>{pdfProcessor.provider}/{pdfProcessor.model}</span>
               {:else}
-                <span class="s2b-text-[--text-muted]">Select model…</span>
+                <span class="s2b-text-[--text-muted]">{t("agents.tool_config.select_model")}</span>
               {/if}
             </Button>
           {/if}
@@ -389,10 +392,10 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
   {:else if capturedToolId === "fetch_url"}
     <!-- no tool-specific settings -->
   {:else if capturedToolId === "web_search"}
-    <SettingGroup heading="Web search">
+    <SettingGroup heading={t("agents.tool_config.web_search_heading")}>
       <SettingContainer
-        name="Provider"
-        desc="Search provider used by this tool. The provider and API key are shared across all agents that enable web_search."
+        name={t("agents.tool_config.web_search_provider_name")}
+        desc={t("agents.tool_config.web_search_provider_desc")}
       >
         <Dropdown
           type="options"
@@ -403,7 +406,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
       </SettingContainer>
       {#if pluginData.webSearchProvider}
         <SettingContainer
-          name={webSearchProviderInfo?.keyless ? "API Key (optional)" : "API Key"}
+          name={webSearchProviderInfo?.keyless ? t("agents.tool_config.api_key_optional") : t("agents.tool_config.api_key")}
           desc={webSearchProviderInfo?.keyHelp ?? ""}
         >
           <SecretSelect
@@ -418,19 +421,19 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
 
   {#if footer === "modal"}
     <div class="tool-config-actions">
-      <Button buttonText="Cancel" onClick={() => onCancel?.()} />
+      <Button buttonText={t("common.cancel")} onClick={() => onCancel?.()} />
       <div class="s2b-flex-1"></div>
       {#if showResetToDefault}
-        <Button buttonText="Reset to default" onClick={handleResetToDefault} />
+        <Button buttonText={t("agents.tool_config.reset_to_default")} onClick={handleResetToDefault} />
       {/if}
       {#if isDirty}
-        <Button buttonText="Save" cta={true} onClick={handleSave} />
+        <Button buttonText={t("common.save")} cta={true} onClick={handleSave} />
       {/if}
     </div>
   {:else if showResetToDefault}
     <div class="tool-config-inline-reset">
       <button type="button" class="tool-config-reset-link" onclick={handleResetToDefault}>
-        Reset {getToolDisplayName(capturedToolId, name)} to default
+        {t("agents.tool_config.reset_tool_to_default", { name: getToolDisplayName(capturedToolId, name) })}
       </button>
     </div>
   {/if}

@@ -1,0 +1,116 @@
+{
+	"view": {
+		"tab_title": "Bienvenue"
+	},
+	"welcome": {
+		"title": "Bienvenue dans Smart Second Brain",
+		"subtitle": "Transformez votre coffre en un second cerveau assisté par l’IA — recherchez plus intelligemment, explorez les connexions dans un graphe et discutez avec vos notes.",
+		"hotkeys_unavailable_notice": "Impossible d’ouvrir les raccourcis clavier — ouvrez Paramètres → Raccourcis clavier et recherchez « Rechercher dans les notes ».",
+		"search": {
+			"title": "Recherche plus intelligente",
+			"desc": "Trouvez des notes par titre, contenu, tags et dossiers — avec une correspondance approximative. Aucune configuration nécessaire. Ajoutez plus tard un modèle d’embedding pour la recherche sémantique.",
+			"hotkey_before": "Ou",
+			"hotkey_link": "définissez un raccourci clavier",
+			"hotkey_after": "pour un accès instantané.",
+			"navbar_toggle": "Ouvrir depuis la loupe de la barre de navigation au lieu du sélecteur rapide"
+		},
+		"graph": {
+			"title": "Graphe plus intelligent",
+			"desc": "Voyez comment vos notes se relient et se regroupent en thèmes. Aucune configuration nécessaire."
+		},
+		"chat": {
+			"title": "Discutez avec vos notes",
+			"desc": "Posez des questions fondées sur votre coffre, avec la recherche web et l’intégration de plugins comme Dataview et Tasks. Nécessite un fournisseur d’IA — configurez-en un ci-dessous."
+		},
+		"provider_step": {
+			"title": "Connecter un fournisseur d’IA",
+			"done_desc": "Fournisseur connecté. Vous pouvez ajouter ou gérer des fournisseurs dans les paramètres.",
+			"desc": "Connectez OpenAI, Anthropic, Ollama, OpenRouter ou tout point de terminaison compatible OpenAI.",
+			"add_another": "En ajouter un autre",
+			"connect": "Connecter un fournisseur"
+		},
+		"model_step": {
+			"title": "Choisir un modèle de chat",
+			"needs_provider_desc": "Connectez d’abord un fournisseur, puis choisissez un modèle avec lequel discuter.",
+			"using_before": "Modèle utilisé :",
+			"using_after": ". Vous êtes prêt à discuter.",
+			"desc": "Choisissez un modèle de votre fournisseur connecté pour activer le chat.",
+			"change": "Changer de modèle",
+			"choose": "Choisir un modèle"
+		},
+		"privacy": {
+			"public_title": "Vos notes sont partagées par défaut",
+			"all_trusted_title": "L’accès aux notes est accordé",
+			"untrusted_title": "Vos notes sont encore privées",
+			"no_provider_title": "L’accès aux notes est privé par défaut",
+			"no_provider_before": "Vos notes ne sont",
+			"no_provider_strong": "pas",
+			"no_provider_after": "partagées avec les fournisseurs d’IA, sauf si vous l’autorisez. Une fois un fournisseur connecté ci-dessus, vous pourrez lui accorder l’accès — rien ne quitte votre coffre d’ici là.",
+			"public_before": "L’accès aux notes est défini sur",
+			"public_strong": "public par défaut",
+			"public_after": " : les fournisseurs peuvent donc lire vos notes, sauf celles que vous excluez.",
+			"public_end": ".",
+			"review_access": "Vérifier l’accès aux notes",
+			"trusted": "de confiance",
+			"all_trusted_before": {
+				"one": "Votre fournisseur est marqué",
+				"many": "Vos fournisseurs sont marqués",
+				"other": "Vos fournisseurs sont marqués"
+			},
+			"all_trusted_after": ", l’agent peut donc lire vos notes.",
+			"all_trusted_end": "pour garder certaines notes privées.",
+			"untrusted_before": {
+				"one": "ne peut pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-le comme",
+				"many": "ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme",
+				"other": "ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme"
+			},
+			"untrusted_middle": "dans les paramètres du fournisseur, ou",
+			"change_access": "modifiez l’accès aux notes",
+			"untrusted_end": "pour autoriser tous les fournisseurs."
+		},
+		"skip": "Passer",
+		"documentation": "Documentation ↗",
+		"explore_graph": "Explorer le graphe",
+		"start_chatting": "Commencer à discuter",
+		"start_chatting_disabled": "Connectez d’abord un fournisseur et ajoutez un modèle de chat"
+	},
+	"provider_setup": {
+		"title_add": "Ajouter un fournisseur",
+		"title_setup": "Configurer le fournisseur",
+		"title_edit": "Modifier {name}",
+		"trusted_indicator": "Autorisé à lire les notes privées",
+		"invalid_name": "Nom invalide",
+		"auth_failed": "Échec de l’authentification",
+		"picker_desc": "Choisissez un fournisseur à connecter.",
+		"setup_guide": "Guide de configuration",
+		"name_label": "Nom du fournisseur",
+		"name_desc": "Nommez cette instance de fournisseur pour la distinguer plus tard.",
+		"name_placeholder": "Nouveau fournisseur",
+		"hide_api_key": "Masquer le champ de clé API",
+		"use_api_key": "Utiliser plutôt une clé API →",
+		"sign_in_desktop_only": "La connexion à {provider} n’est disponible que sur ordinateur.",
+		"checking_connection": "Vérification de la connexion…",
+		"connected": "Connecté",
+		"fix_name_to_finish": "— corrigez le nom du fournisseur pour terminer",
+		"enter_credentials": "Saisissez vos identifiants ci-dessus — la connexion est vérifiée automatiquement.",
+		"trusted_label": "Autorisé à lire les notes privées",
+		"trusted_desc": "Autoriser ce fournisseur à accéder aux notes qui restent privées pour les fournisseurs non approuvés.",
+		"oauth_sign_in_label": "Connexion à {provider}",
+		"cancel_sign_in": "Annuler la connexion",
+		"connected_via": "Connecté via {provider}",
+		"reconnect": "Reconnecter",
+		"disconnect": "Déconnecter",
+		"sign_in_with": "Se connecter avec {provider}",
+		"paste_code_label": "Coller le code d’autorisation",
+		"paste_code_desc": "Copiez le code d’autorisation affiché dans le navigateur et collez-le ici pour terminer la connexion.",
+		"code_placeholder": "Code d’autorisation",
+		"submit": "Valider"
+	},
+	"release_notes": {
+		"tab_title": "Nouveautés",
+		"title": "Nouveautés de la version {version}",
+		"released_on": "Publiée le {date}",
+		"earlier_releases": "Versions précédentes",
+		"all_releases": "Toutes les versions sur GitHub"
+	}
+}

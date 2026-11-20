@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Component } from "svelte";
+import { t } from "../../i18n";
 import Button from "../ui/Button.svelte";
 
 interface Props {
@@ -33,7 +34,7 @@ let {
 </script>
 
 {#if loading}
-  <span class="s2b-text-[--text-muted] s2b-text-sm">Loading models…</span>
+  <span class="s2b-text-[--text-muted] s2b-text-sm">{t("settings.model_control.loading")}</span>
 {:else if !available && configureLabel && onConfigure}
   <!-- Labelled, not icon-only: a bare gear reads as "configure this dropdown" and its meaning
        lived only in the tooltip/aria-label, which touch devices never surface. -->

@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Widget",
+	"block": {
+		"unbundled_library": "This widget asks for a library that is not bundled: {libs}. Available: {available}.",
+		"generating": "Generating widget…",
+		"expand": "Expand",
+		"copy_tooltip": "Copy as block to paste into a note",
+		"copied_notice": "Widget block copied. Paste it into any note.",
+		"save_tooltip": "Save as a widget file and open it",
+		"save_failed": "Could not save widget: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "This widget was stopped because it tried to navigate away from its sandbox."
+	},
+	"embed": {
+		"load_failed": "Could not load widget."
+	},
+	"rename": {
+		"title": "Rename widget",
+		"name": "Name",
+		"button": "Rename",
+		"empty_name": "Enter a name.",
+		"invalid_chars": "A name cannot contain \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "\"{name}\" already exists in this folder.",
+		"failed": "Could not rename: {error}"
+	},
+	"view": {
+		"menu_show_widget": "Show widget",
+		"menu_edit_source": "Edit source",
+		"menu_rename": "Rename...",
+		"review_showing_proposed": "Pending change from chat — showing the proposed widget",
+		"review_showing_current": "Pending change from chat — showing the current widget",
+		"show_current": "Show current",
+		"show_proposed": "Show proposed",
+		"accept": "Accept",
+		"reject": "Reject",
+		"rejected_notice": "Rejected the proposed change to this widget",
+		"conflict_tooltip": "Cannot accept — the widget changed after this was proposed. Reject it and ask the agent to re-stage.",
+		"applied_notice": "Applied the proposed change to this widget",
+		"apply_failed": "Failed to apply change: {error}",
+		"source_aria": "Widget source",
+		"source_hint": "Frontmatter (title, height, queries, libs), then the HTML.",
+		"source_stale_hint": "Changed on disk while editing — Cancel to reload; Save is disabled.",
+		"source_stale_notice": "This widget changed on disk while you were editing. Cancel to reload it, then edit again.",
+		"save_failed": "Could not save widget: {error}"
+	}
+}

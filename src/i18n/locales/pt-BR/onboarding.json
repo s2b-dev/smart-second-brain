@@ -1,0 +1,116 @@
+{
+	"view": {
+		"tab_title": "Boas-vindas"
+	},
+	"welcome": {
+		"title": "Boas-vindas ao Smart Second Brain",
+		"subtitle": "Transforme seu cofre em um segundo cérebro assistido por IA — pesquise de forma mais inteligente, explore conexões em um grafo e converse com suas notas.",
+		"hotkeys_unavailable_notice": "Não foi possível abrir Atalhos de teclado — abra Configurações → Atalhos de teclado e pesquise por “Pesquisar notas”.",
+		"search": {
+			"title": "Pesquisa mais inteligente",
+			"desc": "Encontre notas por título, conteúdo, tags e pastas — com correspondência aproximada. Nenhuma configuração necessária. Adicione um modelo de embedding depois para pesquisa semântica.",
+			"hotkey_before": "Ou",
+			"hotkey_link": "defina um atalho de teclado",
+			"hotkey_after": "para acesso instantâneo.",
+			"navbar_toggle": "Abrir pela lupa da barra de navegação em vez do alternador rápido"
+		},
+		"graph": {
+			"title": "Grafo mais inteligente",
+			"desc": "Veja como suas notas se conectam e se agrupam em tópicos. Nenhuma configuração necessária."
+		},
+		"chat": {
+			"title": "Converse com suas notas",
+			"desc": "Faça perguntas baseadas no seu cofre, com pesquisa na web e plugins como Dataview e Tasks integrados. Requer um provedor de IA — configure um abaixo."
+		},
+		"provider_step": {
+			"title": "Conectar um provedor de IA",
+			"done_desc": "Provedor conectado. Você pode adicionar ou gerenciar provedores nas configurações.",
+			"desc": "Conecte OpenAI, Anthropic, Ollama, OpenRouter ou qualquer endpoint compatível com OpenAI.",
+			"add_another": "Adicionar outro",
+			"connect": "Conectar provedor"
+		},
+		"model_step": {
+			"title": "Escolher um modelo de chat",
+			"needs_provider_desc": "Conecte um provedor primeiro e depois escolha um modelo para conversar.",
+			"using_before": "Usando",
+			"using_after": ". Tudo pronto para começar a conversar.",
+			"desc": "Escolha um modelo do seu provedor conectado para ativar o chat.",
+			"change": "Trocar modelo",
+			"choose": "Escolher modelo"
+		},
+		"privacy": {
+			"public_title": "Suas notas são compartilhadas por padrão",
+			"all_trusted_title": "O acesso às notas está liberado",
+			"untrusted_title": "Suas notas ainda são privadas",
+			"no_provider_title": "O acesso às notas é privado por padrão",
+			"no_provider_before": "Suas notas",
+			"no_provider_strong": "não",
+			"no_provider_after": "são compartilhadas com provedores de IA a menos que você permita. Depois de conectar um provedor acima, você pode conceder acesso a ele — nada sai do seu cofre antes disso.",
+			"public_before": "O acesso às notas está definido como",
+			"public_strong": "público por padrão",
+			"public_after": ", então os provedores podem ler suas notas, exceto as que você excluir.",
+			"public_end": ".",
+			"review_access": "Revisar acesso às notas",
+			"trusted": "de confiança",
+			"all_trusted_before": {
+				"one": "Seu provedor está marcado como",
+				"many": "Seus provedores estão marcados como",
+				"other": "Seus provedores estão marcados como"
+			},
+			"all_trusted_after": ", então o agente pode ler suas notas.",
+			"all_trusted_end": "para manter notas específicas privadas.",
+			"untrusted_before": {
+				"one": "ainda não pode ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-o como",
+				"many": "ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como",
+				"other": "ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como"
+			},
+			"untrusted_middle": "nas configurações do provedor ou",
+			"change_access": "altere o acesso às notas",
+			"untrusted_end": "para permitir todos os provedores."
+		},
+		"skip": "Pular",
+		"documentation": "Documentação ↗",
+		"explore_graph": "Explorar o grafo",
+		"start_chatting": "Começar a conversar",
+		"start_chatting_disabled": "Conecte um provedor e adicione um modelo de chat primeiro"
+	},
+	"provider_setup": {
+		"title_add": "Adicionar provedor",
+		"title_setup": "Configurar provedor",
+		"title_edit": "Editar {name}",
+		"trusted_indicator": "Confiável para notas privadas",
+		"invalid_name": "Nome inválido",
+		"auth_failed": "Falha na autenticação",
+		"picker_desc": "Escolha um provedor para conectar.",
+		"setup_guide": "Guia de configuração",
+		"name_label": "Nome do provedor",
+		"name_desc": "Dê um nome a esta instância do provedor para poder distingui-la depois.",
+		"name_placeholder": "Novo provedor",
+		"hide_api_key": "Ocultar campo da chave de API",
+		"use_api_key": "Usar uma chave de API →",
+		"sign_in_desktop_only": "O login com {provider} só está disponível no desktop.",
+		"checking_connection": "Verificando conexão…",
+		"connected": "Conectado",
+		"fix_name_to_finish": "— corrija o nome do provedor para concluir",
+		"enter_credentials": "Insira suas credenciais acima — a conexão é verificada automaticamente.",
+		"trusted_label": "Confiável para notas privadas",
+		"trusted_desc": "Permitir que este provedor acesse notas que continuam privadas para provedores não confiáveis.",
+		"oauth_sign_in_label": "Login com {provider}",
+		"cancel_sign_in": "Cancelar login",
+		"connected_via": "Conectado via {provider}",
+		"reconnect": "Reconectar",
+		"disconnect": "Desconectar",
+		"sign_in_with": "Entrar com {provider}",
+		"paste_code_label": "Colar código de autorização",
+		"paste_code_desc": "Copie o código de autorização exibido no navegador e cole-o aqui para concluir a conexão.",
+		"code_placeholder": "Código de autorização",
+		"submit": "Enviar"
+	},
+	"release_notes": {
+		"tab_title": "Novidades",
+		"title": "Novidades da versão {version}",
+		"released_on": "Lançada em {date}",
+		"earlier_releases": "Versões anteriores",
+		"all_releases": "Todas as versões no GitHub"
+	}
+}

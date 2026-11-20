@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import ManagedEntitySection from "../../components/settings/ManagedEntitySection.svelte";
 import { PrivacyListModal } from "../../components/modal/PrivacyListModal";
 import ProviderItem from "../../components/settings/ProviderItem.svelte";
@@ -27,13 +28,13 @@ function handleOpenProviderSetup() {
 
 <!-- Providers -->
 <ManagedEntitySection
-  heading="Providers"
-  description="Providers connect Smart Second Brain to the AI services used for chat, embeddings, and other model-powered features."
-  emptyMessage="No provider instances configured yet."
+  heading={t("settings.general.providers.heading")}
+  description={t("settings.general.providers.description")}
+  emptyMessage={t("settings.general.providers.empty")}
   hasItems={configuredProviderIds.length > 0}
 >
   {#snippet actions()}
-    <Button buttonText="Add provider" cta={true} onClick={handleOpenProviderSetup} />
+    <Button buttonText={t("settings.general.providers.add")} cta={true} onClick={handleOpenProviderSetup} />
   {/snippet}
 
   {#if configuredProviderIds.length > 0}
@@ -44,11 +45,11 @@ function handleOpenProviderSetup() {
 </ManagedEntitySection>
 
 <!-- Privacy -->
-<SettingGroup heading="Privacy">
+<SettingGroup heading={t("settings.general.privacy.heading")}>
   <SettingItem
-    name="Note access policy"
+    name={t("settings.general.privacy.note_access")}
     class="privacy-setting-item"
-    desc="Choose whether untrusted providers see nothing or everything by default, then manage the matching file list."
+    desc={t("settings.general.privacy.note_access_desc")}
   >
     {#snippet nameSuffix()}
       <span
@@ -59,15 +60,15 @@ function handleOpenProviderSetup() {
       <!-- Two vault modes crossed with per-provider trust, where the same toggle
            inverts meaning depending on the mode — more than one description line
            can carry, so link the page that lays it out. -->
-      <DocsLink doc="privacyModel" subject="Note access policy" />
+      <DocsLink doc="privacyModel" subject={t("settings.general.privacy.note_access")} />
     {/snippet}
 
-    <Button onClick={() => privacyListModal.open()} buttonText="Manage" />
+    <Button onClick={() => privacyListModal.open()} buttonText={t("settings.general.privacy.manage")} />
   </SettingItem>
 
   <SettingItem
-    name="Check for updates"
-    desc="Once a day, fetch this plugin's version number from GitHub and show a notice when a newer one is available. Nothing about you or your vault is sent. Skipped while Obsidian's own automatic plugin update check is on."
+    name={t("settings.general.privacy.check_updates")}
+    desc={t("settings.general.privacy.check_updates_desc")}
   >
     <Toggle
       checked={pluginData.checkForUpdates}

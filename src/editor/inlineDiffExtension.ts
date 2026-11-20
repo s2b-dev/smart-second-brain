@@ -10,6 +10,7 @@ import { getPendingChangesStore } from "../stores/pendingChangesStore.svelte";
 import { getPlugin } from "../stores/state.svelte";
 import type { PendingChangeEntry } from "../types/shared";
 import type { DiffViewMode } from "../types/plugin";
+import { t } from "../i18n";
 
 /** Dispatched to signal the plugin should rebuild decorations from the store. */
 const refreshPendingChanges = StateEffect.define();
@@ -25,7 +26,7 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 
 	const label = createSpan();
 	label.className = "s2b-diff-actions-label";
-	label.textContent = "Pending change";
+	label.textContent = t("plugin.diff.pending_change");
 	bar.appendChild(label);
 
 	// Position among this note's pending change groups (e.g. "2/3"). Only shown
@@ -72,14 +73,14 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 		return btn;
 	};
 	if (canNavigate(entryId)) {
-		bar.appendChild(makeNavBtn("chevron-up", "Previous pending change", "prev"));
-		bar.appendChild(makeNavBtn("chevron-down", "Next pending change", "next"));
+		bar.appendChild(makeNavBtn("chevron-up", t("plugin.diff.previous"), "prev"));
+		bar.appendChild(makeNavBtn("chevron-down", t("plugin.diff.next"), "next"));
 	}
 
 	// Toggle view mode icon (visible on hover via CSS)
 	const toggleBtn = createEl("button");
 	toggleBtn.className = "s2b-diff-toggle-btn";
-	toggleBtn.setAttribute("aria-label", "Toggle diff view");
+	toggleBtn.setAttribute("aria-label", t("plugin.diff.toggle_view"));
 	let currentMode: DiffViewMode;
 	try {
 		currentMode = getData().diffViewMode;
@@ -104,16 +105,18 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 	});
 	bar.appendChild(toggleBtn);
 
-	const acceptBtn = createResolveButton("s2b-diff-accept-btn", "check", "Accept", "Accept change");
+	const acceptBtn = createResolveButton(
+		"s2b-diff-accept-btn",
+		"check",
+		t("plugin.diff.accept"),
+		t("plugin.diff.accept_aria"),
+	);
 	// Stale parity with the chat bar: once the document no longer matches the
 	// staged original, the store's conflict check makes every group accept fail
 	// unconditionally, so offer the explanation instead of the error.
 	if (stale) {
 		acceptBtn.disabled = true;
-		acceptBtn.setAttribute(
-			"title",
-			"Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage.",
-		);
+		acceptBtn.setAttribute("title", t("plugin.diff.stale_tooltip"));
 	}
 	acceptBtn.addEventListener("click", (e) => {
 		e.preventDefault();
@@ -127,7 +130,12 @@ function createEditActionBar(entryId: string, groupIndex: number, groupTotal: nu
 	});
 	bar.appendChild(acceptBtn);
 
-	const rejectBtn = createResolveButton("s2b-diff-reject-btn", "x", "Reject", "Reject change");
+	const rejectBtn = createResolveButton(
+		"s2b-diff-reject-btn",
+		"x",
+		t("plugin.diff.reject"),
+		t("plugin.diff.reject_aria"),
+	);
 	rejectBtn.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -333,8 +341,7 @@ function getWidgetClasses(): WidgetClasses {
 		toDOM(): HTMLElement {
 			const banner = createDiv();
 			banner.className = "s2b-diff-cross-thread-banner";
-			const chat = this.otherCount === 1 ? "chat has" : "chats have";
-			banner.textContent = `${this.otherCount} other ${chat} a pending edit to this file. Only the latest is shown here; whichever is accepted first wins and the others may then fail to apply.`;
+			banner.textContent = t("plugin.diff.cross_thread_banner", { count: this.otherCount });
 			return banner;
 		}
 

@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Widget",
+	"block": {
+		"unbundled_library": "Este widget pede uma biblioteca que não está incluída: {libs}. Disponíveis: {available}.",
+		"generating": "Gerando widget…",
+		"expand": "Expandir",
+		"copy_tooltip": "Copiar como bloco para colar em uma nota",
+		"copied_notice": "Bloco do widget copiado. Cole-o em qualquer nota.",
+		"save_tooltip": "Salvar como arquivo de widget e abri-lo",
+		"save_failed": "Não foi possível salvar o widget: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "Este widget foi interrompido porque tentou sair do seu ambiente isolado."
+	},
+	"embed": {
+		"load_failed": "Não foi possível carregar o widget."
+	},
+	"rename": {
+		"title": "Renomear widget",
+		"name": "Nome",
+		"button": "Renomear",
+		"empty_name": "Digite um nome.",
+		"invalid_chars": "Um nome não pode conter \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "“{name}” já existe nesta pasta.",
+		"failed": "Não foi possível renomear: {error}"
+	},
+	"view": {
+		"menu_show_widget": "Mostrar widget",
+		"menu_edit_source": "Editar código-fonte",
+		"menu_rename": "Renomear...",
+		"review_showing_proposed": "Alteração pendente do chat — mostrando o widget proposto",
+		"review_showing_current": "Alteração pendente do chat — mostrando o widget atual",
+		"show_current": "Mostrar atual",
+		"show_proposed": "Mostrar proposto",
+		"accept": "Aceitar",
+		"reject": "Rejeitar",
+		"rejected_notice": "A alteração proposta para este widget foi rejeitada",
+		"conflict_tooltip": "Não é possível aceitar — o widget mudou depois desta proposta. Rejeite-a e peça ao agente para propô-la de novo.",
+		"applied_notice": "A alteração proposta para este widget foi aplicada",
+		"apply_failed": "Falha ao aplicar a alteração: {error}",
+		"source_aria": "Código-fonte do widget",
+		"source_hint": "Frontmatter (title, height, queries, libs) e, em seguida, o HTML.",
+		"source_stale_hint": "Alterado no disco durante a edição — Cancele para recarregar; Salvar está desativado.",
+		"source_stale_notice": "Este widget foi alterado no disco enquanto você editava. Cancele para recarregá-lo e edite novamente.",
+		"save_failed": "Não foi possível salvar o widget: {error}"
+	}
+}

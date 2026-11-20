@@ -1,5 +1,6 @@
 import ModalProvider from "../../lib/QueryClientProvider.svelte";
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import EmbeddingIndexSetupModalComponent from "./EmbeddingIndexSetupModal.svelte";
 import type { SelectedModel } from "./ModelSelectionModal";
 import { SvelteModal } from "./SvelteModal";
@@ -27,7 +28,9 @@ export class EmbeddingIndexSetupModal extends SvelteModal {
 
 	onOpen() {
 		this.setTitle(
-			this.options.purpose === "search" ? "Configure Search Embedding Index" : "Configure Graph Embedding Index",
+			this.options.purpose === "search"
+				? t("modals.embedding_index_setup.title_search")
+				: t("modals.embedding_index_setup.title_graph"),
 		);
 		// Wrapped in ModalProvider: the component calls `useAvailableModels()`, which
 		// resolves a QueryClient from Svelte context. Mounting it bare threw

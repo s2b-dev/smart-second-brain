@@ -1,6 +1,7 @@
 <script lang="ts">
 import Button from "../ui/Button.svelte";
 import Icon from "../ui/Icon.svelte";
+import { t } from "../../i18n";
 
 /**
  * How a turn that produced no answer ends: the run failed, or the user stopped it.
@@ -20,21 +21,21 @@ interface Props {
 
 const { kind, detail = undefined, onRetry = undefined }: Props = $props();
 
-const trimmedDetail = $derived(detail?.trim() || "The model request failed.");
+const trimmedDetail = $derived(detail?.trim() || t("chat.status.request_failed"));
 </script>
 
 {#if kind === "error"}
   <div class="s2b-turn-error" role="alert">
     <div class="turn-error-header">
       <span class="turn-error-icon"><Icon name="triangle-alert" size="s" /></span>
-      <span class="turn-error-title">Something went wrong</span>
+      <span class="turn-error-title">{t("chat.status.error_title")}</span>
       {#if onRetry}
         <Button
           class="clickable-icon turn-error-retry"
           iconId="refresh-cw"
-          buttonText="Retry"
-          ariaLabel="Retry this request"
-          tooltip="Re-run the failed request"
+          buttonText={t("common.retry")}
+          ariaLabel={t("chat.status.retry_aria")}
+          tooltip={t("chat.status.retry_tooltip")}
           onClick={onRetry}
         />
       {/if}
@@ -44,7 +45,7 @@ const trimmedDetail = $derived(detail?.trim() || "The model request failed.");
 {:else}
   <div class="s2b-turn-stopped">
     <Icon name="circle-stop" size="xs" />
-    <span>Stopped</span>
+    <span>{t("chat.status.stopped")}</span>
   </div>
 {/if}
 

@@ -14,6 +14,7 @@ import { confirmDelete } from "../modal/ConfirmModal";
 import { Logger } from "../../utils/logging";
 import { getProviderDefinition } from "../../providers/index";
 import { getData } from "../../stores/dataStore.svelte";
+import { t } from "../../i18n";
 import { getPlugin } from "../../stores/state.svelte";
 import {
 	isVectorStoreInitialized,
@@ -166,7 +167,11 @@ async function deleteIndex(targetIndexId: string) {
 		// rather than letting it surface as an unhandled rejection: the index is still there,
 		// so the row below must not be reset as though it had been removed.
 		Logger.error(`[EmbeddingIndexSection] Failed to delete index ${targetIndexId}:`, error);
-		new Notice(`Could not delete this index: ${error instanceof Error ? error.message : String(error)}`);
+		new Notice(
+			t("settings.embedding_index.delete_failed", {
+				error: error instanceof Error ? error.message : String(error),
+			}),
+		);
 		return;
 	}
 	if (targetIndexId === indexId) {
@@ -216,20 +221,22 @@ async function importFromFile(): Promise<boolean> {
 
 function describeCurrentSelection(): string {
 	return purpose === "search"
-		? "Embedding indexes power semantic search across your notes."
-		: "Embedding indexes power semantic graph features across your notes.";
+		? t("settings.embedding_index.description_search")
+		: t("settings.embedding_index.description_graph");
 }
 
 function getSelectionGroupLabel(): string {
-	return purpose === "search" ? "Search embedding index" : "Graph embedding index";
+	return purpose === "search"
+		? t("settings.embedding_index.group_search")
+		: t("settings.embedding_index.group_graph");
 }
 </script>
 
 <ManagedEntitySection
-  heading="Embedding indexes"
+  heading={t("settings.embedding_index.heading")}
   actionsLayout="control"
   description={describeCurrentSelection()}
-  emptyMessage="No embedding indexes configured yet."
+  emptyMessage={t("settings.embedding_index.empty")}
   hasItems={indexes.length > 0}
 >
   {#snippet actions()}
@@ -250,12 +257,12 @@ function getSelectionGroupLabel(): string {
           <span>{progressText.status}</span>
         </div>
       {/if}
-      <Button buttonText="Cancel" onClick={cancelIndexing} />
+      <Button buttonText={t("common.cancel")} onClick={cancelIndexing} />
     {:else}
       <!-- Importing an existing index lives inside the setup modal, as the
            alternative to building one — not as a bare icon competing with the
            primary action here. -->
-      <Button buttonText="Add index" cta={true} onClick={openAddIndexModal} />
+      <Button buttonText={t("settings.embedding_index.add")} cta={true} onClick={openAddIndexModal} />
     {/if}
   {/snippet}
 
@@ -277,7 +284,7 @@ function getSelectionGroupLabel(): string {
           meta={[
             entryProviderDef?.displayName ?? entry.provider,
             formatIndexBuildStatus(entry.lastBuiltAt, entry.documentCount),
-            `${entry.documentCount} notes indexed`,
+            t("settings.embedding_index.notes_indexed", { count: entry.documentCount }),
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -285,7 +292,10 @@ function getSelectionGroupLabel(): string {
           radio={{
             selected,
             onclick: () => selectIndex(entry.id),
-            ariaLabel: `Use ${entry.model} as ${purpose} index`,
+            ariaLabel:
+              purpose === "search"
+                ? t("settings.embedding_index.use_as_search", { model: entry.model })
+                : t("settings.embedding_index.use_as_graph", { model: entry.model }),
           }}
         >
           {#snippet leading()}
@@ -296,24 +306,24 @@ function getSelectionGroupLabel(): string {
             {#if entry.documentCount > 0}
               <Button
                 iconId="list"
-                ariaLabel="View indexing report"
-                tooltip="View indexing report"
+                ariaLabel={t("settings.embedding_index.view_report")}
+                tooltip={t("settings.embedding_index.view_report")}
                 onClick={() => openIndexingReport(entry.id)}
               />
               <!-- Index export uses a native file dialog + node fs; desktop only. -->
               {#if Platform.isDesktopApp}
               <Button
                 iconId="download"
-                ariaLabel="Export index to file"
-                tooltip="Export index to file"
+                ariaLabel={t("settings.embedding_index.export")}
+                tooltip={t("settings.embedding_index.export")}
                 onClick={() => void exportIndex(entry.id)}
               />
               {/if}
             {/if}
             <Button
               iconId="trash"
-              ariaLabel="Delete index"
-              tooltip="Delete index"
+              ariaLabel={t("settings.embedding_index.delete")}
+              tooltip={t("settings.embedding_index.delete")}
               onClick={() => void deleteIndex(entry.id)}
             />
           {/snippet}
@@ -323,7 +333,7 @@ function getSelectionGroupLabel(): string {
   {/if}
 
   {#if memoryHint}
-    <SettingContainer name="Memory on mobile" desc={memoryHint} />
+    <SettingContainer name={t("settings.embedding_index.memory_on_mobile")} desc={memoryHint} />
   {/if}
 </ManagedEntitySection>
 

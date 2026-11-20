@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import type { App } from "obsidian";
 import type { ViewFilter } from "../../types/viewFilter";
 import { icon as iconDirective } from "../../utils/utils";
@@ -85,28 +86,28 @@ let {
 	app,
 	sourcePath = "",
 	hoverSource = "smart-second-brain-file-set-editor",
-	sectionTitle = "Included files",
+	sectionTitle = t("modals.file_set_editor.included_files"),
 	includedEntries,
 	includedEmptyText,
-	filteredEmptyText = "No included files match this filter.",
-	searchPlaceholder = "Filter included files",
+	filteredEmptyText = t("modals.file_set_editor.filtered_empty"),
+	searchPlaceholder = t("modals.file_set_editor.filter_placeholder"),
 	searchThreshold = 6,
-	addButtonText = "Add files",
+	addButtonText = t("modals.file_set_editor.add_files"),
 	addButtonCta = false,
 	onAddFile,
-	pickerModalTitle = "Add files",
+	pickerModalTitle = t("modals.file_set_editor.add_files"),
 	pickerText = {},
 	pickerExistingPaths = [],
 	pickerIncludedPaths = [],
 	onAddPaths,
 	showFilterToggle = false,
-	filtersButtonText = "Filters",
+	filtersButtonText = t("modals.file_set_editor.filters"),
 	filterToggleAriaLabel = filtersButtonText,
 	isFilterActive = false,
 	filterCount = 0,
 	onToggleFilters,
 	showFilterPanel = false,
-	filterPanelLabel = "Filters",
+	filterPanelLabel = t("modals.file_set_editor.filters"),
 	filterBuilderFilter = null,
 	availableFolders = [],
 	availableTags = [],
@@ -115,7 +116,7 @@ let {
 	maxVisibleEntries,
 	revealActionsOnHover = false,
 	excludedEntries = [],
-	excludedTitle = "Excluded files",
+	excludedTitle = t("modals.file_set_editor.excluded_files"),
 	resolveIncludedActions,
 	resolveExcludedActions,
 }: Props = $props();
@@ -189,7 +190,7 @@ function handleAddButtonClick() {
       <div class="file-set-editor-filter-panel-header">
         <div class="file-set-editor-filter-panel-title">{filterPanelLabel}</div>
         {#if filterCount > 0}
-          <div class="file-set-editor-filter-panel-meta">{filterCount} active</div>
+          <div class="file-set-editor-filter-panel-meta">{t("modals.file_set_editor.active_count", { count: filterCount })}</div>
         {/if}
       </div>
 
@@ -243,8 +244,7 @@ function handleAddButtonClick() {
 
         {#if hiddenIncludedCount > 0}
           <div class="file-set-editor-truncation">
-            {hiddenIncludedCount} more file{hiddenIncludedCount === 1 ? "" : "s"} not shown — search to
-            narrow the list.
+            {t("modals.file_set_editor.hidden_count", { count: hiddenIncludedCount })}
           </div>
         {/if}
       {/if}

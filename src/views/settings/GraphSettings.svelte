@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import EmbeddingIndexSection from "../../components/settings/EmbeddingIndexSection.svelte";
 import ModelSettingControl from "../../components/settings/ModelSettingControl.svelte";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
@@ -46,9 +47,8 @@ const graphModelWithholdsPrivate = $derived(
  */
 const namingModelDesc = $derived(
 	graphModelWithholdsPrivate
-		? "Model used to name topics. Without one, a topic is named after its best-connected note. " +
-				"This provider isn't trusted for private notes, so private titles are withheld from naming."
-		: "Model used to name topics. Without one, a topic is named after its best-connected note.",
+		? t("settings.graph.topic_names.naming_model_desc_withheld")
+		: t("settings.graph.topic_names.naming_model_desc"),
 );
 
 function openGraphModelSelection() {
@@ -63,24 +63,24 @@ function openGraphModelSelection() {
 }
 </script>
 
-<SettingGroup heading="Topic names">
-  <SettingItem name="Topic naming model" desc={namingModelDesc}>
+<SettingGroup heading={t("settings.graph.topic_names.heading")}>
+  <SettingItem name={t("settings.graph.topic_names.naming_model")} desc={namingModelDesc}>
     <ModelSettingControl
       available={models.hasProviders && models.hasModels}
       loading={models.hasProviders && models.isLoadingModels}
-      configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
-      unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
+      configureLabel={!models.hasProviders ? t("settings.graph.topic_names.configure_provider") : t("settings.graph.topic_names.configure_models")}
+      unavailableHint={!models.hasProviders ? t("settings.graph.topic_names.no_provider") : undefined}
       onConfigure={() => models.openSettings()}
-      placeholder="Select a model"
+      placeholder={t("settings.graph.topic_names.select_model")}
       selectedLabel={graphChatModel?.model ?? null}
       onSelect={openGraphModelSelection}
-      secondaryLabel={graphChatModel ? "Clear" : undefined}
+      secondaryLabel={graphChatModel ? t("settings.graph.topic_names.clear") : undefined}
       onSecondary={graphChatModel ? () => updateSetting("graphChatModel", null) : undefined}
     />
   </SettingItem>
   <SettingItem
-    name="Name topics automatically"
-    desc="Name topics whenever they change. Off means naming only runs from the graph's Topics panel."
+    name={t("settings.graph.topic_names.auto_name")}
+    desc={t("settings.graph.topic_names.auto_name_desc")}
   >
     <Toggle
       checked={pluginData.smartGraphSettings.autoLabelClusters ?? false}

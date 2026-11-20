@@ -52,6 +52,7 @@ import {
 	type ProviderTemplateId,
 } from "../providers/index";
 import { syncAllProviders, syncProvider, unsyncProvider } from "../providers/registrySync";
+import { t } from "../i18n";
 
 const LANGSMITH_API_KEY_SECRET_ID = buildManagedSecretId("langsmith", "apiKey");
 /** Managed secret id for a web-search provider's API key, e.g. "web-search-brave-api-key". */
@@ -496,7 +497,7 @@ export class PluginDataStore {
 	private notifySaveFailed(error: unknown): void {
 		if (this.#saveFailureNotified) return;
 		this.#saveFailureNotified = true;
-		new Notice(`Smart Second Brain could not save your settings: ${extractErrorMessage(error)}`, 10000);
+		new Notice(t("plugin.settings_save_failed", { error: extractErrorMessage(error) }), 10000);
 		window.setTimeout(() => {
 			this.#saveFailureNotified = false;
 		}, 30000);

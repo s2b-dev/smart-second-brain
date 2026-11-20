@@ -6,6 +6,7 @@ import type SecondBrainPlugin from "../main";
 import { getPendingChangesStore } from "../stores/pendingChangesStore.svelte";
 import type { PendingChange, PendingChangeEntry } from "../types/shared";
 import { ChatView } from "../views/chat/Chat";
+import { t } from "../i18n";
 
 /**
  * Per-thread navigation cursor for stepping through a chat's pending changes.
@@ -327,7 +328,7 @@ export async function navigateToPendingChange(
 
 	const opened = await revealAndScroll(plugin, target.entry.change.path, target.line);
 	if (!opened) {
-		new Notice("This change creates a new file — nothing to open yet.");
+		new Notice(t("plugin.pending_navigation.new_file_nothing_to_open"));
 	}
 	return target;
 }

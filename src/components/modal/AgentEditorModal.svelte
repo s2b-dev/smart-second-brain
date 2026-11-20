@@ -1,5 +1,6 @@
 <script lang="ts">
 import { Notice, getIconIds, normalizePath, type Modal } from "obsidian";
+import { t } from "../../i18n";
 import { obsidianSettingsAction, showActionNotice } from "../../utils/actionNotice";
 import { onMount } from "svelte";
 import { AddSkillModal } from "./AddSkillModal";
@@ -96,7 +97,7 @@ function updateAgentName(name: string) {
 	const oldDir = agentDir(agentId);
 	pluginData.updateAgent(agentId, { name });
 	void plugin.promptFilesService?.renameAgentDir(agentId, oldDir);
-	modal.setTitle(`Edit Agent: ${name || "Untitled"}`);
+	modal.setTitle(t("agents.editor.title_with_name", { name: name || t("agents.editor.untitled") }));
 }
 
 function updateAgentIcon(icon: string) {
@@ -171,7 +172,10 @@ const summarizationContextWindowWarning = $derived.by(() => {
 	const summarizationContextWindow = selectedAgent?.summarizationModel?.modelConfig?.contextWindow;
 	if (!chatContextWindow || !summarizationContextWindow) return null;
 	if (summarizationContextWindow >= chatContextWindow) return null;
-	return `This summarization model has a smaller context window (${formatContextWindowLabel(summarizationContextWindow)}) than the chat model (${formatContextWindowLabel(chatContextWindow)}), so history compaction may fail earlier.`;
+	return t("agents.editor.summarization_window_warning", {
+		summarization: formatContextWindowLabel(summarizationContextWindow),
+		chat: formatContextWindowLabel(chatContextWindow),
+	});
 });
 
 function openModelSelectionModal() {
@@ -199,7 +203,7 @@ function updateChatContextWindow(value: number) {
 	if (!chatModel) return;
 	const contextWindow = Math.round(value);
 	if (!Number.isFinite(contextWindow) || contextWindow < 1) {
-		new Notice("Context window must be a positive number of tokens.");
+		new Notice(t("agents.editor.context_window_invalid"));
 		contextWindowFieldKey++;
 		return;
 	}
@@ -294,9 +298,8 @@ function openRenderedSystemPromptModal() {
 		plugin,
 		{ getPrompt: async () => plugin.agentManager.assembleSystemPrompt() },
 		{
-			title: "Final System Prompt",
-			description:
-				"Preview the fully assembled system prompt after dynamic tool guidance and skills are injected.",
+			title: t("agents.editor.final_prompt_title"),
+			description: t("agents.editor.final_prompt_description"),
 			readOnly: true,
 		},
 	).open();
@@ -345,7 +348,9 @@ async function refreshSkillsList() {
 }
 
 onMount(() => {
-	modal.setTitle(`Edit Agent: ${selectedAgent?.name ?? "Agent"}`);
+	modal.setTitle(
+		t("agents.editor.title_with_name", { name: selectedAgent?.name ?? t("agents.editor.agent_fallback") }),
+	);
 	void refreshSkillsList();
 
 	// A plugin installed/enabled in Obsidian's settings while this modal is open won't
@@ -374,7 +379,7 @@ onMount(() => {
 function openSkillNote(skillId: string) {
 	const metadata = plugin.skillsService?.getCachedSkills().get(skillId);
 	if (!metadata) {
-		new Notice("Could not find this skill's file.");
+		new Notice(t("agents.editor.skill_file_not_found"));
 		return;
 	}
 	const skillPath = normalizePath(`${metadata.path}/SKILL.md`);
@@ -422,15 +427,15 @@ async function toggleSkill(skillId: string, newEnabled: boolean) {
 		if (linkedPlugin) {
 			if (!plugin.agentManager?.isPluginInstalled(linkedPlugin)) {
 				showActionNotice(
-					`The ${skill.displayName} plugin isn't installed yet.`,
-					obsidianSettingsAction("community-plugins", "Browse community plugins"),
+					t("agents.editor.plugin_not_installed", { plugin: skill.displayName }),
+					obsidianSettingsAction("community-plugins", t("agents.editor.browse_community_plugins")),
 				);
 				return;
 			}
 			if (!plugin.agentManager?.isPluginEnabled(linkedPlugin)) {
 				showActionNotice(
-					`The ${skill.displayName} plugin is installed but not enabled.`,
-					obsidianSettingsAction("community-plugins", "Open community plugins"),
+					t("agents.editor.plugin_not_enabled", { plugin: skill.displayName }),
+					obsidianSettingsAction("community-plugins", t("agents.editor.open_community_plugins")),
 				);
 				return;
 			}
@@ -532,18 +537,23 @@ async function toggleAutoIntegration(pluginId: string, displayName: string, newE
 		if (!skillId) {
 			const service = plugin.skillsService;
 			if (!service) {
-				new Notice("Skills are still initializing — try again in a moment.");
+				new Notice(t("agents.editor.skills_initializing"));
 				return;
 			}
 			try {
 				skillId = (await service.seedIntegrationSkill(pluginId, displayName)) ?? undefined;
 			} catch (error) {
 				Logger.error(`[AgentEditor] seedIntegrationSkill failed for ${pluginId}:`, error);
-				new Notice(`Could not create skill for ${displayName}: ${extractErrorMessage(error)}`);
+				new Notice(
+					t("agents.editor.create_skill_failed_with_error", {
+						plugin: displayName,
+						error: extractErrorMessage(error),
+					}),
+				);
 				return;
 			}
 			if (!skillId) {
-				new Notice(`Could not create skill for ${displayName}.`);
+				new Notice(t("agents.editor.create_skill_failed", { plugin: displayName }));
 				return;
 			}
 			// Re-discover so the new skill enters the cache; without this the enable below
@@ -561,10 +571,10 @@ async function toggleAutoIntegration(pluginId: string, displayName: string, newE
 }
 
 function getMCPToolsBadgeLabel(serverId: string, toolsState?: MCPServerToolsState): string {
-	if (toolsState?.loading) return "Loading tools";
-	if (toolsState?.error) return "Tool load error";
-	if (toolsState?.tools) return `${toolsState.tools.length} tools`;
-	return "Load tools";
+	if (toolsState?.loading) return t("agents.editor.mcp_tools_badge.loading");
+	if (toolsState?.error) return t("agents.editor.mcp_tools_badge.error");
+	if (toolsState?.tools) return t("agents.editor.mcp_tools_badge.count", { count: toolsState.tools.length });
+	return t("agents.editor.mcp_tools_badge.load");
 }
 
 function getToolEnabled(toolId: BuiltInToolId): boolean {
@@ -607,8 +617,8 @@ function handleSubAgentToggle(refId: string) {
 }
 
 function getSubAgentModelLabel(agent: AgentConfig): string {
-	const model = agent.chatModel ? agent.chatModel.model : "No model configured";
-	return agent.id === agentId ? `${model} · isolated copy of this agent` : model;
+	const model = agent.chatModel ? agent.chatModel.model : t("agents.editor.subagent_no_model");
+	return agent.id === agentId ? t("agents.editor.subagent_isolated_copy", { model }) : model;
 }
 
 let mcpServerIds = $derived(selectedAgent ? Object.keys(selectedAgent.mcpServers) : []);
@@ -700,7 +710,7 @@ async function fetchServerTools(serverId: string) {
 	} catch (err) {
 		mcpServerTools[serverId] = {
 			loading: false,
-			error: err instanceof Error ? err.message : "Failed to fetch tools",
+			error: err instanceof Error ? err.message : t("agents.editor.mcp_fetch_tools_failed"),
 			tools: [],
 		};
 	}
@@ -727,13 +737,13 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 {#if selectedAgent}
   <div class="agent-editor-container">
     <div class="agent-editor-pane">
-      <SettingGroup heading="General">
-        <SettingItem name="Name" desc="This agent's display name and icon">
+      <SettingGroup heading={t("agents.editor.general_heading")}>
+        <SettingItem name={t("agents.editor.name_label")} desc={t("agents.editor.name_desc")}>
           <PickerPopover
             bind:open={isAgentIconPickerOpen}
             triggerClass="s2b-agent-icon-trigger"
             contentClass="s2b-agent-icon-popover"
-            tooltip="Change icon"
+            tooltip={t("agents.editor.change_icon")}
             side="bottom"
             align="start"
             sideOffset={8}
@@ -748,12 +758,14 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               <Search
                 class="agent-icon-search"
                 value={agentIconQuery}
-                placeholder="Search built-in icons"
+                placeholder={t("agents.editor.icon_search_placeholder")}
                 onchange={(value: string) => (agentIconQuery = value)}
               />
 
               <div class="agent-icon-results-header">
-                <span>{agentIconQuery.trim() ? `Built-in icons (${matchingAgentIconCount})` : "Popular icons"}</span>
+                <span>{agentIconQuery.trim()
+                  ? t("agents.editor.icon_results", { count: matchingAgentIconCount })
+                  : t("agents.editor.icon_popular")}</span>
               </div>
 
               <div class="agent-icon-grid">
@@ -777,7 +789,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                   {/each}
                 {:else}
                   <div class="agent-icon-empty-state">
-                    No built-in icons match this search.
+                    {t("agents.editor.icon_no_match")}
                   </div>
                 {/if}
               </div>
@@ -787,20 +799,20 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           <Text
             inputType="text"
             class="s2b-agent-overview-name-input"
-            placeholder="Agent name"
+            placeholder={t("agents.editor.name_placeholder")}
             value={selectedAgent.name}
             onblur={(value: string) => updateAgentName(value)}
           />
         </SettingItem>
 
-        <SettingItem name="Chat model" desc="Primary model this agent uses for conversation">
+        <SettingItem name={t("agents.editor.chat_model_name")} desc={t("agents.editor.chat_model_desc")}>
           <ModelSettingControl
             available={models.hasProviders && models.hasModels}
             loading={models.hasProviders && models.isLoadingModels}
-            configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
-            unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
+            configureLabel={!models.hasProviders ? t("agents.editor.configure_provider") : t("agents.editor.configure_models")}
+            unavailableHint={!models.hasProviders ? t("agents.editor.no_provider_hint") : undefined}
             onConfigure={() => models.openSettings(() => modal.close())}
-            placeholder="Select a model"
+            placeholder={t("agents.editor.select_model")}
             selectedLabel={currentModelDisplay?.model ?? null}
             selectedLogo={currentModelDisplay?.logo ?? null}
             onSelect={openModelSelectionModal}
@@ -809,8 +821,8 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
 
         {#if selectedAgent.chatModel}
           <SettingItem
-            name="Context window"
-            desc="Tokens the chat model can take in. Decides when older history is summarized, and for Ollama it is also the num_ctx sent with each request. Filled in from the provider when you pick a model."
+            name={t("agents.editor.context_window_name")}
+            desc={t("agents.editor.context_window_desc")}
           >
             {#key contextWindowFieldKey}
               <Text
@@ -829,23 +841,23 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
              The memory FOLDER (Agents/Memories/) stays global, shared by every agent, because
              remembered facts are properties of the user, not of one agent. -->
         <SettingItem
-          name="System prompt"
-          desc="This agent's instructions, including how it uses memory, stored as its own AGENT.md note in your vault"
+          name={t("agents.editor.system_prompt_name")}
+          desc={t("agents.editor.system_prompt_desc")}
         >
           <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-justify-end">
             <Button
               iconId="pencil"
-              ariaLabel="Open agent note"
-              tooltip="Open agent note"
+              ariaLabel={t("agents.editor.open_agent_note")}
+              tooltip={t("agents.editor.open_agent_note")}
               onClick={openAgentNote}
             />
             {#if promptDrifted}
-              <Button buttonText="Diff with default" onClick={openPromptDiff} />
+              <Button buttonText={t("agents.editor.diff_with_default")} onClick={openPromptDiff} />
             {/if}
             <Button
               iconId="eye"
-              ariaLabel="View final assembled prompt"
-              tooltip="View final assembled prompt"
+              ariaLabel={t("agents.editor.view_final_prompt")}
+              tooltip={t("agents.editor.view_final_prompt")}
               onClick={openRenderedSystemPromptModal}
             />
           </div>
@@ -856,30 +868,30 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
              vault) — so configuration lives here at the agent level rather than behind any single
              skill's row. -->
         <SettingItem
-          name="Tools"
-          desc="Enable, rename, and configure the individual tools your skills attach. A tool is only usable when at least one enabled skill provides it."
+          name={t("agents.editor.tools_name")}
+          desc={t("agents.tools.configurable_description")}
         >
-          <Button buttonText="Manage" onClick={openToolsModal} />
+          <Button buttonText={t("agents.editor.manage")} onClick={openToolsModal} />
         </SettingItem>
 
         <SettingItem
-          name="Summarization model"
-          desc="Model used to compress older chat history when the context window fills up"
+          name={t("agents.editor.summarization_model_name")}
+          desc={t("agents.editor.summarization_model_desc")}
         >
           <div class="agent-model-setting">
             <ModelSettingControl
               available={models.hasProviders && models.hasModels}
               loading={models.hasProviders && models.isLoadingModels}
-              configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
+              configureLabel={!models.hasProviders ? t("agents.editor.configure_provider") : t("agents.editor.configure_models")}
               unavailableHint={!models.hasProviders
-                ? "No AI provider is configured yet."
+                ? t("agents.editor.no_provider_hint")
                 : undefined}
               onConfigure={() => models.openSettings(() => modal.close())}
-              placeholder="Auto (same as chat model)"
+              placeholder={t("agents.editor.auto_same_as_chat")}
               selectedLabel={currentSummarizationModelDisplay?.model ?? null}
               selectedLogo={currentSummarizationModelDisplay?.logo ?? null}
               onSelect={openSummarizationModelSelectionModal}
-              secondaryLabel={selectedAgent.summarizationModel ? "Reset" : undefined}
+              secondaryLabel={selectedAgent.summarizationModel ? t("common.reset") : undefined}
               onSecondary={selectedAgent.summarizationModel ? resetSummarizationModel : undefined}
             />
             {#if summarizationContextWindowWarning}
@@ -889,32 +901,30 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         </SettingItem>
 
         <SettingItem
-          name="Title generation model"
-          desc="Model used to generate conversation titles from the first user message"
+          name={t("agents.editor.title_model_name")}
+          desc={t("agents.editor.title_model_desc")}
         >
           <ModelSettingControl
             available={models.hasProviders && models.hasModels}
             loading={models.hasProviders && models.isLoadingModels}
-            configureLabel={!models.hasProviders ? "Configure Provider" : "Configure Models"}
-            unavailableHint={!models.hasProviders ? "No AI provider is configured yet." : undefined}
+            configureLabel={!models.hasProviders ? t("agents.editor.configure_provider") : t("agents.editor.configure_models")}
+            unavailableHint={!models.hasProviders ? t("agents.editor.no_provider_hint") : undefined}
             onConfigure={() => models.openSettings(() => modal.close())}
-            placeholder="Auto (same as chat model)"
+            placeholder={t("agents.editor.auto_same_as_chat")}
             selectedLabel={currentTitleModelDisplay?.model ?? null}
             selectedLogo={currentTitleModelDisplay?.logo ?? null}
             onSelect={openTitleModelSelectionModal}
-            secondaryLabel={selectedAgent.titleModel ? "Reset" : undefined}
+            secondaryLabel={selectedAgent.titleModel ? t("common.reset") : undefined}
             onSecondary={selectedAgent.titleModel ? resetTitleModel : undefined}
           />
         </SettingItem>
       </SettingGroup>
 
-      <SettingGroup heading="Core skills">
+      <SettingGroup heading={t("agents.editor.core_skills_heading")}>
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
             <div class="setting-item-description">
-              Built-in skills every agent can use — vault exploration, note editing, web access, and
-              skill management. Each is a skill: toggle it to attach its tools, or open its note to
-              edit its instructions. Individual tools are configured from the Tools row above.
+              {t("agents.editor.core_skills_intro")}
               <DocsLink variant="inline" doc="skills" />
             </div>
           </div>
@@ -933,13 +943,13 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             {/snippet}
             {#snippet nameSuffix()}
               {#if !pluginAvailable}
-                <Badge label="Core plugin disabled" tone="warning" />
+                <Badge label={t("agents.editor.core_plugin_disabled")} tone="warning" />
               {/if}
             {/snippet}
             <Button
               iconId="pencil"
-              ariaLabel={`Open ${ext.displayName} skill note`}
-              tooltip={`Open ${ext.displayName} skill note`}
+              ariaLabel={t("agents.editor.open_skill_note", { name: ext.displayName })}
+              tooltip={t("agents.editor.open_skill_note", { name: ext.displayName })}
               onClick={() => openSkillNote(ext.id)}
             />
             <Toggle
@@ -951,12 +961,11 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {/each}
       </SettingGroup>
 
-      <SettingGroup heading="Integrations">
+      <SettingGroup heading={t("agents.editor.integrations_heading")}>
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
             <div class="setting-item-description">
-              Skills backed by your installed community plugins. Each bundles a skill (and, where
-              available, code-scripting) behind one switch.
+              {t("agents.editor.integrations_intro")}
               <DocsLink variant="inline" doc="integrations" />
             </div>
           </div>
@@ -973,19 +982,19 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             {#snippet nameSuffix()}
               {#if !pluginAvailable}
                 <Badge
-                  label="Not enabled"
+                  label={t("agents.editor.not_enabled")}
                   tone="warning"
                   interactive
                   onclick={() => openPluginPage(ext.linkedPluginId ?? ext.id)}
                 />
               {:else if execIntegration && ext.enabled}
-                <Badge label="API scripting" tone="muted" />
+                <Badge label={t("agents.editor.api_scripting")} tone="muted" />
               {/if}
             {/snippet}
             <Button
               iconId="pencil"
-              ariaLabel={`Open ${ext.displayName} skill note`}
-              tooltip={`Open ${ext.displayName} skill note`}
+              ariaLabel={t("agents.editor.open_skill_note", { name: ext.displayName })}
+              tooltip={t("agents.editor.open_skill_note", { name: ext.displayName })}
               onClick={() => openSkillNote(ext.id)}
             />
             <!-- Keyed on the enabled state: toggleSkill can reject asynchronously (the
@@ -1007,14 +1016,14 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {#each autoDiscoveredIntegrations as integ (integ.pluginId)}
           <SettingItem
             name={integ.displayName}
-            desc="Auto-discovered plugin exposing a public API. Enabling creates an editable API-scripting skill — the agent introspects the API before calling it. Runs on the main thread (not sandboxed)."
+            desc={t("agents.editor.auto_integration_desc")}
           >
             {#snippet namePrefix()}
               <Icon name={getPluginIcon(integ.pluginId)} size="s" />
             {/snippet}
             {#snippet nameSuffix()}
               {#if integ.execEnabled}
-                <Badge label="API scripting" tone="muted" />
+                <Badge label={t("agents.editor.api_scripting")} tone="muted" />
               {/if}
             {/snippet}
             <!--
@@ -1035,14 +1044,11 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {/each}
       </SettingGroup>
 
-      <SettingGroup heading="Subagents">
+      <SettingGroup heading={t("agents.editor.subagents_heading")}>
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
             <div class="setting-item-description">
-              Other agents this one can delegate to via the <code>task</code> tool — each subagent
-              runs with its own model, tools, and prompt. Enabling this agent itself delegates to a
-              fresh, isolated-context copy of it (useful for keeping the main conversation clean).
-              Delegation is one level deep (a subagent's own subagents are ignored).
+              {t("agents.editor.subagents_intro.before")} <code>task</code> {t("agents.editor.subagents_intro.after")}
             </div>
           </div>
         </div>
@@ -1051,10 +1057,10 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           {@const hasModel = !!candidate.chatModel}
           {@const isEnabled = isSubAgentEnabled(candidate.id)}
           <SettingItem
-            name={candidate.id === agentId ? `${candidate.name} (this agent)` : candidate.name}
+            name={candidate.id === agentId ? t("agents.editor.this_agent", { name: candidate.name }) : candidate.name}
             desc={hasModel
               ? getSubAgentModelLabel(candidate)
-              : "No chat model configured — cannot be used as a subagent"}
+              : t("agents.editor.subagent_unavailable")}
           >
             {#snippet namePrefix()}
               <Icon name={candidate.icon?.trim() || DEFAULT_AGENT_ICON} size="s" />
@@ -1068,19 +1074,19 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {/each}
       </SettingGroup>
 
-      <SettingGroup heading="Custom">
+      <SettingGroup heading={t("agents.editor.custom_heading")}>
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
             <div class="setting-item-description">
-              Skills you bring yourself — your own skills and MCP servers.
+              {t("agents.editor.custom_intro")}
             </div>
           </div>
         </div>
 
         <!-- Custom skills — the user's own skills + MCP servers, each sub-group with its
              own "Add" button on the heading row. -->
-        <SettingContainer name="Skills" isHeading>
-          <Button buttonText="Add skill" onClick={openAddSkillModal} />
+        <SettingContainer name={t("agents.editor.skills_heading")} isHeading>
+          <Button buttonText={t("agents.editor.add_skill")} onClick={openAddSkillModal} />
         </SettingContainer>
         {#each customSkills as ext (ext.id)}
           <ManagedEntityItem
@@ -1091,14 +1097,14 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             {#snippet actions()}
               <Button
                 iconId="trash"
-                ariaLabel={`Delete ${ext.displayName}`}
-                tooltip={`Delete ${ext.displayName}`}
+                ariaLabel={t("agents.editor.delete_item", { name: ext.displayName })}
+                tooltip={t("agents.editor.delete_item", { name: ext.displayName })}
                 onClick={() => void deleteSkill(ext.id)}
               />
               <Button
                 iconId="pencil"
-                ariaLabel={`Open ${ext.displayName} skill note`}
-                tooltip={`Open ${ext.displayName} skill note`}
+                ariaLabel={t("agents.editor.open_skill_note", { name: ext.displayName })}
+                tooltip={t("agents.editor.open_skill_note", { name: ext.displayName })}
                 onClick={() => openSkillNote(ext.id)}
               />
               <!-- See the pluginSkills row above for why this is keyed: toggleSkill can
@@ -1111,16 +1117,16 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           </ManagedEntityItem>
         {/each}
         {#if customSkills.length === 0}
-          <div class="setting-item-description skill-empty-state">No custom skills yet</div>
+          <div class="setting-item-description skill-empty-state">{t("agents.editor.no_custom_skills")}</div>
         {/if}
 
         <!-- A heading row rather than a section with an intro paragraph, so the docs
              link takes the compact icon form here. -->
-        <SettingContainer name="MCP servers" isHeading>
+        <SettingContainer name={t("agents.editor.mcp_servers_heading")} isHeading>
           {#snippet nameSuffix()}
-            <DocsLink doc="mcp" subject="MCP servers" />
+            <DocsLink doc="mcp" subject={t("agents.editor.mcp_servers_heading")} />
           {/snippet}
-          <Button buttonText="Add server" onClick={openAddMCPServer} />
+          <Button buttonText={t("agents.editor.add_server")} onClick={openAddMCPServer} />
         </SettingContainer>
         {#if mcpServerIds.length > 0}
           <div class="mcp-servers-list">
@@ -1132,7 +1138,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                 class="s2b-mcp-entity"
                 name={config.displayName}
                 desc={config.url}
-                meta="Remote HTTP MCP server"
+                meta={t("agents.editor.mcp_remote_meta")}
               >
                 {#snippet badges()}
                   <Badge label="HTTP" tone="accent" />
@@ -1156,18 +1162,18 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                   {#if isExpanded && toolsState}
                     <div class="mcp-tools-list">
                       {#if toolsState.loading}
-                        <div class="mcp-tools-loading">Loading tools...</div>
+                        <div class="mcp-tools-loading">{t("agents.editor.mcp_loading_tools")}</div>
                       {:else if toolsState.error}
                         <div class="mcp-tools-error">
                           <Icon name="alert-circle" size="s" />
                           <span>{toolsState.error}</span>
                           <button
                             class="mcp-tools-retry"
-                            onclick={() => void fetchServerTools(serverId)}>Retry</button
+                            onclick={() => void fetchServerTools(serverId)}>{t("common.retry")}</button
                           >
                         </div>
                       {:else if toolsState.tools.length === 0}
-                        <div class="mcp-tools-empty">No tools available</div>
+                        <div class="mcp-tools-empty">{t("agents.editor.mcp_no_tools")}</div>
                       {:else}
                         {#each toolsState.tools as tool (tool.name)}
                           <div class="mcp-tool-item">
@@ -1185,8 +1191,8 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
                 {#snippet actions()}
                   <Button
                     iconId="pencil"
-                    ariaLabel={`Edit ${config.displayName}`}
-                    tooltip={`Edit ${config.displayName}`}
+                    ariaLabel={t("agents.editor.edit_item", { name: config.displayName })}
+                    tooltip={t("agents.editor.edit_item", { name: config.displayName })}
                     onClick={() => openEditMCPServer(serverId)}
                   />
                   <Toggle checked={config.enabled} onchange={() => toggleMCPServer(serverId)} />
@@ -1196,7 +1202,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           </div>
         {:else}
           <div class="setting-item-description mcp-empty-state">
-            No MCP servers configured for this agent.
+            {t("agents.editor.no_mcp_servers")}
           </div>
         {/if}
       </SettingGroup>

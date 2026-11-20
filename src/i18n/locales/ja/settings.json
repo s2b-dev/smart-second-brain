@@ -1,0 +1,227 @@
+{
+	"tabs": {
+		"general": "一般",
+		"search": "検索",
+		"agents": "エージェント",
+		"graph": "グラフ",
+		"troubleshooting": "トラブルシューティング",
+		"developer": "開発者"
+	},
+	"general": {
+		"providers": {
+			"heading": "プロバイダー",
+			"description": "プロバイダーは、チャット、埋め込み、その他のモデルを使う機能のために、Smart Second Brain を AI サービスに接続します。",
+			"empty": "プロバイダーインスタンスはまだ設定されていません。",
+			"add": "プロバイダーを追加"
+		},
+		"privacy": {
+			"heading": "プライバシー",
+			"note_access": "ノートのアクセスポリシー",
+			"note_access_desc": "信頼されていないプロバイダーにデフォルトで何も見せないか、すべてを見せるかを選び、対応するファイルリストを管理します。",
+			"manage": "管理",
+			"check_updates": "アップデートを確認",
+			"check_updates_desc": "1 日 1 回、GitHub からこのプラグインのバージョン番号を取得し、新しいバージョンがあれば通知します。あなたや保管庫に関する情報は一切送信されません。Obsidian 自体のプラグイン自動アップデート確認がオンの場合はスキップされます。"
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "表示",
+			"result_details": "結果の詳細",
+			"result_details_desc": "各検索結果に表示するメタデータとコンテキストを選択します。現在: {summary}。",
+			"configure": "設定",
+			"label_path": "パス",
+			"label_tags": "タグ",
+			"label_match_badges": "一致バッジ",
+			"label_content_snippets": "内容のスニペット",
+			"nothing_extra": "追加情報なし",
+			"navbar_search": "ナビゲーションバーで S2B 検索を使用",
+			"navbar_search_desc": "下部ナビゲーションバーの虫眼鏡ボタンで、Obsidian のクイックスイッチャーの代わりに Smart Second Brain の検索を開きます。変わるのはこのボタンだけです — クイックスイッチャーは引き続きコマンドパレットとホットキーから開けます。"
+		},
+		"indexed_content": {
+			"heading": "インデックス対象のコンテンツ",
+			"heading_desc": "ノート、キャンバス、ウィジェットは常にインデックスされます。検索と埋め込みのために内容をインデックスするその他のファイルを選択してください — それ以外もタイトルとパスで見つけることができ、エージェントは必要に応じて読み取れます。",
+			"pdfs": "PDF",
+			"pdfs_desc": "PDF のテキストを抽出してインデックスします。大きなライブラリでは時間がかかり、長い PDF の大部分が関係することはまれです。長い PDF は最初の約 80 ページ(モバイルでは 4 ページ)までインデックスされます。",
+			"chats": "チャット",
+			"chats_desc": "過去の会話をインデックスします。会話の大半はモデル自身の回答であり、それが情報源であるかのように再び現れることがあります。",
+			"data_files": "データファイル",
+			"data_files_desc": "CSV、JSON、YAML ファイルをインデックスします。構造化データは意味による検索に向いておらず、1 つのエクスポートで数千件のエントリが追加されることもあります。"
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "トピック名",
+			"naming_model": "トピック命名モデル",
+			"naming_model_desc": "トピックの命名に使うモデル。未設定の場合、トピックには最もつながりの多いノートの名前が付けられます。",
+			"naming_model_desc_withheld": "トピックの命名に使うモデル。未設定の場合、トピックには最もつながりの多いノートの名前が付けられます。このプロバイダーは非公開ノートについて信頼されていないため、非公開ノートのタイトルは命名に使われません。",
+			"configure_provider": "プロバイダーを設定",
+			"configure_models": "モデルを設定",
+			"no_provider": "AI プロバイダーがまだ設定されていません。",
+			"select_model": "モデルを選択",
+			"clear": "クリア",
+			"auto_name": "トピックに自動で名前を付ける",
+			"auto_name_desc": "トピックが変わるたびに名前を付けます。オフの場合、命名はグラフの「トピック」パネルからのみ実行されます。"
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "オンボーディング",
+			"replay": "オンボーディングの紹介を再生",
+			"replay_desc": "スプラッシュアニメーションと完了フラグをリセットします — 「ようこそ」ビューで紹介が再生され、初回起動時のように起動時に自動で開きます(プロバイダーを設定するまで)。",
+			"reset": "紹介をリセット",
+			"reset_notice": "オンボーディングをリセットして再表示しました — 紹介が最初から再生されます。"
+		},
+		"chat": {
+			"heading": "チャット",
+			"raw_tool_io": "ツールの生の入出力を表示",
+			"raw_tool_io_desc": "チャットのツール呼び出し行に、ツールの正確な引数と生の出力を表示します。デフォルトはオフです — ユーザーにはわかりやすい要約と整形された結果だけが表示されます。",
+			"restore": "復元",
+			"restore_recommendations": "非表示にした提案を復元",
+			"restore_recommendations_desc": "新しいチャットの空の状態から非表示にした、おすすめの質問、プラグインスキルの提案、デフォルト更新の通知をすべて元に戻します。",
+			"restored_recommendations": {
+				"other": "非表示にした提案を {count} 件復元しました。"
+			},
+			"no_recommendations": "復元する非表示の提案はありません。",
+			"restore_privacy_warning": "連携のプライバシー警告を復元",
+			"restore_privacy_warning_desc": "プラグイン連携のコード実行ツール(プロバイダーごとのプライバシールールを回避します)を有効にする前に表示される警告の「今後確認しない」を取り消します。",
+			"privacy_warning_restored": "連携のプライバシー警告を復元しました — 次に連携を有効にするときに再び表示されます。",
+			"privacy_warning_not_suppressed": "連携のプライバシー警告は非表示になっていませんでした。"
+		},
+		"observability": {
+			"heading": "オブザーバビリティ",
+			"langsmith": "LangSmith 連携",
+			"langsmith_desc": "デバッグとトレースのために LangSmith のテレメトリを有効にします",
+			"api_key": "API キー",
+			"api_key_desc": "LangSmith の認証に使う Obsidian キーチェーンのシークレットを選択します",
+			"project": "プロジェクト名",
+			"project_desc": "実行を記録するプロジェクト名",
+			"endpoint": "エンドポイント URL",
+			"endpoint_desc": "LangSmith API のベース URL を上書きします(任意)",
+			"check_aria": "LangSmith の API キーとエンドポイントを確認",
+			"check_idle": "LangSmith の接続を確認",
+			"check_no_key": "先に LangSmith の API キーのシークレットを選択してください",
+			"check_invalid_url": "LangSmith のエンドポイント URL が無効です",
+			"check_pending": "LangSmith の接続を確認中...",
+			"check_success": "LangSmith に接続できました",
+			"check_rejected": "LangSmith が API キーを拒否しました",
+			"check_not_found": "LangSmith のエンドポイントが想定した API を提供していません",
+			"check_failed_body": "LangSmith の確認に失敗しました ({status}): {body}",
+			"check_failed_status": "LangSmith の確認に失敗しました(ステータス {status})",
+			"check_unreachable": "LangSmith に接続できませんでした",
+			"check_failed_notice": "LangSmith の確認に失敗しました: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "診断",
+		"maintenance_heading": "メンテナンス",
+		"release_notes": "リリースノート",
+		"release_notes_desc": "現在のバージョンは {version} です。最近のリリースでの変更点を確認できます。",
+		"show_release_notes": "リリースノートを表示",
+		"guide": "トラブルシューティングガイド",
+		"guide_desc": "よくある問題とその解決方法 — エージェントが応答しない、検索結果が役に立たない、ノートが除外される、MCP ツールが見つからない、モバイル特有の問題など。",
+		"open_guide": "ガイドを開く",
+		"still_stuck": "まだ解決しませんか?",
+		"still_stuck_desc": "既存の GitHub Issue を確認し、問題がすでに報告されていないか調べてください。報告されていなければ、新しい Issue を作成し、試したこと、エラーメッセージ、再現手順を記載してください。",
+		"view_issues": "既存の Issue を見る",
+		"new_issue": "新しい Issue を作成",
+		"clear": "プラグインのデータを消去",
+		"clear_desc": "プラグインの設定と生成されたインデックスデータを削除します。シークレット、スキルファイル、保管庫内のチャットファイルは保持されます。",
+		"clear_label": "消去",
+		"clear_modal": {
+			"title": "プラグインのデータを消去",
+			"description": "プラグインの設定と生成されたインデックスデータを削除しますか?シークレット、スキルファイル、保管庫内のチャットファイルは保持されます。"
+		},
+		"verbose": "開発者コンソールへのログ出力",
+		"verbose_desc": "開発者コンソールで詳細なログを有効にします。",
+		"cleared": "プラグインのデータを消去しました。",
+		"cleared_partial": "プラグインのデータを消去しましたが、{indexes} の保存済みベクトルを削除できませんでした。詳細はコンソールを確認してください。",
+		"clear_failed": "プラグインのデータを消去できませんでした"
+	},
+	"providers": {
+		"auth_failed": "認証に失敗しました",
+		"checking_auth": "認証を確認中",
+		"authenticated": "認証済み。クリックして接続を再試行",
+		"auth_error_retry": "{message}。クリックして接続を再試行",
+		"trusted": "非公開ノートへのアクセスを信頼済み",
+		"configure": "プロバイダーを設定",
+		"remove": "プロバイダーを削除",
+		"remove_failed": "プロバイダーを削除できませんでした",
+		"delete_embeddings": "このプロバイダーで作成した埋め込みも削除",
+		"delete_embeddings_desc": {
+			"other": "インデックス済みの {formatted} 件のノートが使用しているストレージを解放します。オフのままにすると保持され、このプロバイダーを再追加したときに再埋め込みせずに再利用されます(再埋め込みは時間とコストがかかることがあります)。"
+		},
+		"embeddings_kept_starting": "プロバイダーを削除しました。インデックスサービスがまだ起動中のため、埋め込みは保持されました。",
+		"embeddings_delete_failed": {
+			"other": "プロバイダーを削除しましたが、{count} 件中 {failed} 件の埋め込みインデックスを削除できませんでした: {ids}。詳細はコンソールを確認してください。"
+		},
+		"advanced": "詳細設定"
+	},
+	"embedding_index": {
+		"heading": "埋め込みインデックス",
+		"description_search": "埋め込みインデックスは、ノート全体のセマンティック検索を支えます。",
+		"description_graph": "埋め込みインデックスは、ノート全体のセマンティックなグラフ機能を支えます。",
+		"group_search": "検索用の埋め込みインデックス",
+		"group_graph": "グラフ用の埋め込みインデックス",
+		"empty": "埋め込みインデックスはまだ設定されていません。",
+		"add": "インデックスを追加",
+		"notes_indexed": {
+			"other": "{count} 件のノートをインデックス済み"
+		},
+		"use_as_search": "{model} を検索用インデックスとして使用",
+		"use_as_graph": "{model} をグラフ用インデックスとして使用",
+		"view_report": "インデックス作成レポートを表示",
+		"export": "インデックスをファイルにエクスポート",
+		"delete": "インデックスを削除",
+		"delete_failed": "このインデックスを削除できませんでした: {error}",
+		"memory_on_mobile": "モバイルでのメモリ"
+	},
+	"orphaned": {
+		"name": "孤立したベクトルデータベース",
+		"legacy": "{label}(旧グラフデータ)",
+		"chunks": {
+			"other": "{id}({count} チャンク)"
+		},
+		"summary": {
+			"other": "{count} 件の保存済みデータベースが、設定済みのどの埋め込みインデックスにも属していません{size}: {list}。"
+		},
+		"size": "(ベクトル {size} 以上)",
+		"origin_usage": "このデバイス上の Obsidian のストレージは、すべての保管庫で合計 {size} です。",
+		"confirm_title": "孤立したインデックスを削除しますか?",
+		"confirm_desc": {
+			"other": "設定済みのどの埋め込みインデックスにも使われていない {count} 件の保存済みデータベースを完全に削除します。後でこれらのモデルを再追加すると、インデックスは最初から再構築されます。"
+		},
+		"deleted": {
+			"other": "孤立したインデックスを {count} 件削除しました。"
+		},
+		"deleted_partial": "{deleted} を削除しましたが、{failed} は削除できませんでした: {reason}",
+		"delete_button": "孤立したインデックスを削除"
+	},
+	"secret_select": {
+		"nothing_selected": "(未選択)",
+		"add_tooltip": "新しいシークレットを追加",
+		"missing": "シークレット「{id}」が Obsidian のキーチェーンに見つかりません。",
+		"add_action": "シークレットを追加"
+	},
+	"model_control": {
+		"loading": "モデルを読み込み中…"
+	},
+	"managed_entity": {
+		"select": "{name} を選択"
+	},
+	"filter": {
+		"type_folder": "フォルダ",
+		"type_tag": "タグ",
+		"type_extension": "拡張子",
+		"type_property": "プロパティ",
+		"all_of": "すべてに一致",
+		"any_of": "いずれかに一致",
+		"none_of": "いずれにも一致しない",
+		"remove_condition": "条件を削除",
+		"property_placeholder": "プロパティ名",
+		"any_value": "任意の値",
+		"no_properties": "保管庫にプロパティが見つかりません — 名前を入力すればそのまま使用できます。",
+		"live_placeholder": "グラフで選択してください",
+		"add_condition": "条件",
+		"add_group": "グループ"
+	}
+}

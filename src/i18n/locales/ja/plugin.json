@@ -1,0 +1,316 @@
+{
+	"commands": {
+		"open_chat": "チャットを開く",
+		"new_chat": "新しいチャット",
+		"search_notes": "ノートを検索",
+		"open_smart_graph": "スマートグラフを開く",
+		"show_welcome": "ようこそ画面を表示",
+		"show_release_notes": "リリースノートを表示",
+		"next_pending_change": "次の保留中の変更",
+		"previous_pending_change": "前の保留中の変更"
+	},
+	"chat_file_menu": {
+		"rename": "チャットの名前を変更",
+		"rename_button": "名前を変更",
+		"delete": "チャットを削除",
+		"rename_failed": "チャットの名前を変更できませんでした: {error}",
+		"delete_failed": "チャットを削除できませんでした: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"other": "{count} 件のファイルをチャットに追加"
+		},
+		"add_file_failed": "ファイルをチャットに追加できませんでした: {error}",
+		"add_files_failed": "ファイルをチャットに追加できませんでした: {error}",
+		"no_supported_files": "対応しているファイルが選択されていません。対応形式: txt、md、csv、json、画像、pdf。",
+		"chat_not_initialized": "チャットがまだ初期化されていません。チャットを開いてからもう一度お試しください。",
+		"queued": {
+			"other": "{count} 件のファイルをチャット用に追加しました。"
+		},
+		"skipped_unsupported": {
+			"other": "対応していない {count} 件のファイルはスキップしました。"
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "開いているチャットはありません",
+		"no_pending_changes": "このチャットに保留中の変更はありません",
+		"new_file_nothing_to_open": "この変更は新しいファイルを作成するため、まだ開くものはありません。"
+	},
+	"huggingface_connected": "Hugging Face に接続しました。",
+	"update": {
+		"available": "Smart Second Brain {version} が利用可能です。",
+		"update_link": "アップデート",
+		"updated": "Smart Second Brain を {version} にアップデートしました。",
+		"whats_new_link": "新機能を見る"
+	},
+	"settings_save_failed": "Smart Second Brain の設定を保存できませんでした: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: 最も古いチャット履歴のうち約 {tokens} トークンが要約モデルのコンテキストウィンドウに収まらず、要約から除外されました。",
+		"repeated_failure": "Smart Second Brain: このチャットの履歴の要約が {failures} 回連続で失敗したため、履歴全体がそのまま送信されており、モデルのコンテキスト上限を超える可能性があります。エージェントの要約モデルを確認してください。エラーは開発者コンソールで確認できます。"
+	},
+	"agent": {
+		"memory_too_large": {
+			"other": "メモリがこのモデルには大きすぎます{window}: {names} は各メッセージに読み込まれなくなりました。エージェントは必要なときだけ読み取ります。ノートを短くするか、コンテキストウィンドウの大きいモデルを使用してください。"
+		},
+		"memory_window": "({k}k トークン)",
+		"save_prompt_failed": "システムプロンプトを保存できませんでした: {error}",
+		"open_agent_note": "エージェントのノートを開く",
+		"prompt_modal_title": "システムプロンプト — {name}",
+		"save_skill_failed": "スキル「{skill}」を保存できませんでした: {error}",
+		"open_skill_note": "スキルのノートを開く",
+		"skill_modal_title": "スキル — {skill}",
+		"cannot_connect": "接続できません: {providers}。サービスが実行中か確認してください。",
+		"review_providers": "プロバイダーを確認",
+		"provider_unavailable": "プロバイダー「{provider}」は利用できなくなりました。",
+		"select_new_model": "新しいモデルを選択",
+		"withdrew_changes": {
+			"other": "置き換えられた応答が提案した保留中のノート変更 {count} 件を取り下げました。"
+		},
+		"kept_partial_changes": {
+			"other": "部分的に適用された変更 {count} 件を保持しました — レビューバーで解決してください。"
+		}
+	},
+	"errors": {
+		"request_failed": "モデルへのリクエストに失敗しました。",
+		"context_overflow": "このチャットはモデルのコンテキストウィンドウに収まらなくなりました。",
+		"context_overflow_hint": "新しいチャットを始めるか、このモデルに設定されたコンテキストウィンドウを確認してください。",
+		"refusal": "モデルがこのリクエストへの回答を拒否しました。",
+		"refusal_hint": "リクエストを言い換えるか、別のモデルに切り替えると解決する場合があります。"
+	},
+	"provider_auth": {
+		"unknown_provider": "不明なプロバイダー: {provider}",
+		"invalid_api_key": "API キーが無効です",
+		"invalid_endpoint": "ベース URL が無効か、エンドポイントに到達できません",
+		"configuration_failed": "プロバイダーの設定に失敗しました",
+		"no_auth_config": "{provider} の認証設定が見つかりません",
+		"discovery_failed": "モデルの検出に失敗しました: {error}",
+		"server_url_required": "サーバー URL は必須です",
+		"api_key_required": "API キーは必須です",
+		"connection_failed": "接続に失敗しました: {error}",
+		"auth_failed_status": "認証に失敗しました ({status})",
+		"auth_failed": "認証に失敗しました",
+		"request_failed_status": "リクエストが失敗しました(ステータス {status})",
+		"codex_sign_in_required": "Codex を使うには ChatGPT でサインインしてください",
+		"openai_codex_sign_in_required": "Codex 経由で OpenAI を使うには ChatGPT でサインインしてください",
+		"huggingface_token_rejected": "Hugging Face がこのアクセストークンを拒否しました",
+		"huggingface_status": "Hugging Face がステータス {status} を返しました",
+		"huggingface_sign_in_required": "接続するには Hugging Face でサインインしてください"
+	},
+	"providers": {
+		"templates": {
+			"openai": "ChatGPT へのサインインまたは API キーで使う OpenAI モデル。",
+			"openai_compatible": "OpenAI および互換エンドポイント向けの柔軟な OpenAI 形式プロバイダー。",
+			"anthropic": "Anthropic の API 経由の Claude モデル。",
+			"ollama": "Ollama API 経由のローカル Ollama モデル。",
+			"omlx": "oMLX の OpenAI 互換サーバー経由で Mac 上のローカル MLX モデル。",
+			"openrouter": "OpenRouter のアカウントとモデルカタログ。",
+			"huggingface": "Hugging Face の推論プロバイダーによるオープンモデル。"
+		},
+		"fields": {
+			"api_key": "API キー",
+			"base_url": "ベース URL",
+			"server_url": "サーバー URL",
+			"access_token": "アクセストークン",
+			"custom_headers": "カスタムヘッダー",
+			"custom_headers_desc": "JSON 形式の追加ヘッダー(任意)",
+			"chatgpt_sign_in": "ChatGPT サインイン"
+		},
+		"openai": {
+			"link": "OpenAI ダッシュボード",
+			"oauth_desc": "ブラウザウィンドウを開いて ChatGPT/Codex の認可を完了します。",
+			"api_key_desc": "認証に使う OpenAI の API キー",
+			"base_url_desc": "カスタム API エンドポイント(デフォルトの OpenAI を使う場合は空欄)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "このプロバイダーはブラウザでの ChatGPT/Codex サインインを使用します。",
+			"sign_in_placeholder": "ChatGPT サインインで認可済み"
+		},
+		"openai_compatible": {
+			"base_url_desc": "OpenAI 互換 API エンドポイントのベース URL",
+			"api_key_desc": "認証用の API キー(エンドポイントで不要な場合は空欄)"
+		},
+		"anthropic": {
+			"link": "Anthropic Console",
+			"api_key_desc": "認証に使う Anthropic の API キー",
+			"base_url_desc": "Anthropic 互換 API エンドポイントのベース URL"
+		},
+		"ollama": {
+			"link": "Ollama ウェブサイト",
+			"server_url_desc": "Ollama サーバーが動作している URL",
+			"api_key_desc": "認証用の API キー(ローカルの Ollama では通常不要)"
+		},
+		"omlx": {
+			"link": "oMLX ウェブサイト",
+			"server_url_desc": "oMLX サーバーが動作している URL",
+			"api_key_desc": "oMLX ではデフォルトで API キーが必要です(管理パネルのグローバル設定で確認できます)。キーの検証を無効にした場合のみ空欄にしてください。"
+		},
+		"openrouter": {
+			"link": "OpenRouter のキー",
+			"oauth_desc": "ブラウザで認可すると、API キーを手動で作成せずに接続できます。",
+			"api_key_desc": "認証に使う OpenRouter の API キー"
+		},
+		"huggingface": {
+			"link": "Hugging Face のアクセストークン",
+			"oauth_desc": "ブラウザでアクセスを承認すると、アクセストークンを作成せずに接続できます。"
+		}
+	},
+	"indexing": {
+		"status": "インデックス作成中: {status}",
+		"cancelled_chunks": {
+			"other": "インデックス作成をキャンセルしました({count} チャンクを更新済み)"
+		},
+		"updated_chunks": {
+			"other": "✓ インデックスを更新しました: {count} チャンク"
+		},
+		"cancelled_notes": {
+			"other": "インデックス作成をキャンセルしました(これまでに {count} 件のノートをインデックス済み)"
+		},
+		"indexed_notes": {
+			"other": "✓ {count} 件のノートをインデックスしました"
+		},
+		"indexed_notes_skipped": {
+			"other": "✓ {count} 件のノートをインデックスし、{skipped} 件をスキップしました"
+		},
+		"no_embedding_model": "埋め込みモデルが設定されていません。デフォルトの埋め込みモデルを設定してください。",
+		"invalid_config": "埋め込みインデックスの設定が無効です。",
+		"provider_not_configured": "プロバイダー「{provider}」が設定されていません。",
+		"embedding_init_failed": "埋め込みモデルを初期化できませんでした。",
+		"open_search_settings": "検索設定を開く",
+		"open_provider_settings": "プロバイダー設定を開く",
+		"provider_unreachable": "インデックス作成を停止しました — 埋め込みプロバイダーに到達できません。接続を確認してから再開してください。",
+		"rate_limited": "インデックス作成を一時停止しました — 埋め込みプロバイダーのレート制限に達しました。次回の起動時に再開されます。後で検索設定から再開することもできます。",
+		"already_in_progress": "インデックス作成はすでに実行中です...",
+		"embed_failed": "{file} を埋め込めませんでした: {error}",
+		"embed_empty": "{file} を埋め込めませんでした: モデルから空の結果が返されました",
+		"semantic_unreachable": "セマンティック検索を利用できません — 埋め込みプロバイダーに到達できません。セマンティック検索の結果は表示されません。",
+		"semantic_failed": "セマンティック検索に失敗しました: {error}",
+		"cancelling": "インデックス作成をキャンセル中…",
+		"export_empty": "インデックスが空のため、エクスポートするものはありません。",
+		"export_dialog_title": "埋め込みインデックスをエクスポート",
+		"exported": "{count} 件の埋め込みをエクスポートしました。",
+		"export_failed": "インデックスをエクスポートできませんでした。",
+		"import_dialog_title": "埋め込みインデックスをインポート",
+		"import_invalid_version": "エクスポートファイルの version フィールドが無効か、存在しません。再インデックスして互換性のあるエクスポートを作成し直してください。",
+		"import_outdated": "エクスポートファイルのスキーマ v{version} は古くなっています(現在: v{current})。再インデックスして互換性のあるエクスポートを作成し直してください。",
+		"import_newer": "エクスポートファイルは新しいバージョンのプラグイン(スキーマ v{version})で作成されています。インポートするにはプラグインをアップデートしてください。",
+		"import_missing_metadata": "エクスポートファイルにプロバイダーまたはモデルのメタデータがありません。",
+		"imported": "{count} 件の埋め込みをインポートしました({model})。",
+		"import_failed": "インデックスをインポートできませんでした。ファイルが破損している可能性があります。",
+		"reindex": "再インデックス"
+	},
+	"search_index": {
+		"status": "検索用にノートをインデックス中: {status}",
+		"updated": "✓ 検索インデックスを更新しました: {count} 件のノート"
+	},
+	"bulk_progress": {
+		"skipped": "({count} 件スキップ)",
+		"eta": "(残り約 {eta})",
+		"pdfs_progress": "PDF {done}/{total}",
+		"then": "続いて {pdfs}",
+		"pdfs": {
+			"other": "{count} 件の PDF"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "検索ペインを開きましたが、タグのクエリを設定できませんでした",
+		"open_failed": "タグの検索ペインを開けませんでした: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "プロバイダーに埋め込みモデルが見つかりません。埋め込みを提供するプロバイダーがあるか確認してください。",
+		"no_models": "モデルが見つかりません。プロバイダーが動作していて到達可能か確認してください。"
+	},
+	"actions": {
+		"open_settings": "設定を開く",
+		"add_provider": "プロバイダーを追加",
+		"check_provider_settings": "プロバイダー設定を確認",
+		"select_model": "モデルを選択",
+		"configure_embedding_index": "埋め込みインデックスを設定",
+		"edit_agent": "エージェントを編集",
+		"view_report": "レポートを表示",
+		"open_note": "ノートを開く",
+		"open_chat": "チャットを開く",
+		"agent_gone_pick_model": "そのエージェントはもう存在しません。使いたいエージェントからモデルを選んでください。",
+		"agent_gone_not_saved": "そのエージェントはもう存在しないため、モデルは保存されませんでした。"
+	},
+	"diff": {
+		"pending_change": "保留中の変更",
+		"previous": "前の保留中の変更",
+		"next": "次の保留中の変更",
+		"toggle_view": "差分表示を切り替え",
+		"accept": "承認",
+		"accept_aria": "変更を承認",
+		"reject": "却下",
+		"reject_aria": "変更を却下",
+		"stale_tooltip": "承認できません — 提案後にノートが変更されました。却下して、エージェントに再提案を依頼してください。",
+		"cross_thread_banner": {
+			"other": "他の {count} 件のチャットに、このファイルへの保留中の編集があります。ここには最新のものだけが表示されます。最初に承認されたものが優先され、それ以外は適用に失敗する可能性があります。"
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "ツール呼び出し",
+		"reasoning": "拡張推論",
+		"vision": "画像 / ファイル添付",
+		"structured_output": "構造化出力(JSON スキーマ)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "ノートの検索",
+			"summary": "キーワードで Obsidian のノートを検索します。一致したファイル名とメタデータを返します。"
+		},
+		"list_directory": {
+			"name": "ディレクトリの一覧",
+			"summary": "保管庫のフォルダ構造を一覧表示します。ルートではファイル数付きの概要を、フォルダ内ではファイルとサブフォルダを表示します。出力はコンテキストの予算に収まるよう折りたたまれます。"
+		},
+		"read_content": {
+			"name": "内容の読み取り",
+			"summary": "パスまたはウィキリンクでノートや保管庫のファイルを読み取ります。Markdown/テキストファイルと PDF のテキスト抽出に対応しています。画像はチャットで添付する必要があります。"
+		},
+		"grep_notes": {
+			"name": "ノートの grep",
+			"summary": "ノート全体から完全一致の部分文字列または正規表現パターンを探し、一致した行を行番号と前後の文脈付きで返します。「ノートの検索」と異なり、文字列をそのまま照合します。パスで 1 つのノートに絞り込んだり、大量の結果をページ分けしたりできます。"
+		},
+		"get_all_tags": {
+			"name": "全タグの取得",
+			"summary": "保管庫で使われているすべてのタグの一覧を取得します。"
+		},
+		"get_properties": {
+			"name": "プロパティの取得",
+			"summary": "ノートのフロントマターのプロパティを取得するか、保管庫内のすべてのプロパティキーを一覧表示します。"
+		},
+		"execute_javascript": {
+			"name": "JavaScript の実行",
+			"summary": "計算やデータ変換のために隔離された JavaScript を実行します。最終的な値には return を、途中の出力には console.log を使います。"
+		},
+		"manage_notes": {
+			"name": "ノートの管理",
+			"summary": "Markdown ノートの作成、更新、削除を 1 つのまとまった提案として行います。関連するノート操作をまとめて提案し、ユーザーの承認を受けられます。"
+		},
+		"fetch_url": {
+			"name": "URL の取得",
+			"summary": "HTTP(S) で公開ウェブページやテキストリソースを取得し、主要な内容を整形した Markdown で返します。ユーザーが指定した URL か、明らかに公開されている参照先にのみ使用します。"
+		},
+		"web_search": {
+			"name": "ウェブ検索",
+			"summary": "ウェブを検索して結果(タイトル、URL、スニペット)を返します。プロバイダーと API キーはツールの設定パネルで設定します。まず保管庫の検索を優先します。"
+		},
+		"manage_skills": {
+			"name": "スキルの管理",
+			"summary": "新しいスキルを作成したり、エージェント自身に付与されたスキルを修正したり、依頼に応じてスキルを削除したりします。変更はすぐに適用されます。スキルの名前とプラグインとの関連付けは、作成後は変更できません。"
+		},
+		"write_todos": {
+			"name": "タスクリスト",
+			"summary": "エージェントが複数の手順からなる作業をチェックリストとして計画し、進めながらチェックを付けられるようにします。リストはチャット入力欄の上に表示されます。"
+		},
+		"ask_question": {
+			"name": "質問する",
+			"summary": "依頼が不明確なとき、エージェントが一時停止して選択式の質問をできるようにします。質問はチャット入力欄の上に表示されます。"
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider}(キー不要)",
+		"firecrawl_key_help": "任意 — レート制限を緩和するには Firecrawl の API キー(fc-…)を追加します。空欄にするとキー不要の枠を使用します。",
+		"brave_key_help": "api.search.brave.com で取得した Brave Search の API キー。",
+		"tavily_key_help": "app.tavily.com で取得した Tavily の API キー。",
+		"keenable_key_help": "任意 — レート制限を緩和するには Keenable の API キーを追加します。空欄にすると無料の公開エンドポイントを使用します。"
+	}
+}

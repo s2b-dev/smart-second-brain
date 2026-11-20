@@ -1,5 +1,6 @@
 <script lang="ts">
 import { DOCS, type DocKey } from "../../utils/docs";
+import { t } from "../../i18n";
 import { icon } from "../../utils/utils";
 import ExternalLinkButton from "./ExternalLinkButton.svelte";
 
@@ -27,9 +28,9 @@ interface Props {
 	class?: string;
 }
 
-let { doc, variant = "icon", label = "Learn more", subject, class: className = "" }: Props = $props();
+let { doc, variant = "icon", label = t("common.learn_more"), subject, class: className = "" }: Props = $props();
 
-const accessibleName = $derived(subject ? `Documentation: ${subject}` : "Open documentation");
+const accessibleName = $derived(subject ? t("ui.docs_link.subject_label", { subject }) : t("ui.docs_link.open_label"));
 </script>
 
 {#if variant === "icon"}

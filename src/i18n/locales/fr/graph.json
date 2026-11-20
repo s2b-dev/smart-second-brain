@@ -1,0 +1,222 @@
+{
+	"view": {
+		"display_text": "Graphe intelligent",
+		"loading": "Construction du graphe…"
+	},
+	"toolbar": {
+		"exit_immerse": "Quitter l’immersion — retour au graphe complet",
+		"fit": "Ajuster le graphe à la vue",
+		"fit_with_key": "Ajuster le graphe à la vue (F)",
+		"lasso": "Sélection au lasso",
+		"lasso_with_hint": "Sélection au lasso (ou maintenez Shift + glisser)",
+		"exit_lasso": "Quitter la sélection au lasso",
+		"hide_topics": "Masquer les thèmes — afficher le graphe brut sans regroupement",
+		"show_topics": "Afficher les thèmes — colorer les notes selon leur thème détecté",
+		"computing_topics": "Calcul des thèmes…",
+		"collapse_needs_topics": "Activez les thèmes pour pouvoir les replier",
+		"expand_all": "Déplier tous les thèmes en notes (S)",
+		"collapse_all": "Replier tous les thèmes en nœuds uniques (S) — ou sélectionnez des thèmes et utilisez Replier",
+		"show_panel": "Afficher le panneau du graphe",
+		"hide_panel": "Masquer le panneau du graphe"
+	},
+	"controls": {
+		"aria_label": "Paramètres du graphe",
+		"stats": {
+			"notes": {
+				"one": "{count} note",
+				"many": "{count} notes",
+				"other": "{count} notes"
+			},
+			"unlinked": {
+				"one": "{count} sans lien",
+				"many": "{count} sans lien",
+				"other": "{count} sans lien"
+			},
+			"links": {
+				"one": "{count} lien",
+				"many": "{count} liens",
+				"other": "{count} liens"
+			},
+			"inferred": {
+				"one": "{count} déduit",
+				"many": "{count} déduits",
+				"other": "{count} déduits"
+			}
+		},
+		"topics": {
+			"heading": "Thèmes",
+			"granularity": "Granularité",
+			"granularity_desc": "À gauche : quelques thèmes généraux. À droite : de nombreux thèmes précis. Toutes les notes restent visibles.",
+			"granularity_desc_with_keys": "À gauche : quelques thèmes généraux. À droite : de nombreux thèmes précis. Toutes les notes restent visibles. (↑/↓ sur le graphe)",
+			"granularity_pending": "Calcul des niveaux de thèmes de ce coffre…",
+			"inferred_links": "Liens déduits"
+		},
+		"inferred_hint": {
+			"no_index": "Reliez les notes par leur sens, en plus des liens que vous avez écrits. Nécessite un index d’embeddings pour le graphe — choisissez-en un dans les paramètres Graphe du plugin.",
+			"hidden_still_grouping": "Masqués, mais regroupent toujours les notes. Basculez deux fois pour les exclure aussi des thèmes.",
+			"off": "Désactivé — les thèmes proviennent des liens que vous avez écrits.",
+			"off_coverage": "Désactivé — les thèmes proviennent des liens que vous avez écrits. Vos liens seuls regroupent {placed} notes sur {total} ({percent} %) ; les {unlinked} autres sont sans lien.",
+			"on_no_edges": "Reliez les notes par leur sens, en plus des liens que vous avez écrits — nécessite un index d’embeddings pour le graphe.",
+			"on": "Les notes sont reliées par leur sens, en plus des liens que vous avez écrits : {inferred} connexions de similarité pour que les notes sans lien trouvent quand même un thème. Désactivez pour voir ce que couvrent vos propres liens."
+		},
+		"found": {
+			"heading": "Trouvés · {count}",
+			"multi_select_hint": "shift/⌘ sélection multiple",
+			"cancel_naming_aria": "Annuler le nommage des thèmes",
+			"cancel_naming": "Annuler le nommage",
+			"name_topics": "Nommer les thèmes avec l’IA"
+		},
+		"scope": {
+			"heading": "Périmètre",
+			"markdown_only": "Markdown uniquement",
+			"markdown_only_desc": "Afficher uniquement les notes Markdown ; désactivé, affiche tous les fichiers indexables",
+			"tags": "Tags",
+			"tags_desc": "Dessiner chaque tag comme un nœud relié aux notes qui le portent ; les tags partagés aident aussi à former les thèmes"
+		},
+		"display": {
+			"heading": "Affichage",
+			"topic_regions": "Zones des thèmes",
+			"topic_regions_desc": "Teinter la zone derrière chaque thème pour repérer les groupes d’un coup d’œil",
+			"topic_labels": "Libellés des thèmes",
+			"topic_labels_desc": "Afficher les étiquettes de nom des thèmes sur le graphe",
+			"direction_arrows": "Flèches de direction",
+			"direction_arrows_desc": "Afficher des flèches pour les liens wiki orientés",
+			"highlight_inferred": "Mettre en évidence les liens déduits",
+			"highlight_inferred_desc_no_index": "Dessiner les liens déduits dans la couleur d’accentuation. Nécessite un index d’embeddings pour le graphe — choisissez-en un dans les paramètres Graphe du plugin.",
+			"highlight_inferred_desc": "Dessiner les liens déduits dans la couleur d’accentuation pour les distinguer des liens que vous avez écrits",
+			"highlight_inferred_desc_off": "Dessiner les liens déduits dans la couleur d’accentuation. Nécessite l’activation de Liens déduits (sous Thèmes).",
+			"highlight_isolated": "Mettre en évidence les notes isolées",
+			"highlight_isolated_desc": "Marquer dans la couleur d’accentuation les notes sans aucun lien wiki",
+			"highlight_bridges": "Mettre en évidence les ponts",
+			"highlight_bridges_desc": "Marquer dans la couleur d’accentuation les notes qui relient plusieurs thèmes"
+		}
+	},
+	"selection": {
+		"aria_label": "Sélection du graphe",
+		"count_selected": {
+			"one": "{count} note sélectionnée",
+			"many": "{count} notes sélectionnées",
+			"other": "{count} notes sélectionnées"
+		},
+		"notes_selected": {
+			"one": "note sélectionnée",
+			"many": "notes sélectionnées",
+			"other": "notes sélectionnées"
+		},
+		"immersed_suffix": " · en immersion",
+		"notes_immersed": {
+			"one": "note · en immersion",
+			"many": "notes · en immersion",
+			"other": "notes · en immersion"
+		},
+		"immersed_into": "Immersion dans",
+		"immersed_prefix": "Immersion ·",
+		"note_noun": {
+			"one": "note",
+			"many": "notes",
+			"other": "notes"
+		},
+		"clear": "Effacer la sélection",
+		"clear_with_key": "Effacer la sélection (Échap)",
+		"zoom": "Zoomer sur la sélection",
+		"zoom_with_key": "Zoomer sur la sélection (F)",
+		"zoom_tooltip": "Déplacer la caméra pour cadrer les notes sélectionnées",
+		"collapse": "Replier",
+		"expand": "Déplier",
+		"collapse_tooltip": "Replier les thèmes sélectionnés en nœuds uniques",
+		"expand_tooltip": "Déplier les thèmes sélectionnés en notes",
+		"immerse": "Immersion",
+		"immerse_tooltip": "Reconstruire le graphe avec les seules notes sélectionnées",
+		"open_in_chat": "Ouvrir dans le chat",
+		"open_in_chat_tooltip": "Afficher le chat et y joindre les notes sélectionnées",
+		"open_all": "Tout ouvrir",
+		"open_all_tooltip": "Ouvrir toutes les notes sélectionnées dans de nouveaux onglets",
+		"exit": "Quitter",
+		"exit_immerse_tooltip": "Quitter l’immersion (Échap)"
+	},
+	"open_all_confirm": {
+		"title": "Ouvrir toutes les notes",
+		"message": {
+			"one": "Cela ouvre {count} note dans un nouvel onglet. Il faudra le fermer manuellement.",
+			"many": "Cela ouvre {count} notes dans de nouveaux onglets. Il faudra les fermer manuellement.",
+			"other": "Cela ouvre {count} notes dans de nouveaux onglets. Il faudra les fermer manuellement."
+		},
+		"confirm": {
+			"one": "Ouvrir {count} onglet",
+			"many": "Ouvrir {count} onglets",
+			"other": "Ouvrir {count} onglets"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "Le chat n’est pas encore initialisé. Ouvrez d’abord un chat.",
+		"private_titles_withheld": {
+			"one": "Les titres de notes privées ont été masqués pour {count} thème. Faites confiance au fournisseur du modèle du graphe pour les inclure.",
+			"many": "Les titres de notes privées ont été masqués pour {count} thèmes. Faites confiance au fournisseur du modèle du graphe pour les inclure.",
+			"other": "Les titres de notes privées ont été masqués pour {count} thèmes. Faites confiance au fournisseur du modèle du graphe pour les inclure."
+		},
+		"open_provider_settings": "Ouvrir les paramètres du fournisseur",
+		"no_graph_chat_model": "Aucun modèle de chat sélectionné pour le graphe : les thèmes ne peuvent pas être nommés.",
+		"open_graph_settings": "Ouvrir les paramètres du graphe"
+	},
+	"node_menu": {
+		"expand_topic": "Déplier le thème",
+		"open_all_notes": {
+			"one": "Ouvrir {count} note",
+			"many": "Ouvrir les {count} notes",
+			"other": "Ouvrir les {count} notes"
+		},
+		"search_tag": "Rechercher les notes avec ce tag",
+		"open_file": "Ouvrir le fichier",
+		"reveal_in_explorer": "Afficher dans l’explorateur de fichiers",
+		"focus_cluster": "Se concentrer sur ce groupe",
+		"collapse_topic": "Replier le thème",
+		"select_cluster": "Sélectionner ce groupe"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} note",
+			"many": "{n} notes",
+			"other": "{n} notes"
+		},
+		"links": {
+			"one": "{n} lien",
+			"many": "{n} liens",
+			"other": "{n} liens"
+		},
+		"cluster_fallback": "Groupe {id}",
+		"connections": {
+			"one": "{count} connexion",
+			"many": "{count} connexions",
+			"other": "{count} connexions"
+		},
+		"pinned": "📌 Épinglé"
+	},
+	"note_context": {
+		"title": "Contexte",
+		"title_of": "Contexte de {name}",
+		"semantic_hint": "Les voisins sémantiques apparaissent une fois qu’un index d’embeddings pour le graphe est configuré.",
+		"direction_in": "Entrants",
+		"direction_out": "Sortants",
+		"direction_both": "Les deux",
+		"updating": "Mise à jour…",
+		"fit": "Ajuster le graphe à la vue",
+		"options": "Options du contexte de note",
+		"close_options": "Fermer les options du contexte de note",
+		"view": "Vue",
+		"mode_graph": "Graphe",
+		"mode_list": "Liste",
+		"show": "Afficher",
+		"linked": "Liés",
+		"semantic": "Sémantiques",
+		"both": "Les deux",
+		"display": "Affichage",
+		"direction_arrows": "Flèches de direction",
+		"no_neighbors": "Aucun voisin.",
+		"open_a_note": "Ouvrez une note."
+	},
+	"topic_fallback": {
+		"unsorted": "Non classé",
+		"unsorted_with_count": "Non classé · {count}",
+		"topic": "Thème {id}"
+	}
+}

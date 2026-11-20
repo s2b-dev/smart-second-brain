@@ -1,0 +1,112 @@
+{
+	"view": {
+		"tab_title": "欢迎"
+	},
+	"welcome": {
+		"title": "欢迎使用 Smart Second Brain",
+		"subtitle": "把你的仓库变成 AI 辅助的第二大脑——更智能地搜索、在关系图谱中探索联系，并与你的笔记对话。",
+		"hotkeys_unavailable_notice": "无法打开快捷键设置——请打开“设置 → 快捷键”，然后搜索“Search notes”。",
+		"search": {
+			"title": "更智能的搜索",
+			"desc": "按标题、内容、标签和文件夹查找笔记，支持模糊匹配，无需任何设置。之后添加嵌入模型即可使用语义搜索。",
+			"hotkey_before": "也可以",
+			"hotkey_link": "设置快捷键",
+			"hotkey_after": "以便随时调用。",
+			"navbar_toggle": "从导航栏的放大镜打开，而不是快速切换"
+		},
+		"graph": {
+			"title": "更智能的关系图谱",
+			"desc": "查看笔记之间如何相互关联并聚合成主题，无需任何设置。"
+		},
+		"chat": {
+			"title": "与你的笔记对话",
+			"desc": "基于你的仓库提问，并集成了网页搜索以及 Dataview、Tasks 等插件。需要一个 AI 提供商——请在下方设置。"
+		},
+		"provider_step": {
+			"title": "连接 AI 提供商",
+			"done_desc": "提供商已连接。你可以在设置中添加或管理提供商。",
+			"desc": "连接 OpenAI、Anthropic、Ollama、OpenRouter 或任何兼容 OpenAI 的端点。",
+			"add_another": "再添加一个",
+			"connect": "连接提供商"
+		},
+		"model_step": {
+			"title": "选择对话模型",
+			"needs_provider_desc": "请先连接提供商，然后选择一个用于对话的模型。",
+			"using_before": "正在使用",
+			"using_after": "。一切就绪，可以开始对话了。",
+			"desc": "从已连接的提供商中选择一个模型以启用对话。",
+			"change": "更换模型",
+			"choose": "选择模型"
+		},
+		"privacy": {
+			"public_title": "你的笔记默认会被共享",
+			"all_trusted_title": "已授予笔记访问权限",
+			"untrusted_title": "你的笔记仍为私密",
+			"no_provider_title": "笔记访问默认为私密",
+			"no_provider_before": "除非你允许，否则你的笔记",
+			"no_provider_strong": "不会",
+			"no_provider_after": "与 AI 提供商共享。在上方连接提供商后，你可以授予其访问权限——在此之前，任何内容都不会离开你的仓库。",
+			"public_before": "笔记访问已设置为",
+			"public_strong": "默认公开",
+			"public_after": "，因此提供商可以读取你的笔记，被你排除的笔记除外。",
+			"public_end": "。",
+			"review_access": "检查笔记访问权限",
+			"trusted": "受信任",
+			"all_trusted_before": {
+				"other": "你的提供商已被标记为"
+			},
+			"all_trusted_after": "，因此智能体可以读取你的笔记。",
+			"all_trusted_end": "，可将特定笔记设为私密。",
+			"untrusted_before": {
+				"other": "还无法读取你的笔记——对话仍可使用，但回答不会以你的仓库为依据。请在提供商设置中将其标记为"
+			},
+			"untrusted_middle": "，或",
+			"change_access": "更改笔记访问权限",
+			"untrusted_end": "以允许所有提供商。"
+		},
+		"skip": "跳过",
+		"documentation": "文档 ↗",
+		"explore_graph": "探索关系图谱",
+		"start_chatting": "开始对话",
+		"start_chatting_disabled": "请先连接提供商并添加对话模型"
+	},
+	"provider_setup": {
+		"title_add": "添加提供商",
+		"title_setup": "设置提供商",
+		"title_edit": "编辑 {name}",
+		"trusted_indicator": "可访问私密笔记",
+		"invalid_name": "名称无效",
+		"auth_failed": "身份验证失败",
+		"picker_desc": "选择要连接的提供商。",
+		"setup_guide": "设置指南",
+		"name_label": "提供商名称",
+		"name_desc": "为此提供商实例命名，以便日后区分。",
+		"name_placeholder": "新提供商",
+		"hide_api_key": "隐藏 API 密钥字段",
+		"use_api_key": "改用 API 密钥 →",
+		"sign_in_desktop_only": "{provider} 登录仅在桌面端可用。",
+		"checking_connection": "正在检查连接…",
+		"connected": "已连接",
+		"fix_name_to_finish": "——请修正提供商名称以完成设置",
+		"enter_credentials": "请在上方输入凭据——连接会自动检查。",
+		"trusted_label": "可访问私密笔记",
+		"trusted_desc": "允许此提供商访问对不受信任的提供商保持私密的笔记。",
+		"oauth_sign_in_label": "{provider} 登录",
+		"cancel_sign_in": "取消登录",
+		"connected_via": "已通过 {provider} 连接",
+		"reconnect": "重新连接",
+		"disconnect": "断开连接",
+		"sign_in_with": "使用 {provider} 登录",
+		"paste_code_label": "粘贴授权码",
+		"paste_code_desc": "复制浏览器中显示的授权码并粘贴到此处，以完成连接。",
+		"code_placeholder": "授权码",
+		"submit": "提交"
+	},
+	"release_notes": {
+		"tab_title": "新功能",
+		"title": "{version} 的新功能",
+		"released_on": "发布于 {date}",
+		"earlier_releases": "更早的版本",
+		"all_releases": "GitHub 上的所有版本"
+	}
+}

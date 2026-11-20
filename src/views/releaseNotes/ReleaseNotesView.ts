@@ -1,5 +1,6 @@
 import { Component, MarkdownRenderer, type ViewStateResult } from "obsidian";
 import changelog from "../../../CHANGELOG.md?raw";
+import { t } from "../../i18n";
 import { type ReleaseNotesSection, parseChangelog } from "../../utils/releaseNotes";
 import { SvelteItemView } from "../SvelteItemView";
 import ReleaseNotes from "./ReleaseNotes.svelte";
@@ -30,7 +31,7 @@ export class ReleaseNotesView extends SvelteItemView {
 	}
 
 	getDisplayText(): string {
-		return "What's new";
+		return t("onboarding.release_notes.tab_title");
 	}
 
 	getIcon(): string {

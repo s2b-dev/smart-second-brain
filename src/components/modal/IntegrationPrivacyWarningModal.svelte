@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import Button from "../ui/Button.svelte";
 import Toggle from "../ui/Toggle.svelte";
 
@@ -11,29 +12,37 @@ interface Props {
 let { displayName, onConfirm, onCancel }: Props = $props();
 
 let dontAskAgain = $state(false);
+
+// Split on `{placeholder}` tokens so the inline markup sits wherever the translation puts it.
+const placeholder = /(\{\w+\})/;
+const enablingParts = t("modals.integration_privacy_warning.enabling").split(placeholder);
+const rulesDetailParts = t("modals.integration_privacy_warning.rules_detail").split(placeholder);
+const toolNames = new Map([
+	["{search_notes}", "search_notes"],
+	["{read_content}", "read_content"],
+	["{manage_notes}", "manage_notes"],
+]);
 </script>
 
-<div class="modal-title">Privacy Warning</div>
+<div class="modal-title">{t("modals.privacy_warning.title")}</div>
 <div class="modal-content">
   <p>
-    Enabling <strong>{displayName}</strong> gives the agent a tool that runs JavaScript against
-    this plugin's API with full vault access on the main thread.
+    {#each enablingParts as part}{#if part === "{name}"}<strong>{displayName}</strong>{:else}{part}{/if}{/each}
   </p>
   <p>
-    <strong>Your privacy rules do not apply to this tool.</strong> Notes you've marked private for
-    the current provider can still be read or written through it, unlike <code>search_notes</code>,
-    <code>read_content</code>, and <code>manage_notes</code>, which respect those rules.
+    <strong>{t("modals.integration_privacy_warning.rules_not_applied")}</strong>
+    {#each rulesDetailParts as part}{#if toolNames.has(part)}<code>{toolNames.get(part)}</code>{:else}{part}{/if}{/each}
   </p>
 </div>
 
 <label class="s2b-dont-ask-again">
   <Toggle checked={dontAskAgain} onchange={(checked) => (dontAskAgain = checked)} />
-  <span>Don't ask again for any integration</span>
+  <span>{t("modals.integration_privacy_warning.dont_ask_again")}</span>
 </label>
 
 <div class="modal-button-container">
-  <Button buttonText="Cancel" onClick={onCancel} />
-  <Button buttonText="Enable anyway" styles="mod-warning" onClick={() => onConfirm(dontAskAgain)} />
+  <Button buttonText={t("common.cancel")} onClick={onCancel} />
+  <Button buttonText={t("modals.integration_privacy_warning.enable_button")} styles="mod-warning" onClick={() => onConfirm(dontAskAgain)} />
 </div>
 
 <style>

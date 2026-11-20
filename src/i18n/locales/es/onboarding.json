@@ -1,0 +1,116 @@
+{
+	"view": {
+		"tab_title": "Bienvenida"
+	},
+	"welcome": {
+		"title": "Te damos la bienvenida a Smart Second Brain",
+		"subtitle": "Convierte tu bóveda en un segundo cerebro asistido por IA: busca mejor, explora conexiones en un grafo y chatea con tus notas.",
+		"hotkeys_unavailable_notice": "No se pudieron abrir los atajos de teclado — abre Configuración → Atajos de teclado y busca «Search notes».",
+		"search": {
+			"title": "Búsqueda más inteligente",
+			"desc": "Encuentra notas por título, contenido, etiquetas y carpetas, con coincidencia aproximada. Sin configuración. Añade más tarde un modelo de embeddings para la búsqueda semántica.",
+			"hotkey_before": "O",
+			"hotkey_link": "asigna un atajo de teclado",
+			"hotkey_after": "para acceder al instante.",
+			"navbar_toggle": "Abrir desde la lupa de la barra de navegación en lugar del selector rápido"
+		},
+		"graph": {
+			"title": "Grafo más inteligente",
+			"desc": "Mira cómo se conectan tus notas y se agrupan en temas. Sin configuración."
+		},
+		"chat": {
+			"title": "Chatea con tus notas",
+			"desc": "Haz preguntas basadas en tu bóveda, con búsqueda web y plugins como Dataview y Tasks integrados. Necesita un proveedor de IA: configura uno abajo."
+		},
+		"provider_step": {
+			"title": "Conecta un proveedor de IA",
+			"done_desc": "Proveedor conectado. Puedes añadir o gestionar proveedores en la configuración.",
+			"desc": "Conecta OpenAI, Anthropic, Ollama, OpenRouter o cualquier endpoint compatible con OpenAI.",
+			"add_another": "Añadir otro",
+			"connect": "Conectar proveedor"
+		},
+		"model_step": {
+			"title": "Elige un modelo de chat",
+			"needs_provider_desc": "Primero conecta un proveedor y luego elige un modelo con el que chatear.",
+			"using_before": "Usando",
+			"using_after": ". Ya puedes empezar a chatear.",
+			"desc": "Elige un modelo de tu proveedor conectado para activar el chat.",
+			"change": "Cambiar modelo",
+			"choose": "Elegir modelo"
+		},
+		"privacy": {
+			"public_title": "Tus notas se comparten de forma predeterminada",
+			"all_trusted_title": "El acceso a las notas está concedido",
+			"untrusted_title": "Tus notas siguen siendo privadas",
+			"no_provider_title": "El acceso a las notas es privado de forma predeterminada",
+			"no_provider_before": "Tus notas",
+			"no_provider_strong": "no",
+			"no_provider_after": "se comparten con proveedores de IA a menos que lo permitas. Cuando conectes un proveedor arriba, podrás darle acceso; hasta entonces nada sale de tu bóveda.",
+			"public_before": "El acceso a las notas está configurado como",
+			"public_strong": "público de forma predeterminada",
+			"public_after": ", así que los proveedores pueden leer tus notas excepto las que excluyas.",
+			"public_end": ".",
+			"review_access": "Revisar acceso a las notas",
+			"trusted": "de confianza",
+			"all_trusted_before": {
+				"one": "Tu proveedor está marcado como",
+				"many": "Tus proveedores están marcados como",
+				"other": "Tus proveedores están marcados como"
+			},
+			"all_trusted_after": ", así que el agente puede leer tus notas.",
+			"all_trusted_end": "para mantener privadas notas concretas.",
+			"untrusted_before": {
+				"one": "aún no puede leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalo como",
+				"many": "aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como",
+				"other": "aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como"
+			},
+			"untrusted_middle": "en la configuración del proveedor, o",
+			"change_access": "cambia el acceso a las notas",
+			"untrusted_end": "para permitir a todos los proveedores."
+		},
+		"skip": "Omitir",
+		"documentation": "Documentación ↗",
+		"explore_graph": "Explorar el grafo",
+		"start_chatting": "Empezar a chatear",
+		"start_chatting_disabled": "Primero conecta un proveedor y añade un modelo de chat"
+	},
+	"provider_setup": {
+		"title_add": "Añadir proveedor",
+		"title_setup": "Configurar proveedor",
+		"title_edit": "Editar {name}",
+		"trusted_indicator": "De confianza para notas privadas",
+		"invalid_name": "Nombre no válido",
+		"auth_failed": "Error de autenticación",
+		"picker_desc": "Elige un proveedor para conectar.",
+		"setup_guide": "Guía de configuración",
+		"name_label": "Nombre del proveedor",
+		"name_desc": "Pon un nombre a esta instancia del proveedor para distinguirla más adelante.",
+		"name_placeholder": "Nuevo proveedor",
+		"hide_api_key": "Ocultar campo de clave de API",
+		"use_api_key": "Usar una clave de API en su lugar →",
+		"sign_in_desktop_only": "El inicio de sesión con {provider} solo está disponible en escritorio.",
+		"checking_connection": "Comprobando conexión…",
+		"connected": "Conectado",
+		"fix_name_to_finish": "— corrige el nombre del proveedor para terminar",
+		"enter_credentials": "Introduce tus credenciales arriba; la conexión se comprueba automáticamente.",
+		"trusted_label": "De confianza para notas privadas",
+		"trusted_desc": "Permite que este proveedor acceda a las notas que siguen siendo privadas para los proveedores que no son de confianza.",
+		"oauth_sign_in_label": "Inicio de sesión con {provider}",
+		"cancel_sign_in": "Cancelar inicio de sesión",
+		"connected_via": "Conectado mediante {provider}",
+		"reconnect": "Volver a conectar",
+		"disconnect": "Desconectar",
+		"sign_in_with": "Iniciar sesión con {provider}",
+		"paste_code_label": "Pegar código de autorización",
+		"paste_code_desc": "Copia el código de autorización que aparece en el navegador y pégalo aquí para terminar de conectar.",
+		"code_placeholder": "Código de autorización",
+		"submit": "Enviar"
+	},
+	"release_notes": {
+		"tab_title": "Novedades",
+		"title": "Novedades de la versión {version}",
+		"released_on": "Publicada el {date}",
+		"earlier_releases": "Versiones anteriores",
+		"all_releases": "Todas las versiones en GitHub"
+	}
+}

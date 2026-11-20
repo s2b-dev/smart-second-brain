@@ -1,0 +1,227 @@
+{
+	"tabs": {
+		"general": "일반",
+		"search": "검색",
+		"agents": "에이전트",
+		"graph": "그래프",
+		"troubleshooting": "문제 해결",
+		"developer": "개발자"
+	},
+	"general": {
+		"providers": {
+			"heading": "제공자",
+			"description": "제공자는 Smart Second Brain을 채팅, 임베딩 및 기타 모델 기반 기능에 사용되는 AI 서비스와 연결합니다.",
+			"empty": "아직 구성된 제공자 인스턴스가 없습니다.",
+			"add": "제공자 추가"
+		},
+		"privacy": {
+			"heading": "개인 정보",
+			"note_access": "노트 접근 정책",
+			"note_access_desc": "신뢰하지 않는 제공자가 기본적으로 아무것도 볼 수 없게 할지 모두 볼 수 있게 할지 선택한 다음, 해당 파일 목록을 관리하세요.",
+			"manage": "관리",
+			"check_updates": "업데이트 확인",
+			"check_updates_desc": "하루에 한 번 GitHub에서 이 플러그인의 버전 번호를 가져와, 새 버전이 있으면 알림을 표시합니다. 사용자나 보관소에 관한 정보는 전송되지 않습니다. Obsidian 자체의 플러그인 자동 업데이트 확인이 켜져 있으면 건너뜁니다."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "표시",
+			"result_details": "결과 세부 정보",
+			"result_details_desc": "각 검색 결과에 표시할 메타데이터와 컨텍스트를 선택하세요. 현재: {summary}.",
+			"configure": "구성",
+			"label_path": "경로",
+			"label_tags": "태그",
+			"label_match_badges": "일치 배지",
+			"label_content_snippets": "내용 발췌",
+			"nothing_extra": "추가 항목 없음",
+			"navbar_search": "내비게이션 바에서 S2B 검색 사용",
+			"navbar_search_desc": "하단 내비게이션 바의 돋보기 버튼이 Obsidian의 빠른 전환기 대신 Smart Second Brain 검색을 열도록 합니다. 해당 버튼만 바뀌며, 빠른 전환기는 여전히 명령어 팔레트와 단축키로 열 수 있습니다."
+		},
+		"indexed_content": {
+			"heading": "색인 대상 내용",
+			"heading_desc": "노트, 캔버스, 위젯은 항상 색인됩니다. 다른 파일 중 검색과 임베딩을 위해 내용을 색인할 파일을 선택하세요 — 나머지도 제목과 경로로는 찾을 수 있고, 에이전트가 필요할 때 읽을 수 있습니다.",
+			"pdfs": "PDF",
+			"pdfs_desc": "PDF의 텍스트를 추출해 색인합니다. 큰 라이브러리에서는 느리며, 긴 PDF는 대부분 관련이 적습니다. 긴 PDF는 대략 처음 80페이지(모바일은 4페이지)까지만 색인합니다.",
+			"chats": "채팅",
+			"chats_desc": "지난 대화를 색인합니다. 대화는 대부분 모델 자신의 답변이라, 마치 출처인 것처럼 다시 나타날 수 있습니다.",
+			"data_files": "데이터 파일",
+			"data_files_desc": "CSV, JSON, YAML 파일을 색인합니다. 구조화된 데이터는 의미로 검색하기 어렵고, 내보내기 하나로 수천 개의 항목이 추가될 수 있습니다."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "주제 이름",
+			"naming_model": "주제 이름 짓기 모델",
+			"naming_model_desc": "주제 이름을 짓는 데 사용하는 모델입니다. 모델이 없으면 가장 많이 연결된 노트의 이름을 주제 이름으로 사용합니다.",
+			"naming_model_desc_withheld": "주제 이름을 짓는 데 사용하는 모델입니다. 모델이 없으면 가장 많이 연결된 노트의 이름을 주제 이름으로 사용합니다. 이 제공자는 비공개 노트에 대해 신뢰되지 않았으므로 비공개 제목은 이름 짓기에서 제외됩니다.",
+			"configure_provider": "제공자 구성",
+			"configure_models": "모델 구성",
+			"no_provider": "아직 구성된 AI 제공자가 없습니다.",
+			"select_model": "모델 선택",
+			"clear": "지우기",
+			"auto_name": "주제 이름 자동 짓기",
+			"auto_name_desc": "주제가 바뀔 때마다 이름을 짓습니다. 끄면 그래프의 주제 패널에서만 이름 짓기가 실행됩니다."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "온보딩",
+			"replay": "온보딩 소개 다시 보기",
+			"replay_desc": "시작 애니메이션과 완료 플래그를 초기화합니다 — 시작하기 화면이 소개를 다시 재생하며, 처음 실행한 것처럼 시작할 때 자동으로 열립니다(제공자를 구성할 때까지).",
+			"reset": "소개 초기화",
+			"reset_notice": "온보딩을 초기화하고 다시 열었습니다 — 소개가 처음부터 다시 재생됩니다."
+		},
+		"chat": {
+			"heading": "채팅",
+			"raw_tool_io": "도구 원시 입력/출력 표시",
+			"raw_tool_io_desc": "채팅의 도구 호출 행에 정확한 도구 인수와 원시 출력을 표시합니다. 기본값은 꺼짐이며, 사용자에게는 쉬운 요약과 정리된 결과만 보입니다.",
+			"restore": "복원",
+			"restore_recommendations": "닫은 추천 복원",
+			"restore_recommendations_desc": "새 채팅의 빈 화면에서 닫은 추천 질문, 플러그인 스킬 제안, 기본값 업데이트 알림을 모두 되돌립니다.",
+			"restored_recommendations": {
+				"other": "닫은 추천 {count}개를 복원했습니다."
+			},
+			"no_recommendations": "복원할 닫은 추천이 없습니다.",
+			"restore_privacy_warning": "통합 개인 정보 경고 복원",
+			"restore_privacy_warning_desc": "플러그인 통합의 코드 실행 도구를 활성화하기 전에 표시되는 경고(제공자별 개인 정보 규칙을 우회함)에서 '다시 묻지 않기'를 취소합니다.",
+			"privacy_warning_restored": "통합 개인 정보 경고를 복원했습니다 — 다음에 통합을 활성화할 때 다시 표시됩니다.",
+			"privacy_warning_not_suppressed": "통합 개인 정보 경고가 숨겨져 있지 않았습니다."
+		},
+		"observability": {
+			"heading": "관측성",
+			"langsmith": "LangSmith 통합",
+			"langsmith_desc": "디버깅과 추적을 위해 LangSmith 원격 측정을 활성화합니다",
+			"api_key": "API 키",
+			"api_key_desc": "LangSmith 인증에 사용할 Obsidian 키체인 비밀을 선택하세요",
+			"project": "프로젝트 이름",
+			"project_desc": "실행을 기록할 프로젝트 이름",
+			"endpoint": "엔드포인트 URL",
+			"endpoint_desc": "LangSmith API 기본 URL 재정의 (선택 사항)",
+			"check_aria": "LangSmith API 키와 엔드포인트 확인",
+			"check_idle": "LangSmith 연결 확인",
+			"check_no_key": "먼저 LangSmith API 키 비밀을 선택하세요",
+			"check_invalid_url": "잘못된 LangSmith 엔드포인트 URL",
+			"check_pending": "LangSmith 연결 확인 중...",
+			"check_success": "LangSmith 연결 성공",
+			"check_rejected": "LangSmith가 API 키를 거부했습니다",
+			"check_not_found": "LangSmith 엔드포인트가 예상한 API를 제공하지 않습니다",
+			"check_failed_body": "LangSmith 확인 실패 ({status}): {body}",
+			"check_failed_status": "LangSmith 확인 실패, 상태 {status}",
+			"check_unreachable": "LangSmith에 연결하지 못했습니다",
+			"check_failed_notice": "LangSmith 확인 실패: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "진단",
+		"maintenance_heading": "유지 관리",
+		"release_notes": "릴리스 노트",
+		"release_notes_desc": "현재 버전은 {version}입니다. 최근 릴리스에서 무엇이 바뀌었는지 확인하세요.",
+		"show_release_notes": "릴리스 노트 보기",
+		"guide": "문제 해결 가이드",
+		"guide_desc": "자주 발생하는 문제와 해결 방법 — 에이전트가 응답하지 않음, 검색 결과가 도움이 되지 않음, 노트가 제외됨, MCP 도구 누락, 모바일 관련 문제.",
+		"open_guide": "가이드 열기",
+		"still_stuck": "여전히 해결되지 않나요?",
+		"still_stuck_desc": "기존 GitHub 이슈를 살펴보고 문제가 이미 등록되어 있는지 확인하세요. 없다면 새 이슈를 열고 시도한 내용, 오류 메시지, 재현 단계를 포함하세요.",
+		"view_issues": "기존 이슈 보기",
+		"new_issue": "새 이슈 열기",
+		"clear": "플러그인 데이터 정리",
+		"clear_desc": "플러그인 설정과 생성된 색인 데이터를 삭제합니다. 보관소 안의 비밀, 스킬 파일, 채팅 파일은 유지됩니다.",
+		"clear_label": "정리",
+		"clear_modal": {
+			"title": "플러그인 데이터 정리",
+			"description": "플러그인 설정과 생성된 색인 데이터를 삭제할까요? 보관소 안의 비밀, 스킬 파일, 채팅 파일은 유지됩니다."
+		},
+		"verbose": "개발자 콘솔 로깅",
+		"verbose_desc": "개발자 콘솔에서 상세 로깅을 활성화합니다.",
+		"cleared": "플러그인 데이터를 정리했습니다.",
+		"cleared_partial": "플러그인 데이터를 정리했지만 {indexes}에 저장된 벡터를 삭제하지 못했습니다. 자세한 내용은 콘솔을 확인하세요.",
+		"clear_failed": "플러그인 데이터를 정리하지 못했습니다"
+	},
+	"providers": {
+		"auth_failed": "인증 실패",
+		"checking_auth": "인증 확인 중",
+		"authenticated": "인증되었습니다. 클릭하면 연결을 다시 시도합니다",
+		"auth_error_retry": "{message}. 클릭하면 연결을 다시 시도합니다",
+		"trusted": "비공개 노트 접근 신뢰",
+		"configure": "제공자 구성",
+		"remove": "제공자 제거",
+		"remove_failed": "제공자를 제거하지 못했습니다",
+		"delete_embeddings": "이 제공자로 만든 임베딩도 삭제",
+		"delete_embeddings_desc": {
+			"other": "색인된 노트 {formatted}개가 사용하는 저장 공간을 확보합니다. 유지하려면 끄세요 — 이 제공자를 다시 추가하면 다시 임베딩하는 대신 재사용하며, 다시 임베딩은 느리고 비용이 들 수 있습니다."
+		},
+		"embeddings_kept_starting": "제공자를 제거했습니다. 색인 서비스가 아직 시작 중이어서 임베딩은 유지되었습니다.",
+		"embeddings_delete_failed": {
+			"other": "제공자를 제거했지만 임베딩 색인 {count}개 중 {failed}개를 삭제하지 못했습니다: {ids}. 자세한 내용은 콘솔을 확인하세요."
+		},
+		"advanced": "고급"
+	},
+	"embedding_index": {
+		"heading": "임베딩 색인",
+		"description_search": "임베딩 색인은 노트 전반의 의미 기반 검색을 지원합니다.",
+		"description_graph": "임베딩 색인은 노트 전반의 의미 기반 그래프 기능을 지원합니다.",
+		"group_search": "검색 임베딩 색인",
+		"group_graph": "그래프 임베딩 색인",
+		"empty": "아직 구성된 임베딩 색인이 없습니다.",
+		"add": "색인 추가",
+		"notes_indexed": {
+			"other": "노트 {count}개 색인됨"
+		},
+		"use_as_search": "{model}을(를) 검색 색인으로 사용",
+		"use_as_graph": "{model}을(를) 그래프 색인으로 사용",
+		"view_report": "색인 보고서 보기",
+		"export": "색인을 파일로 내보내기",
+		"delete": "색인 삭제",
+		"delete_failed": "이 색인을 삭제할 수 없습니다: {error}",
+		"memory_on_mobile": "모바일 메모리 사용량"
+	},
+	"orphaned": {
+		"name": "고아 벡터 데이터베이스",
+		"legacy": "{label} (이전 그래프 데이터)",
+		"chunks": {
+			"other": "{id} (청크 {count}개)"
+		},
+		"summary": {
+			"other": "저장된 데이터베이스 {count}개가 더 이상 구성된 임베딩 색인에 속하지 않습니다{size}: {list}."
+		},
+		"size": " (벡터 최소 {size})",
+		"origin_usage": "이 기기에서 Obsidian의 저장 공간은 모든 보관소를 합쳐 {size}입니다.",
+		"confirm_title": "고아 색인을 삭제할까요?",
+		"confirm_desc": {
+			"other": "구성된 임베딩 색인이 사용하지 않는 저장된 데이터베이스 {count}개를 영구적으로 제거합니다. 나중에 이 모델 중 하나를 다시 추가하면 색인을 처음부터 다시 만듭니다."
+		},
+		"deleted": {
+			"other": "고아 색인 {count}개를 삭제했습니다."
+		},
+		"deleted_partial": "{deleted}개를 삭제했고, {failed}개는 삭제하지 못했습니다: {reason}",
+		"delete_button": "고아 색인 삭제"
+	},
+	"secret_select": {
+		"nothing_selected": "(선택 안 함)",
+		"add_tooltip": "새 비밀 추가",
+		"missing": "Obsidian 키체인에서 비밀 \"{id}\"을(를) 찾을 수 없습니다.",
+		"add_action": "비밀 추가"
+	},
+	"model_control": {
+		"loading": "모델 불러오는 중…"
+	},
+	"managed_entity": {
+		"select": "{name} 선택"
+	},
+	"filter": {
+		"type_folder": "폴더",
+		"type_tag": "태그",
+		"type_extension": "확장자",
+		"type_property": "속성",
+		"all_of": "다음 모두",
+		"any_of": "다음 중 하나 이상",
+		"none_of": "다음 중 해당 없음",
+		"remove_condition": "조건 제거",
+		"property_placeholder": "속성 이름",
+		"any_value": "모든 값",
+		"no_properties": "보관소에서 속성을 찾을 수 없습니다 — 그래도 사용하려면 이름을 입력하세요.",
+		"live_placeholder": "그래프에서 선택하세요",
+		"add_condition": "조건",
+		"add_group": "그룹"
+	}
+}

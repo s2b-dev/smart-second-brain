@@ -1,0 +1,243 @@
+{
+	"tabs": {
+		"general": "General",
+		"search": "Búsqueda",
+		"agents": "Agentes",
+		"graph": "Grafo",
+		"troubleshooting": "Solución de problemas",
+		"developer": "Desarrollador"
+	},
+	"general": {
+		"providers": {
+			"heading": "Proveedores",
+			"description": "Los proveedores conectan Smart Second Brain con los servicios de IA que se usan para el chat, los embeddings y otras funciones basadas en modelos.",
+			"empty": "Aún no hay instancias de proveedor configuradas.",
+			"add": "Añadir proveedor"
+		},
+		"privacy": {
+			"heading": "Privacidad",
+			"note_access": "Política de acceso a las notas",
+			"note_access_desc": "Elige si los proveedores que no son de confianza no ven nada o lo ven todo de forma predeterminada y, después, gestiona la lista de archivos correspondiente.",
+			"manage": "Gestionar",
+			"check_updates": "Buscar actualizaciones",
+			"check_updates_desc": "Una vez al día, obtiene de GitHub el número de versión de este plugin y muestra un aviso cuando hay una más reciente. No se envía nada sobre ti ni sobre tu bóveda. Se omite mientras esté activada la búsqueda automática de actualizaciones de plugins de Obsidian."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "Visualización",
+			"result_details": "Detalles de los resultados",
+			"result_details_desc": "Elige qué metadatos y contexto aparecen en cada resultado de búsqueda. Actualmente: {summary}.",
+			"configure": "Configurar",
+			"label_path": "Ruta",
+			"label_tags": "Etiquetas",
+			"label_match_badges": "Distintivos de coincidencia",
+			"label_content_snippets": "Fragmentos de contenido",
+			"nothing_extra": "Nada adicional",
+			"navbar_search": "Usar la búsqueda de S2B en la barra de navegación",
+			"navbar_search_desc": "Hace que el botón de la lupa de la barra de navegación inferior abra la búsqueda de Smart Second Brain en lugar del selector rápido de Obsidian. Solo cambia ese botón: el selector rápido se sigue abriendo desde la paleta de comandos y con su atajo de teclado."
+		},
+		"indexed_content": {
+			"heading": "Contenido indexado",
+			"heading_desc": "Las notas, los lienzos y los widgets siempre se indexan. Elige de qué otros archivos se indexa el contenido para la búsqueda y los embeddings; el resto se sigue encontrando por título y ruta, y el agente puede leerlos cuando lo necesite.",
+			"pdfs": "PDF",
+			"pdfs_desc": "Extrae e indexa el texto de los PDF. Es lento en bibliotecas grandes, y la mayor parte de un PDF largo rara vez es relevante. Los PDF largos se indexan aproximadamente hasta sus primeras 80 páginas (4 en móvil).",
+			"chats": "Chats",
+			"chats_desc": "Indexa las conversaciones anteriores. Son sobre todo respuestas del propio modelo, que luego pueden volver como si fueran fuentes.",
+			"data_files": "Archivos de datos",
+			"data_files_desc": "Indexa archivos CSV, JSON y YAML. Los datos estructurados se buscan mal por significado, y una sola exportación puede añadir miles de entradas."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "Nombres de temas",
+			"naming_model": "Modelo para nombrar temas",
+			"naming_model_desc": "Modelo que se usa para nombrar los temas. Sin él, cada tema recibe el nombre de su nota mejor conectada.",
+			"naming_model_desc_withheld": "Modelo que se usa para nombrar los temas. Sin él, cada tema recibe el nombre de su nota mejor conectada. Este proveedor no es de confianza para notas privadas, así que los títulos privados no se usan para nombrar.",
+			"configure_provider": "Configurar proveedor",
+			"configure_models": "Configurar modelos",
+			"no_provider": "Aún no hay ningún proveedor de IA configurado.",
+			"select_model": "Selecciona un modelo",
+			"clear": "Quitar",
+			"auto_name": "Nombrar temas automáticamente",
+			"auto_name_desc": "Nombra los temas cada vez que cambian. Si está desactivado, solo se nombran desde el panel Temas del grafo."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "Introducción",
+			"replay": "Repetir la introducción",
+			"replay_desc": "Restablece la animación de bienvenida y los indicadores de finalización: la vista de bienvenida vuelve a mostrar su introducción y se abre automáticamente al iniciar como si fuera la primera vez (hasta que se configure un proveedor).",
+			"reset": "Restablecer introducción",
+			"reset_notice": "Introducción restablecida y reabierta: se repetirá desde el principio."
+		},
+		"chat": {
+			"heading": "Chat",
+			"raw_tool_io": "Mostrar entrada/salida sin procesar de las herramientas",
+			"raw_tool_io_desc": "Muestra los argumentos exactos y la salida sin procesar en las filas de llamadas a herramientas del chat. Desactivado de forma predeterminada: los usuarios solo ven el resumen en lenguaje sencillo y el resultado estructurado.",
+			"restore": "Restaurar",
+			"restore_recommendations": "Restaurar recomendaciones descartadas",
+			"restore_recommendations_desc": "Recupera todas las consultas sugeridas, sugerencias de habilidades de plugins y avisos de valores predeterminados actualizados que se descartaron en el estado vacío de un chat nuevo.",
+			"restored_recommendations": {
+				"one": "Se restauró {count} recomendación descartada.",
+				"many": "Se restauraron {count} recomendaciones descartadas.",
+				"other": "Se restauraron {count} recomendaciones descartadas."
+			},
+			"no_recommendations": "No hay recomendaciones descartadas que restaurar.",
+			"restore_privacy_warning": "Restaurar la advertencia de privacidad de integraciones",
+			"restore_privacy_warning_desc": "Deshace «No volver a preguntar» en la advertencia que aparece antes de activar la herramienta de ejecución de código de una integración de plugin (omite las reglas de privacidad por proveedor).",
+			"privacy_warning_restored": "Advertencia de privacidad de integraciones restaurada: volverá a aparecer la próxima vez que se active una integración.",
+			"privacy_warning_not_suppressed": "La advertencia de privacidad de integraciones no estaba desactivada."
+		},
+		"observability": {
+			"heading": "Observabilidad",
+			"langsmith": "Integración con LangSmith",
+			"langsmith_desc": "Activa la telemetría de LangSmith para depuración y trazas",
+			"api_key": "Clave de API",
+			"api_key_desc": "Selecciona un secreto del llavero de Obsidian para autenticarte en LangSmith",
+			"project": "Nombre del proyecto",
+			"project_desc": "Nombre del proyecto al que se atribuyen las ejecuciones",
+			"endpoint": "URL del endpoint",
+			"endpoint_desc": "Sustituye la URL base de la API de LangSmith (opcional)",
+			"check_aria": "Comprobar la clave de API y el endpoint de LangSmith",
+			"check_idle": "Comprobar la conexión con LangSmith",
+			"check_no_key": "Primero selecciona un secreto con la clave de API de LangSmith",
+			"check_invalid_url": "URL del endpoint de LangSmith no válida",
+			"check_pending": "Comprobando la conexión con LangSmith...",
+			"check_success": "Conexión con LangSmith correcta",
+			"check_rejected": "LangSmith rechazó la clave de API",
+			"check_not_found": "El endpoint de LangSmith no expone la API esperada",
+			"check_failed_body": "Error en la comprobación de LangSmith ({status}): {body}",
+			"check_failed_status": "Error en la comprobación de LangSmith con el estado {status}",
+			"check_unreachable": "No se pudo contactar con LangSmith",
+			"check_failed_notice": "Error en la comprobación de LangSmith: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "Diagnóstico",
+		"maintenance_heading": "Mantenimiento",
+		"release_notes": "Notas de la versión",
+		"release_notes_desc": "Tienes la versión {version}. Mira qué ha cambiado en las versiones recientes.",
+		"show_release_notes": "Mostrar notas de la versión",
+		"guide": "Guía de solución de problemas",
+		"guide_desc": "Problemas habituales y cómo resolverlos: el agente no responde, resultados de búsqueda poco útiles, notas ocultas, herramientas MCP que faltan y problemas propios del móvil.",
+		"open_guide": "Abrir guía",
+		"still_stuck": "¿Sigues atascado?",
+		"still_stuck_desc": "Revisa las incidencias existentes en GitHub para ver si el problema ya está registrado. Si no lo está, abre una nueva incidencia e incluye lo que probaste, los mensajes de error y los pasos para reproducirlo.",
+		"view_issues": "Ver incidencias existentes",
+		"new_issue": "Abrir nueva incidencia",
+		"clear": "Limpiar datos del plugin",
+		"clear_desc": "Elimina la configuración del plugin y los datos de índice generados. Se conservan los secretos, los archivos de habilidades y los archivos de chat de tu bóveda.",
+		"clear_label": "Limpiar",
+		"clear_modal": {
+			"title": "Limpiar datos del plugin",
+			"description": "¿Eliminar la configuración del plugin y los datos de índice generados? Se conservarán los secretos, los archivos de habilidades y los archivos de chat de tu bóveda."
+		},
+		"verbose": "Registro en la consola de desarrollador",
+		"verbose_desc": "Activa el registro detallado en la consola de desarrollador.",
+		"cleared": "Datos del plugin eliminados.",
+		"cleared_partial": "Datos del plugin eliminados, pero no se pudieron eliminar los vectores guardados de {indexes}. Consulta la consola para más detalles.",
+		"clear_failed": "No se pudieron limpiar los datos del plugin"
+	},
+	"providers": {
+		"auth_failed": "Error de autenticación",
+		"checking_auth": "Comprobando autenticación",
+		"authenticated": "Autenticado. Haz clic para reintentar la conexión",
+		"auth_error_retry": "{message}. Haz clic para reintentar la conexión",
+		"trusted": "De confianza para notas privadas",
+		"configure": "Configurar proveedor",
+		"remove": "Quitar proveedor",
+		"remove_failed": "No se pudo quitar el proveedor",
+		"delete_embeddings": "Eliminar también los embeddings creados con este proveedor",
+		"delete_embeddings_desc": {
+			"one": "Libera el almacenamiento que ocupa {formatted} nota indexada. Déjalo desactivado para conservarlos: si vuelves a añadir este proveedor, se reutilizan en lugar de recalcular los embeddings, lo que puede ser lento y costoso.",
+			"many": "Libera el almacenamiento que ocupan {formatted} notas indexadas. Déjalo desactivado para conservarlos: si vuelves a añadir este proveedor, se reutilizan en lugar de recalcular los embeddings, lo que puede ser lento y costoso.",
+			"other": "Libera el almacenamiento que ocupan {formatted} notas indexadas. Déjalo desactivado para conservarlos: si vuelves a añadir este proveedor, se reutilizan en lugar de recalcular los embeddings, lo que puede ser lento y costoso."
+		},
+		"embeddings_kept_starting": "Proveedor quitado. Sus embeddings se conservaron: el servicio de índices aún se está iniciando.",
+		"embeddings_delete_failed": {
+			"one": "Proveedor quitado, pero no se pudieron eliminar {failed} de {count} índice de embeddings: {ids}. Consulta la consola para más detalles.",
+			"many": "Proveedor quitado, pero no se pudieron eliminar {failed} de {count} índices de embeddings: {ids}. Consulta la consola para más detalles.",
+			"other": "Proveedor quitado, pero no se pudieron eliminar {failed} de {count} índices de embeddings: {ids}. Consulta la consola para más detalles."
+		},
+		"advanced": "Avanzado"
+	},
+	"embedding_index": {
+		"heading": "Índices de embeddings",
+		"description_search": "Los índices de embeddings hacen posible la búsqueda semántica en tus notas.",
+		"description_graph": "Los índices de embeddings hacen posibles las funciones semánticas del grafo en tus notas.",
+		"group_search": "Índice de embeddings de búsqueda",
+		"group_graph": "Índice de embeddings del grafo",
+		"empty": "Aún no hay índices de embeddings configurados.",
+		"add": "Añadir índice",
+		"notes_indexed": {
+			"one": "{count} nota indexada",
+			"many": "{count} notas indexadas",
+			"other": "{count} notas indexadas"
+		},
+		"use_as_search": "Usar {model} como índice de búsqueda",
+		"use_as_graph": "Usar {model} como índice del grafo",
+		"view_report": "Ver informe de indexación",
+		"export": "Exportar índice a un archivo",
+		"delete": "Eliminar índice",
+		"delete_failed": "No se pudo eliminar este índice: {error}",
+		"memory_on_mobile": "Memoria en móvil"
+	},
+	"orphaned": {
+		"name": "Bases de datos vectoriales huérfanas",
+		"legacy": "{label} (datos antiguos del grafo)",
+		"chunks": {
+			"one": "{id} ({count} fragmento)",
+			"many": "{id} ({count} fragmentos)",
+			"other": "{id} ({count} fragmentos)"
+		},
+		"summary": {
+			"one": "{count} base de datos guardada ya no pertenece a ningún índice de embeddings configurado{size}: {list}.",
+			"many": "{count} bases de datos guardadas ya no pertenecen a ningún índice de embeddings configurado{size}: {list}.",
+			"other": "{count} bases de datos guardadas ya no pertenecen a ningún índice de embeddings configurado{size}: {list}."
+		},
+		"size": " (al menos {size} de vectores)",
+		"origin_usage": "El almacenamiento de Obsidian en este dispositivo suma {size} entre todas las bóvedas.",
+		"confirm_title": "¿Eliminar índices huérfanos?",
+		"confirm_desc": {
+			"one": "Esto elimina de forma permanente {count} base de datos guardada que no usa ningún índice de embeddings configurado. Si más adelante vuelves a añadir uno de estos modelos, su índice se reconstruirá desde cero.",
+			"many": "Esto elimina de forma permanente {count} bases de datos guardadas que no usa ningún índice de embeddings configurado. Si más adelante vuelves a añadir uno de estos modelos, su índice se reconstruirá desde cero.",
+			"other": "Esto elimina de forma permanente {count} bases de datos guardadas que no usa ningún índice de embeddings configurado. Si más adelante vuelves a añadir uno de estos modelos, su índice se reconstruirá desde cero."
+		},
+		"deleted": {
+			"one": "Se eliminó {count} índice huérfano.",
+			"many": "Se eliminaron {count} índices huérfanos.",
+			"other": "Se eliminaron {count} índices huérfanos."
+		},
+		"deleted_partial": "Se eliminaron {deleted}; no se pudieron eliminar {failed}: {reason}",
+		"delete_button": "Eliminar índices huérfanos"
+	},
+	"secret_select": {
+		"nothing_selected": "(Nada seleccionado)",
+		"add_tooltip": "Añadir nuevo secreto",
+		"missing": "No se encontró el secreto «{id}» en el llavero de Obsidian.",
+		"add_action": "Añadir un secreto"
+	},
+	"model_control": {
+		"loading": "Cargando modelos…"
+	},
+	"managed_entity": {
+		"select": "Seleccionar {name}"
+	},
+	"filter": {
+		"type_folder": "Carpeta",
+		"type_tag": "Etiqueta",
+		"type_extension": "Extensión",
+		"type_property": "Propiedad",
+		"all_of": "TODAS",
+		"any_of": "CUALQUIERA",
+		"none_of": "NINGUNA",
+		"remove_condition": "Quitar condición",
+		"property_placeholder": "nombre de la propiedad",
+		"any_value": "cualquier valor",
+		"no_properties": "No se encontraron propiedades en la bóveda; escribe un nombre para usarlo igualmente.",
+		"live_placeholder": "Haz una selección en el grafo",
+		"add_condition": "Condición",
+		"add_group": "Grupo"
+	}
+}

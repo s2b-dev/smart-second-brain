@@ -3,6 +3,7 @@ import { useResizeObserver } from "runed";
 import type { ChatAttachment } from "../../types/shared";
 import Button from "../ui/Button.svelte";
 import MarkdownRenderer from "../ui/MarkdownRenderer.svelte";
+import { t } from "../../i18n";
 
 interface Props {
 	content: string;
@@ -68,8 +69,8 @@ function handleClick(evt: MouseEvent) {
     >
       <Button
         iconId="chevron-down"
-        ariaLabel={isExpanded ? "Collapse message" : "Expand message"}
-        tooltip={isExpanded ? "Collapse message" : "Expand message"}
+        ariaLabel={isExpanded ? t("chat.message.collapse") : t("chat.message.expand")}
+        tooltip={isExpanded ? t("chat.message.collapse") : t("chat.message.expand")}
         iconSize="xs"
         styles="s2b-transition-transform s2b-duration-200 {isExpanded ? 's2b-rotate-180' : ''}"
         onClick={(e) => {

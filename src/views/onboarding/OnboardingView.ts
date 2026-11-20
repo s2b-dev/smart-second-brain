@@ -1,4 +1,5 @@
 import QueryClientProvider from "../../lib/QueryClientProvider.svelte";
+import { t } from "../../i18n";
 import type SecondBrainPlugin from "../../main";
 import { SvelteItemView } from "../SvelteItemView";
 import OnboardingComponent from "./Onboarding.svelte";
@@ -11,7 +12,7 @@ export class OnboardingView extends SvelteItemView {
 	}
 
 	getDisplayText(): string {
-		return "Welcome";
+		return t("onboarding.view.tab_title");
 	}
 
 	getIcon(): string {

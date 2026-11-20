@@ -32,6 +32,7 @@ import {
 	createTransportedChatOpenAIResponses,
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
+import { t } from "../i18n";
 
 // =============================================================================
 // Constants
@@ -99,7 +100,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 		],
 		link: {
 			url: "https://platform.openai.com/api-keys",
-			text: "OpenAI Dashboard",
+			text: t("plugin.providers.openai.link"),
 		},
 	},
 
@@ -109,7 +110,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 	oauth: {
 		label: "ChatGPT",
 		icon: "log-in",
-		description: "Open a browser window to complete ChatGPT/Codex authorization.",
+		description: t("plugin.providers.openai.oauth_desc"),
 		signIn: async () => {
 			await signInWithOpenAICodex();
 			return { kind: "session" };
@@ -125,22 +126,22 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 	// =========================================================================
 	auth: {
 		apiKey: {
-			label: "API Key",
-			description: "Your OpenAI API key for authentication",
+			label: t("plugin.providers.fields.api_key"),
+			description: t("plugin.providers.openai.api_key_desc"),
 			kind: "secret",
 			required: true,
 			placeholder: "sk-...",
 		},
 		baseUrl: {
-			label: "Base URL",
-			description: "Custom API endpoint (leave empty for default OpenAI)",
+			label: t("plugin.providers.fields.base_url"),
+			description: t("plugin.providers.openai.base_url_desc"),
 			kind: "text",
 			required: false,
 			placeholder: "https://api.openai.com/v1",
 		},
 		headers: {
-			label: "Custom Headers",
-			description: "Additional headers as JSON (optional)",
+			label: t("plugin.providers.fields.custom_headers"),
+			description: t("plugin.providers.fields.custom_headers_desc"),
 			kind: "textarea",
 			required: false,
 			placeholder: '{"X-Custom-Header": "value"}',
@@ -271,13 +272,13 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 		if (auth.authMode === "codex") {
 			const session = await getValidOpenAICodexSession();
 			if (!session) {
-				return { valid: false, error: "Sign in with ChatGPT to use OpenAI via Codex" };
+				return { valid: false, error: t("plugin.provider_auth.openai_codex_sign_in_required") };
 			}
 			return { valid: true };
 		}
 
 		if (!auth.apiKey?.trim()) {
-			return { valid: false, error: "API key is required" };
+			return { valid: false, error: t("plugin.provider_auth.api_key_required") };
 		}
 
 		const baseUrl =
@@ -301,7 +302,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			return { valid: false, error: `Connection failed: ${message}` };
+			return { valid: false, error: t("plugin.provider_auth.connection_failed", { error: message }) };
 		}
 
 		if (response.ok) {
@@ -323,10 +324,19 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 		}
 
 		if (response.status === 401 || response.status === 403 || errorCode === "invalid_api_key") {
-			return { valid: false, error: errorMessage || `Authentication failed (${response.status})` };
+			return {
+				valid: false,
+				error: errorMessage || t("plugin.provider_auth.auth_failed_status", { status: response.status }),
+			};
 		}
 
-		return { valid: false, error: errorMessage || errorBody || `Request failed with status ${response.status}` };
+		return {
+			valid: false,
+			error:
+				errorMessage ||
+				errorBody ||
+				t("plugin.provider_auth.request_failed_status", { status: response.status }),
+		};
 	},
 
 	discoverModels: async (auth: AuthObject): Promise<string[]> => {

@@ -1,0 +1,632 @@
+{
+	"editing": {
+		"label": "Редактирование сообщения",
+		"cancel": "Отменить редактирование"
+	},
+	"branch": {
+		"previous": "Предыдущая ветка",
+		"next": "Следующая ветка"
+	},
+	"message": {
+		"collapse": "Свернуть сообщение",
+		"expand": "Развернуть сообщение",
+		"wait_before_edit": "Дождитесь окончания текущего ответа, прежде чем редактировать",
+		"regenerate_failed": "Не удалось сгенерировать заново: {error}",
+		"retry_failed": "Не удалось повторить: {error}",
+		"branch_switch_failed": "Не удалось переключить ветку: {error}",
+		"unknown_error": "Неизвестная ошибка",
+		"copied": "Скопировано в буфер обмена",
+		"edit": "Изменить сообщение",
+		"copy": "Копировать сообщение",
+		"compaction_manual": "Ручное сжатие беседы",
+		"compaction_automatic": "Автоматическое сжатие беседы",
+		"regenerate": "Сгенерировать ответ заново",
+		"copy_response": "Копировать ответ",
+		"jump_to_bottom": "Перейти в конец"
+	},
+	"model_select": {
+		"tooltip": "Выбрать модель"
+	},
+	"attach": {
+		"tooltip": "Добавить контекст",
+		"from_device": "С устройства",
+		"take_photo": "Сделать фото",
+		"from_vault": "Из хранилища"
+	},
+	"running": {
+		"go_to": "Перейти к работающему чату: {name}"
+	},
+	"status": {
+		"request_failed": "Запрос к модели не удался.",
+		"error_title": "Что-то пошло не так",
+		"retry_aria": "Повторить этот запрос",
+		"retry_tooltip": "Повторно выполнить неудавшийся запрос",
+		"stopped": "Остановлено"
+	},
+	"embed": {
+		"open_chat": "Открыть чат",
+		"fallback_title": "Чат",
+		"empty": "В этом чате пока нет сообщений.",
+		"load_failed": "Не удалось загрузить предпросмотр чата."
+	},
+	"agent": {
+		"configure": "Настроить агента",
+		"options": "Параметры агента",
+		"edit": "Изменить агента",
+		"default_badge": "по умолчанию",
+		"create": "Создать агента",
+		"new": "Новый агент"
+	},
+	"todos": {
+		"all_done": "Все шаги выполнены",
+		"status_pending": "Не начато",
+		"status_in_progress": "В процессе",
+		"collapse": "Свернуть список задач",
+		"expand": "Развернуть список задач",
+		"progress": "{done} из {total}"
+	},
+	"pending": {
+		"count_create": {
+			"one": "{count} создание",
+			"few": "{count} создания",
+			"many": "{count} созданий",
+			"other": "{count} создания"
+		},
+		"count_update": {
+			"one": "{count} изменение",
+			"few": "{count} изменения",
+			"many": "{count} изменений",
+			"other": "{count} изменения"
+		},
+		"count_delete": {
+			"one": "{count} удаление",
+			"few": "{count} удаления",
+			"many": "{count} удалений",
+			"other": "{count} удаления"
+		},
+		"count_move": {
+			"one": "{count} перемещение",
+			"few": "{count} перемещения",
+			"many": "{count} перемещений",
+			"other": "{count} перемещения"
+		},
+		"summary_pending": "Ожидает: {composition}",
+		"summary_partially_applied": "Частично применено: {count}",
+		"type_create": "Создание",
+		"type_update": "Изменение",
+		"type_move": "Перемещение",
+		"notice_applied": "Применено: {path}",
+		"notice_apply_failed": "Не удалось применить изменение: {error}",
+		"notice_rejected": "Отклонено: {path}",
+		"notice_restored": "Восстановлено: {path}",
+		"skip_conflict": "«{path}» оставлена без изменений — она изменилась после частичного применения изменения.",
+		"skip_missing": "Не удалось восстановить «{path}» — этой заметки больше нет. Всё применённое содержимое переместилось вместе с ней.",
+		"skip_failed": "Не удалось восстановить «{path}». Подробности в консоли.",
+		"notice_all_stale": "Все ожидающие изменения устарели — заметки изменились после того, как изменения были предложены. Отклоните их и попросите агента предложить изменения заново.",
+		"risk_deletions": {
+			"one": "{count} удаление заметки",
+			"few": "{count} удаления заметок",
+			"many": "{count} удалений заметок",
+			"other": "{count} удаления заметок"
+		},
+		"risk_deprivatizing_moves": {
+			"one": "{count} перемещение из закрытого расположения",
+			"few": "{count} перемещения из закрытого расположения",
+			"many": "{count} перемещений из закрытого расположения",
+			"other": "{count} перемещения из закрытого расположения"
+		},
+		"risk_join": "{first} и {second}",
+		"confirm_accept_all_title": "Принять все изменения?",
+		"confirm_accept_all_message": {
+			"one": "Этот пакет включает {risks}. Применить {count} изменение?",
+			"few": "Этот пакет включает {risks}. Применить все {count} изменения?",
+			"many": "Этот пакет включает {risks}. Применить все {count} изменений?",
+			"other": "Этот пакет включает {risks}. Применить все {count} изменения?"
+		},
+		"accept_all": "Принять все",
+		"skipped_stale_suffix": ", пропущено устаревших: {count}",
+		"notice_applied_one": "Изменение применено{skipped}",
+		"notice_applied_all": "Применены все изменения ({count}){skipped}",
+		"notice_applied_partial": "Применено изменений: {applied}{skipped}; не удалось: {failed}: {paths}",
+		"notice_apply_error": "Ошибка при применении изменений: {error}",
+		"notice_rejected_all": "Все ожидающие изменения отклонены",
+		"notice_restored_partial": "Частично изменённые заметки восстановлены",
+		"notice_rejected_all_head": "Все ожидающие изменения отклонены.",
+		"notice_undo_finished_head": "Отмена применённых изменений завершена.",
+		"notice_open_failed": "Не удалось открыть заметку для этого изменения.",
+		"collapse": "Свернуть ожидающие изменения",
+		"expand": "Развернуть ожидающие изменения",
+		"diff_mode_to_split": "Показывать сравнение в заметке в две панели",
+		"diff_mode_to_word": "Показывать сравнение в заметке по словам в тексте",
+		"diff_mode_toggle": "Переключить режим сравнения",
+		"accept_all_tooltip": "Принять все изменения",
+		"reject_all_tooltip": "Отклонить все изменения и восстановить частично изменённые заметки",
+		"undo_applied_tooltip": "Вернуть частично изменённым заметкам исходное содержимое",
+		"reject_all": "Отклонить все",
+		"undo_applied": "Отменить применённое",
+		"hide_widget_preview": "Скрыть предпросмотр виджета",
+		"preview_widget": "Предпросмотр виджета",
+		"hide_changes": "Скрыть изменения",
+		"show_changes": "Показать изменения",
+		"hide_content": "Скрыть содержимое",
+		"show_content": "Показать содержимое",
+		"hide_widget_preview_aria": "Скрыть предпросмотр {path}",
+		"preview_widget_aria": "Предпросмотр {path}",
+		"hide_changes_aria": "Скрыть изменения в {path}",
+		"show_changes_aria": "Показать изменения в {path}",
+		"hide_content_aria": "Скрыть содержимое {path}",
+		"show_content_aria": "Показать содержимое {path}",
+		"partly_applied_explanation": "Часть этого изменения уже применена к заметке. Отмените её, чтобы вернуть исходное содержимое заметки.",
+		"partly_applied": "Применено частично",
+		"stale_delete_explanation": "Эта заметка изменилась после того, как было предложено удаление, — предпросмотр больше не соответствует тому, что будет удалено. Принять не получится; отклоните и попросите агента предложить удаление заново.",
+		"stale_explanation": "Эта заметка изменилась после того, как было предложено изменение, поэтому принять его не получится. Отклоните его и попросите агента заново применить правку к текущему содержимому.",
+		"stale": "Устарело",
+		"deprivatizing_explanation": "Сейчас эта заметка закрыта. Перемещение в это расположение выводит её из-под фильтра конфиденциальности, поэтому с этого момента она будет индексироваться, находиться поиском и станет доступна недоверенным провайдерам.",
+		"deprivatizing": "Перестаёт быть закрытой",
+		"cross_thread_explanation": {
+			"one": "Ещё в {count} чате есть ожидающее изменение этого файла. Применится то, которое будет принято первым; остальные затем могут не примениться.",
+			"few": "Ещё в {count} чатах есть ожидающие изменения этого файла. Применится то, которое будет принято первым; остальные затем могут не примениться.",
+			"many": "Ещё в {count} чатах есть ожидающие изменения этого файла. Применится то, которое будет принято первым; остальные затем могут не примениться.",
+			"other": "Ещё в {count} чата есть ожидающие изменения этого файла. Применится то, которое будет принято первым; остальные затем могут не примениться."
+		},
+		"stale_accept_disabled": "Невозможно принять — заметка изменилась после того, как было сделано это предложение. Отклоните его и попросите агента предложить изменение заново.",
+		"accept_change": "Принять изменение",
+		"accept_change_aria": "Принять изменение в {path}",
+		"reject_change": "Отклонить изменение",
+		"reject_change_aria": "Отклонить изменение в {path}",
+		"undo_applied_change_tooltip": "Вернуть этой заметке содержимое, которое было до предложения",
+		"undo_applied_change_aria": "Отменить применённое изменение в {path}",
+		"hide_source_changes": "Скрыть изменения исходного кода",
+		"show_source_changes": "Показать изменения исходного кода",
+		"note_empty": "Эта заметка пуста.",
+		"no_remaining_differences": "Различий не осталось.",
+		"accept_hunk": "Принять это изменение",
+		"accept_hunk_aria": "Принять изменение {index} из {total}",
+		"reject_hunk": "Отклонить это изменение",
+		"reject_hunk_aria": "Отклонить изменение {index} из {total}",
+		"hunk_too_large": "Это изменение слишком большое для предпросмотра здесь — откройте заметку, чтобы просмотреть его."
+	},
+	"question": {
+		"send_failed": "Не удалось отправить ваш ответ",
+		"group_aria": "Вопрос от агента",
+		"position": "Вопрос {index} из {total}",
+		"label": "Вопрос",
+		"dismiss_aria": "Закрыть вопрос",
+		"dismiss_tooltip": "Закрыть без ответа",
+		"multi_hint": "Выберите все подходящие варианты",
+		"custom_placeholder": "Другое…",
+		"answer_placeholder": "Введите ответ…",
+		"custom_aria": "Ваш собственный ответ",
+		"send_answers": "Отправить ответы",
+		"send_answer": "Отправить ответ",
+		"unrenderable": "Агент задал вопрос, который не удалось отобразить.",
+		"retry": "Попробовать ещё раз"
+	},
+	"context_usage": {
+		"row_system": "Системный промпт",
+		"row_human": "Ваши сообщения",
+		"row_assistant": "Ассистент",
+		"row_tool": "Результаты инструментов",
+		"row_draft": "Черновик и ожидающее",
+		"tooltip_unknown_limit": "Использование контекста (оценка): {used} тыс. токенов (лимит неизвестен)",
+		"tooltip": "Использование контекста (оценка): {percent}% ({used} тыс. / {limit} тыс.)",
+		"line_unknown_limit": "{tokens} токенов · лимит неизвестен",
+		"line": "{tokens} из {limit} токенов",
+		"compaction_unknown_short": "Для автосжатия нужен известный лимит",
+		"compaction_unknown_long": "Для автоматической суммаризации нужна модель с известным лимитом контекста.",
+		"compaction_short": "Автосжатие при {tokens}{percent}",
+		"compaction_long": "Старые сообщения автоматически суммируются при достижении {tokens} токенов{percent}.",
+		"trigger_aria": "Открыть распределение токенов контекста",
+		"heading": "Использование контекста (оценка)",
+		"summarize_now": "Суммировать сейчас",
+		"summarize_now_tooltip": "Суммировать старые сообщения сейчас",
+		"nothing_to_summarize": "Пока нечего суммировать"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "Чем ты можешь мне помочь?",
+		"suggestion_summarize_recent": "Кратко перескажи мои последние заметки",
+		"suggestion_find_notes": "Найди заметки на определённую тему",
+		"suggestion_find_notes_query": "Найди мои заметки на тему: ",
+		"suggestion_tasknotes": "Какие задачи нужно сделать на этой неделе?",
+		"suggestion_tasks": "Какие задачи просрочены?",
+		"suggestion_dataview": "Покажи таблицу моих заметок по тегам",
+		"skills_initializing": "Навыки ещё инициализируются — попробуйте чуть позже.",
+		"skill_create_failed_detail": "Не удалось создать навык для {name}: {error}",
+		"skill_create_failed": "Не удалось создать навык для {name}.",
+		"open_agent_skills": "Открыть навыки агента",
+		"enabled_notice": "{name} включён для агента {agent}.",
+		"greeting_title": "Начните новую беседу",
+		"greeting_sub": "Спросите меня о чём угодно в ваших заметках.",
+		"add_provider_title": "Добавьте ИИ-провайдера",
+		"add_provider_sub": "Подключите провайдера, чтобы начать общение.",
+		"select_model_title": "Выберите модель для чата",
+		"select_model_sub": "Выберите модель, чтобы начать общение.",
+		"dismiss_suggestion_aria": "Скрыть «{label}»",
+		"stale_agent_not_updated_before": "Версия по умолчанию ({label}) изменилась, но копию агента ",
+		"stale_agent_not_updated_after": " не удалось обновить автоматически.",
+		"stale_not_updated": "Версия по умолчанию ({label}) изменилась, но вашу копию не удалось обновить автоматически.",
+		"stale_agent_kept_before": "Версия по умолчанию ({label}) изменилась. Изменённая версия агента ",
+		"stale_agent_kept_after": " сохранена.",
+		"stale_kept": "Версия по умолчанию ({label}) изменилась. Ваша изменённая версия сохранена.",
+		"review": "Просмотреть",
+		"dismiss_notice_aria": "Скрыть уведомление об обновлении: {label}",
+		"dismiss_notice": "Скрыть это уведомление",
+		"nudges_summary_before": "Интеграций с плагинами, доступных для этого агента: ",
+		"nudges_summary_after": {
+			"one": ".",
+			"few": ".",
+			"many": ".",
+			"other": "."
+		},
+		"dismiss_all_nudges_aria": "Скрыть все предложения интеграций с плагинами ({count})",
+		"dismiss_all_nudges_tooltip": "Скрыть все предложения ({count})",
+		"dismiss_all": "Скрыть все",
+		"nudge_before": "Включите навык ",
+		"nudge_after": " для этого агента.",
+		"enable": "Включить",
+		"dismiss_nudge_aria": "Скрыть предложение {name}",
+		"dismiss_nudge": "Скрыть это предложение",
+		"show_less": "Свернуть",
+		"dismiss_all_aria": "Скрыть все предложения",
+		"stale_label": {
+			"system_prompt": "системный промпт",
+			"skill": "навык «{name}»"
+		}
+	},
+	"context_tray": {
+		"attachment_open": "{path} (нажмите, чтобы открыть)",
+		"remove_attachment": "Удалить вложение",
+		"remove_attachment_aria": "Удалить {name}",
+		"note_excluded": "{path} (исключена — нажмите, чтобы добавить как ссылку)",
+		"note_included": "{path} (открытая заметка — нажмите, чтобы исключить)",
+		"attach_full_content": "Прикрепить к сообщению полное содержимое",
+		"graph_collapse": "Выделение на графе — нажмите, чтобы свернуть",
+		"graph_topic_expand": "{topic} — нажмите, чтобы развернуть",
+		"graph_notes_expand": {
+			"one": "{count} заметка с графа — нажмите, чтобы развернуть",
+			"few": "{count} заметки с графа — нажмите, чтобы развернуть",
+			"many": "{count} заметок с графа — нажмите, чтобы развернуть",
+			"other": "{count} заметки с графа — нажмите, чтобы развернуть"
+		},
+		"graph_notes_label": {
+			"one": "{count} заметка с графа",
+			"few": "{count} заметки с графа",
+			"many": "{count} заметок с графа",
+			"other": "{count} заметки с графа"
+		},
+		"remove_graph_notes": "Убрать все заметки с графа",
+		"graph_member": "{path} (с графа — нажмите, чтобы исключить)",
+		"selection": "Выделенный текст из {path} (нажмите, чтобы убрать)\n\n{text}",
+		"selection_long": "Длинное выделение — будет обрезано, чтобы поместиться в контекст модели"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "Поиск в заметках: {target}",
+				"done": "Выполнен поиск в заметках: {target}"
+			},
+			"recent_notes": {
+				"running": "Просмотр недавних заметок",
+				"done": "Просмотрены недавние заметки"
+			},
+			"search_notes": {
+				"running": "Поиск в заметках",
+				"done": "Выполнен поиск в заметках"
+			},
+			"grep_for": {
+				"running": "Поиск текста {target}",
+				"done": "Выполнен поиск текста {target}"
+			},
+			"grep": {
+				"running": "Поиск по тексту заметок",
+				"done": "Выполнен поиск по тексту заметок"
+			},
+			"list_folder": {
+				"running": "Просмотр папки {target}",
+				"done": "Просмотрена папка {target}"
+			},
+			"list_vault": {
+				"running": "Просмотр хранилища",
+				"done": "Просмотрено хранилище"
+			},
+			"read_target": {
+				"running": "Чтение: {target}",
+				"done": "Прочитано: {target}"
+			},
+			"read_note": {
+				"running": "Чтение заметки",
+				"done": "Прочитана заметка"
+			},
+			"edit_notes": {
+				"running": "Редактирование заметок",
+				"done": "Заметки отредактированы"
+			},
+			"edit_note": {
+				"running": "Редактирование заметки",
+				"done": "Заметка отредактирована"
+			},
+			"run_javascript": {
+				"running": "Выполнение JavaScript",
+				"done": "JavaScript выполнен"
+			},
+			"list_tags": {
+				"running": "Получение списка всех тегов",
+				"done": "Получен список всех тегов"
+			},
+			"read_properties_of": {
+				"running": "Чтение свойств: {target}",
+				"done": "Прочитаны свойства: {target}"
+			},
+			"read_properties": {
+				"running": "Чтение свойств заметок",
+				"done": "Прочитаны свойства заметок"
+			},
+			"fetch_target": {
+				"running": "Загрузка: {target}",
+				"done": "Загружено: {target}"
+			},
+			"fetch_page": {
+				"running": "Загрузка страницы",
+				"done": "Страница загружена"
+			},
+			"web_search_for": {
+				"running": "Поиск в интернете: {target}",
+				"done": "Выполнен поиск в интернете: {target}"
+			},
+			"web_search": {
+				"running": "Поиск в интернете",
+				"done": "Выполнен поиск в интернете"
+			},
+			"load_skill_target": {
+				"running": "Загрузка навыка {target}",
+				"done": "Загружен навык {target}"
+			},
+			"load_skill": {
+				"running": "Загрузка навыка",
+				"done": "Навык загружен"
+			},
+			"update_todos": {
+				"running": "Обновление списка задач",
+				"done": "Список задач обновлён"
+			},
+			"clear_todos": {
+				"running": "Очистка списка задач",
+				"done": "Список задач очищен"
+			},
+			"ask_target": {
+				"running": "Вопрос: {target}",
+				"done": "Задан вопрос: {target}"
+			},
+			"generic_target": {
+				"running": "Использование {name}: {target}",
+				"done": "Использован {name}: {target}"
+			},
+			"generic": {
+				"running": "Использование {name}",
+				"done": "Использован {name}"
+			}
+		},
+		"count": {
+			"note": {
+				"one": "{count} заметка",
+				"few": "{count} заметки",
+				"many": "{count} заметок",
+				"other": "{count} заметки"
+			},
+			"match": {
+				"one": "{count} совпадение",
+				"few": "{count} совпадения",
+				"many": "{count} совпадений",
+				"other": "{count} совпадения"
+			},
+			"file": {
+				"one": "{count} файл",
+				"few": "{count} файла",
+				"many": "{count} файлов",
+				"other": "{count} файла"
+			},
+			"folder": {
+				"one": "{count} папка",
+				"few": "{count} папки",
+				"many": "{count} папок",
+				"other": "{count} папки"
+			},
+			"line": {
+				"one": "{count} строка",
+				"few": "{count} строки",
+				"many": "{count} строк",
+				"other": "{count} строки"
+			},
+			"tag": {
+				"one": "{count} тег",
+				"few": "{count} тега",
+				"many": "{count} тегов",
+				"other": "{count} тега"
+			},
+			"result": {
+				"one": "{count} результат",
+				"few": "{count} результата",
+				"many": "{count} результатов",
+				"other": "{count} результата"
+			},
+			"question": {
+				"one": "{count} вопрос",
+				"few": "{count} вопроса",
+				"many": "{count} вопросов",
+				"other": "{count} вопроса"
+			},
+			"operation": {
+				"one": "{count} операция",
+				"few": "{count} операции",
+				"many": "{count} операций",
+				"other": "{count} операции"
+			},
+			"item": {
+				"one": "{count} элемент",
+				"few": "{count} элемента",
+				"many": "{count} элементов",
+				"other": "{count} элемента"
+			},
+			"row": {
+				"one": "{count} строка",
+				"few": "{count} строки",
+				"many": "{count} строк",
+				"other": "{count} строки"
+			},
+			"field": {
+				"one": "{count} поле",
+				"few": "{count} поля",
+				"many": "{count} полей",
+				"other": "{count} поля"
+			}
+		},
+		"found": "найдено: {items}",
+		"found_no_matches": "совпадений не найдено",
+		"found_in": "найдено: {items}, файлы: {files}",
+		"found_folders_and_files": "найдено: {folders} и {files}",
+		"truncated": "{lines} (обрезано)",
+		"operations_across": "{operations} ({notes})",
+		"errored": "ошибка",
+		"logged": "выведено: {lines}",
+		"returned_value": "вернул значение",
+		"duration_ms": "за {ms} мс",
+		"todos_done": "выполнено {done} из {total}",
+		"dismissed": "закрыт",
+		"answered_in_chat": "ответ дан в чате",
+		"answered": "ответ получен",
+		"failed": "сбой",
+		"lines_total": "всего: {lines}",
+		"list_separator": ", ",
+		"list_and": "{list} и {last}",
+		"list_and_more": "{list} и ещё {count}",
+		"tool_fallback": "Инструмент"
+	},
+	"tool_output": {
+		"key_count": {
+			"one": "{count} ключ",
+			"few": "{count} ключа",
+			"many": "{count} ключей",
+			"other": "{count} ключа"
+		}
+	},
+	"tools": {
+		"review_accepted": "принято: {count}",
+		"review_partial": "применено частично: {count}",
+		"review_rejected": "отклонено: {count}",
+		"review_pending": "ожидает проверки: {count}",
+		"label_with_outcome": "{label}, {outcome}",
+		"source_note": "Заметка",
+		"phase_summarizing": "Суммирование ранних сообщений",
+		"phase_running_tools": {
+			"one": "Выполняется {count} инструмент",
+			"few": "Выполняются {count} инструмента",
+			"many": "Выполняются {count} инструментов",
+			"other": "Выполняются {count} инструмента"
+		},
+		"phase_loading_model": "Загрузка модели",
+		"phase_waiting": "Ожидание модели",
+		"phase_writing": "Написание ответа",
+		"phase_thinking": "Размышление",
+		"running_label": "{phase}… {seconds} с",
+		"settled_label": "Размышление: {seconds} с",
+		"via_subagent": "через {name}",
+		"input": "Вход",
+		"output": "Выход",
+		"no_output": "(нет вывода)",
+		"result": "Результат",
+		"tree_more_files": {
+			"one": "+ещё {count} файл",
+			"few": "+ещё {count} файла",
+			"many": "+ещё {count} файлов",
+			"other": "+ещё {count} файла"
+		},
+		"tree_unlisted_files": {
+			"one": "{count} файл не показан",
+			"few": "{count} файла не показаны",
+			"many": "{count} файлов не показаны",
+			"other": "{count} файла не показаны"
+		},
+		"no_answer": "Нет ответа",
+		"dismissed_without_answer": "Закрыт без ответа.",
+		"chip_query": "запрос: {value}",
+		"chip_algorithm": "алгоритм: {value}",
+		"chip_results": "результаты: {value}",
+		"chip_shown": "показано: {value}",
+		"chip_recent_only": "только недавние",
+		"chip_skipped_private": "пропущено закрытых: {value}",
+		"untitled": "Без названия",
+		"more_results": {
+			"one": "+ещё {count} результат",
+			"few": "+ещё {count} результата",
+			"many": "+ещё {count} результатов",
+			"other": "+ещё {count} результата"
+		},
+		"chip_root": "корень: {value}",
+		"chip_folders": "папки: {value}",
+		"chip_files": "файлы: {value}",
+		"chip_depth": "глубина: {value}",
+		"chip_folders_only": "только папки",
+		"chip_collapsed": "свёрнуто",
+		"tree": "Дерево",
+		"chip_operations": "операции: {value}",
+		"chip_paths": "пути: {value}",
+		"chip_truncated": "обрезано",
+		"chip_logs": "журнал: {value}",
+		"chip_error": "ошибка",
+		"chip_return_value": "возвращаемое значение",
+		"console_output": "Вывод консоли",
+		"return_value": "Возвращаемое значение",
+		"executed_code": "Выполненный код",
+		"raw_output": "Необработанный вывод"
+	},
+	"input": {
+		"drop_files": "Перетащите файлы сюда",
+		"send_shortcut_hint": "↵ · {shortcut} в списке",
+		"edit_attachment_missing": "Вложения «{name}» больше нет в хранилище — оно не войдёт в отредактированное сообщение.",
+		"select_model_to_send": "Выберите модель для чата, чтобы отправить сообщение.",
+		"placeholder": "Спросите о своих заметках...",
+		"wait_for_attachments": "Дождитесь окончания сохранения вложений",
+		"select_model_before_sending": "Выберите модель для чата перед отправкой.",
+		"empty_before_sending": "Добавьте текст или прикрепите файл перед отправкой",
+		"empty_before_saving": "Добавьте текст или прикрепите файл перед сохранением",
+		"select_model_before_saving": "Выберите модель для чата перед сохранением.",
+		"save_edit_failed": "Не удалось сохранить правку",
+		"not_ready": "Чат ещё не готов",
+		"question_blocks_attachments": "Ответьте на вопрос агента или закройте его, прежде чем прикреплять файлы",
+		"send_failed": "Не удалось отправить сообщение",
+		"summarize_failed": "Не удалось суммировать историю",
+		"unsupported_file_type": "Неподдерживаемый тип файла: .{ext}",
+		"the_selected_model": "выбранная модель",
+		"vision_required_switch": "Для вложений-изображений нужна модель со зрением. Смените модель, чтобы прикреплять изображения (текущая: {model}).",
+		"vision_unknown": "Неизвестно, поддерживает ли модель зрение; анализ изображений с этой моделью может не сработать.",
+		"file_too_large": "Файл слишком большой: {name} превышает лимит 15 МБ на файл.",
+		"total_too_large": "Общий размер вложений превышает лимит 25 МБ на одно сообщение.",
+		"attach_failed": "Не удалось прикрепить файл: {error}",
+		"vision_required": "Для вложений-изображений нужна модель со зрением (текущая: {model}).",
+		"switch_model": "Сменить модель",
+		"already_attached": "{name} уже прикреплён.",
+		"wait_for_current_attachments": "Дождитесь окончания сохранения текущих вложений.",
+		"file_not_found": "Файл не найден: {path}",
+		"only_files": "Прикреплять можно только файлы: {path}",
+		"picker_placeholder": "Поиск файлов хранилища для прикрепления...",
+		"picker_verb": "Прикрепить",
+		"current_model": "текущая модель",
+		"drag_images_unsupported": "{model} не поддерживает изображения. Переключитесь на модель со зрением.",
+		"drag_some_unsupported": "Некоторые файлы могут не поддерживаться (принимаются: txt, md, csv, json, изображения, pdf).",
+		"retry_connection": "Нажмите, чтобы повторить подключение",
+		"provider_unreachable": "Не удаётся подключиться к {provider} — нажмите, чтобы повторить",
+		"saving": "Сохранение...",
+		"save_edit_aria": "сохранить правку",
+		"send_aria": "отправить сообщение",
+		"select_model_first": "Сначала выберите модель для чата",
+		"save_edit_with_hint": "Сохранить правку ({hint})",
+		"save_edit": "Сохранить правку",
+		"send_with_hint": "Отправить сообщение ({hint})",
+		"send": "Отправить сообщение",
+		"stop_aria": "остановить генерацию",
+		"stop": "Остановить генерацию"
+	},
+	"view": {
+		"session_unavailable": "Сеанс чата пока недоступен. Откройте это окно заново после завершения инициализации плагина."
+	}
+}

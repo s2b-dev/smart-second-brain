@@ -4,6 +4,7 @@ import Button from "../ui/Button.svelte";
 import RangeSlider from "../ui/RangeSlider.svelte";
 import Toggle from "../ui/Toggle.svelte";
 import SettingContainer from "../settings/SettingContainer.svelte";
+import { t } from "../../i18n";
 import { isMobileUI } from "../../utils/platform";
 import {
 	type SmartGraphSettings,
@@ -187,24 +188,24 @@ let inferredLinksOn = $derived(!(settings.linkOnlyTopics ?? false) && (settings.
 let inferredLinksHint = $derived.by(() => {
 	const total = graphData.nodes.length;
 	if (!hasGraphIndex) {
-		return "Connect notes by meaning as well as by the links you wrote. Needs a graph embedding index — pick one in the plugin's Graph settings.";
+		return t("graph.controls.inferred_hint.no_index");
 	}
 	if (!inferredLinksOn) {
 		// Only report link coverage when topics really are link-only. A stored
 		// half-state (hidden but still grouping) would make that number a lie.
 		if (!settings.linkOnlyTopics) {
-			return "Hidden, but still grouping notes. Toggle twice to exclude them from topics as well.";
+			return t("graph.controls.inferred_hint.hidden_still_grouping");
 		}
-		if (total === 0) return "Off — topics come from the links you wrote.";
+		if (total === 0) return t("graph.controls.inferred_hint.off");
 		const placed = graphData.nodes.filter((n) => n.cluster != null).length;
 		const percent = Math.round((placed / total) * 100);
-		return `Off — topics come from the links you wrote. Your links alone group ${placed} of ${total} notes (${percent}%); the other ${total - placed} are unlinked.`;
+		return t("graph.controls.inferred_hint.off_coverage", { placed, total, percent, unlinked: total - placed });
 	}
 	const inferred = graphData.edges.filter((e) => e.type === "semantic").length;
 	if (inferred === 0) {
-		return "Connect notes by meaning as well as by the links you wrote — needs a graph embedding index.";
+		return t("graph.controls.inferred_hint.on_no_edges");
 	}
-	return `Connect notes by meaning as well as by the links you wrote: ${inferred} similarity connections so unlinked notes still find a topic. Turn off to see what your own links cover.`;
+	return t("graph.controls.inferred_hint.on", { inferred });
 });
 
 function handleLinkDistanceChange(val: number) {
@@ -290,8 +291,8 @@ function handleResetDevSettings() {
 // the user cannot perform. Drop them on mobile rather than advertise a
 // non-existent affordance.
 const onMobile = isMobileUI();
-const fitTooltip = onMobile ? "Fit graph to view" : "Fit graph to view (F)";
-const lassoTooltip = onMobile ? "Lasso selection" : "Lasso selection (or hold Shift + drag)";
+const fitTooltip = onMobile ? t("graph.toolbar.fit") : t("graph.toolbar.fit_with_key");
+const lassoTooltip = onMobile ? t("graph.toolbar.lasso") : t("graph.toolbar.lasso_with_hint");
 
 // Pointer/keyboard focus on the topic-naming button, which turns the spinner
 // into a cancel control. Tracked here because Button exposes no hover state.
@@ -346,14 +347,14 @@ $effect(() => {
     <Button
       iconId="log-out"
       onClick={() => onExitImmerse?.()}
-      tooltip="Exit immerse — back to the full graph"
+      tooltip={t("graph.toolbar.exit_immerse")}
       styles="is-active"
     />
   {/if}
   <Button iconId="maximize" onClick={onFitToView} tooltip={fitTooltip} />
   <Button
     iconId="lasso"
-    tooltip={lassoMode ? "Exit lasso selection" : lassoTooltip}
+    tooltip={lassoMode ? t("graph.toolbar.exit_lasso") : lassoTooltip}
     onClick={() => onLassoModeChange?.(!lassoMode)}
     styles={lassoMode ? "is-active" : ""}
   />
@@ -369,8 +370,8 @@ $effect(() => {
   <Button
     iconId="wand-sparkles"
     tooltip={showTopics
-      ? "Hide topics — show the raw graph without clustering"
-      : "Show topics — colour notes by their detected topic"}
+      ? t("graph.toolbar.hide_topics")
+      : t("graph.toolbar.show_topics")}
     onClick={() => onSettingsChange({ showTopics: !showTopics })}
     styles={showTopics ? "is-active" : ""}
   />
@@ -385,12 +386,12 @@ $effect(() => {
   <Button
     iconId={isTopicsCollapsed ? "chevrons-up-down" : "chevrons-down-up"}
     tooltip={isLeidenRunning
-      ? "Computing topics…"
+      ? t("graph.toolbar.computing_topics")
       : !showTopics
-        ? "Turn topics on to collapse them"
+        ? t("graph.toolbar.collapse_needs_topics")
         : isTopicsCollapsed
-          ? "Expand all topics back into notes (S)"
-          : "Collapse all topics into single nodes (S) — or select topics and use Collapse"}
+          ? t("graph.toolbar.expand_all")
+          : t("graph.toolbar.collapse_all")}
     onClick={() => onToggleCollapseAll?.()}
     disabled={isLeidenRunning || !showTopics}
     styles={isTopicsCollapsed ? "is-active" : ""}
@@ -398,7 +399,7 @@ $effect(() => {
   <div class="toolbar-icon-wrapper">
     <Button
       iconId="sliders-horizontal"
-      tooltip={isCollapsed ? "Show graph panel" : "Hide graph panel"}
+      tooltip={isCollapsed ? t("graph.toolbar.show_panel") : t("graph.toolbar.hide_panel")}
       onClick={() => (isCollapsed = !isCollapsed)}
       styles={!isCollapsed ? "is-active" : ""}
     />
@@ -429,9 +430,9 @@ $effect(() => {
         {#if isLoading}
           <span class="loading-label">{loadingLabel}</span>
         {:else if graphStats}
-          {nodeCount} notes · {graphStats.unlinkedNotes} unlinked · {graphStats.wikiEdges} links{#if graphStats.semanticEdges > 0}{" "}· {graphStats.semanticEdges} inferred{/if}
+          {t("graph.controls.stats.notes", { count: nodeCount })} · {t("graph.controls.stats.unlinked", { count: graphStats.unlinkedNotes })} · {t("graph.controls.stats.links", { count: graphStats.wikiEdges })}{#if graphStats.semanticEdges > 0}{" "}· {t("graph.controls.stats.inferred", { count: graphStats.semanticEdges })}{/if}
         {:else}
-          {nodeCount} notes
+          {t("graph.controls.stats.notes", { count: nodeCount })}
         {/if}
       </span>
     </div>
@@ -448,7 +449,7 @@ $effect(() => {
          `--setting-items-*`. Using core's structure means the panel tracks the
          user's theme instead of approximating it. -->
     <div class="setting-group">
-      <SettingContainer name="Topics" isHeading />
+      <SettingContainer name={t("graph.controls.topics.heading")} isHeading />
       <div class="setting-items">
 
     <!-- Held back until the vault's levels are known: the slider's length is
@@ -458,10 +459,10 @@ $effect(() => {
            This changes how finely notes are grouped into topics — hence the
            separate `granularity*` vocabulary throughout. -->
       <SettingContainer
-        name="Granularity"
+        name={t("graph.controls.topics.granularity")}
         desc={onMobile
-          ? "Left: a few broad topics. Right: many specific ones. Every note stays visible."
-          : "Left: a few broad topics. Right: many specific ones. Every note stays visible. (↑/↓ on the graph)"}
+          ? t("graph.controls.topics.granularity_desc")
+          : t("graph.controls.topics.granularity_desc_with_keys")}
         compact
       >
         <RangeSlider
@@ -475,7 +476,11 @@ $effect(() => {
         />
       </SettingContainer>
     {:else}
-      <SettingContainer name="Granularity" desc="Working out this vault's topic levels…" compact>
+      <SettingContainer
+        name={t("graph.controls.topics.granularity")}
+        desc={t("graph.controls.topics.granularity_pending")}
+        compact
+      >
         <span class="granularity-pending">…</span>
       </SettingContainer>
     {/if}
@@ -488,7 +493,7 @@ $effect(() => {
          folds the live measurement into the same hover description, so the
          number is still there without this row growing an extra line and an
          affordance nothing else in the panel has. -->
-    <SettingContainer name="Inferred links" desc={inferredLinksHint} compact>
+    <SettingContainer name={t("graph.controls.topics.inferred_links")} desc={inferredLinksHint} compact>
       <!-- Disabled, not hidden, without a graph index: the stored value is kept
            (flipping it would silently rewrite settings on every open), the
            hint says what's missing, and the switch comes alive the moment an
@@ -508,9 +513,9 @@ $effect(() => {
       <!-- A heading row like the others, so the naming button lands in the
            control slot Obsidian already right-aligns rather than needing a
            bespoke flex row. -->
-      <SettingContainer name="Found · {segments.length}" isHeading class="s2b-section-heading--action">
+      <SettingContainer name={t("graph.controls.found.heading", { count: segments.length })} isHeading class="s2b-section-heading--action">
         {#snippet nameSuffix()}
-          {#if !onMobile}<span class="section-label-hint">shift/⌘ multi-select</span>{/if}
+          {#if !onMobile}<span class="section-label-hint">{t("graph.controls.found.multi_select_hint")}</span>{/if}
         {/snippet}
         <!-- The spinner doubles as the cancel control: hovering (or focusing)
              a live run swaps it for an X. Listeners go on the button itself
@@ -519,8 +524,8 @@ $effect(() => {
         <Button
           bind:element={labelButtonEl}
           iconId={showCancelLabeling ? "x" : isLabeling ? "loader" : "sparkles"}
-          ariaLabel={isLabeling ? "Cancel naming topics" : "Name topics with AI"}
-          tooltip={isLabeling ? "Cancel naming" : "Name topics with AI"}
+          ariaLabel={isLabeling ? t("graph.controls.found.cancel_naming_aria") : t("graph.controls.found.name_topics")}
+          tooltip={isLabeling ? t("graph.controls.found.cancel_naming") : t("graph.controls.found.name_topics")}
           onClick={() => (isLabeling ? onCancelLabeling?.() : onLabelTopics?.())}
           styles={isLabeling && !showCancelLabeling ? "s2b-is-spinning" : ""}
         />
@@ -548,11 +553,11 @@ $effect(() => {
          controls reached on every visit stay at the top, where the topic list
          can also sit directly under the settings that produce it. -->
     <div class="setting-group">
-      <SettingContainer name="Scope" isHeading />
+      <SettingContainer name={t("graph.controls.scope.heading")} isHeading />
       <div class="setting-items">
     <SettingContainer
-      name="Markdown only"
-      desc="Show only Markdown notes; off shows all indexable files"
+      name={t("graph.controls.scope.markdown_only")}
+      desc={t("graph.controls.scope.markdown_only_desc")}
       compact
     >
       <Toggle
@@ -561,8 +566,8 @@ $effect(() => {
       />
     </SettingContainer>
     <SettingContainer
-      name="Tags"
-      desc="Draw each tag as a node linked to the notes that carry it; shared tags also help shape topics"
+      name={t("graph.controls.scope.tags")}
+      desc={t("graph.controls.scope.tags_desc")}
       compact
     >
       <Toggle
@@ -577,11 +582,11 @@ $effect(() => {
     <!-- Purely how the graph above is drawn — nothing here changes which notes
          are included or how they group. -->
     <div class="setting-group">
-      <SettingContainer name="Display" isHeading />
+      <SettingContainer name={t("graph.controls.display.heading")} isHeading />
       <div class="setting-items">
     <SettingContainer
-      name="Topic regions"
-      desc="Tint the area behind each topic so groups read at a glance"
+      name={t("graph.controls.display.topic_regions")}
+      desc={t("graph.controls.display.topic_regions_desc")}
       compact
     >
       <Toggle
@@ -590,8 +595,8 @@ $effect(() => {
       />
     </SettingContainer>
     <SettingContainer
-      name="Topic labels"
-      desc="Show the topic name pills over the graph"
+      name={t("graph.controls.display.topic_labels")}
+      desc={t("graph.controls.display.topic_labels_desc")}
       compact
     >
       <Toggle
@@ -600,8 +605,8 @@ $effect(() => {
       />
     </SettingContainer>
     <SettingContainer
-      name="Direction arrows"
-      desc="Show arrows for directed wiki links"
+      name={t("graph.controls.display.direction_arrows")}
+      desc={t("graph.controls.display.direction_arrows_desc")}
       compact
     >
       <Toggle
@@ -618,12 +623,12 @@ $effect(() => {
          vanishes leaves the user hunting for a control they saw a moment ago,
          and the hint says which switch to flip to get it back. -->
     <SettingContainer
-      name="Highlight inferred links"
+      name={t("graph.controls.display.highlight_inferred")}
       desc={!hasGraphIndex
-        ? "Draw inferred links in the accent color. Needs a graph embedding index — pick one in the plugin's Graph settings."
+        ? t("graph.controls.display.highlight_inferred_desc_no_index")
         : inferredLinksOn
-          ? "Draw inferred links in the accent color so they stand apart from the links you wrote"
-          : "Draw inferred links in the accent color. Needs Inferred links (under Topics) turned on."}
+          ? t("graph.controls.display.highlight_inferred_desc")
+          : t("graph.controls.display.highlight_inferred_desc_off")}
       compact
     >
       <Toggle
@@ -633,8 +638,8 @@ $effect(() => {
       />
     </SettingContainer>
     <SettingContainer
-      name="Highlight isolated"
-      desc="Mark notes with no wiki links in accent color"
+      name={t("graph.controls.display.highlight_isolated")}
+      desc={t("graph.controls.display.highlight_isolated_desc")}
       compact
     >
       <Toggle
@@ -643,8 +648,8 @@ $effect(() => {
       />
     </SettingContainer>
     <SettingContainer
-      name="Highlight bridges"
-      desc="Mark notes that connect multiple topics in accent color"
+      name={t("graph.controls.display.highlight_bridges")}
+      desc={t("graph.controls.display.highlight_bridges_desc")}
       compact
     >
       <Toggle
@@ -670,7 +675,7 @@ $effect(() => {
   <BottomSheet
     open={!isCollapsed}
     onClose={() => (isCollapsed = true)}
-    ariaLabel="Graph settings"
+    ariaLabel={t("graph.controls.aria_label")}
   >
     {@render panelBody()}
   </BottomSheet>

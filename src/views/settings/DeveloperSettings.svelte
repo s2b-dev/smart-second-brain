@@ -1,5 +1,6 @@
 <script lang="ts">
 import { Notice } from "obsidian";
+import { t } from "../../i18n";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import SecretSelect from "../../components/settings/SecretSelect.svelte";
@@ -17,7 +18,7 @@ const plugin = getPlugin();
 const DEFAULT_LANGSMITH_ENDPOINT = "https://api.smith.langchain.com";
 let langSmithEndpointDraft = $state(pluginData.langSmithEndpoint);
 let langSmithCheckState = $state<"idle" | "pending" | "success" | "error">("idle");
-let langSmithCheckMessage = $state("Check LangSmith connection");
+let langSmithCheckMessage = $state(t("settings.developer.observability.check_idle"));
 
 $effect(() => {
 	if (langSmithCheckState !== "pending") {
@@ -46,7 +47,7 @@ function replayOnboardingIntro() {
 	// also closes Settings first (activateOnboardingView's own behavior), matching
 	// what a real first run looks like when the plugin is enabled from Settings.
 	void plugin.activateOnboardingView();
-	new Notice("Onboarding reset and reopened — the intro will replay from the start.");
+	new Notice(t("settings.developer.onboarding.reset_notice"));
 }
 
 function restoreDismissedRecommendations() {
@@ -54,8 +55,8 @@ function restoreDismissedRecommendations() {
 	pluginData.restoreDismissedRecommendations();
 	new Notice(
 		count > 0
-			? `Restored ${count} dismissed recommendation${count === 1 ? "" : "s"}.`
-			: "No dismissed recommendations to restore.",
+			? t("settings.developer.chat.restored_recommendations", { count })
+			: t("settings.developer.chat.no_recommendations"),
 	);
 }
 
@@ -64,8 +65,8 @@ function restoreIntegrationPrivacyWarning() {
 	pluginData.suppressIntegrationPrivacyWarning = false;
 	new Notice(
 		wasSuppressed
-			? "Integration privacy warning restored — it will show again next time an integration is enabled."
-			: "Integration privacy warning was not suppressed.",
+			? t("settings.developer.chat.privacy_warning_restored")
+			: t("settings.developer.chat.privacy_warning_not_suppressed"),
 	);
 }
 
@@ -90,7 +91,7 @@ async function handleCheckLangSmithConnection() {
 	const apiKey = pluginData.langSmithApiKey;
 	if (!pluginData.langSmithApiKeyId || !apiKey) {
 		langSmithCheckState = "error";
-		langSmithCheckMessage = "Select a LangSmith API key secret first";
+		langSmithCheckMessage = t("settings.developer.observability.check_no_key");
 		new Notice(langSmithCheckMessage);
 		return;
 	}
@@ -103,13 +104,13 @@ async function handleCheckLangSmithConnection() {
 		validationUrl = new URL("/api/v1/sessions?limit=1", `${endpoint}/`).toString();
 	} catch {
 		langSmithCheckState = "error";
-		langSmithCheckMessage = "Invalid LangSmith endpoint URL";
+		langSmithCheckMessage = t("settings.developer.observability.check_invalid_url");
 		new Notice(langSmithCheckMessage);
 		return;
 	}
 
 	langSmithCheckState = "pending";
-	langSmithCheckMessage = "Checking LangSmith connection...";
+	langSmithCheckMessage = t("settings.developer.observability.check_pending");
 
 	try {
 		const obsidianFetch = createObsidianFetch(window.fetch.bind(window));
@@ -123,7 +124,7 @@ async function handleCheckLangSmithConnection() {
 
 		if (response.ok) {
 			langSmithCheckState = "success";
-			langSmithCheckMessage = "LangSmith connection successful";
+			langSmithCheckMessage = t("settings.developer.observability.check_success");
 			new Notice(langSmithCheckMessage);
 			return;
 		}
@@ -131,40 +132,44 @@ async function handleCheckLangSmithConnection() {
 		const responseText = (await response.text()).trim();
 		if (response.status === 401 || response.status === 403) {
 			langSmithCheckState = "error";
-			langSmithCheckMessage = "LangSmith rejected the API key";
+			langSmithCheckMessage = t("settings.developer.observability.check_rejected");
 		} else if (response.status === 404) {
 			langSmithCheckState = "error";
-			langSmithCheckMessage = "LangSmith endpoint did not expose the expected API";
+			langSmithCheckMessage = t("settings.developer.observability.check_not_found");
 		} else {
 			langSmithCheckState = "error";
 			langSmithCheckMessage = responseText
-				? `LangSmith check failed (${response.status}): ${responseText}`
-				: `LangSmith check failed with status ${response.status}`;
+				? t("settings.developer.observability.check_failed_body", {
+						status: response.status,
+						body: responseText,
+					})
+				: t("settings.developer.observability.check_failed_status", { status: response.status });
 		}
 		new Notice(langSmithCheckMessage);
 	} catch (error) {
 		langSmithCheckState = "error";
-		langSmithCheckMessage = error instanceof Error ? error.message : "Failed to reach LangSmith";
-		new Notice(`LangSmith check failed: ${langSmithCheckMessage}`);
+		langSmithCheckMessage =
+			error instanceof Error ? error.message : t("settings.developer.observability.check_unreachable");
+		new Notice(t("settings.developer.observability.check_failed_notice", { message: langSmithCheckMessage }));
 	}
 }
 </script>
 
 <!-- Onboarding -->
-<SettingGroup heading="Onboarding">
+<SettingGroup heading={t("settings.developer.onboarding.heading")}>
   <SettingItem
-    name="Replay onboarding intro"
-    desc="Reset the splash animation and completion flags — the Welcome view plays its intro again, and auto-opens on startup as if this were a first run (until a provider is configured)."
+    name={t("settings.developer.onboarding.replay")}
+    desc={t("settings.developer.onboarding.replay_desc")}
   >
-    <Button buttonText="Reset intro" iconId="rotate-ccw" onClick={replayOnboardingIntro} />
+    <Button buttonText={t("settings.developer.onboarding.reset")} iconId="rotate-ccw" onClick={replayOnboardingIntro} />
   </SettingItem>
 </SettingGroup>
 
 <!-- Chat -->
-<SettingGroup heading="Chat">
+<SettingGroup heading={t("settings.developer.chat.heading")}>
   <SettingItem
-    name="Show raw tool input/output"
-    desc="Reveal the exact tool arguments and raw output blob in chat tool-call rows. Off by default — users see only the plain-language summary and the friendly structured result."
+    name={t("settings.developer.chat.raw_tool_io")}
+    desc={t("settings.developer.chat.raw_tool_io_desc")}
   >
     <Toggle
       checked={pluginData.showToolIODetails}
@@ -173,22 +178,22 @@ async function handleCheckLangSmithConnection() {
   </SettingItem>
 
   <SettingItem
-    name="Restore dismissed recommendations"
-    desc="Bring back every suggested query, plugin skill nudge, and updated-default notice dismissed from a new chat's empty state."
+    name={t("settings.developer.chat.restore_recommendations")}
+    desc={t("settings.developer.chat.restore_recommendations_desc")}
   >
     <Button
-      buttonText="Restore"
+      buttonText={t("settings.developer.chat.restore")}
       iconId="rotate-ccw"
       onClick={restoreDismissedRecommendations}
     />
   </SettingItem>
 
   <SettingItem
-    name="Restore integration privacy warning"
-    desc="Undo 'Don't ask again' on the warning shown before enabling a plugin integration's code-exec tool (it bypasses per-provider privacy rules)."
+    name={t("settings.developer.chat.restore_privacy_warning")}
+    desc={t("settings.developer.chat.restore_privacy_warning_desc")}
   >
     <Button
-      buttonText="Restore"
+      buttonText={t("settings.developer.chat.restore")}
       iconId="rotate-ccw"
       onClick={restoreIntegrationPrivacyWarning}
     />
@@ -196,10 +201,10 @@ async function handleCheckLangSmithConnection() {
 </SettingGroup>
 
 <!-- Observability -->
-<SettingGroup heading="Observability">
+<SettingGroup heading={t("settings.developer.observability.heading")}>
   <SettingItem
-    name="LangSmith integration"
-    desc="Enable LangSmith telemetry for debugging and tracing"
+    name={t("settings.developer.observability.langsmith")}
+    desc={t("settings.developer.observability.langsmith_desc")}
   >
     <Toggle
       checked={pluginData.enableLangSmith}
@@ -209,8 +214,8 @@ async function handleCheckLangSmithConnection() {
 
   {#if pluginData.enableLangSmith}
     <SettingItem
-      name="API key"
-      desc="Select an Obsidian keychain secret for LangSmith authentication"
+      name={t("settings.developer.observability.api_key")}
+      desc={t("settings.developer.observability.api_key_desc")}
     >
       <SecretSelect
         value={pluginData.langSmithApiKeyId}
@@ -219,7 +224,7 @@ async function handleCheckLangSmithConnection() {
       />
     </SettingItem>
 
-    <SettingItem name="Project name" desc="Project name to attribute runs">
+    <SettingItem name={t("settings.developer.observability.project")} desc={t("settings.developer.observability.project_desc")}>
       <Text
         placeholder="obsidian-agent"
         inputType="text"
@@ -228,11 +233,11 @@ async function handleCheckLangSmithConnection() {
       />
     </SettingItem>
 
-    <SettingItem name="Endpoint URL" desc="Override LangSmith API base URL (optional)">
+    <SettingItem name={t("settings.developer.observability.endpoint")} desc={t("settings.developer.observability.endpoint_desc")}>
       <div class="s2b-flex s2b-items-center s2b-gap-2 s2b-w-full">
         <Button
           iconId={getLangSmithCheckIcon()}
-          ariaLabel="Check LangSmith API key and endpoint"
+          ariaLabel={t("settings.developer.observability.check_aria")}
           tooltip={langSmithCheckMessage}
           styles={getLangSmithCheckButtonStyles()}
           disabled={langSmithCheckState === "pending"}

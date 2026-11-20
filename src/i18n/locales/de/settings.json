@@ -1,0 +1,235 @@
+{
+	"tabs": {
+		"general": "Allgemein",
+		"search": "Suche",
+		"agents": "Agenten",
+		"graph": "Graph",
+		"troubleshooting": "Fehlerbehebung",
+		"developer": "Entwickler"
+	},
+	"general": {
+		"providers": {
+			"heading": "Anbieter",
+			"description": "Anbieter verbinden Smart Second Brain mit den KI-Diensten für Chat, Embeddings und andere modellgestützte Funktionen.",
+			"empty": "Noch keine Anbieterinstanzen konfiguriert.",
+			"add": "Anbieter hinzufügen"
+		},
+		"privacy": {
+			"heading": "Datenschutz",
+			"note_access": "Richtlinie für Notizzugriff",
+			"note_access_desc": "Lege fest, ob nicht vertrauenswürdige Anbieter standardmäßig nichts oder alles sehen, und verwalte dann die passende Dateiliste.",
+			"manage": "Verwalten",
+			"check_updates": "Nach Updates suchen",
+			"check_updates_desc": "Einmal täglich die Versionsnummer dieses Plugins von GitHub abrufen und einen Hinweis anzeigen, wenn eine neuere verfügbar ist. Es werden keine Daten über dich oder deinen Tresor gesendet. Wird übersprungen, solange Obsidians eigene automatische Plugin-Update-Prüfung aktiv ist."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "Darstellung",
+			"result_details": "Ergebnisdetails",
+			"result_details_desc": "Lege fest, welche Metadaten und welcher Kontext in jedem Suchergebnis erscheinen. Aktuell: {summary}.",
+			"configure": "Konfigurieren",
+			"label_path": "Pfad",
+			"label_tags": "Tags",
+			"label_match_badges": "Treffer-Badges",
+			"label_content_snippets": "Inhaltsausschnitte",
+			"nothing_extra": "Nichts zusätzlich",
+			"navbar_search": "S2B-Suche in der Navigationsleiste verwenden",
+			"navbar_search_desc": "Die Lupe in der unteren Navigationsleiste öffnet die Suche von Smart Second Brain statt Obsidians Schnellwechsler. Nur diese Schaltfläche ändert sich – der Schnellwechsler lässt sich weiterhin über die Befehlspalette und sein Tastenkürzel öffnen."
+		},
+		"indexed_content": {
+			"heading": "Indexierte Inhalte",
+			"heading_desc": "Notizen, Canvas-Dateien und Widgets werden immer indexiert. Wähle, bei welchen anderen Dateien der Inhalt für Suche und Embeddings indexiert wird – die übrigen werden weiterhin über Titel und Pfad gefunden, und der Agent kann sie bei Bedarf trotzdem lesen.",
+			"pdfs": "PDFs",
+			"pdfs_desc": "Text aus PDFs extrahieren und indexieren. Langsam bei großen Sammlungen, und der Großteil eines langen PDFs ist selten relevant. Lange PDFs werden etwa bis zu ihren ersten 80 Seiten indexiert (4 auf Mobilgeräten).",
+			"chats": "Chats",
+			"chats_desc": "Vergangene Unterhaltungen indexieren. Sie bestehen überwiegend aus den eigenen Antworten des Modells, die dann wie Quellen wieder auftauchen können.",
+			"data_files": "Datendateien",
+			"data_files_desc": "CSV-, JSON- und YAML-Dateien indexieren. Strukturierte Daten lassen sich schlecht nach Bedeutung durchsuchen, und ein einziger Export kann Tausende Einträge hinzufügen."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "Themennamen",
+			"naming_model": "Modell für Themennamen",
+			"naming_model_desc": "Modell, mit dem Themen benannt werden. Ohne Modell wird ein Thema nach seiner am besten vernetzten Notiz benannt.",
+			"naming_model_desc_withheld": "Modell, mit dem Themen benannt werden. Ohne Modell wird ein Thema nach seiner am besten vernetzten Notiz benannt. Dieser Anbieter ist für private Notizen nicht vertrauenswürdig, daher werden private Titel beim Benennen zurückgehalten.",
+			"configure_provider": "Anbieter konfigurieren",
+			"configure_models": "Modelle konfigurieren",
+			"no_provider": "Es ist noch kein KI-Anbieter konfiguriert.",
+			"select_model": "Modell auswählen",
+			"clear": "Entfernen",
+			"auto_name": "Themen automatisch benennen",
+			"auto_name_desc": "Themen benennen, sobald sie sich ändern. Aus bedeutet, dass nur über den Themen-Bereich des Graphen benannt wird."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "Einführung",
+			"replay": "Einführung erneut abspielen",
+			"replay_desc": "Setzt die Startanimation und die Abschluss-Flags zurück – die Willkommensansicht spielt ihr Intro erneut ab und öffnet sich beim Start automatisch wie beim ersten Mal (bis ein Anbieter konfiguriert ist).",
+			"reset": "Intro zurücksetzen",
+			"reset_notice": "Einführung zurückgesetzt und neu geöffnet – das Intro wird von vorn abgespielt."
+		},
+		"chat": {
+			"heading": "Chat",
+			"raw_tool_io": "Rohe Tool-Ein-/Ausgabe anzeigen",
+			"raw_tool_io_desc": "Zeigt die genauen Tool-Argumente und die rohe Ausgabe in den Tool-Aufrufzeilen des Chats. Standardmäßig aus – Nutzer sehen nur die verständliche Zusammenfassung und das aufbereitete Ergebnis.",
+			"restore": "Wiederherstellen",
+			"restore_recommendations": "Ausgeblendete Empfehlungen wiederherstellen",
+			"restore_recommendations_desc": "Holt alle vorgeschlagenen Anfragen, Plugin-Skill-Hinweise und Hinweise zu geänderten Standards zurück, die im leeren Zustand eines neuen Chats ausgeblendet wurden.",
+			"restored_recommendations": {
+				"one": "{count} ausgeblendete Empfehlung wiederhergestellt.",
+				"other": "{count} ausgeblendete Empfehlungen wiederhergestellt."
+			},
+			"no_recommendations": "Keine ausgeblendeten Empfehlungen zum Wiederherstellen.",
+			"restore_privacy_warning": "Datenschutzwarnung für Integrationen wiederherstellen",
+			"restore_privacy_warning_desc": "Macht „Nicht mehr fragen“ für die Warnung rückgängig, die vor dem Aktivieren des Code-Ausführungs-Tools einer Plugin-Integration erscheint (es umgeht die Datenschutzregeln pro Anbieter).",
+			"privacy_warning_restored": "Datenschutzwarnung für Integrationen wiederhergestellt – sie erscheint beim nächsten Aktivieren einer Integration erneut.",
+			"privacy_warning_not_suppressed": "Die Datenschutzwarnung für Integrationen war nicht unterdrückt."
+		},
+		"observability": {
+			"heading": "Beobachtbarkeit",
+			"langsmith": "LangSmith-Integration",
+			"langsmith_desc": "LangSmith-Telemetrie für Debugging und Tracing aktivieren",
+			"api_key": "API-Schlüssel",
+			"api_key_desc": "Wähle ein Geheimnis aus dem Obsidian-Schlüsselbund für die LangSmith-Authentifizierung",
+			"project": "Projektname",
+			"project_desc": "Projektname, dem die Läufe zugeordnet werden",
+			"endpoint": "Endpunkt-URL",
+			"endpoint_desc": "Basis-URL der LangSmith-API überschreiben (optional)",
+			"check_aria": "LangSmith-API-Schlüssel und -Endpunkt prüfen",
+			"check_idle": "LangSmith-Verbindung prüfen",
+			"check_no_key": "Wähle zuerst ein Geheimnis für den LangSmith-API-Schlüssel",
+			"check_invalid_url": "Ungültige LangSmith-Endpunkt-URL",
+			"check_pending": "LangSmith-Verbindung wird geprüft…",
+			"check_success": "LangSmith-Verbindung erfolgreich",
+			"check_rejected": "LangSmith hat den API-Schlüssel abgelehnt",
+			"check_not_found": "Der LangSmith-Endpunkt stellt die erwartete API nicht bereit",
+			"check_failed_body": "LangSmith-Prüfung fehlgeschlagen ({status}): {body}",
+			"check_failed_status": "LangSmith-Prüfung fehlgeschlagen mit Status {status}",
+			"check_unreachable": "LangSmith ist nicht erreichbar",
+			"check_failed_notice": "LangSmith-Prüfung fehlgeschlagen: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "Diagnose",
+		"maintenance_heading": "Wartung",
+		"release_notes": "Versionshinweise",
+		"release_notes_desc": "Du verwendest Version {version}. Sieh dir an, was sich in den letzten Versionen geändert hat.",
+		"show_release_notes": "Versionshinweise anzeigen",
+		"guide": "Anleitung zur Fehlerbehebung",
+		"guide_desc": "Häufige Probleme und ihre Lösung – der Agent antwortet nicht, unbrauchbare Suchergebnisse, zurückgehaltene Notizen, fehlende MCP-Tools und Probleme auf Mobilgeräten.",
+		"open_guide": "Anleitung öffnen",
+		"still_stuck": "Kommst du nicht weiter?",
+		"still_stuck_desc": "Sieh in den bestehenden GitHub-Issues nach, ob das Problem bereits erfasst ist. Falls nicht, eröffne ein neues Issue und beschreibe, was du versucht hast, alle Fehlermeldungen und die Schritte zum Reproduzieren.",
+		"view_issues": "Bestehende Issues ansehen",
+		"new_issue": "Neues Issue eröffnen",
+		"clear": "Plugin-Daten bereinigen",
+		"clear_desc": "Löscht Plugin-Einstellungen und erzeugte Indexdaten. Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Tresor bleiben erhalten.",
+		"clear_label": "Bereinigen",
+		"clear_modal": {
+			"title": "Plugin-Daten bereinigen",
+			"description": "Plugin-Einstellungen und erzeugte Indexdaten löschen? Geheimnisse, Skill-Dateien und Chat-Dateien in deinem Tresor bleiben erhalten."
+		},
+		"verbose": "Protokollierung in der Entwicklerkonsole",
+		"verbose_desc": "Ausführliche Protokollierung in der Entwicklerkonsole aktivieren.",
+		"cleared": "Plugin-Daten bereinigt.",
+		"cleared_partial": "Plugin-Daten bereinigt, aber die gespeicherten Vektoren für {indexes} konnten nicht gelöscht werden. Details findest du in der Konsole.",
+		"clear_failed": "Plugin-Daten konnten nicht bereinigt werden"
+	},
+	"providers": {
+		"auth_failed": "Authentifizierung fehlgeschlagen",
+		"checking_auth": "Authentifizierung wird geprüft",
+		"authenticated": "Authentifiziert. Klicken, um die Verbindung erneut zu prüfen",
+		"auth_error_retry": "{message}. Klicken, um die Verbindung erneut zu prüfen",
+		"trusted": "Vertrauenswürdig für private Notizen",
+		"configure": "Anbieter konfigurieren",
+		"remove": "Anbieter entfernen",
+		"remove_failed": "Anbieter konnte nicht entfernt werden",
+		"delete_embeddings": "Auch die mit diesem Anbieter erstellten Embeddings löschen",
+		"delete_embeddings_desc": {
+			"one": "Gibt den Speicher von {formatted} indexierten Notiz frei. Lass diese Option aus, um sie zu behalten – fügst du diesen Anbieter erneut hinzu, werden sie wiederverwendet, statt neu eingebettet zu werden, was langsam und teuer sein kann.",
+			"other": "Gibt den Speicher von {formatted} indexierten Notizen frei. Lass diese Option aus, um sie zu behalten – fügst du diesen Anbieter erneut hinzu, werden sie wiederverwendet, statt neu eingebettet zu werden, was langsam und teuer sein kann."
+		},
+		"embeddings_kept_starting": "Anbieter entfernt. Seine Embeddings wurden behalten – der Indexdienst startet noch.",
+		"embeddings_delete_failed": {
+			"one": "Anbieter entfernt, aber das Löschen von {failed} von {count} Embedding-Index ist fehlgeschlagen: {ids}. Details findest du in der Konsole.",
+			"other": "Anbieter entfernt, aber das Löschen von {failed} von {count} Embedding-Indizes ist fehlgeschlagen: {ids}. Details findest du in der Konsole."
+		},
+		"advanced": "Erweitert"
+	},
+	"embedding_index": {
+		"heading": "Embedding-Indizes",
+		"description_search": "Embedding-Indizes ermöglichen die semantische Suche in deinen Notizen.",
+		"description_graph": "Embedding-Indizes ermöglichen semantische Graph-Funktionen für deine Notizen.",
+		"group_search": "Embedding-Index für die Suche",
+		"group_graph": "Embedding-Index für den Graphen",
+		"empty": "Noch keine Embedding-Indizes konfiguriert.",
+		"add": "Index hinzufügen",
+		"notes_indexed": {
+			"one": "{count} Notiz indexiert",
+			"other": "{count} Notizen indexiert"
+		},
+		"use_as_search": "{model} als Suchindex verwenden",
+		"use_as_graph": "{model} als Graph-Index verwenden",
+		"view_report": "Indexierungsbericht anzeigen",
+		"export": "Index in Datei exportieren",
+		"delete": "Index löschen",
+		"delete_failed": "Dieser Index konnte nicht gelöscht werden: {error}",
+		"memory_on_mobile": "Speicher auf Mobilgeräten"
+	},
+	"orphaned": {
+		"name": "Verwaiste Vektordatenbanken",
+		"legacy": "{label} (alte Graph-Daten)",
+		"chunks": {
+			"one": "{id} ({count} Chunk)",
+			"other": "{id} ({count} Chunks)"
+		},
+		"summary": {
+			"one": "{count} gespeicherte Datenbank gehört zu keinem konfigurierten Embedding-Index mehr{size}: {list}.",
+			"other": "{count} gespeicherte Datenbanken gehören zu keinem konfigurierten Embedding-Index mehr{size}: {list}."
+		},
+		"size": " (mindestens {size} an Vektoren)",
+		"origin_usage": "Obsidians Speicher auf diesem Gerät umfasst insgesamt {size} über alle Tresore.",
+		"confirm_title": "Verwaiste Indizes löschen?",
+		"confirm_desc": {
+			"one": "Dadurch wird {count} gespeicherte Datenbank, die von keinem konfigurierten Embedding-Index verwendet wird, dauerhaft entfernt. Fügst du eines dieser Modelle später erneut hinzu, wird sein Index von Grund auf neu erstellt.",
+			"other": "Dadurch werden {count} gespeicherte Datenbanken, die von keinem konfigurierten Embedding-Index verwendet werden, dauerhaft entfernt. Fügst du eines dieser Modelle später erneut hinzu, wird sein Index von Grund auf neu erstellt."
+		},
+		"deleted": {
+			"one": "{count} verwaister Index gelöscht.",
+			"other": "{count} verwaiste Indizes gelöscht."
+		},
+		"deleted_partial": "{deleted} gelöscht, {failed} konnten nicht gelöscht werden: {reason}",
+		"delete_button": "Verwaiste Indizes löschen"
+	},
+	"secret_select": {
+		"nothing_selected": "(Nichts ausgewählt)",
+		"add_tooltip": "Neues Geheimnis hinzufügen",
+		"missing": "Geheimnis „{id}“ nicht im Obsidian-Schlüsselbund gefunden.",
+		"add_action": "Geheimnis hinzufügen"
+	},
+	"model_control": {
+		"loading": "Modelle werden geladen…"
+	},
+	"managed_entity": {
+		"select": "{name} auswählen"
+	},
+	"filter": {
+		"type_folder": "Ordner",
+		"type_tag": "Tag",
+		"type_extension": "Dateiendung",
+		"type_property": "Eigenschaft",
+		"all_of": "ALLE von",
+		"any_of": "EINES von",
+		"none_of": "KEINES von",
+		"remove_condition": "Bedingung entfernen",
+		"property_placeholder": "Name der Eigenschaft",
+		"any_value": "beliebiger Wert",
+		"no_properties": "Keine Eigenschaften im Tresor gefunden – gib einen Namen ein, um ihn trotzdem zu verwenden.",
+		"live_placeholder": "Triff eine Auswahl im Graphen",
+		"add_condition": "Bedingung",
+		"add_group": "Gruppe"
+	}
+}

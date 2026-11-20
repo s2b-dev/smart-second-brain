@@ -1,6 +1,7 @@
 import { type App, Modal } from "obsidian";
 import { WidgetRenderChild } from "./WidgetRenderChild";
 import type { WidgetSpec } from "./widgetSpec";
+import { t } from "../i18n";
 
 /**
  * A widget expanded to (almost) the whole window. Used from the chat toolbar for a
@@ -21,7 +22,7 @@ export class WidgetModal extends Modal {
 
 	onOpen(): void {
 		this.modalEl.addClass("s2b-widget-modal");
-		this.titleEl.setText(this.spec.title ?? "Widget");
+		this.titleEl.setText(this.spec.title ?? t("widget.fallback_title"));
 		this.contentEl.addClass("s2b-widget-modal-content");
 		this.child = new WidgetRenderChild(this.contentEl, this.app, this.spec, this.sourcePath, { fill: true });
 		this.child.load();

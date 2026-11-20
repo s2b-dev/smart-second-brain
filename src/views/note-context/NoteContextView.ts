@@ -10,6 +10,7 @@
  */
 import { MarkdownView, type EventRef, type TFile, type WorkspaceLeaf } from "obsidian";
 import NoteContextViewComponent from "../../components/graph/NoteContextView.svelte";
+import { t } from "../../i18n";
 import { SvelteItemView } from "../SvelteItemView";
 
 export const VIEW_TYPE_NOTE_CONTEXT = "smart-second-brain-note-context";
@@ -49,9 +50,9 @@ export class NoteContextView extends SvelteItemView {
 	private getContextTitle(): string {
 		const contextFile = this.getContextFile();
 		if (contextFile?.extension === "md") {
-			return `Context of ${contextFile.basename}`;
+			return t("graph.note_context.title_of", { name: contextFile.basename });
 		}
-		return "Context";
+		return t("graph.note_context.title");
 	}
 
 	private refreshTitle(): void {

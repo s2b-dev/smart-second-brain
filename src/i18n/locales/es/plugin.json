@@ -1,0 +1,342 @@
+{
+	"commands": {
+		"open_chat": "Abrir chat",
+		"new_chat": "Nuevo chat",
+		"search_notes": "Buscar notas",
+		"open_smart_graph": "Abrir grafo inteligente",
+		"show_welcome": "Mostrar bienvenida",
+		"show_release_notes": "Mostrar notas de la versión",
+		"next_pending_change": "Siguiente cambio pendiente",
+		"previous_pending_change": "Cambio pendiente anterior"
+	},
+	"chat_file_menu": {
+		"rename": "Renombrar chat",
+		"rename_button": "Renombrar",
+		"delete": "Eliminar chat",
+		"rename_failed": "No se pudo renombrar el chat: {error}",
+		"delete_failed": "No se pudo eliminar el chat: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Añadir al chat",
+			"many": "Añadir {count} archivos al chat",
+			"other": "Añadir {count} archivos al chat"
+		},
+		"add_file_failed": "No se pudo añadir el archivo al chat: {error}",
+		"add_files_failed": "No se pudieron añadir los archivos al chat: {error}",
+		"no_supported_files": "No hay archivos compatibles seleccionados. Compatibles: txt, md, csv, json, imágenes, pdf.",
+		"chat_not_initialized": "El chat aún no se ha inicializado. Abre el chat y vuelve a intentarlo.",
+		"queued": {
+			"one": "{count} archivo en cola para el chat.",
+			"many": "{count} archivos en cola para el chat.",
+			"other": "{count} archivos en cola para el chat."
+		},
+		"skipped_unsupported": {
+			"one": "Se omitió {count} archivo no compatible.",
+			"many": "Se omitieron {count} archivos no compatibles.",
+			"other": "Se omitieron {count} archivos no compatibles."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "No hay ningún chat abierto",
+		"no_pending_changes": "No hay cambios pendientes en este chat",
+		"new_file_nothing_to_open": "Este cambio crea un archivo nuevo; todavía no hay nada que abrir."
+	},
+	"huggingface_connected": "Conectado a Hugging Face.",
+	"update": {
+		"available": "Smart Second Brain {version} está disponible.",
+		"update_link": "Actualizar",
+		"updated": "Smart Second Brain se actualizó a la versión {version}.",
+		"whats_new_link": "Ver novedades"
+	},
+	"settings_save_failed": "Smart Second Brain no pudo guardar tu configuración: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: unos {tokens} tokens del historial más antiguo del chat no cabían en la ventana de contexto del modelo de resumen y se dejaron fuera del resumen.",
+		"repeated_failure": "Smart Second Brain: el resumen del historial de este chat falló {failures} veces seguidas, así que se sigue enviando el historial completo y puede superar el límite de contexto del modelo. Revisa el modelo de resumen del agente; el error está en la consola de desarrollador."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Memoria demasiado grande para este modelo{window}: {names} ya no se carga en cada mensaje. El agente la lee solo cuando la necesita. Acorta la nota o usa un modelo con una ventana de contexto mayor.",
+			"many": "Memoria demasiado grande para este modelo{window}: {names} ya no se cargan en cada mensaje. El agente las lee solo cuando las necesita. Acorta las notas o usa un modelo con una ventana de contexto mayor.",
+			"other": "Memoria demasiado grande para este modelo{window}: {names} ya no se cargan en cada mensaje. El agente las lee solo cuando las necesita. Acorta las notas o usa un modelo con una ventana de contexto mayor."
+		},
+		"memory_window": "({k}k tokens)",
+		"save_prompt_failed": "No se pudo guardar el prompt del sistema: {error}",
+		"open_agent_note": "Abrir la nota del agente",
+		"prompt_modal_title": "Prompt del sistema — {name}",
+		"save_skill_failed": "No se pudo guardar la habilidad «{skill}»: {error}",
+		"open_skill_note": "Abrir la nota de la habilidad",
+		"skill_modal_title": "Habilidad — {skill}",
+		"cannot_connect": "No se puede conectar con: {providers}. Comprueba que el servicio esté en ejecución.",
+		"review_providers": "Revisar proveedores",
+		"provider_unavailable": "El proveedor «{provider}» ya no está disponible.",
+		"select_new_model": "Selecciona un modelo nuevo",
+		"withdrew_changes": {
+			"one": "Se retiró {count} cambio pendiente en notas propuesto por la respuesta sustituida.",
+			"many": "Se retiraron {count} cambios pendientes en notas propuestos por la respuesta sustituida.",
+			"other": "Se retiraron {count} cambios pendientes en notas propuestos por la respuesta sustituida."
+		},
+		"kept_partial_changes": {
+			"one": "Se conservó {count} cambio aplicado parcialmente; resuélvelo en la barra de revisión.",
+			"many": "Se conservaron {count} cambios aplicados parcialmente; resuélvelos en la barra de revisión.",
+			"other": "Se conservaron {count} cambios aplicados parcialmente; resuélvelos en la barra de revisión."
+		}
+	},
+	"errors": {
+		"request_failed": "La solicitud al modelo falló.",
+		"context_overflow": "Este chat ya no cabe en la ventana de contexto del modelo.",
+		"context_overflow_hint": "Empieza un chat nuevo o revisa la ventana de contexto configurada para este modelo.",
+		"refusal": "El modelo se negó a responder a esta solicitud.",
+		"refusal_hint": "Puede ayudar reformular la solicitud o cambiar a otro modelo."
+	},
+	"provider_auth": {
+		"unknown_provider": "Proveedor desconocido: {provider}",
+		"invalid_api_key": "Clave de API no válida",
+		"invalid_endpoint": "URL base no válida o endpoint inaccesible",
+		"configuration_failed": "Error en la configuración del proveedor",
+		"no_auth_config": "No se encontró configuración de autenticación para {provider}",
+		"discovery_failed": "Error al descubrir modelos: {error}",
+		"server_url_required": "La URL del servidor es obligatoria",
+		"api_key_required": "La clave de API es obligatoria",
+		"connection_failed": "Error de conexión: {error}",
+		"auth_failed_status": "Error de autenticación ({status})",
+		"auth_failed": "Error de autenticación",
+		"request_failed_status": "La solicitud falló con el estado {status}",
+		"codex_sign_in_required": "Inicia sesión con ChatGPT para usar Codex",
+		"openai_codex_sign_in_required": "Inicia sesión con ChatGPT para usar OpenAI mediante Codex",
+		"huggingface_token_rejected": "Hugging Face rechazó este token de acceso",
+		"huggingface_status": "Hugging Face devolvió el estado {status}",
+		"huggingface_sign_in_required": "Inicia sesión con Hugging Face para conectar"
+	},
+	"providers": {
+		"templates": {
+			"openai": "Modelos de OpenAI mediante inicio de sesión en ChatGPT o una clave de API.",
+			"openai_compatible": "Proveedor flexible de estilo OpenAI para OpenAI y endpoints compatibles.",
+			"anthropic": "Modelos Claude mediante la API de Anthropic.",
+			"ollama": "Modelos locales de Ollama a través de la API de Ollama.",
+			"omlx": "Modelos MLX locales en tu Mac mediante el servidor compatible con OpenAI de oMLX.",
+			"openrouter": "Cuenta y catálogo de modelos de OpenRouter.",
+			"huggingface": "Modelos abiertos de los proveedores de inferencia de Hugging Face."
+		},
+		"fields": {
+			"api_key": "Clave de API",
+			"base_url": "URL base",
+			"server_url": "URL del servidor",
+			"access_token": "Token de acceso",
+			"custom_headers": "Cabeceras personalizadas",
+			"custom_headers_desc": "Cabeceras adicionales en JSON (opcional)",
+			"chatgpt_sign_in": "Inicio de sesión en ChatGPT"
+		},
+		"openai": {
+			"link": "Panel de OpenAI",
+			"oauth_desc": "Abre una ventana del navegador para completar la autorización de ChatGPT/Codex.",
+			"api_key_desc": "Tu clave de API de OpenAI para la autenticación",
+			"base_url_desc": "Endpoint de API personalizado (déjalo vacío para usar el de OpenAI)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Este proveedor usa un inicio de sesión de ChatGPT/Codex en el navegador.",
+			"sign_in_placeholder": "Autorizado mediante inicio de sesión en ChatGPT"
+		},
+		"openai_compatible": {
+			"base_url_desc": "La URL base del endpoint de API compatible con OpenAI",
+			"api_key_desc": "Clave de API para la autenticación (déjala vacía si tu endpoint no la necesita)"
+		},
+		"anthropic": {
+			"link": "Consola de Anthropic",
+			"api_key_desc": "Tu clave de API de Anthropic para la autenticación",
+			"base_url_desc": "La URL base del endpoint de API compatible con Anthropic"
+		},
+		"ollama": {
+			"link": "Sitio web de Ollama",
+			"server_url_desc": "La URL donde se ejecuta tu servidor de Ollama",
+			"api_key_desc": "Clave de API para la autenticación (normalmente no es necesaria para Ollama en local)"
+		},
+		"omlx": {
+			"link": "Sitio web de oMLX",
+			"server_url_desc": "La URL donde se ejecuta tu servidor de oMLX",
+			"api_key_desc": "oMLX requiere una clave de API de forma predeterminada (la encontrarás en la configuración global del panel de administración). Déjala vacía solo si desactivaste la verificación de claves."
+		},
+		"openrouter": {
+			"link": "Claves de OpenRouter",
+			"oauth_desc": "Autoriza en tu navegador para conectar sin crear una clave de API a mano.",
+			"api_key_desc": "Tu clave de API de OpenRouter para la autenticación"
+		},
+		"huggingface": {
+			"link": "Tokens de acceso de Hugging Face",
+			"oauth_desc": "Aprueba el acceso en tu navegador para conectar sin crear un token de acceso."
+		}
+	},
+	"indexing": {
+		"status": "Indexando: {status}",
+		"cancelled_chunks": {
+			"one": "Indexación cancelada ({count} fragmento actualizado)",
+			"many": "Indexación cancelada ({count} fragmentos actualizados)",
+			"other": "Indexación cancelada ({count} fragmentos actualizados)"
+		},
+		"updated_chunks": {
+			"one": "✓ Índice actualizado: {count} fragmento",
+			"many": "✓ Índice actualizado: {count} fragmentos",
+			"other": "✓ Índice actualizado: {count} fragmentos"
+		},
+		"cancelled_notes": {
+			"one": "Indexación cancelada ({count} nota indexada hasta ahora)",
+			"many": "Indexación cancelada ({count} notas indexadas hasta ahora)",
+			"other": "Indexación cancelada ({count} notas indexadas hasta ahora)"
+		},
+		"indexed_notes": {
+			"one": "✓ {count} nota indexada",
+			"many": "✓ {count} notas indexadas",
+			"other": "✓ {count} notas indexadas"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ {count} nota indexada, omitidas: {skipped}",
+			"many": "✓ {count} notas indexadas, omitidas: {skipped}",
+			"other": "✓ {count} notas indexadas, omitidas: {skipped}"
+		},
+		"no_embedding_model": "No hay ningún modelo de embeddings configurado. Establece un modelo de embeddings predeterminado.",
+		"invalid_config": "Configuración del índice de embeddings no válida.",
+		"provider_not_configured": "El proveedor «{provider}» no está configurado.",
+		"embedding_init_failed": "No se pudo inicializar el modelo de embeddings.",
+		"open_search_settings": "Abrir configuración de búsqueda",
+		"open_provider_settings": "Abrir configuración del proveedor",
+		"provider_unreachable": "Indexación detenida: no se puede contactar con el proveedor de embeddings. Comprueba la conexión y reanúdala.",
+		"rate_limited": "Indexación en pausa: se alcanzó el límite de solicitudes del proveedor de embeddings. Se reanudará en el próximo inicio, o puedes reanudarla más tarde desde la configuración de búsqueda.",
+		"already_in_progress": "Ya hay una indexación en curso...",
+		"embed_failed": "No se pudo calcular el embedding de {file}: {error}",
+		"embed_empty": "No se pudo calcular el embedding de {file}: el modelo devolvió un resultado vacío",
+		"semantic_unreachable": "Búsqueda semántica no disponible: no se puede contactar con el proveedor de embeddings. No se muestran resultados semánticos.",
+		"semantic_failed": "La búsqueda semántica falló: {error}",
+		"cancelling": "Cancelando indexación…",
+		"export_empty": "El índice está vacío; no hay nada que exportar.",
+		"export_dialog_title": "Exportar índice de embeddings",
+		"exported": "Se exportaron {count} embeddings.",
+		"export_failed": "No se pudo exportar el índice.",
+		"import_dialog_title": "Importar índice de embeddings",
+		"import_invalid_version": "El archivo exportado tiene un campo de versión no válido o ausente. Vuelve a indexar para generar una exportación compatible.",
+		"import_outdated": "El esquema v{version} del archivo exportado está desactualizado (actual: v{current}). Vuelve a indexar para generar una exportación compatible.",
+		"import_newer": "El archivo exportado se creó con una versión más reciente del plugin (esquema v{version}). Actualiza el plugin para importarlo.",
+		"import_missing_metadata": "Al archivo exportado le faltan los metadatos del proveedor o del modelo.",
+		"imported": "Se importaron {count} embeddings ({model}).",
+		"import_failed": "No se pudo importar el índice. Puede que el archivo esté dañado.",
+		"reindex": "Volver a indexar"
+	},
+	"search_index": {
+		"status": "Indexando notas para la búsqueda: {status}",
+		"updated": "✓ Índice de búsqueda actualizado: {count} notas"
+	},
+	"bulk_progress": {
+		"skipped": "({count} omitidos)",
+		"eta": "(~{eta} restantes)",
+		"pdfs_progress": "PDF {done}/{total}",
+		"then": "luego {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"many": "{count} PDF",
+			"other": "{count} PDF"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Se abrió el panel de búsqueda, pero no se pudo establecer la consulta de la etiqueta",
+		"open_failed": "No se pudo abrir el panel de búsqueda para la etiqueta: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "No se encontraron modelos de embeddings en tus proveedores. Comprueba que alguno ofrezca embeddings.",
+		"no_models": "No se encontraron modelos. Comprueba que tu proveedor esté en ejecución y accesible."
+	},
+	"actions": {
+		"open_settings": "Abrir configuración",
+		"add_provider": "Añadir un proveedor",
+		"check_provider_settings": "Revisar configuración del proveedor",
+		"select_model": "Seleccionar un modelo",
+		"configure_embedding_index": "Configurar índice de embeddings",
+		"edit_agent": "Editar agente",
+		"view_report": "Ver informe",
+		"open_note": "Abrir nota",
+		"open_chat": "Abrir chat",
+		"agent_gone_pick_model": "Ese agente ya no existe. Elige un modelo desde el agente que quieras usar.",
+		"agent_gone_not_saved": "Ese agente ya no existe, así que el modelo no se guardó."
+	},
+	"diff": {
+		"pending_change": "Cambio pendiente",
+		"previous": "Cambio pendiente anterior",
+		"next": "Siguiente cambio pendiente",
+		"toggle_view": "Alternar vista de diferencias",
+		"accept": "Aceptar",
+		"accept_aria": "Aceptar cambio",
+		"reject": "Rechazar",
+		"reject_aria": "Rechazar cambio",
+		"stale_tooltip": "No se puede aceptar: la nota cambió después de proponerse. Recházalo y pide al agente que lo vuelva a proponer.",
+		"cross_thread_banner": {
+			"one": "{count} chat más tiene una edición pendiente de este archivo. Aquí solo se muestra la más reciente; la primera que se acepte prevalece y es posible que las demás ya no se puedan aplicar.",
+			"many": "{count} chats más tienen una edición pendiente de este archivo. Aquí solo se muestra la más reciente; la primera que se acepte prevalece y es posible que las demás ya no se puedan aplicar.",
+			"other": "{count} chats más tienen una edición pendiente de este archivo. Aquí solo se muestra la más reciente; la primera que se acepte prevalece y es posible que las demás ya no se puedan aplicar."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Llamadas a herramientas",
+		"reasoning": "Razonamiento extendido",
+		"vision": "Visión / archivos adjuntos",
+		"structured_output": "Salida estructurada (esquema JSON)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Buscar notas",
+			"summary": "Busca en tus notas de Obsidian por palabra clave. Devuelve los nombres de archivo coincidentes y sus metadatos."
+		},
+		"list_directory": {
+			"name": "Listar carpeta",
+			"summary": "Lista la estructura de carpetas de la bóveda: un resumen con el número de archivos en la raíz, y los archivos y subcarpetas dentro de una carpeta. La salida se condensa para ajustarse al presupuesto de contexto."
+		},
+		"read_content": {
+			"name": "Leer contenido",
+			"summary": "Lee notas y archivos de la bóveda por ruta o enlace wiki. Admite archivos Markdown/de texto y extracción de texto de PDF. Las imágenes deben adjuntarse en el chat."
+		},
+		"grep_notes": {
+			"name": "Grep en notas",
+			"summary": "Busca una subcadena exacta o un patrón regex en las notas y devuelve las líneas coincidentes con su número de línea y contexto. A diferencia de Buscar notas, busca cadenas literales. Limítalo a una nota con una ruta o pagina los conjuntos de resultados grandes."
+		},
+		"get_all_tags": {
+			"name": "Obtener todas las etiquetas",
+			"summary": "Obtiene una lista de todas las etiquetas usadas en la bóveda."
+		},
+		"get_properties": {
+			"name": "Obtener propiedades",
+			"summary": "Obtiene las propiedades del frontmatter de las notas o lista todas las claves de propiedades de la bóveda."
+		},
+		"execute_javascript": {
+			"name": "Ejecutar JavaScript",
+			"summary": "Ejecuta JavaScript aislado para cálculos y transformación de datos. Usa return para el valor final y console.log para la salida intermedia."
+		},
+		"manage_notes": {
+			"name": "Gestionar notas",
+			"summary": "Crea, actualiza o elimina notas Markdown en un único lote pendiente de revisión. Las operaciones relacionadas pueden proponerse juntas para que el usuario las apruebe."
+		},
+		"fetch_url": {
+			"name": "Obtener URL",
+			"summary": "Obtiene una página web pública o un recurso de texto por HTTP(S) y devuelve su contenido principal como Markdown limpio. Úsalo solo con URL que haya proporcionado el usuario o referencias claramente públicas."
+		},
+		"web_search": {
+			"name": "Búsqueda web",
+			"summary": "Busca en la web y devuelve resultados (título, URL, fragmento). Configura el proveedor y la clave de API en el panel Configurar de la herramienta. Es preferible buscar primero en la bóveda."
+		},
+		"manage_skills": {
+			"name": "Gestionar habilidades",
+			"summary": "Crea habilidades nuevas, revisa las habilidades adjuntas del propio agente o elimina una habilidad cuando se lo pidas. Los cambios se aplican de inmediato. El nombre de una habilidad y su vínculo con un plugin quedan fijados al crearla."
+		},
+		"write_todos": {
+			"name": "Lista de tareas",
+			"summary": "Permite al agente planificar el trabajo de varios pasos como una lista de comprobación y marcarla a medida que avanza. La lista aparece encima del campo de entrada del chat."
+		},
+		"ask_question": {
+			"name": "Hacer una pregunta",
+			"summary": "Permite al agente detenerse y hacerte una pregunta de opción múltiple cuando una solicitud no está clara. La pregunta aparece encima del campo de entrada del chat."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (sin clave)",
+		"firecrawl_key_help": "Opcional: añade una clave de API de Firecrawl (fc-…) para tener límites de solicitudes más altos. Déjala vacía para usar el nivel sin clave.",
+		"brave_key_help": "Clave de API de Brave Search de api.search.brave.com.",
+		"tavily_key_help": "Clave de API de Tavily de app.tavily.com.",
+		"keenable_key_help": "Opcional: añade una clave de API de Keenable para tener límites de solicitudes más altos. Déjala vacía para usar el endpoint público gratuito."
+	}
+}

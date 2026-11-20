@@ -7,6 +7,7 @@ import Toggle from "../../components/ui/Toggle.svelte";
 import { useAvailableModels } from "../../hooks/useAvailableModels.svelte";
 import type SecondBrainPlugin from "../../main";
 import { DOCS } from "../../utils/docs";
+import { getLocale, t } from "../../i18n";
 import { buildPersistedChatModel } from "../../utils/persistedChatModel";
 import { getData } from "../../stores/dataStore.svelte";
 import { isMobileUI } from "../../utils/platform";
@@ -146,13 +147,8 @@ let privacyCase = $derived(
 let untrustedNames = $derived(
 	configuredProviders.filter((p) => !data.isProviderTrusted(p)).map((p) => data.getProviderMeta(p)?.displayName ?? p),
 );
-let untrustedLabel = $derived(
-	untrustedNames.length === 1
-		? untrustedNames[0]
-		: untrustedNames.length === 2
-			? `${untrustedNames[0]} and ${untrustedNames[1]}`
-			: `${untrustedNames.slice(0, -1).join(", ")}, and ${untrustedNames[untrustedNames.length - 1]}`,
-);
+// Locale-aware "A, B, and C" (English output is unchanged: "A and B", "A, B, and C").
+let untrustedLabel = $derived(new Intl.ListFormat(getLocale(), { type: "conjunction" }).format(untrustedNames));
 // Onboarding sets the model on the selected agent (same as the chat header
 // selector), so completion tracks the agent's chat model, not added configs.
 let selectedAgent = $derived(data.getSelectedAgent());
@@ -214,7 +210,7 @@ function openHotkeysSettings() {
 	};
 	const setting = app.setting;
 	if (!setting?.open || !setting?.openTabById) {
-		new Notice("Couldn't open Hotkeys — open Settings → Hotkeys and search for “Search notes”.");
+		new Notice(t("onboarding.welcome.hotkeys_unavailable_notice"));
 		return;
 	}
 
@@ -256,11 +252,10 @@ function openHotkeysSettings() {
 			{@html logoSvg}
 		</div>
 		<h1 class="s2b-onboarding-title" class:s2b-fade-in={playIntro} style="--s2b-order: 0">
-			Welcome to Smart Second Brain
+			{t("onboarding.welcome.title")}
 		</h1>
 		<p class="s2b-onboarding-subtitle" class:s2b-fade-in={playIntro} style="--s2b-order: 1">
-			Turn your vault into an AI-assisted second brain — search smarter, explore connections in a graph,
-			and chat with your notes.
+			{t("onboarding.welcome.subtitle")}
 		</p>
 	</header>
 
@@ -268,13 +263,13 @@ function openHotkeysSettings() {
 		<div class="s2b-onboarding-pillar" class:s2b-fade-in={playIntro} style="--s2b-order: 2">
 			<span class="s2b-onboarding-pillar-icon" use:icon={"search"} aria-hidden="true"></span>
 			<div>
-				<div class="s2b-onboarding-pillar-title">Smarter search</div>
+				<div class="s2b-onboarding-pillar-title">{t("onboarding.welcome.search.title")}</div>
 				<div class="s2b-onboarding-pillar-desc">
-					Find notes by title, content, tags, and folders — with fuzzy matching. No setup needed. Add
-					an embedding model later for semantic search.
+					{t("onboarding.welcome.search.desc")}
 					{#if !isMobileUI()}
-						Or <button class="s2b-onboarding-link" onclick={openHotkeysSettings}>set a hotkey</button
-						> for instant access.
+						{t("onboarding.welcome.search.hotkey_before")} <button class="s2b-onboarding-link" onclick={openHotkeysSettings}
+							>{t("onboarding.welcome.search.hotkey_link")}</button
+						> {t("onboarding.welcome.search.hotkey_after")}
 					{/if}
 				</div>
 				<!-- A hotkey is meaningless on a phone with no keyboard, so the quick
@@ -287,7 +282,7 @@ function openHotkeysSettings() {
 				     the description where it read as another paragraph. -->
 				{#if isMobileUI()}
 					<label class="s2b-onboarding-navbar-toggle">
-						<span>Open from the navbar magnifier instead of the quick switcher</span>
+						<span>{t("onboarding.welcome.search.navbar_toggle")}</span>
 						<Toggle
 							checked={data.overrideMobileNavbarSearch}
 							onchange={(checked) => (data.overrideMobileNavbarSearch = checked)}
@@ -299,19 +294,18 @@ function openHotkeysSettings() {
 		<div class="s2b-onboarding-pillar" class:s2b-fade-in={playIntro} style="--s2b-order: 3">
 			<span class="s2b-onboarding-pillar-icon" use:icon={"git-fork"} aria-hidden="true"></span>
 			<div>
-				<div class="s2b-onboarding-pillar-title">Smarter graph</div>
+				<div class="s2b-onboarding-pillar-title">{t("onboarding.welcome.graph.title")}</div>
 				<div class="s2b-onboarding-pillar-desc">
-					See how your notes connect and cluster into topics. No setup needed.
+					{t("onboarding.welcome.graph.desc")}
 				</div>
 			</div>
 		</div>
 		<div class="s2b-onboarding-pillar" class:s2b-fade-in={playIntro} style="--s2b-order: 4">
 			<span class="s2b-onboarding-pillar-icon" use:icon={"message-square"} aria-hidden="true"></span>
 			<div>
-				<div class="s2b-onboarding-pillar-title">Chat with your notes</div>
+				<div class="s2b-onboarding-pillar-title">{t("onboarding.welcome.chat.title")}</div>
 				<div class="s2b-onboarding-pillar-desc">
-					Ask questions grounded in your vault, with web search and plugins like Dataview and Tasks
-					integrated in. Needs an AI provider — set one up below.
+					{t("onboarding.welcome.chat.desc")}
 				</div>
 			</div>
 		</div>
@@ -331,17 +325,17 @@ function openHotkeysSettings() {
 				aria-hidden="true"
 			></span>
 			<div class="s2b-onboarding-step-body">
-				<div class="s2b-onboarding-step-title">Connect an AI provider</div>
+				<div class="s2b-onboarding-step-title">{t("onboarding.welcome.provider_step.title")}</div>
 				<div class="s2b-onboarding-step-desc">
 					{#if hasProvider}
-						Provider connected. You can add or manage providers in settings.
+						{t("onboarding.welcome.provider_step.done_desc")}
 					{:else}
-						Connect OpenAI, Anthropic, Ollama, OpenRouter, or any OpenAI-compatible endpoint.
+						{t("onboarding.welcome.provider_step.desc")}
 					{/if}
 				</div>
 			</div>
 			<Button
-				buttonText={hasProvider ? "Add another" : "Connect provider"}
+				buttonText={hasProvider ? t("onboarding.welcome.provider_step.add_another") : t("onboarding.welcome.provider_step.connect")}
 				cta={!hasProvider}
 				onClick={openProviderSetup}
 			/>
@@ -361,19 +355,19 @@ function openHotkeysSettings() {
 				aria-hidden="true"
 			></span>
 			<div class="s2b-onboarding-step-body">
-				<div class="s2b-onboarding-step-title">Choose a chat model</div>
+				<div class="s2b-onboarding-step-title">{t("onboarding.welcome.model_step.title")}</div>
 				<div class="s2b-onboarding-step-desc">
 					{#if !hasProvider}
-						Connect a provider first, then pick a model to chat with.
+						{t("onboarding.welcome.model_step.needs_provider_desc")}
 					{:else if hasChatModel}
-						Using <strong>{selectedAgent?.chatModel?.model}</strong>. You're all set to start chatting.
+						{t("onboarding.welcome.model_step.using_before")} <strong>{selectedAgent?.chatModel?.model}</strong>{t("onboarding.welcome.model_step.using_after")}
 					{:else}
-						Pick a model from your connected provider to enable chat.
+						{t("onboarding.welcome.model_step.desc")}
 					{/if}
 				</div>
 			</div>
 			<Button
-				buttonText={hasChatModel ? "Change model" : "Choose model"}
+				buttonText={hasChatModel ? t("onboarding.welcome.model_step.change") : t("onboarding.welcome.model_step.choose")}
 				cta={hasProvider && !hasChatModel}
 				disabled={!hasProvider}
 				onClick={openChatModelSetup}
@@ -398,36 +392,35 @@ function openHotkeysSettings() {
 		<div>
 			<div class="s2b-onboarding-privacy-title">
 				{#if privacyCase === "public"}
-					Your notes are shared by default
+					{t("onboarding.welcome.privacy.public_title")}
 				{:else if privacyCase === "all-trusted"}
-					Note access is granted
+					{t("onboarding.welcome.privacy.all_trusted_title")}
 				{:else if privacyCase === "none-trusted" || privacyCase === "some-trusted"}
-					Your notes are still private
+					{t("onboarding.welcome.privacy.untrusted_title")}
 				{:else}
-					Note access is private by default
+					{t("onboarding.welcome.privacy.no_provider_title")}
 				{/if}
 			</div>
 			<div class="s2b-onboarding-privacy-desc">
 				{#if privacyCase === "no-provider"}
-					Your notes are <strong>not</strong> shared with AI providers unless you allow it. Once you
-					connect a provider above, you can grant it access — nothing leaves your vault before then.
+					{t("onboarding.welcome.privacy.no_provider_before")} <strong>{t("onboarding.welcome.privacy.no_provider_strong")}</strong>
+					{t("onboarding.welcome.privacy.no_provider_after")}
 				{:else if privacyCase === "public"}
-					Note access is set to <strong>public by default</strong>, so providers can read your notes
-					except the ones you exclude. <button class="s2b-onboarding-link" onclick={openPrivacySettings}
-						>Review note access</button
-					>.
+					{t("onboarding.welcome.privacy.public_before")} <strong>{t("onboarding.welcome.privacy.public_strong")}</strong>{t("onboarding.welcome.privacy.public_after")}
+					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.review_access")}</button
+					>{t("onboarding.welcome.privacy.public_end")}
 				{:else if privacyCase === "all-trusted"}
-					{configuredProviders.length === 1 ? "Your provider is" : "Your providers are"} marked
-					<strong>trusted</strong>, so the agent can read your notes. <button
-						class="s2b-onboarding-link"
-						onclick={openPrivacySettings}>Review note access</button
-					> to keep specific notes private.
+					{t("onboarding.welcome.privacy.all_trusted_before", { count: configuredProviders.length })}
+					<strong>{t("onboarding.welcome.privacy.trusted")}</strong>{t("onboarding.welcome.privacy.all_trusted_after")}
+					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.review_access")}</button
+					> {t("onboarding.welcome.privacy.all_trusted_end")}
 				{:else}
-					<strong>{untrustedLabel}</strong> can't read your notes yet — chat will work, but answers
-					won't be grounded in your vault. Mark
-					{untrustedNames.length === 1 ? "it" : "them"} as <strong>trusted</strong> in provider settings,
-					or <button class="s2b-onboarding-link" onclick={openPrivacySettings}>change note access</button
-					> to allow all providers.
+					<strong>{untrustedLabel}</strong>
+					{t("onboarding.welcome.privacy.untrusted_before", { count: untrustedNames.length })}
+					<strong>{t("onboarding.welcome.privacy.trusted")}</strong>
+					{t("onboarding.welcome.privacy.untrusted_middle")}
+					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.change_access")}</button
+					> {t("onboarding.welcome.privacy.untrusted_end")}
 				{/if}
 			</div>
 		</div>
@@ -438,21 +431,21 @@ function openHotkeysSettings() {
 		     user sees, so it is where a link to the full documentation has the most
 		     reach, but it must not compete with the two actions on the right. -->
 		<div class="s2b-onboarding-footer-secondary">
-			<Button buttonText="Skip" onClick={skip} />
+			<Button buttonText={t("onboarding.welcome.skip")} onClick={skip} />
 			<a
 				class="s2b-onboarding-link"
 				href={DOCS.home}
 				target="_blank"
-				rel="noopener noreferrer">Documentation ↗</a
+				rel="noopener noreferrer">{t("onboarding.welcome.documentation")}</a
 			>
 		</div>
 		<div class="s2b-onboarding-footer-primary">
-			<Button buttonText="Explore the graph" onClick={exploreGraph} />
+			<Button buttonText={t("onboarding.welcome.explore_graph")} onClick={exploreGraph} />
 			<Button
-				buttonText="Start chatting"
+				buttonText={t("onboarding.welcome.start_chatting")}
 				cta={true}
 				disabled={!hasChatModel}
-				tooltip={hasChatModel ? undefined : "Connect a provider and add a chat model first"}
+				tooltip={hasChatModel ? undefined : t("onboarding.welcome.start_chatting_disabled")}
 				onClick={startChatting}
 			/>
 		</div>

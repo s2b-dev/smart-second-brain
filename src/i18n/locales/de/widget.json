@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Widget",
+	"block": {
+		"unbundled_library": "Dieses Widget verlangt eine Bibliothek, die nicht mitgeliefert wird: {libs}. Verfügbar: {available}.",
+		"generating": "Widget wird erstellt…",
+		"expand": "Erweitern",
+		"copy_tooltip": "Als Block kopieren, um ihn in eine Notiz einzufügen",
+		"copied_notice": "Widget-Block kopiert. Füge ihn in eine beliebige Notiz ein.",
+		"save_tooltip": "Als Widget-Datei speichern und öffnen",
+		"save_failed": "Widget konnte nicht gespeichert werden: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "Dieses Widget wurde gestoppt, weil es versucht hat, seine Sandbox zu verlassen."
+	},
+	"embed": {
+		"load_failed": "Widget konnte nicht geladen werden."
+	},
+	"rename": {
+		"title": "Widget umbenennen",
+		"name": "Name",
+		"button": "Umbenennen",
+		"empty_name": "Gib einen Namen ein.",
+		"invalid_chars": "Ein Name darf folgende Zeichen nicht enthalten: \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "„{name}“ existiert bereits in diesem Ordner.",
+		"failed": "Umbenennen fehlgeschlagen: {error}"
+	},
+	"view": {
+		"menu_show_widget": "Widget anzeigen",
+		"menu_edit_source": "Quelltext bearbeiten",
+		"menu_rename": "Umbenennen…",
+		"review_showing_proposed": "Ausstehende Änderung aus dem Chat – vorgeschlagenes Widget wird angezeigt",
+		"review_showing_current": "Ausstehende Änderung aus dem Chat – aktuelles Widget wird angezeigt",
+		"show_current": "Aktuelles anzeigen",
+		"show_proposed": "Vorschlag anzeigen",
+		"accept": "Annehmen",
+		"reject": "Ablehnen",
+		"rejected_notice": "Vorgeschlagene Änderung an diesem Widget abgelehnt",
+		"conflict_tooltip": "Annehmen nicht möglich – das Widget wurde nach dem Vorschlag geändert. Lehne ihn ab und bitte den Agenten, die Änderung neu vorzuschlagen.",
+		"applied_notice": "Vorgeschlagene Änderung an diesem Widget übernommen",
+		"apply_failed": "Änderung konnte nicht übernommen werden: {error}",
+		"source_aria": "Widget-Quelltext",
+		"source_hint": "Frontmatter (title, height, queries, libs), danach das HTML.",
+		"source_stale_hint": "Während der Bearbeitung auf der Festplatte geändert – Abbrechen lädt neu; Speichern ist deaktiviert.",
+		"source_stale_notice": "Dieses Widget wurde während deiner Bearbeitung auf der Festplatte geändert. Brich ab, um es neu zu laden, und bearbeite es dann erneut.",
+		"save_failed": "Widget konnte nicht gespeichert werden: {error}"
+	}
+}

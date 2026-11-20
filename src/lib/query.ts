@@ -5,6 +5,7 @@ import { getProviderDefinition, isEmbeddingProvider } from "../providers";
 import { getData } from "../stores/dataStore.svelte";
 import { getPlugin } from "../stores/state.svelte";
 import { Logger } from "../utils/logging";
+import { t } from "../i18n";
 
 /**
  * Query functions for provider state management.
@@ -47,7 +48,10 @@ export function getProviderStateQueryOptions(providerId: string) {
 
 			if (!resolvedAuth) {
 				return {
-					auth: { success: false, message: `No auth configuration found for ${providerId}` },
+					auth: {
+						success: false,
+						message: t("plugin.provider_auth.no_auth_config", { provider: providerId }),
+					},
 					models: [],
 				};
 			}
@@ -88,7 +92,10 @@ export function getProviderStateQueryOptions(providerId: string) {
 				const errorMessage = error instanceof Error ? error.message : String(error);
 				Logger.warn(`Model discovery failed for ${providerId}:`, errorMessage);
 				return {
-					auth: { success: false, message: `Model discovery failed: ${errorMessage}` },
+					auth: {
+						success: false,
+						message: t("plugin.provider_auth.discovery_failed", { error: errorMessage }),
+					},
 					models: [],
 				};
 			}
@@ -184,7 +191,7 @@ export function createAuthStateQuery(provider: () => string) {
 			const resolvedAuth = data.getResolvedAuthState(providerId);
 
 			if (!resolvedAuth) {
-				return { success: false, message: `No auth configuration found for ${providerId}` };
+				return { success: false, message: t("plugin.provider_auth.no_auth_config", { provider: providerId }) };
 			}
 
 			// Validate auth using new provider system

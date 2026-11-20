@@ -1,0 +1,192 @@
+{
+	"view": {
+		"display_text": "智能关系图谱",
+		"loading": "正在构建关系图谱…"
+	},
+	"toolbar": {
+		"exit_immerse": "退出沉浸——返回完整关系图谱",
+		"fit": "缩放关系图谱以适应视图",
+		"fit_with_key": "缩放关系图谱以适应视图（F）",
+		"lasso": "套索选择",
+		"lasso_with_hint": "套索选择（或按住 Shift 拖动）",
+		"exit_lasso": "退出套索选择",
+		"hide_topics": "隐藏主题——显示未聚类的原始关系图谱",
+		"show_topics": "显示主题——按检测到的主题为笔记着色",
+		"computing_topics": "正在计算主题…",
+		"collapse_needs_topics": "开启主题后才能折叠",
+		"expand_all": "将所有主题展开为笔记（S）",
+		"collapse_all": "将所有主题折叠为单个节点（S）——或选中主题后使用“折叠”",
+		"show_panel": "显示关系图谱面板",
+		"hide_panel": "隐藏关系图谱面板"
+	},
+	"controls": {
+		"aria_label": "关系图谱设置",
+		"stats": {
+			"notes": {
+				"other": "{count} 篇笔记"
+			},
+			"unlinked": {
+				"other": "{count} 篇未链接"
+			},
+			"links": {
+				"other": "{count} 个链接"
+			},
+			"inferred": {
+				"other": "{count} 个推断链接"
+			}
+		},
+		"topics": {
+			"heading": "主题",
+			"granularity": "粒度",
+			"granularity_desc": "左：少量宽泛的主题。右：大量具体的主题。所有笔记始终可见。",
+			"granularity_desc_with_keys": "左：少量宽泛的主题。右：大量具体的主题。所有笔记始终可见。（在关系图谱上按 ↑/↓）",
+			"granularity_pending": "正在计算此仓库的主题层级…",
+			"inferred_links": "推断链接"
+		},
+		"inferred_hint": {
+			"no_index": "除了你手动添加的链接，还按语义关联笔记。需要关系图谱嵌入索引——请在插件的关系图谱设置中选择一个。",
+			"hidden_still_grouping": "已隐藏，但仍参与笔记分组。再切换一次可将其从主题中也排除。",
+			"off": "已关闭——主题仅来自你手动添加的链接。",
+			"off_coverage": "已关闭——主题仅来自你手动添加的链接。仅凭你的链接，{total} 篇笔记中有 {placed} 篇被分组（{percent}%）；其余 {unlinked} 篇未链接。",
+			"on_no_edges": "除了你手动添加的链接，还按语义关联笔记——需要关系图谱嵌入索引。",
+			"on": "除了你手动添加的链接，还按语义关联笔记：{inferred} 个相似度连接，让未链接的笔记也能归入主题。关闭后可查看你自己的链接覆盖了多少。"
+		},
+		"found": {
+			"heading": "已找到 · {count}",
+			"multi_select_hint": "shift/⌘ 多选",
+			"cancel_naming_aria": "取消为主题命名",
+			"cancel_naming": "取消命名",
+			"name_topics": "用 AI 为主题命名"
+		},
+		"scope": {
+			"heading": "范围",
+			"markdown_only": "仅 Markdown",
+			"markdown_only_desc": "只显示 Markdown 笔记；关闭后显示所有可索引的文件",
+			"tags": "标签",
+			"tags_desc": "将每个标签绘制为节点，并与带有该标签的笔记相连；共同的标签也有助于形成主题"
+		},
+		"display": {
+			"heading": "显示",
+			"topic_regions": "主题区域",
+			"topic_regions_desc": "为每个主题后方的区域着色，一眼就能看出分组",
+			"topic_labels": "主题标签",
+			"topic_labels_desc": "在关系图谱上显示主题名称标签",
+			"direction_arrows": "方向箭头",
+			"direction_arrows_desc": "为有向的 Wiki 链接显示箭头",
+			"highlight_inferred": "高亮推断链接",
+			"highlight_inferred_desc_no_index": "用强调色绘制推断链接。需要关系图谱嵌入索引——请在插件的关系图谱设置中选择一个。",
+			"highlight_inferred_desc": "用强调色绘制推断链接，使其与你手动添加的链接区分开",
+			"highlight_inferred_desc_off": "用强调色绘制推断链接。需要先开启“推断链接”（在“主题”下）。",
+			"highlight_isolated": "高亮孤立笔记",
+			"highlight_isolated_desc": "用强调色标记没有 Wiki 链接的笔记",
+			"highlight_bridges": "高亮桥接笔记",
+			"highlight_bridges_desc": "用强调色标记连接多个主题的笔记"
+		}
+	},
+	"selection": {
+		"aria_label": "关系图谱选区",
+		"count_selected": {
+			"other": "已选中 {count} 篇笔记"
+		},
+		"notes_selected": {
+			"other": "篇笔记已选中"
+		},
+		"immersed_suffix": " · 沉浸中",
+		"notes_immersed": {
+			"other": "篇笔记 · 沉浸中"
+		},
+		"immersed_into": "沉浸于",
+		"immersed_prefix": "沉浸中 ·",
+		"note_noun": {
+			"other": "篇笔记"
+		},
+		"clear": "清除选择",
+		"clear_with_key": "清除选择（Esc）",
+		"zoom": "缩放至选区",
+		"zoom_with_key": "缩放至选区（F）",
+		"zoom_tooltip": "移动视角以容纳所选笔记",
+		"collapse": "折叠",
+		"expand": "展开",
+		"collapse_tooltip": "将所选主题折叠为单个节点",
+		"expand_tooltip": "将所选主题展开为笔记",
+		"immerse": "沉浸",
+		"immerse_tooltip": "仅用所选笔记重建关系图谱",
+		"open_in_chat": "在对话中打开",
+		"open_in_chat_tooltip": "显示对话并附加所选笔记",
+		"open_all": "全部打开",
+		"open_all_tooltip": "在新标签页中打开所有所选笔记",
+		"exit": "退出",
+		"exit_immerse_tooltip": "退出沉浸（Esc）"
+	},
+	"open_all_confirm": {
+		"title": "打开所有笔记",
+		"message": {
+			"other": "这将在新标签页中打开 {count} 篇笔记，之后需要手动关闭。"
+		},
+		"confirm": {
+			"other": "打开 {count} 个标签页"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "对话尚未初始化，请先打开一个对话。",
+		"private_titles_withheld": {
+			"other": "已对 {count} 个主题隐去私密笔记的标题。将关系图谱模型的提供商设为受信任即可包含这些标题。"
+		},
+		"open_provider_settings": "打开提供商设置",
+		"no_graph_chat_model": "未选择关系图谱对话模型，因此无法为主题命名。",
+		"open_graph_settings": "打开关系图谱设置"
+	},
+	"node_menu": {
+		"expand_topic": "展开主题",
+		"open_all_notes": {
+			"other": "打开全部 {count} 篇笔记"
+		},
+		"search_tag": "搜索带有此标签的笔记",
+		"open_file": "打开文件",
+		"reveal_in_explorer": "在文件列表中显示",
+		"focus_cluster": "聚焦此聚类",
+		"collapse_topic": "折叠主题",
+		"select_cluster": "选中此聚类"
+	},
+	"node_tooltip": {
+		"notes": {
+			"other": "{n} 篇笔记"
+		},
+		"links": {
+			"other": "{n} 个链接"
+		},
+		"cluster_fallback": "聚类 {id}",
+		"connections": {
+			"other": "{count} 个连接"
+		},
+		"pinned": "📌 已固定"
+	},
+	"note_context": {
+		"title": "上下文",
+		"title_of": "{name} 的上下文",
+		"semantic_hint": "配置关系图谱嵌入索引后，将显示语义相近的笔记。",
+		"direction_in": "入",
+		"direction_out": "出",
+		"direction_both": "双向",
+		"updating": "正在更新…",
+		"fit": "缩放关系图谱以适应视图",
+		"options": "笔记上下文选项",
+		"close_options": "关闭笔记上下文选项",
+		"view": "视图",
+		"mode_graph": "关系图谱",
+		"mode_list": "列表",
+		"show": "显示",
+		"linked": "已链接",
+		"semantic": "语义",
+		"both": "两者",
+		"display": "显示",
+		"direction_arrows": "方向箭头",
+		"no_neighbors": "没有相邻笔记。",
+		"open_a_note": "请打开一篇笔记。"
+	},
+	"topic_fallback": {
+		"unsorted": "未分类",
+		"unsorted_with_count": "未分类 · {count}",
+		"topic": "主题 {id}"
+	}
+}

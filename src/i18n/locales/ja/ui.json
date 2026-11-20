@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "パネルのサイズを変更"
+	},
+	"docs_link": {
+		"subject_label": "ドキュメント: {subject}",
+		"open_label": "ドキュメントを開く"
+	},
+	"markdown": {
+		"copy_code": "コードをコピー"
+	},
+	"search": {
+		"placeholder": "検索..."
+	}
+}

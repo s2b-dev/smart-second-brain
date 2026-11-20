@@ -12,6 +12,7 @@ import {
 	setIcon,
 } from "obsidian";
 import { performSearch } from "../../agent/tools/searchNotes";
+import { t } from "../../i18n";
 import { getRecentNotes } from "../../search/recentNotes";
 import { getLexicalSearchService, isLexicalSearchInitialized } from "../../search/LexicalSearchService";
 import type { SearchResult } from "../../vectorstore/types";
@@ -109,7 +110,6 @@ export interface SearchModalPickerText {
 	defaultHeading?: string;
 	defaultDescription?: string;
 	emptySearchText?: string;
-	selectionLabel?: string;
 	confirmVerb?: string;
 	alreadySelectedBadgeLabel?: string;
 }
@@ -202,8 +202,8 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		this.setPlaceholder(
 			this.pickerOptions?.pickerText?.searchPlaceholder ??
 				(isMobileUI()
-					? "Search notes with #tag or /folder..."
-					: `Search notes with #tag or /folder, or ${Platform.isMacOS ? "⌥↵" : "Alt+↵"} to ask the agent...`),
+					? t("modals.search.placeholder_mobile")
+					: t("modals.search.placeholder", { key: Platform.isMacOS ? "⌥↵" : "Alt+↵" })),
 		);
 		this.updateInstructions();
 
@@ -373,7 +373,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 	}
 
 	private getPickerConfirmVerb(): string {
-		return this.pickerOptions?.pickerText?.confirmVerb ?? "Add";
+		return this.pickerOptions?.pickerText?.confirmVerb ?? t("modals.search.picker_default_verb");
 	}
 
 	private isPickerUnavailable(path: string): boolean {
@@ -441,9 +441,9 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 	}
 
 	private showMissingSearchEmbeddingIndexNotice(): void {
-		showSettingsLinkNotice(this.app, "Select a search embedding index before enabling semantic search.", {
+		showSettingsLinkNotice(this.app, t("modals.search.missing_index_notice"), {
 			tab: "search",
-			linkText: "Open search settings",
+			linkText: t("modals.search.open_search_settings"),
 		});
 	}
 
@@ -491,11 +491,11 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 	private getEnterInstructionPurpose(): string {
 		if (this.isPickerMode()) {
 			return this.selectedResultsByPath.size > 0
-				? `${this.getPickerConfirmVerb()} selection`
-				: `${this.getPickerConfirmVerb()} focused file`;
+				? t("modals.search.picker_confirm_selection", { verb: this.getPickerConfirmVerb() })
+				: t("modals.search.picker_confirm_focused", { verb: this.getPickerConfirmVerb() });
 		}
 
-		return this.selectedResultsByPath.size > 0 ? "Open selection" : "Open note";
+		return this.selectedResultsByPath.size > 0 ? t("modals.search.open_selection") : t("modals.search.open_note");
 	}
 
 	private getCreateInstructionPurpose(): string | null {
@@ -509,7 +509,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		}
 
 		const preview = trimmedQuery.length > 36 ? `${trimmedQuery.slice(0, 33)}...` : trimmedQuery;
-		return `Create "${preview}"`;
+		return t("modals.search.create_note", { title: preview });
 	}
 
 	private updateInstructions(): void {
@@ -521,10 +521,10 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 		if (this.isPickerMode()) {
 			this.setInstructions([
-				{ command: "↑↓", purpose: "Navigate" },
+				{ command: "↑↓", purpose: t("modals.search.hint_navigate") },
 				{ command: "↵", purpose: this.getEnterInstructionPurpose() },
-				{ command: "⇧↑↓/↵", purpose: "Select" },
-				{ command: "esc", purpose: "Close" },
+				{ command: "⇧↑↓/↵", purpose: t("modals.search.hint_select") },
+				{ command: "esc", purpose: t("common.close") },
 			]);
 			return;
 		}
@@ -534,17 +534,22 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		const modShiftEnterKey = Platform.isMacOS ? "⌘⇧↵" : "Ctrl+Shift+↵";
 		const altEnterKey = Platform.isMacOS ? "⌥↵" : "Alt+↵";
 		const attachKey = Platform.isMacOS ? "⌥A" : "Alt+A";
-		const attachPurpose = this.selectedResultsByPath.size > 0 ? "Attach selection to chat" : "Attach to chat";
-		const semanticLabel = this.semanticEnabled ? "semantic: on" : "semantic: off";
+		const attachPurpose =
+			this.selectedResultsByPath.size > 0
+				? t("modals.search.hint_attach_selection")
+				: t("modals.search.hint_attach");
+		const semanticLabel = this.semanticEnabled
+			? t("modals.search.hint_semantic_on")
+			: t("modals.search.hint_semantic_off");
 		const instructions = [
-			{ command: "↑↓", purpose: "Navigate" },
+			{ command: "↑↓", purpose: t("modals.search.hint_navigate") },
 			{ command: "↵", purpose: this.getEnterInstructionPurpose() },
-			{ command: "⇧↑↓/↵", purpose: "Select" },
-			{ command: modEnterKey, purpose: "Open in new tab" },
-			{ command: altEnterKey, purpose: "Ask agent" },
+			{ command: "⇧↑↓/↵", purpose: t("modals.search.hint_select") },
+			{ command: modEnterKey, purpose: t("modals.search.hint_open_new_tab") },
+			{ command: altEnterKey, purpose: t("modals.search.hint_ask_agent") },
 			{ command: attachKey, purpose: attachPurpose },
 			{ command: tabKey, purpose: semanticLabel },
-			{ command: "esc", purpose: "Close" },
+			{ command: "esc", purpose: t("common.close") },
 		];
 
 		const createPurpose = this.getCreateInstructionPurpose();
@@ -822,14 +827,14 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		if (!messenger) {
 			// Reached before any chat has been opened, so the link has something to do —
 			// unlike the post-`createNewChat` guard below.
-			showActionNotice("Chat is not initialized yet.", openChatAction());
+			showActionNotice(t("modals.search.chat_not_initialized"), openChatAction());
 			return;
 		}
 
 		const plugin = getPlugin();
 		const threadPath = await plugin.agentManager.resolveOrOpenChatForAttach();
 		if (!threadPath) {
-			new Notice("Could not open a chat to attach to.");
+			new Notice(t("modals.search.attach_chat_failed"));
 			return;
 		}
 
@@ -875,7 +880,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 		const messenger = getSessionRegistry();
 		if (!messenger) {
-			new Notice("Chat is not initialized yet. Please open a chat first.");
+			new Notice(t("modals.search.chat_not_initialized_open_first"));
 			return;
 		}
 
@@ -978,7 +983,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			await this.app.workspace.revealLeaf(leaf);
 		} catch (error) {
 			Logger.error("[SearchModal] Failed to create note from query:", error);
-			new Notice("Failed to create note");
+			new Notice(t("modals.search.create_note_failed"));
 		}
 	}
 
@@ -1504,7 +1509,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 			}
 
 			const label = filter.type === "path" ? filter.value.replace(/\/$/, "") : filter.value.replace(/^#/, "");
-			chip.setAttribute("aria-label", `Remove filter ${label}`);
+			chip.setAttribute("aria-label", t("modals.search.remove_filter", { label }));
 			chip.createSpan({ cls: "s2b-inline-chip-label", text: label });
 			chip.createSpan({ cls: "s2b-inline-chip-remove", text: "×" });
 			chip.addEventListener("click", (evt) => {
@@ -1519,10 +1524,10 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		if (tagCount > 1) {
 			const modeChip = chipsEl.createEl("button", {
 				cls: "s2b-inline-chip s2b-inline-chip-mode",
-				text: this.requireAllTags ? "ALL" : "ANY",
+				text: this.requireAllTags ? t("modals.search.tag_mode_all") : t("modals.search.tag_mode_any"),
 			});
 			modeChip.type = "button";
-			modeChip.setAttribute("aria-label", "Toggle tag match mode");
+			modeChip.setAttribute("aria-label", t("modals.search.toggle_tag_mode"));
 			modeChip.addEventListener("click", (evt) => {
 				evt.stopPropagation();
 				this.toggleRequireAllTags();
@@ -1812,7 +1817,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 					type: "autocomplete" as const,
 					kind: "tag" as const,
 					value: tag,
-					display: children ? `${label} (${children} subtags)` : label,
+					display: children ? t("modals.search.tag_with_subtags", { label, count: children }) : label,
 				};
 			});
 	}
@@ -2066,7 +2071,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		container.createSpan({ cls: "s2b-search-autocomplete-text", text: suggestion.display });
 		container.createSpan({
 			cls: "s2b-search-autocomplete-hint",
-			text: suggestion.kind === "tag" ? "Filter by tag" : "Filter by folder",
+			text: suggestion.kind === "tag" ? t("modals.search.filter_by_tag") : t("modals.search.filter_by_folder"),
 		});
 	}
 
@@ -2165,18 +2170,18 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		if (!isMobileUI()) {
 			const tabKey = Platform.isMacOS ? "⇥" : "Tab";
 			const hint = this.resultContainerEl.createDiv({ cls: "s2b-search-semantic-hint" });
-			hint.setText(`Press ${tabKey} to enhance results with semantic search`);
+			hint.setText(t("modals.search.semantic_hint", { key: tabKey }));
 			return;
 		}
 
 		const row = this.resultContainerEl.createDiv({ cls: "s2b-search-followup" });
-		row.createSpan({ cls: "s2b-search-followup-label", text: "Not what you meant?" });
+		row.createSpan({ cls: "s2b-search-followup-label", text: t("modals.search.not_what_you_meant") });
 
 		const btn = row.createEl("button", { cls: "s2b-pill s2b-pill--interactive s2b-search-followup-action" });
 		btn.type = "button";
 		const icon = btn.createSpan({ cls: "s2b-search-mobile-icon" });
 		setIcon(icon, "sparkles");
-		btn.appendChild(document.createTextNode("Search by meaning"));
+		btn.appendChild(document.createTextNode(t("modals.search.search_by_meaning")));
 		// Pointerdown, not click: the input keeps focus on mobile and a tap that
 		// blurs it first can dismiss the sheet before the click lands.
 		btn.addEventListener("pointerdown", (evt) => {
@@ -2207,7 +2212,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 		btn.type = "button";
 		const icon = btn.createSpan({ cls: "s2b-search-mobile-icon" });
 		setIcon(icon, "brain");
-		btn.appendChild(document.createTextNode("Ask the agent instead"));
+		btn.appendChild(document.createTextNode(t("modals.search.ask_agent_instead")));
 		btn.addEventListener("pointerdown", (evt) => {
 			evt.preventDefault();
 			void this.askAgentWithQuery();
@@ -2222,13 +2227,13 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 		const emptyEl = this.resultContainerEl.createDiv({ cls: "s2b-search-empty" });
 		if (this.currentQuery.trim() && (this.isSearching || this.searchTimeout !== null)) {
-			emptyEl.setText("Searching...");
+			emptyEl.setText(t("modals.search.searching"));
 		} else if (this.currentQuery.trim()) {
-			emptyEl.setText("No notes found");
+			emptyEl.setText(t("modals.search.no_notes_found"));
 			this.appendSemanticHint();
 			this.appendAskAgentAction();
 		} else {
-			emptyEl.setText("No recent notes yet. Open a note to see it here, or type to search your notes.");
+			emptyEl.setText(t("modals.search.no_recent_notes"));
 		}
 	}
 }

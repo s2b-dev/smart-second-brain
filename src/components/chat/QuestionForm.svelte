@@ -13,6 +13,7 @@ import {
 	parseAskQuestions,
 } from "../../utils/askQuestion";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 interface Props {
 	session: ChatSession;
@@ -62,7 +63,7 @@ async function resume(result: (interrupt: ToolInterrupt) => string) {
 		await session.answerInterrupts(result);
 	} catch (error) {
 		submitting = false;
-		new Notice(error instanceof Error ? error.message : "Could not send your answer");
+		new Notice(error instanceof Error ? error.message : t("chat.question.send_failed"));
 	}
 }
 
@@ -115,23 +116,23 @@ function optionIcon(selected: boolean, multi: boolean): string {
 }
 </script>
 
-<div class="s2b-question-bar" role="group" aria-label="Question from the agent">
+<div class="s2b-question-bar" role="group" aria-label={t("chat.question.group_aria")}>
   <div class="s2b-question-head">
     <div class="s2b-question-icon" use:icon={"message-circle-question"} style="--icon-size: var(--icon-xs)"></div>
     <span class="s2b-question-meta">
       {#if steps.length > 1}
-        Question {index + 1} of {steps.length}{step.question.header ? ` · ${step.question.header}` : ""}
+        {t("chat.question.position", { index: index + 1, total: steps.length })}{step.question.header ? ` · ${step.question.header}` : ""}
       {:else if step?.question.header}
         {step.question.header}
       {:else}
-        Question
+        {t("chat.question.label")}
       {/if}
     </span>
     <button
       class="s2b-question-dismiss clickable-icon"
       type="button"
-      aria-label="Dismiss question"
-      title="Dismiss without answering"
+      aria-label={t("chat.question.dismiss_aria")}
+      title={t("chat.question.dismiss_tooltip")}
       disabled={submitting}
       onclick={dismiss}
     >
@@ -142,7 +143,7 @@ function optionIcon(selected: boolean, multi: boolean): string {
   {#if step}
     <div class="s2b-question-text">{step.question.question}</div>
     {#if step.question.multiSelect}
-      <div class="s2b-question-hint">Select all that apply</div>
+      <div class="s2b-question-hint">{t("chat.question.multi_hint")}</div>
     {/if}
 
     <div class="s2b-question-options">
@@ -173,8 +174,8 @@ function optionIcon(selected: boolean, multi: boolean): string {
       <input
         class="s2b-question-custom"
         type="text"
-        placeholder={step.question.options.length > 0 ? "Something else…" : "Type your answer…"}
-        aria-label="Your own answer"
+        placeholder={step.question.options.length > 0 ? t("chat.question.custom_placeholder") : t("chat.question.answer_placeholder")}
+        aria-label={t("chat.question.custom_aria")}
         value={answer.custom}
         disabled={submitting}
         oninput={onCustomInput}
@@ -185,24 +186,24 @@ function optionIcon(selected: boolean, multi: boolean): string {
     {#if steps.length > 1 || step.question.multiSelect || answer.custom?.trim()}
       <div class="s2b-question-actions">
         {#if index > 0}
-          <button type="button" disabled={submitting} onclick={() => (index -= 1)}>Back</button>
+          <button type="button" disabled={submitting} onclick={() => (index -= 1)}>{t("common.back")}</button>
         {/if}
         {#if isLast}
           <button class="mod-cta" type="button" disabled={!allAnswered || submitting} onclick={submit}>
-            {steps.length > 1 ? "Send answers" : "Send answer"}
+            {steps.length > 1 ? t("chat.question.send_answers") : t("chat.question.send_answer")}
           </button>
         {:else}
           <button class="mod-cta" type="button" disabled={!isAnswered(answer) || submitting} onclick={advance}>
-            Next
+            {t("common.next")}
           </button>
         {/if}
       </div>
     {/if}
   {:else}
-    <div class="s2b-question-text">The agent asked a question that could not be shown.</div>
+    <div class="s2b-question-text">{t("chat.question.unrenderable")}</div>
     <div class="s2b-question-actions">
       <button class="mod-cta" type="button" disabled={submitting} onclick={() => void resume(resultFor)}>
-        Let it try again
+        {t("chat.question.retry")}
       </button>
     </div>
   {/if}

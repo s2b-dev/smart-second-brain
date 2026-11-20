@@ -1,4 +1,5 @@
 import { setIcon } from "obsidian";
+import { t } from "../../i18n";
 import PrivacyListComponent from "./PrivacyListModal.svelte";
 import { SvelteModal } from "./SvelteModal";
 
@@ -8,7 +9,7 @@ export class PrivacyListModal extends SvelteModal {
 		// directly. `shield-check` in `--text-accent` is the same treatment the
 		// "Note access policy" setting row that opens this modal uses, so the two
 		// surfaces read as the same feature.
-		this.setTitle("Manage Note Access Policy");
+		this.setTitle(t("modals.privacy_list.title"));
 		this.titleEl.addClass("s2b-privacy-modal-title");
 		const titleIconEl = createSpan();
 		titleIconEl.addClass("s2b-privacy-modal-title-icon");

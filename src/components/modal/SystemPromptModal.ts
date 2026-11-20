@@ -1,4 +1,5 @@
 import type SecondBrainPlugin from "../../main";
+import { t } from "../../i18n";
 import { SvelteModal } from "./SvelteModal";
 import SystemPromptModalComponent from "./SystemPromptModal.svelte";
 
@@ -59,10 +60,8 @@ export class SystemPromptModal extends SvelteModal {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.accessors = accessors;
-		this.titleText = options?.title ?? "System Prompt";
-		this.descriptionText =
-			options?.description ??
-			"Your version compared with the current default. Edit the note to merge changes by hand, or replace it with the default.";
+		this.titleText = options?.title ?? t("agents.system_prompt.title");
+		this.descriptionText = options?.description ?? t("agents.system_prompt.diff_description");
 		this.readOnly = options?.readOnly ?? false;
 		this.setTitle(this.titleText);
 	}

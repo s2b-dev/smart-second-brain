@@ -3,6 +3,7 @@ import { Tooltip } from "bits-ui";
 import { listSecrets } from "../../lib/secretStorage";
 import { showActionNotice } from "../../utils/actionNotice";
 import { getPlugin } from "../../stores/state.svelte";
+import { t } from "../../i18n";
 import { Logger } from "../../utils/logging";
 import { AddSecretModal } from "../modal/AddSecretModal";
 import Dropdown from "../ui/Dropdown.svelte";
@@ -51,8 +52,8 @@ $effect(() => {
 		// Reuse the local handler rather than opening AddSecretModal directly: it also
 		// refreshes the list and clears the notified/attempt flags on success.
 		showActionNotice(
-			`Secret "${value}" not found in Obsidian Keychain.`,
-			{ label: "Add a secret", run: handleAddSecret },
+			t("settings.secret_select.missing", { id: value }),
+			{ label: t("settings.secret_select.add_action"), run: handleAddSecret },
 			10000,
 		);
 		hasNotifiedMissing = true;
@@ -95,7 +96,7 @@ function handleAddSecret() {
 
 // Dropdown options
 let dropdownOptions = $derived([
-	{ display: "(Nothing selected)", value: "" },
+	{ display: t("settings.secret_select.nothing_selected"), value: "" },
 	...secrets.map((secretId) => ({
 		display: secretId,
 		value: secretId,
@@ -131,7 +132,7 @@ let selectedValue = $derived(secrets.includes(value) ? value : "");
           sideOffset={5}
           class="s2b-z-50 s2b-rounded s2b-bg-[--background-modifier-hover] s2b-px-2 s2b-py-1 s2b-text-xs s2b-shadow-md"
         >
-          Add new secret
+          {t("settings.secret_select.add_tooltip")}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

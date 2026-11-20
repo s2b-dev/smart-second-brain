@@ -5,6 +5,7 @@ import { identifyGroups } from "../../lib/diffGroups";
 import { getPendingChangesStore } from "../../stores/pendingChangesStore.svelte";
 import type { PendingChangeEntry } from "../../types/shared";
 import { icon } from "../../utils/utils";
+import { t } from "../../i18n";
 
 /**
  * In-chat diff for a pending `update`: one hunk per contiguous change group,
@@ -60,7 +61,7 @@ async function acceptGroup(groupIndex: number) {
 	try {
 		await store.acceptChangeGroup(entry.id, groupIndex);
 	} catch (e) {
-		new Notice(`Failed to apply change: ${e instanceof Error ? e.message : String(e)}`);
+		new Notice(t("chat.pending.notice_apply_failed", { error: e instanceof Error ? e.message : String(e) }));
 	}
 }
 
@@ -70,7 +71,7 @@ function rejectGroup(groupIndex: number) {
 </script>
 
 {#if groups.length === 0}
-  <div class="pdh-empty">No remaining differences.</div>
+  <div class="pdh-empty">{t("chat.pending.no_remaining_differences")}</div>
 {:else}
   <div class="pdh-hunks">
     {#each groups as group, groupIndex (groupIndex)}
@@ -87,9 +88,9 @@ function rejectGroup(groupIndex: number) {
                   class="pdh-action-icon pdh-action-accept"
                   onclick={() => acceptGroup(groupIndex)}
                   title={stale
-                    ? "Cannot accept — the note changed after this was proposed. Reject it and ask the agent to re-stage."
-                    : "Accept this change"}
-                  aria-label="Accept change {groupIndex + 1} of {groups.length}"
+                    ? t("chat.pending.stale_accept_disabled")
+                    : t("chat.pending.accept_hunk")}
+                  aria-label={t("chat.pending.accept_hunk_aria", { index: groupIndex + 1, total: groups.length })}
                   type="button"
                   disabled={stale}
                 >
@@ -98,8 +99,8 @@ function rejectGroup(groupIndex: number) {
                 <button
                   class="pdh-action-icon pdh-action-reject"
                   onclick={() => rejectGroup(groupIndex)}
-                  title="Reject this change"
-                  aria-label="Reject change {groupIndex + 1} of {groups.length}"
+                  title={t("chat.pending.reject_hunk")}
+                  aria-label={t("chat.pending.reject_hunk_aria", { index: groupIndex + 1, total: groups.length })}
                   type="button"
                 >
                   <div use:icon={"x"} style="--icon-size: 12px"></div>
@@ -110,7 +111,7 @@ function rejectGroup(groupIndex: number) {
         {/if}
         {#if group.removedText.length + group.addedText.length > MAX_HUNK_PREVIEW_CHARS}
           <div class="pdh-too-large">
-            This change is too large to preview here — open the note to review it.
+            {t("chat.pending.hunk_too_large")}
           </div>
         {:else}
           <!-- Word-level old->new diff, same idiom as the in-note card. The each

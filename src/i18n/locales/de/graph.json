@@ -1,0 +1,207 @@
+{
+	"view": {
+		"display_text": "Smart Graph",
+		"loading": "Graph wird erstellt…"
+	},
+	"toolbar": {
+		"exit_immerse": "Eintauchen beenden – zurück zum vollständigen Graphen",
+		"fit": "Graph an Ansicht anpassen",
+		"fit_with_key": "Graph an Ansicht anpassen (F)",
+		"lasso": "Lasso-Auswahl",
+		"lasso_with_hint": "Lasso-Auswahl (oder Shift gedrückt halten und ziehen)",
+		"exit_lasso": "Lasso-Auswahl beenden",
+		"hide_topics": "Themen ausblenden – den Graphen ohne Gruppierung anzeigen",
+		"show_topics": "Themen anzeigen – Notizen nach ihrem erkannten Thema einfärben",
+		"computing_topics": "Themen werden berechnet…",
+		"collapse_needs_topics": "Aktiviere Themen, um sie einzuklappen",
+		"expand_all": "Alle Themen wieder in Notizen aufklappen (S)",
+		"collapse_all": "Alle Themen zu einzelnen Knoten einklappen (S) – oder Themen auswählen und Einklappen verwenden",
+		"show_panel": "Graph-Bereich anzeigen",
+		"hide_panel": "Graph-Bereich ausblenden"
+	},
+	"controls": {
+		"aria_label": "Graph-Einstellungen",
+		"stats": {
+			"notes": {
+				"one": "{count} Notiz",
+				"other": "{count} Notizen"
+			},
+			"unlinked": {
+				"one": "{count} unverknüpft",
+				"other": "{count} unverknüpft"
+			},
+			"links": {
+				"one": "{count} Link",
+				"other": "{count} Links"
+			},
+			"inferred": {
+				"one": "{count} abgeleitet",
+				"other": "{count} abgeleitet"
+			}
+		},
+		"topics": {
+			"heading": "Themen",
+			"granularity": "Detailgrad",
+			"granularity_desc": "Links: wenige breite Themen. Rechts: viele spezifische. Jede Notiz bleibt sichtbar.",
+			"granularity_desc_with_keys": "Links: wenige breite Themen. Rechts: viele spezifische. Jede Notiz bleibt sichtbar. (↑/↓ im Graphen)",
+			"granularity_pending": "Themenebenen dieses Tresors werden ermittelt…",
+			"inferred_links": "Abgeleitete Links"
+		},
+		"inferred_hint": {
+			"no_index": "Verbinde Notizen nach Bedeutung, nicht nur über die Links, die du geschrieben hast. Benötigt einen Graph-Embedding-Index – wähle einen in den Graph-Einstellungen des Plugins.",
+			"hidden_still_grouping": "Ausgeblendet, gruppiert aber weiterhin Notizen. Zweimal umschalten, um sie auch von den Themen auszuschließen.",
+			"off": "Aus – Themen entstehen aus den Links, die du geschrieben hast.",
+			"off_coverage": "Aus – Themen entstehen aus den Links, die du geschrieben hast. Deine Links allein gruppieren {placed} von {total} Notizen ({percent} %); die übrigen {unlinked} sind unverknüpft.",
+			"on_no_edges": "Verbinde Notizen nach Bedeutung, nicht nur über die Links, die du geschrieben hast – benötigt einen Graph-Embedding-Index.",
+			"on": "Verbindet Notizen nach Bedeutung, nicht nur über die Links, die du geschrieben hast: {inferred} Ähnlichkeitsverbindungen, damit auch unverknüpfte Notizen ein Thema finden. Schalte es aus, um zu sehen, was deine eigenen Links abdecken."
+		},
+		"found": {
+			"heading": "Gefunden · {count}",
+			"multi_select_hint": "Shift/⌘ für Mehrfachauswahl",
+			"cancel_naming_aria": "Benennen der Themen abbrechen",
+			"cancel_naming": "Benennen abbrechen",
+			"name_topics": "Themen mit KI benennen"
+		},
+		"scope": {
+			"heading": "Umfang",
+			"markdown_only": "Nur Markdown",
+			"markdown_only_desc": "Nur Markdown-Notizen anzeigen; aus zeigt alle indexierbaren Dateien",
+			"tags": "Tags",
+			"tags_desc": "Jeden Tag als Knoten darstellen, der mit den Notizen verknüpft ist, die ihn tragen; gemeinsame Tags helfen auch, Themen zu formen"
+		},
+		"display": {
+			"heading": "Darstellung",
+			"topic_regions": "Themenbereiche",
+			"topic_regions_desc": "Den Bereich hinter jedem Thema einfärben, damit Gruppen auf einen Blick erkennbar sind",
+			"topic_labels": "Themenbeschriftungen",
+			"topic_labels_desc": "Die Themennamen als Etiketten über dem Graphen anzeigen",
+			"direction_arrows": "Richtungspfeile",
+			"direction_arrows_desc": "Pfeile für gerichtete Wikilinks anzeigen",
+			"highlight_inferred": "Abgeleitete Links hervorheben",
+			"highlight_inferred_desc_no_index": "Abgeleitete Links in der Akzentfarbe zeichnen. Benötigt einen Graph-Embedding-Index – wähle einen in den Graph-Einstellungen des Plugins.",
+			"highlight_inferred_desc": "Abgeleitete Links in der Akzentfarbe zeichnen, damit sie sich von deinen geschriebenen Links abheben",
+			"highlight_inferred_desc_off": "Abgeleitete Links in der Akzentfarbe zeichnen. Erfordert, dass „Abgeleitete Links“ (unter Themen) aktiviert ist.",
+			"highlight_isolated": "Isolierte hervorheben",
+			"highlight_isolated_desc": "Notizen ohne Wikilinks in der Akzentfarbe markieren",
+			"highlight_bridges": "Brücken hervorheben",
+			"highlight_bridges_desc": "Notizen, die mehrere Themen verbinden, in der Akzentfarbe markieren"
+		}
+	},
+	"selection": {
+		"aria_label": "Graph-Auswahl",
+		"count_selected": {
+			"one": "{count} Notiz ausgewählt",
+			"other": "{count} Notizen ausgewählt"
+		},
+		"notes_selected": {
+			"one": "Notiz ausgewählt",
+			"other": "Notizen ausgewählt"
+		},
+		"immersed_suffix": " · eingetaucht",
+		"notes_immersed": {
+			"one": "Notiz · eingetaucht",
+			"other": "Notizen · eingetaucht"
+		},
+		"immersed_into": "Eingetaucht in",
+		"immersed_prefix": "Eingetaucht ·",
+		"note_noun": {
+			"one": "Notiz",
+			"other": "Notizen"
+		},
+		"clear": "Auswahl aufheben",
+		"clear_with_key": "Auswahl aufheben (Esc)",
+		"zoom": "Auf Auswahl zoomen",
+		"zoom_with_key": "Auf Auswahl zoomen (F)",
+		"zoom_tooltip": "Die Kamera so bewegen, dass die ausgewählten Notizen hineinpassen",
+		"collapse": "Einklappen",
+		"expand": "Aufklappen",
+		"collapse_tooltip": "Die ausgewählten Themen zu einzelnen Knoten einklappen",
+		"expand_tooltip": "Die ausgewählten Themen wieder in Notizen aufklappen",
+		"immerse": "Eintauchen",
+		"immerse_tooltip": "Graph nur mit den ausgewählten Notizen neu aufbauen",
+		"open_in_chat": "Im Chat öffnen",
+		"open_in_chat_tooltip": "Den Chat einblenden und die ausgewählten Notizen anhängen",
+		"open_all": "Alle öffnen",
+		"open_all_tooltip": "Alle ausgewählten Notizen in neuen Tabs öffnen",
+		"exit": "Beenden",
+		"exit_immerse_tooltip": "Eintauchen beenden (Esc)"
+	},
+	"open_all_confirm": {
+		"title": "Alle Notizen öffnen",
+		"message": {
+			"one": "Dadurch wird {count} Notiz in einem neuen Tab geöffnet. Schließen musst du ihn selbst.",
+			"other": "Dadurch werden {count} Notizen in neuen Tabs geöffnet. Schließen musst du sie selbst."
+		},
+		"confirm": {
+			"one": "{count} Tab öffnen",
+			"other": "{count} Tabs öffnen"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "Der Chat ist noch nicht initialisiert. Öffne zuerst einen Chat.",
+		"private_titles_withheld": {
+			"one": "Private Notiztitel wurden bei {count} Thema zurückgehalten. Vertraue dem Anbieter des Graph-Modells, um sie einzubeziehen.",
+			"other": "Private Notiztitel wurden bei {count} Themen zurückgehalten. Vertraue dem Anbieter des Graph-Modells, um sie einzubeziehen."
+		},
+		"open_provider_settings": "Anbietereinstellungen öffnen",
+		"no_graph_chat_model": "Kein Graph-Chat-Modell ausgewählt, daher können Themen nicht benannt werden.",
+		"open_graph_settings": "Graph-Einstellungen öffnen"
+	},
+	"node_menu": {
+		"expand_topic": "Thema aufklappen",
+		"open_all_notes": {
+			"one": "{count} Notiz öffnen",
+			"other": "Alle {count} Notizen öffnen"
+		},
+		"search_tag": "Notizen mit diesem Tag suchen",
+		"open_file": "Datei öffnen",
+		"reveal_in_explorer": "Im Dateiexplorer anzeigen",
+		"focus_cluster": "Auf diesen Cluster fokussieren",
+		"collapse_topic": "Thema einklappen",
+		"select_cluster": "Diesen Cluster auswählen"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} Notiz",
+			"other": "{n} Notizen"
+		},
+		"links": {
+			"one": "{n} Link",
+			"other": "{n} Links"
+		},
+		"cluster_fallback": "Cluster {id}",
+		"connections": {
+			"one": "{count} Verbindung",
+			"other": "{count} Verbindungen"
+		},
+		"pinned": "📌 Angeheftet"
+	},
+	"note_context": {
+		"title": "Kontext",
+		"title_of": "Kontext von {name}",
+		"semantic_hint": "Semantische Nachbarn erscheinen, sobald ein Graph-Embedding-Index konfiguriert ist.",
+		"direction_in": "Eingehend",
+		"direction_out": "Ausgehend",
+		"direction_both": "Beide",
+		"updating": "Wird aktualisiert…",
+		"fit": "Graph an Ansicht anpassen",
+		"options": "Optionen für Notizkontext",
+		"close_options": "Optionen für Notizkontext schließen",
+		"view": "Ansicht",
+		"mode_graph": "Graph",
+		"mode_list": "Liste",
+		"show": "Anzeigen",
+		"linked": "Verknüpft",
+		"semantic": "Semantisch",
+		"both": "Beide",
+		"display": "Darstellung",
+		"direction_arrows": "Richtungspfeile",
+		"no_neighbors": "Keine Nachbarn.",
+		"open_a_note": "Öffne eine Notiz."
+	},
+	"topic_fallback": {
+		"unsorted": "Unsortiert",
+		"unsorted_with_count": "Unsortiert · {count}",
+		"topic": "Thema {id}"
+	}
+}

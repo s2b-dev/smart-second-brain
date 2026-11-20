@@ -1,4 +1,5 @@
 <script lang="ts">
+import { t } from "../../i18n";
 import { SearchDisplaySettingsModal } from "../../components/modal/SearchDisplaySettingsModal";
 import EmbeddingIndexSection from "../../components/settings/EmbeddingIndexSection.svelte";
 import SettingGroup from "../../components/settings/SettingGroup.svelte";
@@ -14,12 +15,12 @@ const plugin = getPlugin();
 
 const displaySummary = $derived.by(() => {
 	const enabledLabels: string[] = [];
-	if (pluginData.searchShowPath) enabledLabels.push("Path");
-	if (pluginData.searchShowTags) enabledLabels.push("Tags");
-	if (pluginData.searchShowMatchBadges) enabledLabels.push("Match badges");
-	if (pluginData.searchShowMatchContext) enabledLabels.push("Content snippets");
+	if (pluginData.searchShowPath) enabledLabels.push(t("settings.search.display.label_path"));
+	if (pluginData.searchShowTags) enabledLabels.push(t("settings.search.display.label_tags"));
+	if (pluginData.searchShowMatchBadges) enabledLabels.push(t("settings.search.display.label_match_badges"));
+	if (pluginData.searchShowMatchContext) enabledLabels.push(t("settings.search.display.label_content_snippets"));
 
-	return enabledLabels.length > 0 ? enabledLabels.join(", ") : "Nothing extra";
+	return enabledLabels.length > 0 ? enabledLabels.join(", ") : t("settings.search.display.nothing_extra");
 });
 
 function openDisplaySettingsModal() {
@@ -27,18 +28,18 @@ function openDisplaySettingsModal() {
 }
 </script>
 
-<SettingGroup heading="Display">
+<SettingGroup heading={t("settings.search.display.heading")}>
   <SettingItem
-    name="Result details"
-    desc={`Choose which metadata and context appear in each search result. Currently: ${displaySummary}.`}
+    name={t("settings.search.display.result_details")}
+    desc={t("settings.search.display.result_details_desc", { summary: displaySummary })}
   >
-    <Button buttonText="Configure" onClick={openDisplaySettingsModal} />
+    <Button buttonText={t("settings.search.display.configure")} onClick={openDisplaySettingsModal} />
   </SettingItem>
 
   {#if isMobileUI()}
     <SettingItem
-      name="Use S2B search in the navbar"
-      desc="Make the magnifier button in the bottom navbar open Smart Second Brain search instead of Obsidian's quick switcher. Only that button changes — the quick switcher still opens from the command palette and its hotkey."
+      name={t("settings.search.display.navbar_search")}
+      desc={t("settings.search.display.navbar_search_desc")}
     >
       <Toggle
         checked={pluginData.overrideMobileNavbarSearch}
@@ -49,18 +50,18 @@ function openDisplaySettingsModal() {
 </SettingGroup>
 
 <SettingGroup
-  heading="Indexed content"
-  headingDesc="Notes, canvases and widgets are always indexed. Choose which other files have their contents indexed for search and embeddings — the rest are still found by title and path, and the agent can still read them on demand."
+  heading={t("settings.search.indexed_content.heading")}
+  headingDesc={t("settings.search.indexed_content.heading_desc")}
 >
   <SettingItem
-    name="PDFs"
-    desc="Extract and index the text of PDFs. Slow on large libraries, and most of a long PDF is rarely relevant. Long PDFs are indexed up to roughly their first 80 pages (4 on mobile)."
+    name={t("settings.search.indexed_content.pdfs")}
+    desc={t("settings.search.indexed_content.pdfs_desc")}
   >
     <Toggle checked={pluginData.contentIndexing.pdfs} onchange={(checked) => pluginData.setContentIndexed("pdfs", checked)} />
   </SettingItem>
   <SettingItem
-    name="Chats"
-    desc="Index past conversations. They are mostly the model's own answers, which can then come back as if they were sources."
+    name={t("settings.search.indexed_content.chats")}
+    desc={t("settings.search.indexed_content.chats_desc")}
   >
     <Toggle
       checked={pluginData.contentIndexing.chats}
@@ -68,8 +69,8 @@ function openDisplaySettingsModal() {
     />
   </SettingItem>
   <SettingItem
-    name="Data files"
-    desc="Index CSV, JSON and YAML files. Structured data searches poorly by meaning, and a single export can add thousands of entries."
+    name={t("settings.search.indexed_content.data_files")}
+    desc={t("settings.search.indexed_content.data_files_desc")}
   >
     <Toggle checked={pluginData.contentIndexing.data} onchange={(checked) => pluginData.setContentIndexed("data", checked)} />
   </SettingItem>

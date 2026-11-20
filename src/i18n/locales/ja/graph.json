@@ -1,0 +1,192 @@
+{
+	"view": {
+		"display_text": "スマートグラフ",
+		"loading": "グラフを構築中..."
+	},
+	"toolbar": {
+		"exit_immerse": "没入を終了 — グラフ全体に戻る",
+		"fit": "グラフを画面に合わせる",
+		"fit_with_key": "グラフを画面に合わせる (F)",
+		"lasso": "投げ縄選択",
+		"lasso_with_hint": "投げ縄選択(または Shift を押しながらドラッグ)",
+		"exit_lasso": "投げ縄選択を終了",
+		"hide_topics": "トピックを隠す — クラスタリングなしの素のグラフを表示",
+		"show_topics": "トピックを表示 — 検出したトピックごとにノートを色分け",
+		"computing_topics": "トピックを計算中…",
+		"collapse_needs_topics": "折りたたむにはトピックをオンにしてください",
+		"expand_all": "すべてのトピックをノートに展開 (S)",
+		"collapse_all": "すべてのトピックを単一ノードに折りたたむ (S) — またはトピックを選択して「折りたたむ」を使用",
+		"show_panel": "グラフパネルを表示",
+		"hide_panel": "グラフパネルを隠す"
+	},
+	"controls": {
+		"aria_label": "グラフ設定",
+		"stats": {
+			"notes": {
+				"other": "{count} ノート"
+			},
+			"unlinked": {
+				"other": "{count} 未リンク"
+			},
+			"links": {
+				"other": "{count} リンク"
+			},
+			"inferred": {
+				"other": "{count} 推定"
+			}
+		},
+		"topics": {
+			"heading": "トピック",
+			"granularity": "粒度",
+			"granularity_desc": "左: 少数の大まかなトピック。右: 多数の細かなトピック。すべてのノートは表示されたままです。",
+			"granularity_desc_with_keys": "左: 少数の大まかなトピック。右: 多数の細かなトピック。すべてのノートは表示されたままです。(グラフ上で ↑/↓)",
+			"granularity_pending": "この保管庫のトピック階層を計算中…",
+			"inferred_links": "推定リンク"
+		},
+		"inferred_hint": {
+			"no_index": "自分で書いたリンクだけでなく、意味によってもノートをつなぎます。グラフ用の埋め込みインデックスが必要です — プラグインのグラフ設定で選択してください。",
+			"hidden_still_grouping": "非表示ですが、ノートのグループ化には引き続き使われています。トピックからも除外するには 2 回切り替えてください。",
+			"off": "オフ — トピックは自分で書いたリンクから作られます。",
+			"off_coverage": "オフ — トピックは自分で書いたリンクから作られます。リンクだけで {total} 件中 {placed} 件のノート({percent}%)がグループ化され、残りの {unlinked} 件は未リンクです。",
+			"on_no_edges": "自分で書いたリンクだけでなく、意味によってもノートをつなぎます — グラフ用の埋め込みインデックスが必要です。",
+			"on": "自分で書いたリンクだけでなく、意味によってもノートをつなぎます: {inferred} 件の類似度による接続で、未リンクのノートもトピックに入ります。オフにすると、自分のリンクがどこまでカバーしているか確認できます。"
+		},
+		"found": {
+			"heading": "検出 · {count}",
+			"multi_select_hint": "shift/⌘ で複数選択",
+			"cancel_naming_aria": "トピックの命名をキャンセル",
+			"cancel_naming": "命名をキャンセル",
+			"name_topics": "AI でトピックに名前を付ける"
+		},
+		"scope": {
+			"heading": "範囲",
+			"markdown_only": "Markdown のみ",
+			"markdown_only_desc": "Markdown ノートのみを表示します。オフにするとインデックス可能なすべてのファイルを表示します",
+			"tags": "タグ",
+			"tags_desc": "各タグを、そのタグを持つノートにつながるノードとして描画します。共通のタグはトピックの形成にも役立ちます"
+		},
+		"display": {
+			"heading": "表示",
+			"topic_regions": "トピック領域",
+			"topic_regions_desc": "各トピックの背後の領域に色を付け、グループがひと目でわかるようにします",
+			"topic_labels": "トピックラベル",
+			"topic_labels_desc": "グラフ上にトピック名のラベルを表示します",
+			"direction_arrows": "方向の矢印",
+			"direction_arrows_desc": "方向のあるウィキリンクに矢印を表示します",
+			"highlight_inferred": "推定リンクを強調",
+			"highlight_inferred_desc_no_index": "推定リンクをアクセントカラーで描画します。グラフ用の埋め込みインデックスが必要です — プラグインのグラフ設定で選択してください。",
+			"highlight_inferred_desc": "推定リンクをアクセントカラーで描画し、自分で書いたリンクと区別します",
+			"highlight_inferred_desc_off": "推定リンクをアクセントカラーで描画します。「トピック」の「推定リンク」をオンにする必要があります。",
+			"highlight_isolated": "孤立ノートを強調",
+			"highlight_isolated_desc": "ウィキリンクのないノートをアクセントカラーで示します",
+			"highlight_bridges": "橋渡しノートを強調",
+			"highlight_bridges_desc": "複数のトピックをつなぐノートをアクセントカラーで示します"
+		}
+	},
+	"selection": {
+		"aria_label": "グラフの選択",
+		"count_selected": {
+			"other": "{count} 件のノートを選択中"
+		},
+		"notes_selected": {
+			"other": "件のノートを選択中"
+		},
+		"immersed_suffix": " · 没入中",
+		"notes_immersed": {
+			"other": "件のノート · 没入中"
+		},
+		"immersed_into": "没入中:",
+		"immersed_prefix": "没入中 ·",
+		"note_noun": {
+			"other": "件のノート"
+		},
+		"clear": "選択を解除",
+		"clear_with_key": "選択を解除 (Esc)",
+		"zoom": "選択範囲にズーム",
+		"zoom_with_key": "選択範囲にズーム (F)",
+		"zoom_tooltip": "選択したノートが収まるようにカメラを移動します",
+		"collapse": "折りたたむ",
+		"expand": "展開",
+		"collapse_tooltip": "選択したトピックを単一ノードに折りたたみます",
+		"expand_tooltip": "選択したトピックをノートに展開します",
+		"immerse": "没入",
+		"immerse_tooltip": "選択したノートだけでグラフを再構築します",
+		"open_in_chat": "チャットで開く",
+		"open_in_chat_tooltip": "チャットを表示し、選択したノートを添付します",
+		"open_all": "すべて開く",
+		"open_all_tooltip": "選択したノートをすべて新しいタブで開きます",
+		"exit": "終了",
+		"exit_immerse_tooltip": "没入を終了 (Esc)"
+	},
+	"open_all_confirm": {
+		"title": "すべてのノートを開く",
+		"message": {
+			"other": "{count} 件のノートを新しいタブで開きます。閉じるときは手動で閉じる必要があります。"
+		},
+		"confirm": {
+			"other": "{count} 個のタブを開く"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "チャットがまだ初期化されていません。先にチャットを開いてください。",
+		"private_titles_withheld": {
+			"other": "{count} 件のトピックで非公開ノートのタイトルを除外しました。含めるには、グラフモデルのプロバイダーを信頼済みにしてください。"
+		},
+		"open_provider_settings": "プロバイダー設定を開く",
+		"no_graph_chat_model": "グラフ用チャットモデルが選択されていないため、トピックに名前を付けられません。",
+		"open_graph_settings": "グラフ設定を開く"
+	},
+	"node_menu": {
+		"expand_topic": "トピックを展開",
+		"open_all_notes": {
+			"other": "{count} 件のノートをすべて開く"
+		},
+		"search_tag": "このタグを持つノートを検索",
+		"open_file": "ファイルを開く",
+		"reveal_in_explorer": "ファイルエクスプローラーで表示",
+		"focus_cluster": "このクラスターにフォーカス",
+		"collapse_topic": "トピックを折りたたむ",
+		"select_cluster": "このクラスターを選択"
+	},
+	"node_tooltip": {
+		"notes": {
+			"other": "{n} ノート"
+		},
+		"links": {
+			"other": "{n} リンク"
+		},
+		"cluster_fallback": "クラスター {id}",
+		"connections": {
+			"other": "{count} 件の接続"
+		},
+		"pinned": "📌 固定済み"
+	},
+	"note_context": {
+		"title": "コンテキスト",
+		"title_of": "{name} のコンテキスト",
+		"semantic_hint": "グラフ用の埋め込みインデックスを設定すると、意味的に近いノートが表示されます。",
+		"direction_in": "入",
+		"direction_out": "出",
+		"direction_both": "両方",
+		"updating": "更新中…",
+		"fit": "グラフを画面に合わせる",
+		"options": "ノートコンテキストのオプション",
+		"close_options": "ノートコンテキストのオプションを閉じる",
+		"view": "表示形式",
+		"mode_graph": "グラフ",
+		"mode_list": "リスト",
+		"show": "表示",
+		"linked": "リンク",
+		"semantic": "意味",
+		"both": "両方",
+		"display": "表示",
+		"direction_arrows": "方向の矢印",
+		"no_neighbors": "近接ノートはありません。",
+		"open_a_note": "ノートを開いてください。"
+	},
+	"topic_fallback": {
+		"unsorted": "未分類",
+		"unsorted_with_count": "未分類 · {count}",
+		"topic": "トピック {id}"
+	}
+}
