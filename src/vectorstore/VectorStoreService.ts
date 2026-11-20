@@ -60,7 +60,7 @@ import {
 	takeEmbeddingBatch,
 } from "./batchSize";
 import { aggregateChunksToNotes } from "./chunkAggregation";
-import { formatRetrievalQuery } from "./queryInstruction";
+import { documentPrefixLength, formatRetrievalDocument, formatRetrievalQuery } from "./queryInstruction";
 import { createVectorStore } from "./storeFactory";
 import {
 	type DefaultEmbedModel,
@@ -866,7 +866,24 @@ export class VectorStoreService {
 		defaultModel: DefaultEmbedModel | null,
 	): Promise<number> {
 		const maxInputTokens = await this.getEmbeddingMaxInputTokens(inst, defaultModel);
-		return Math.min(maxInputTokens, MAX_EMBED_CHUNK_TOKENS) * CHARS_PER_TOKEN;
+		// The document prefix (`embedDocumentsFor`) rides on every chunk, so the
+		// chunk itself gets that much less of the window.
+		const prefix = defaultModel ? documentPrefixLength(defaultModel.model) : 0;
+		return Math.min(maxInputTokens, MAX_EMBED_CHUNK_TOKENS) * CHARS_PER_TOKEN - prefix;
+	}
+
+	/**
+	 * Embed document chunks in the form the model was trained on: raw for most
+	 * families, prefixed for those with a document-side marker (e5, EmbeddingGemma).
+	 * Every index-time `embedDocuments` goes through here so the build, the
+	 * per-entry retry and single-note reindex can never disagree.
+	 */
+	private embedDocumentsFor(
+		embeddings: EmbeddingsInterface,
+		model: DefaultEmbedModel,
+		texts: string[],
+	): Promise<number[][]> {
+		return embeddings.embedDocuments(texts.map((text) => formatRetrievalDocument(model.model, text)));
 	}
 
 	/**
@@ -1878,7 +1895,10 @@ export class VectorStoreService {
 
 			try {
 				const texts = batch.map((entry) => entry.embedText);
-				const vectors = await this.embedWithCancellation(inst, embeddings.embedDocuments(texts));
+				const vectors = await this.embedWithCancellation(
+					inst,
+					this.embedDocumentsFor(embeddings, model, texts),
+				);
 				// The run may have been aborted (e.g. index deleted) while the
 				// embedding call was in flight; bail before writing to a store
 				// that could now be closed.
@@ -1960,7 +1980,10 @@ export class VectorStoreService {
 					try {
 						// A document, so `embedDocuments` — `embedQuery` is the query
 						// side of an asymmetric model and may be wrapped differently.
-						[vector] = await this.embedWithCancellation(inst, embeddings.embedDocuments([entry.embedText]));
+						[vector] = await this.embedWithCancellation(
+							inst,
+							this.embedDocumentsFor(embeddings, model, [entry.embedText]),
+						);
 					} catch (entryError) {
 						// Cancellation is not a per-file failure. Without this guard,
 						// aborting mid-batch fires one error Notice per remaining
@@ -2220,7 +2243,11 @@ export class VectorStoreService {
 		// leave a note partially indexed.
 		let raw: number[][];
 		try {
-			raw = await embeddings.embedDocuments(chunks.map((chunk) => chunk.content));
+			raw = await this.embedDocumentsFor(
+				embeddings,
+				model,
+				chunks.map((chunk) => chunk.content),
+			);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to embed ${file.path} (${inst.indexId}):`, error);
 			const reason = error instanceof Error ? error.message : String(error);
@@ -2367,11 +2394,11 @@ export class VectorStoreService {
 		if (!embeddings) return [];
 
 		try {
-			// Asymmetric models (Qwen3-Embedding, harrier, BGE) want the query
-			// wrapped in a task instruction that documents never carry — see
+			// Asymmetric models (Qwen3-Embedding, harrier, BGE, arctic, e5, EmbeddingGemma)
+			// want the query wrapped in a task instruction — see
 			// `queryInstruction.ts` for the families and the measured effect.
-			// Documents are embedded raw at index time, so this is query-only
-			// and needs no reindex.
+			// Documents carry their own marker only where the family has one
+			// (`embedDocumentsFor`).
 			const embedInput = formatRetrievalQuery(model.model, query);
 			const maxContentLength = await this.getMaxEmbeddingContentLength(inst, model);
 			if (embedInput.length > maxContentLength) {

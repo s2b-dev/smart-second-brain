@@ -1388,3 +1388,79 @@ describe("notes with no text to embed (#541)", () => {
 		expect(stores.get(INDEX)?.docs.get("Sketch.excalidraw.md#0")?.mtime).toBe(6_000);
 	});
 });
+
+describe("document-side prefixes (EmbeddingGemma)", () => {
+	const EG_INDEX = "fake:embeddinggemma-2";
+	const DOC_PREFIX = "title: none | text: ";
+
+	beforeEach(() => {
+		indexIds = [EG_INDEX];
+		fakeData.searchEmbedIndex = EG_INDEX;
+		platform.isMobile = false;
+	});
+
+	const embeddedTexts = () => embedDocuments.mock.calls.flatMap(([texts]) => texts);
+
+	it("prefixes every chunk of a bulk build", async () => {
+		vaultFiles = [file("a.md"), file("b.md"), file("c.md")];
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const texts = embeddedTexts();
+		expect(texts).toHaveLength(3);
+		for (const text of texts) expect(text.startsWith(DOC_PREFIX)).toBe(true);
+	});
+
+	it("prefixes the per-entry retry after a failed batch", async () => {
+		vaultFiles = [file("a.md"), file("b.md")];
+		embedDocuments.mockRejectedValueOnce(new Error("batch exploded"));
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		// One failed batch of two, then one call per entry.
+		const singles = embedDocuments.mock.calls.slice(1).map(([texts]) => texts);
+		expect(singles).toHaveLength(2);
+		for (const [text] of singles) expect(text.startsWith(DOC_PREFIX)).toBe(true);
+		expect(stores.get(EG_INDEX)?.docs.has("a.md#0")).toBe(true);
+	});
+
+	it("prefixes a single-note reindex", async () => {
+		vaultFiles = [file("a.md")];
+		const svc = await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+		embedDocuments.mockClear();
+
+		vaultFiles[0].stat.mtime = 2_000;
+		await (svc as unknown as EventHooks).reindexModifiedFile(vaultFiles[0]);
+
+		expect(embedDocuments).toHaveBeenCalledTimes(1);
+		const [text] = embedDocuments.mock.calls[0][0];
+		expect(text.startsWith(DOC_PREFIX)).toBe(true);
+		expect(text).toContain("content of a.md");
+	});
+
+	it("keeps prefixed chunks inside the chunk budget", async () => {
+		// 2048 tokens × 3 chars: the cap a prefixed chunk must still fit under.
+		const chunkCap = 2048 * 3;
+		vaultFiles = [file("long.md")];
+		longContent = "word ".repeat(12_000);
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		const texts = embeddedTexts();
+		expect(texts.length).toBeGreaterThan(1);
+		for (const text of texts) expect(text.length).toBeLessThanOrEqual(chunkCap);
+		// Packed right up to the cap, so a budget that forgot the prefix would overflow it.
+		expect(Math.max(...texts.map((text) => text.length))).toBeGreaterThan(chunkCap - DOC_PREFIX.length * 2);
+	});
+
+	it("leaves documents raw for a model without a document prefix", async () => {
+		indexIds = [INDEX];
+		fakeData.searchEmbedIndex = INDEX;
+		vaultFiles = [file("a.md")];
+		await startService();
+		await vi.advanceTimersByTimeAsync(1_000);
+
+		for (const text of embeddedTexts()) expect(text.startsWith(DOC_PREFIX)).toBe(false);
+	});
+});
