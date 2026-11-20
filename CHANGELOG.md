@@ -20,6 +20,28 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.6.0 (2026-11-20)
+
+Your agent now shows its plan as a task list, asks when a request is unclear, and speaks your language.
+
+### New
+- **Chat: a task list for multi-step work.** When a request takes several steps, like restructuring a folder or merging notes, the agent writes its plan as a checklist above the chat input and ticks items off as it goes. Simple requests skip it. You can turn it off in the Tools modal (#569).
+- **Chat: the agent can ask you a question.** When a request is unclear, the agent stops and asks a multiple-choice question above the chat input instead of guessing. Pick an option, type your own answer, or dismiss it. An open question survives reloads. Originally built by @Klabundo (#504).
+- **Providers: Hugging Face.** Chat with models from Hugging Face Inference Providers. Click "Sign in with Hugging Face" and approve in the browser; no token to create or paste. A pasted access token works too (#575).
+- **The plugin speaks your language.** The interface follows Obsidian's language setting and is available in German, French, Spanish, Brazilian Portuguese, Russian, Turkish, Slovenian, Simplified Chinese, Japanese and Korean. The translations are machine-made; corrections are welcome (#579).
+
+### Improvements
+- **Agents: long chats no longer fail when they outgrow the model.** If a provider rejects a request as too long, the chat is summarized and the request retried once, instead of the turn ending in an error (#571).
+- **Agents: a clear message when the model refuses.** A safety refusal from Anthropic or OpenAI used to end the turn with an empty answer. It now says the model declined, with Retry (#571).
+- **Agents: lower costs with Anthropic.** Prompt caching is on, so the system prompt and the conversation so far are read from Anthropic's cache instead of billed in full on every request and every tool step (#570).
+- **Search: better results with EmbeddingGemma, e5 and snowflake-arctic.** Queries and notes now get the retrieval prefixes these models expect. Rebuild an existing EmbeddingGemma or e5 index to benefit (#578).
+- **Providers: OpenAI-compatible endpoints report their own context window.** vLLM, SGLang, LiteLLM, Groq and Mistral endpoints now supply each model's real context length, instead of a guess that could be far too small or too large (#576).
+- **Chat: quieter error and stopped notices.** A failed request shows a compact card with Retry in its header instead of a full-width banner, and a stopped turn a single "Stopped" line (#574).
+
+### Fixes
+- **Chat: summarized chats stay summarized after a reload.** Reopening a summarized chat brought the full history back and sent all of it to the model again (#572).
+- **Chat: the first turn stays visible after summarization.** It disappeared from the transcript, and the summary marker sat at the top instead of before the turn where summarization happened (#573).
+
 ## 2.5.0 (2026-11-18)
 
 Your agent now knows how your vault is organized, so new notes land in the right place with the right names and tags.
