@@ -1083,6 +1083,33 @@ On the core tier semantic is *ahead* and widened slightly, δ=-0.0537 (sign test
 5 / hybrid 2 / 7 tied). Neither is significant, and with ~7 of 10 results still unjudged
 the remaining holes plausibly cover the rest of the hard-tier gap.
 
+##### 2026-11-20 — EmbeddingGemma 2 vs harrier, and what its prefixes are worth
+
+Slot vault `S2B WT2`, 381 notes, all three indexes built the same day through oMLX.
+`omlx:embeddinggemma-2-6bit` (`mlx-community/embeddinggemma-2-6bit`, 270M text
+backbone, 768 dims) against `omlx:harrier-oss-v1-0.6b-MLX-8bit` (1024 dims). "raw" is
+EmbeddingGemma 2 indexed and queried with its prefixes disabled, from a fresh index.
+
+| Tier (nDCG@10 / MRR)       | EG2 + prefixes  | EG2 raw         | harrier         |
+| -------------------------- | --------------- | --------------- | --------------- |
+| hybrid core (n=14)         | 0.9631 / 1.0000 | 0.9421 / 0.9643 | 0.9335 / 0.9286 |
+| hybrid hard (n=25)         | 0.7755 / 0.7930 | 0.7589 / 0.7621 | 0.8261 / 0.8178 |
+| semantic core (n=14)       | 0.9527 / 1.0000 | 0.9498 / 0.9643 | 0.9308 / 0.9286 |
+| semantic hard (n=25)       | 0.7441 / 0.7817 | 0.7109 / 0.6892 | 0.7983 / 0.8178 |
+| recency (n=4)              | 1.0000          | 1.0000          | 1.0000          |
+
+Hard-tier hybrid axes, EG2 + prefixes vs harrier: `polysemy` 0.6701 vs 0.8038,
+`intent-frame` 0.6006 vs 0.6706, `long-context` 0.9075 vs 1.0000; `cross-lingual`
+(0.7500), `multi-hop` (0.8155), `dilution` and `size-bias` (1.0000) tie.
+
+Reading: the card's prefixes help EmbeddingGemma on every aggregate (semantic hard
++0.033, hybrid core +0.021), so they are worth applying. Against harrier it is a
+trade, not an upgrade: slightly ahead on the core tier, clearly behind on the hard
+tier, where the gap is polysemy and intent. One build per arm, no cross-model CI; at
+n=14/25 only the hard-tier gap is large enough to read as more than noise. oMLX
+embedded EmbeddingGemma batches in ~0.1 s against ~0.4 s for harrier, at a
+quarter-smaller vector.
+
 ##### 2026-08-18 (re-measured) — corrected matrix on the consolidated layout
 
 Re-run after restoring `test/search-benchmark-realistic-corpus`, so these supersede the
