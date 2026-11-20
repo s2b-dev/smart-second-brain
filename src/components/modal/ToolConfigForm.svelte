@@ -433,7 +433,7 @@ function openProcessorSelectionModal(currentProcessor: ChatModel | null, onSelec
   {:else if showResetToDefault}
     <div class="tool-config-inline-reset">
       <button type="button" class="tool-config-reset-link" onclick={handleResetToDefault}>
-        {t("agents.tool_config.reset_tool_to_default", { name: getToolDisplayName(capturedToolId, name) })}
+        {t("agents.tool_config.reset_tool_to_default", { name: getToolDisplayName(capturedToolId) })}
       </button>
     </div>
   {/if}

@@ -255,22 +255,19 @@ export const DEFAULT_TOOLS_CONFIG: ToolsConfig = Object.fromEntries(
 ) as ToolsConfig;
 
 /**
- * Human-facing display name for a tool. Prefers the agent's configured tool name,
- * falls back to the default, and title-cases snake_case names for readability.
+ * Human-facing display name for a tool, in the UI language. `toolsConfig[id].name` is the
+ * model-facing tool name (never edited in the UI), so it is deliberately not consulted here.
  */
-export function getToolDisplayName(toolId: BuiltInToolId, configuredName?: string): string {
-	const name = configuredName ?? BUILT_IN_TOOL_DEFAULTS[toolId]?.displayName ?? toolId;
-	return name.includes("_")
-		? name
-				.split("_")
-				.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-				.join(" ")
-		: name;
+export function getToolDisplayName(toolId: BuiltInToolId): string {
+	return BUILT_IN_TOOL_DEFAULTS[toolId]?.displayName ?? toolId;
 }
 
-/** Description shown for a tool in the UI — configured description first, then the summary. */
-export function getToolDescription(toolId: BuiltInToolId, configuredDescription?: string): string {
-	return configuredDescription ?? BUILT_IN_TOOL_DEFAULTS[toolId]?.summary ?? "";
+/**
+ * One-line description of a tool for the UI, in the UI language. `toolsConfig[id].description`
+ * is the model-facing tool description, so it is deliberately not shown here.
+ */
+export function getToolDescription(toolId: BuiltInToolId): string {
+	return BUILT_IN_TOOL_DEFAULTS[toolId]?.summary ?? "";
 }
 
 /**

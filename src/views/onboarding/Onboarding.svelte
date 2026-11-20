@@ -221,7 +221,8 @@ function openHotkeysSettings() {
 	// a missing search component isn't worth a warning.
 	const search = setting.activeTab?.searchComponent;
 	if (!search) return;
-	const query = "search notes";
+	// Must match the command name as registered in main.ts, which is translated.
+	const query = t("plugin.commands.search_notes");
 	search.setValue(query);
 	search.changeCallback(query);
 }

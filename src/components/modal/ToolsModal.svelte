@@ -112,15 +112,14 @@ function openToolConfig(toolId: BuiltInToolId) {
         hasItems={true}
       >
         {#each BUILT_IN_TOOL_IDS as toolId (toolId)}
-          {@const config = selectedAgent.toolsConfig[toolId]}
           {@const skills = attachingSkills.get(toolId) ?? []}
           {@const alwaysAttached = ALWAYS_ATTACHED_TOOL_IDS.has(toolId)}
           {@const attached = alwaysAttached || skills.length > 0}
           {@const enabled = isToolEnabled(toolId)}
-          {@const displayName = getToolDisplayName(toolId, config?.name)}
+          {@const displayName = getToolDisplayName(toolId)}
           <ManagedEntityItem
             name={displayName}
-            desc={getToolDescription(toolId, config?.description)}
+            desc={getToolDescription(toolId)}
             disabled={!attached}
           >
             {#snippet badges()}

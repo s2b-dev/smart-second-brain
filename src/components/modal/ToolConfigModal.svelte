@@ -18,10 +18,9 @@ interface Props {
 const { modal, plugin, toolId, onSave, accessors }: Props = $props();
 
 const capturedToolId = (() => toolId)();
-const configuredName = (() => accessors?.getToolConfig()?.name)();
 
 onMount(() => {
-	modal.setTitle(t("agents.tool_config.title", { name: getToolDisplayName(capturedToolId, configuredName) }));
+	modal.setTitle(t("agents.tool_config.title", { name: getToolDisplayName(capturedToolId) }));
 });
 </script>
 
