@@ -134,6 +134,8 @@ describe("resolveLocale", () => {
 		["ja", "ja"],
 		["ru", "ru"],
 		["ko", "ko"],
+		["tr", "tr"],
+		["sl", "sl"],
 		["it", "en"],
 		["", "en"],
 		[undefined, "en"],

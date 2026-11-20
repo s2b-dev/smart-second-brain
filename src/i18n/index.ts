@@ -39,7 +39,7 @@ import widget from "./locales/en/widget.json";
 const en = { agents, common, chat, graph, modals, onboarding, plugin, settings, ui, widget };
 
 /** Locales shipped with the plugin, in the codes Obsidian's `getLanguage()` reports. */
-export const SUPPORTED_LOCALES = ["en", "de", "fr", "es", "pt-BR", "ru", "zh", "ja", "ko"] as const;
+export const SUPPORTED_LOCALES = ["en", "de", "fr", "es", "pt-BR", "ru", "tr", "sl", "zh", "ja", "ko"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export const PLURAL_CATEGORIES = ["zero", "one", "two", "few", "many", "other"] as const;

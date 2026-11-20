@@ -1,0 +1,15 @@
+{
+	"bottom_sheet": {
+		"resize_label": "Paneli yeniden boyutlandır"
+	},
+	"docs_link": {
+		"subject_label": "Belgelendirme: {subject}",
+		"open_label": "Belgelendirmeyi aç"
+	},
+	"markdown": {
+		"copy_code": "Kodu kopyala"
+	},
+	"search": {
+		"placeholder": "Ara..."
+	}
+}

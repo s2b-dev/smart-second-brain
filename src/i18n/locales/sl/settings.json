@@ -1,0 +1,251 @@
+{
+	"tabs": {
+		"general": "Splošno",
+		"search": "Iskanje",
+		"agents": "Agenti",
+		"graph": "Graf",
+		"troubleshooting": "Odpravljanje težav",
+		"developer": "Razvijalec"
+	},
+	"general": {
+		"providers": {
+			"heading": "Ponudniki",
+			"description": "Ponudniki povežejo Smart Second Brain s storitvami AI, ki se uporabljajo za klepet, vdelave in druge funkcije, ki jih poganjajo modeli.",
+			"empty": "Še ni nastavljenih primerkov ponudnikov.",
+			"add": "Dodaj ponudnika"
+		},
+		"privacy": {
+			"heading": "Zasebnost",
+			"note_access": "Pravilnik dostopa do zapiskov",
+			"note_access_desc": "Izberite, ali ponudniki, ki niso zaupanja vredni, privzeto ne vidijo ničesar ali vse, nato upravljajte ustrezen seznam datotek.",
+			"manage": "Upravljaj",
+			"check_updates": "Preverjaj posodobitve",
+			"check_updates_desc": "Enkrat na dan z GitHuba pridobi številko različice tega vtičnika in prikaži obvestilo, ko je na voljo novejša. O vas ali vašem sefu se ne pošlje nič. Preskočeno, dokler je vklopljeno Obsidianovo samodejno preverjanje posodobitev vtičnikov."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "Prikaz",
+			"result_details": "Podrobnosti rezultatov",
+			"result_details_desc": "Izberite, kateri metapodatki in kontekst se prikažejo pri vsakem rezultatu iskanja. Trenutno: {summary}.",
+			"configure": "Nastavi",
+			"label_path": "Pot",
+			"label_tags": "Oznake",
+			"label_match_badges": "Značke ujemanja",
+			"label_content_snippets": "Izrezki vsebine",
+			"nothing_extra": "Nič dodatnega",
+			"navbar_search": "Uporabi iskanje S2B v navigacijski vrstici",
+			"navbar_search_desc": "Gumb s povečevalnim steklom v spodnji navigacijski vrstici naj namesto Obsidianovega hitrega preklopnika odpre iskanje Smart Second Brain. Spremeni se samo ta gumb – hitri preklopnik se še vedno odpre iz palete ukazov in s svojo bližnjico."
+		},
+		"indexed_content": {
+			"heading": "Indeksirana vsebina",
+			"heading_desc": "Zapiski, platna in gradniki so vedno indeksirani. Izberite, katerim drugim datotekam naj se vsebina indeksira za iskanje in vdelave – ostale se še vedno najdejo po naslovu in poti, agent pa jih lahko po potrebi še vedno prebere.",
+			"pdfs": "PDF-ji",
+			"pdfs_desc": "Izlušči in indeksiraj besedilo PDF-jev. Pri velikih knjižnicah je počasno, večina dolgega PDF-ja pa je redko pomembna. Dolgi PDF-ji se indeksirajo približno do prvih 80 strani (4 na mobilnih napravah).",
+			"chats": "Klepeti",
+			"chats_desc": "Indeksiraj pretekle pogovore. Večinoma so to modelovi lastni odgovori, ki se lahko nato vrnejo, kot da bi bili viri.",
+			"data_files": "Podatkovne datoteke",
+			"data_files_desc": "Indeksiraj datoteke CSV, JSON in YAML. Po strukturiranih podatkih se po pomenu slabo išče, en sam izvoz pa lahko doda na tisoče vnosov."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "Imena tem",
+			"naming_model": "Model za poimenovanje tem",
+			"naming_model_desc": "Model, ki poimenuje teme. Brez njega se tema poimenuje po svojem najbolje povezanem zapisku.",
+			"naming_model_desc_withheld": "Model, ki poimenuje teme. Brez njega se tema poimenuje po svojem najbolje povezanem zapisku. Ta ponudnik ni zaupanja vreden za zasebne zapiske, zato so zasebni naslovi izvzeti iz poimenovanja.",
+			"configure_provider": "Nastavi ponudnika",
+			"configure_models": "Nastavi modele",
+			"no_provider": "Noben ponudnik AI še ni nastavljen.",
+			"select_model": "Izberite model",
+			"clear": "Počisti",
+			"auto_name": "Samodejno poimenuj teme",
+			"auto_name_desc": "Poimenuj teme, kadar koli se spremenijo. Izklopljeno pomeni, da poimenovanje teče le iz plošče Teme v grafu."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "Uvajanje",
+			"replay": "Znova predvajaj uvod",
+			"replay_desc": "Ponastavi pozdravno animacijo in zastavice dokončanja – pogled Dobrodošli znova predvaja uvod in se ob zagonu samodejno odpre, kot da bi šlo za prvi zagon (dokler ni nastavljen ponudnik).",
+			"reset": "Ponastavi uvod",
+			"reset_notice": "Uvajanje je ponastavljeno in znova odprto – uvod se bo predvajal od začetka."
+		},
+		"chat": {
+			"heading": "Klepet",
+			"raw_tool_io": "Prikaži surovi vhod/izhod orodij",
+			"raw_tool_io_desc": "V vrsticah klicev orodij v klepetu prikaži natančne argumente orodij in surovi izhod. Privzeto izklopljeno – uporabniki vidijo le povzetek v preprostem jeziku in prijazen strukturiran rezultat.",
+			"restore": "Obnovi",
+			"restore_recommendations": "Obnovi opuščena priporočila",
+			"restore_recommendations_desc": "Vrni vse predlagane poizvedbe, namige za veščine vtičnikov in obvestila o posodobljenih privzetih vrednostih, ki so bili opuščeni na praznem zaslonu novega klepeta.",
+			"restored_recommendations": {
+				"one": "Obnovljeno je {count} opuščeno priporočilo.",
+				"two": "Obnovljeni sta {count} opuščeni priporočili.",
+				"few": "Obnovljena so {count} opuščena priporočila.",
+				"other": "Obnovljenih je {count} opuščenih priporočil."
+			},
+			"no_recommendations": "Ni opuščenih priporočil za obnovitev.",
+			"restore_privacy_warning": "Obnovi opozorilo o zasebnosti integracij",
+			"restore_privacy_warning_desc": "Razveljavi »Ne sprašuj več« pri opozorilu, ki se prikaže pred omogočenjem orodja za izvajanje kode integracije vtičnika (to zaobide pravila zasebnosti posameznih ponudnikov).",
+			"privacy_warning_restored": "Opozorilo o zasebnosti integracij je obnovljeno – znova se bo prikazalo, ko boste naslednjič omogočili integracijo.",
+			"privacy_warning_not_suppressed": "Opozorilo o zasebnosti integracij ni bilo utišano."
+		},
+		"observability": {
+			"heading": "Opazljivost",
+			"langsmith": "Integracija LangSmith",
+			"langsmith_desc": "Omogoči telemetrijo LangSmith za razhroščevanje in sledenje",
+			"api_key": "Ključ API",
+			"api_key_desc": "Izberite skrivnost iz Obsidianove shrambe ključev za preverjanje pristnosti v LangSmith",
+			"project": "Ime projekta",
+			"project_desc": "Ime projekta, ki se mu pripišejo zagoni",
+			"endpoint": "URL končne točke",
+			"endpoint_desc": "Preglasi osnovni URL API-ja LangSmith (neobvezno)",
+			"check_aria": "Preveri ključ API in končno točko LangSmith",
+			"check_idle": "Preveri povezavo z LangSmith",
+			"check_no_key": "Najprej izberite skrivnost s ključem API za LangSmith",
+			"check_invalid_url": "Neveljaven URL končne točke LangSmith",
+			"check_pending": "Preverjanje povezave z LangSmith ...",
+			"check_success": "Povezava z LangSmith je uspela",
+			"check_rejected": "LangSmith je zavrnil ključ API",
+			"check_not_found": "Končna točka LangSmith ne ponuja pričakovanega API-ja",
+			"check_failed_body": "Preverjanje LangSmith ni uspelo ({status}): {body}",
+			"check_failed_status": "Preverjanje LangSmith ni uspelo s stanjem {status}",
+			"check_unreachable": "LangSmith ni dosegljiv",
+			"check_failed_notice": "Preverjanje LangSmith ni uspelo: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "Diagnostika",
+		"maintenance_heading": "Vzdrževanje",
+		"release_notes": "Opombe ob izdaji",
+		"release_notes_desc": "Uporabljate različico {version}. Oglejte si, kaj se je spremenilo v nedavnih izdajah.",
+		"show_release_notes": "Prikaži opombe ob izdaji",
+		"guide": "Vodnik za odpravljanje težav",
+		"guide_desc": "Pogoste težave in kako jih rešiti – agent se ne odziva, neuporabni rezultati iskanja, zadržani zapiski, manjkajoča orodja MCP in težave, značilne za mobilne naprave.",
+		"open_guide": "Odpri vodnik",
+		"still_stuck": "Še vedno ne gre?",
+		"still_stuck_desc": "Preglejte obstoječe zadeve na GitHubu, da vidite, ali je težava že zabeležena. Če ni, odprite novo zadevo in navedite, kaj ste poskusili, morebitna sporočila o napakah in korake za ponovitev.",
+		"view_issues": "Prikaži obstoječe zadeve",
+		"new_issue": "Odpri novo zadevo",
+		"clear": "Počisti podatke vtičnika",
+		"clear_desc": "Izbriše nastavitve vtičnika in ustvarjene podatke indeksa. Skrivnosti, datoteke veščin in datoteke klepetov v vašem sefu se ohranijo.",
+		"clear_label": "Počisti",
+		"clear_modal": {
+			"title": "Počisti podatke vtičnika",
+			"description": "Želite izbrisati nastavitve vtičnika in ustvarjene podatke indeksa? Skrivnosti, datoteke veščin in datoteke klepetov v vašem sefu bodo ohranjene."
+		},
+		"verbose": "Beleženje v konzoli za razvijalce",
+		"verbose_desc": "Omogoči podrobno beleženje v konzoli za razvijalce.",
+		"cleared": "Podatki vtičnika so počiščeni.",
+		"cleared_partial": "Podatki vtičnika so počiščeni, vendar shranjenih vektorjev za {indexes} ni bilo mogoče izbrisati. Podrobnosti so v konzoli.",
+		"clear_failed": "Čiščenje podatkov vtičnika ni uspelo"
+	},
+	"providers": {
+		"auth_failed": "Preverjanje pristnosti ni uspelo",
+		"checking_auth": "Preverjanje pristnosti",
+		"authenticated": "Pristnost potrjena. Kliknite za ponovni poskus povezave",
+		"auth_error_retry": "{message}. Kliknite za ponovni poskus povezave",
+		"trusted": "Zaupanja vreden za zasebne zapiske",
+		"configure": "Nastavi ponudnika",
+		"remove": "Odstrani ponudnika",
+		"remove_failed": "Odstranjevanje ponudnika ni uspelo",
+		"delete_embeddings": "Izbriši tudi vdelave, ustvarjene s tem ponudnikom",
+		"delete_embeddings_desc": {
+			"one": "Sprosti prostor, ki ga zaseda {formatted} indeksiran zapisek. Pustite izklopljeno, da jih ohranite – če tega ponudnika znova dodate, se uporabijo znova namesto ponovnega vdelovanja, ki je lahko počasno in drago.",
+			"two": "Sprosti prostor, ki ga zasedata {formatted} indeksirana zapiska. Pustite izklopljeno, da jih ohranite – če tega ponudnika znova dodate, se uporabijo znova namesto ponovnega vdelovanja, ki je lahko počasno in drago.",
+			"few": "Sprosti prostor, ki ga zasedajo {formatted} indeksirani zapiski. Pustite izklopljeno, da jih ohranite – če tega ponudnika znova dodate, se uporabijo znova namesto ponovnega vdelovanja, ki je lahko počasno in drago.",
+			"other": "Sprosti prostor, ki ga zaseda {formatted} indeksiranih zapiskov. Pustite izklopljeno, da jih ohranite – če tega ponudnika znova dodate, se uporabijo znova namesto ponovnega vdelovanja, ki je lahko počasno in drago."
+		},
+		"embeddings_kept_starting": "Ponudnik je odstranjen. Njegove vdelave so ohranjene – storitev indeksa se še zaganja.",
+		"embeddings_delete_failed": {
+			"one": "Ponudnik je odstranjen, vendar brisanje {failed} od {count} indeksa vdelav ni uspelo: {ids}. Podrobnosti so v konzoli.",
+			"two": "Ponudnik je odstranjen, vendar brisanje {failed} od {count} indeksov vdelav ni uspelo: {ids}. Podrobnosti so v konzoli.",
+			"few": "Ponudnik je odstranjen, vendar brisanje {failed} od {count} indeksov vdelav ni uspelo: {ids}. Podrobnosti so v konzoli.",
+			"other": "Ponudnik je odstranjen, vendar brisanje {failed} od {count} indeksov vdelav ni uspelo: {ids}. Podrobnosti so v konzoli."
+		},
+		"advanced": "Napredno"
+	},
+	"embedding_index": {
+		"heading": "Indeksi vdelav",
+		"description_search": "Indeksi vdelav poganjajo pomensko iskanje po vaših zapiskih.",
+		"description_graph": "Indeksi vdelav poganjajo pomenske funkcije grafa za vaše zapiske.",
+		"group_search": "Indeks vdelav za iskanje",
+		"group_graph": "Indeks vdelav za graf",
+		"empty": "Še ni nastavljenih indeksov vdelav.",
+		"add": "Dodaj indeks",
+		"notes_indexed": {
+			"one": "{count} indeksiran zapisek",
+			"two": "{count} indeksirana zapiska",
+			"few": "{count} indeksirani zapiski",
+			"other": "{count} indeksiranih zapiskov"
+		},
+		"use_as_search": "Uporabi {model} kot indeks za iskanje",
+		"use_as_graph": "Uporabi {model} kot indeks za graf",
+		"view_report": "Prikaži poročilo o indeksiranju",
+		"export": "Izvozi indeks v datoteko",
+		"delete": "Izbriši indeks",
+		"delete_failed": "Tega indeksa ni bilo mogoče izbrisati: {error}",
+		"memory_on_mobile": "Pomnilnik na mobilnih napravah"
+	},
+	"orphaned": {
+		"name": "Osirotele vektorske baze podatkov",
+		"legacy": "{label} (starejši podatki grafa)",
+		"chunks": {
+			"one": "{id} ({count} kos)",
+			"two": "{id} ({count} kosa)",
+			"few": "{id} ({count} kosi)",
+			"other": "{id} ({count} kosov)"
+		},
+		"summary": {
+			"one": "{count} shranjena baza podatkov ne pripada več nobenemu nastavljenemu indeksu vdelav{size}: {list}.",
+			"two": "{count} shranjeni bazi podatkov ne pripadata več nobenemu nastavljenemu indeksu vdelav{size}: {list}.",
+			"few": "{count} shranjene baze podatkov ne pripadajo več nobenemu nastavljenemu indeksu vdelav{size}: {list}.",
+			"other": "{count} shranjenih baz podatkov ne pripada več nobenemu nastavljenemu indeksu vdelav{size}: {list}."
+		},
+		"size": " (vsaj {size} vektorjev)",
+		"origin_usage": "Obsidianova shramba na tej napravi skupno zaseda {size} za vse sefe.",
+		"confirm_title": "Želite izbrisati osirotele indekse?",
+		"confirm_desc": {
+			"one": "S tem trajno odstranite {count} shranjeno bazo podatkov, ki je ne uporablja noben nastavljen indeks vdelav. Če pozneje znova dodate enega od teh modelov, se njegov indeks zgradi od začetka.",
+			"two": "S tem trajno odstranite {count} shranjeni bazi podatkov, ki ju ne uporablja noben nastavljen indeks vdelav. Če pozneje znova dodate enega od teh modelov, se njegov indeks zgradi od začetka.",
+			"few": "S tem trajno odstranite {count} shranjene baze podatkov, ki jih ne uporablja noben nastavljen indeks vdelav. Če pozneje znova dodate enega od teh modelov, se njegov indeks zgradi od začetka.",
+			"other": "S tem trajno odstranite {count} shranjenih baz podatkov, ki jih ne uporablja noben nastavljen indeks vdelav. Če pozneje znova dodate enega od teh modelov, se njegov indeks zgradi od začetka."
+		},
+		"deleted": {
+			"one": "Izbrisan je {count} osirotel indeks.",
+			"two": "Izbrisana sta {count} osirotela indeksa.",
+			"few": "Izbrisani so {count} osiroteli indeksi.",
+			"other": "Izbrisanih je {count} osirotelih indeksov."
+		},
+		"deleted_partial": "Izbrisano: {deleted}, ni bilo mogoče izbrisati: {failed}: {reason}",
+		"delete_button": "Izbriši osirotele indekse"
+	},
+	"secret_select": {
+		"nothing_selected": "(Nič ni izbrano)",
+		"add_tooltip": "Dodaj novo skrivnost",
+		"missing": "Skrivnosti »{id}« ni v Obsidianovi shrambi ključev.",
+		"add_action": "Dodaj skrivnost"
+	},
+	"model_control": {
+		"loading": "Nalaganje modelov …"
+	},
+	"managed_entity": {
+		"select": "Izberi {name}"
+	},
+	"filter": {
+		"type_folder": "Mapa",
+		"type_tag": "Oznaka",
+		"type_extension": "Pripona",
+		"type_property": "Lastnost",
+		"all_of": "VSE od",
+		"any_of": "KATERO KOLI od",
+		"none_of": "NOBENO od",
+		"remove_condition": "Odstrani pogoj",
+		"property_placeholder": "ime lastnosti",
+		"any_value": "katera koli vrednost",
+		"no_properties": "V sefu ni najdenih lastnosti – vnesite ime, da ga vseeno uporabite.",
+		"live_placeholder": "Izberite nekaj v grafu",
+		"add_condition": "Pogoj",
+		"add_group": "Skupina"
+	}
+}

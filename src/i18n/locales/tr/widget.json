@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Widget",
+	"block": {
+		"unbundled_library": "Bu widget, eklentide bulunmayan bir kitaplık istiyor: {libs}. Kullanılabilir olanlar: {available}.",
+		"generating": "Widget oluşturuluyor…",
+		"expand": "Genişlet",
+		"copy_tooltip": "Bir nota yapıştırmak için blok olarak kopyala",
+		"copied_notice": "Widget bloğu kopyalandı. Herhangi bir nota yapıştırabilirsiniz.",
+		"save_tooltip": "Widget dosyası olarak kaydet ve aç",
+		"save_failed": "Widget kaydedilemedi: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "Bu widget, sandbox ortamından dışarı gitmeye çalıştığı için durduruldu."
+	},
+	"embed": {
+		"load_failed": "Widget yüklenemedi."
+	},
+	"rename": {
+		"title": "Widget'ı yeniden adlandır",
+		"name": "Ad",
+		"button": "Yeniden adlandır",
+		"empty_name": "Bir ad girin.",
+		"invalid_chars": "Ad şu karakterleri içeremez: \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "\"{name}\" bu klasörde zaten var.",
+		"failed": "Yeniden adlandırılamadı: {error}"
+	},
+	"view": {
+		"menu_show_widget": "Widget'ı göster",
+		"menu_edit_source": "Kaynağı düzenle",
+		"menu_rename": "Yeniden adlandır...",
+		"review_showing_proposed": "Sohbetten bekleyen değişiklik — önerilen widget gösteriliyor",
+		"review_showing_current": "Sohbetten bekleyen değişiklik — mevcut widget gösteriliyor",
+		"show_current": "Mevcudu göster",
+		"show_proposed": "Öneriyi göster",
+		"accept": "Kabul et",
+		"reject": "Reddet",
+		"rejected_notice": "Bu widget için önerilen değişiklik reddedildi",
+		"conflict_tooltip": "Kabul edilemiyor — widget, bu öneri yapıldıktan sonra değişti. Reddedin ve ajandan değişikliği yeniden hazırlamasını isteyin.",
+		"applied_notice": "Bu widget için önerilen değişiklik uygulandı",
+		"apply_failed": "Değişiklik uygulanamadı: {error}",
+		"source_aria": "Widget kaynağı",
+		"source_hint": "Önce ön tanımlı meta veriler (title, height, queries, libs), ardından HTML.",
+		"source_stale_hint": "Düzenleme sırasında diskte değişti — yeniden yüklemek için İptal'e basın; Kaydet devre dışı.",
+		"source_stale_notice": "Siz düzenlerken bu widget diskte değişti. Yeniden yüklemek için İptal'e basın, ardından tekrar düzenleyin.",
+		"save_failed": "Widget kaydedilemedi: {error}"
+	}
+}

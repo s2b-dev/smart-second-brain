@@ -1,0 +1,236 @@
+{
+	"view": {
+		"display_text": "Pametni graf",
+		"loading": "Gradnja grafa ..."
+	},
+	"toolbar": {
+		"exit_immerse": "Zapusti poglobitev – nazaj na celoten graf",
+		"fit": "Prilagodi graf pogledu",
+		"fit_with_key": "Prilagodi graf pogledu (F)",
+		"lasso": "Izbira z lasom",
+		"lasso_with_hint": "Izbira z lasom (ali držite Shift in povlecite)",
+		"exit_lasso": "Zapusti izbiro z lasom",
+		"hide_topics": "Skrij teme – prikaži surovi graf brez združevanja",
+		"show_topics": "Prikaži teme – obarvaj zapiske glede na zaznano temo",
+		"computing_topics": "Izračunavanje tem …",
+		"collapse_needs_topics": "Vklopite teme, da jih lahko strnete",
+		"expand_all": "Razširi vse teme nazaj v zapiske (S)",
+		"collapse_all": "Strni vse teme v posamezna vozlišča (S) – ali izberite teme in uporabite Strni",
+		"show_panel": "Prikaži ploščo grafa",
+		"hide_panel": "Skrij ploščo grafa"
+	},
+	"controls": {
+		"aria_label": "Nastavitve grafa",
+		"stats": {
+			"notes": {
+				"one": "{count} zapisek",
+				"two": "{count} zapiska",
+				"few": "{count} zapiski",
+				"other": "{count} zapiskov"
+			},
+			"unlinked": {
+				"one": "{count} nepovezan",
+				"two": "{count} nepovezana",
+				"few": "{count} nepovezani",
+				"other": "{count} nepovezanih"
+			},
+			"links": {
+				"one": "{count} povezava",
+				"two": "{count} povezavi",
+				"few": "{count} povezave",
+				"other": "{count} povezav"
+			},
+			"inferred": {
+				"one": "{count} izpeljana",
+				"two": "{count} izpeljani",
+				"few": "{count} izpeljane",
+				"other": "{count} izpeljanih"
+			}
+		},
+		"topics": {
+			"heading": "Teme",
+			"granularity": "Podrobnost",
+			"granularity_desc": "Levo: nekaj širokih tem. Desno: veliko specifičnih. Vsi zapiski ostanejo vidni.",
+			"granularity_desc_with_keys": "Levo: nekaj širokih tem. Desno: veliko specifičnih. Vsi zapiski ostanejo vidni. (↑/↓ na grafu)",
+			"granularity_pending": "Določanje ravni tem za ta sef …",
+			"inferred_links": "Izpeljane povezave"
+		},
+		"inferred_hint": {
+			"no_index": "Povežite zapiske po pomenu in ne le po povezavah, ki ste jih napisali. Potreben je indeks vdelav za graf – izberite ga v nastavitvah grafa vtičnika.",
+			"hidden_still_grouping": "Skrite, vendar še vedno združujejo zapiske. Preklopite dvakrat, da jih izključite tudi iz tem.",
+			"off": "Izklopljeno – teme izhajajo iz povezav, ki ste jih napisali.",
+			"off_coverage": "Izklopljeno – teme izhajajo iz povezav, ki ste jih napisali. Vaše povezave same združijo {placed} od {total} zapiskov ({percent} %); preostalih {unlinked} ni povezanih.",
+			"on_no_edges": "Povežite zapiske po pomenu in ne le po povezavah, ki ste jih napisali – potreben je indeks vdelav za graf.",
+			"on": "Povežite zapiske po pomenu in ne le po povezavah, ki ste jih napisali: {inferred} povezav po podobnosti, da tudi nepovezani zapiski najdejo temo. Izklopite, da vidite, kaj pokrivajo vaše lastne povezave."
+		},
+		"found": {
+			"heading": "Najdeno · {count}",
+			"multi_select_hint": "shift/⌘ za večkratno izbiro",
+			"cancel_naming_aria": "Prekliči poimenovanje tem",
+			"cancel_naming": "Prekliči poimenovanje",
+			"name_topics": "Poimenuj teme z AI"
+		},
+		"scope": {
+			"heading": "Obseg",
+			"markdown_only": "Samo Markdown",
+			"markdown_only_desc": "Prikaži samo zapiske Markdown; izklopljeno prikaže vse datoteke, ki jih je mogoče indeksirati",
+			"tags": "Oznake",
+			"tags_desc": "Vsako oznako nariši kot vozlišče, povezano z zapiski, ki jo nosijo; skupne oznake pomagajo tudi oblikovati teme"
+		},
+		"display": {
+			"heading": "Prikaz",
+			"topic_regions": "Območja tem",
+			"topic_regions_desc": "Obarvaj območje za vsako temo, da so skupine razvidne na prvi pogled",
+			"topic_labels": "Oznake tem",
+			"topic_labels_desc": "Prikaži imena tem nad grafom",
+			"direction_arrows": "Puščice smeri",
+			"direction_arrows_desc": "Prikaži puščice za usmerjene wiki povezave",
+			"highlight_inferred": "Poudari izpeljane povezave",
+			"highlight_inferred_desc_no_index": "Nariši izpeljane povezave v poudarjeni barvi. Potreben je indeks vdelav za graf – izberite ga v nastavitvah grafa vtičnika.",
+			"highlight_inferred_desc": "Nariši izpeljane povezave v poudarjeni barvi, da se ločijo od povezav, ki ste jih napisali",
+			"highlight_inferred_desc_off": "Nariši izpeljane povezave v poudarjeni barvi. Potrebuje vklopljene Izpeljane povezave (pod Teme).",
+			"highlight_isolated": "Poudari osamljene",
+			"highlight_isolated_desc": "Označi zapiske brez wiki povezav v poudarjeni barvi",
+			"highlight_bridges": "Poudari mostove",
+			"highlight_bridges_desc": "Označi zapiske, ki povezujejo več tem, v poudarjeni barvi"
+		}
+	},
+	"selection": {
+		"aria_label": "Izbira v grafu",
+		"count_selected": {
+			"one": "{count} izbran zapisek",
+			"two": "{count} izbrana zapiska",
+			"few": "{count} izbrani zapiski",
+			"other": "{count} izbranih zapiskov"
+		},
+		"notes_selected": {
+			"one": "{number} izbran zapisek",
+			"two": "{number} izbrana zapiska",
+			"few": "{number} izbrani zapiski",
+			"other": "{number} izbranih zapiskov"
+		},
+		"immersed_suffix": " · poglobljeno",
+		"notes_immersed": {
+			"one": "{number} zapisek · poglobljeno",
+			"two": "{number} zapiska · poglobljeno",
+			"few": "{number} zapiski · poglobljeno",
+			"other": "{number} zapiskov · poglobljeno"
+		},
+		"immersed_into": "Poglobljeno v {topics}",
+		"clear": "Počisti izbiro",
+		"clear_with_key": "Počisti izbiro (Esc)",
+		"zoom": "Povečaj na izbiro",
+		"zoom_with_key": "Povečaj na izbiro (F)",
+		"zoom_tooltip": "Premakni kamero, da zajame izbrane zapiske",
+		"collapse": "Strni",
+		"expand": "Razširi",
+		"collapse_tooltip": "Zloži izbrane teme v posamezna vozlišča",
+		"expand_tooltip": "Razširi izbrane teme nazaj v zapiske",
+		"immerse": "Poglobi",
+		"immerse_tooltip": "Znova zgradi graf samo z izbranimi zapiski",
+		"open_in_chat": "Odpri v klepetu",
+		"open_in_chat_tooltip": "Prikaži klepet in priloži izbrane zapiske",
+		"open_all": "Odpri vse",
+		"open_all_tooltip": "Odpri vse izbrane zapiske v novih zavihkih",
+		"exit": "Zapusti",
+		"exit_immerse_tooltip": "Zapusti poglobitev (Esc)",
+		"immersed_count": {
+			"one": "Poglobljeno · {number} zapisek",
+			"two": "Poglobljeno · {number} zapiska",
+			"few": "Poglobljeno · {number} zapiski",
+			"other": "Poglobljeno · {number} zapiskov"
+		}
+	},
+	"open_all_confirm": {
+		"title": "Odpri vse zapiske",
+		"message": {
+			"one": "S tem se odpre {count} zapisek v novem zavihku. Zapreti ga boste morali ročno.",
+			"two": "S tem se odpreta {count} zapiska v novih zavihkih. Zapreti ju boste morali ročno.",
+			"few": "S tem se odprejo {count} zapiski v novih zavihkih. Zapreti jih boste morali ročno.",
+			"other": "S tem se odpre {count} zapiskov v novih zavihkih. Zapreti jih boste morali ročno."
+		},
+		"confirm": {
+			"one": "Odpri {count} zavihek",
+			"two": "Odpri {count} zavihka",
+			"few": "Odpri {count} zavihke",
+			"other": "Odpri {count} zavihkov"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "Klepet še ni inicializiran. Najprej odprite klepet.",
+		"private_titles_withheld": {
+			"one": "Naslovi zasebnih zapiskov so bili zadržani pri {count} temi. Za njihovo vključitev označite ponudnika modela za graf kot zaupanja vrednega.",
+			"two": "Naslovi zasebnih zapiskov so bili zadržani pri {count} temah. Za njihovo vključitev označite ponudnika modela za graf kot zaupanja vrednega.",
+			"few": "Naslovi zasebnih zapiskov so bili zadržani pri {count} temah. Za njihovo vključitev označite ponudnika modela za graf kot zaupanja vrednega.",
+			"other": "Naslovi zasebnih zapiskov so bili zadržani pri {count} temah. Za njihovo vključitev označite ponudnika modela za graf kot zaupanja vrednega."
+		},
+		"open_provider_settings": "Odpri nastavitve ponudnika",
+		"no_graph_chat_model": "Ni izbranega modela za klepet v grafu, zato tem ni mogoče poimenovati.",
+		"open_graph_settings": "Odpri nastavitve grafa"
+	},
+	"node_menu": {
+		"expand_topic": "Razširi temo",
+		"open_all_notes": {
+			"one": "Odpri {count} zapisek",
+			"two": "Odpri oba zapiska",
+			"few": "Odpri vse {count} zapiske",
+			"other": "Odpri vseh {count} zapiskov"
+		},
+		"search_tag": "Išči zapiske s to oznako",
+		"open_file": "Odpri datoteko",
+		"reveal_in_explorer": "Prikaži v raziskovalcu datotek",
+		"focus_cluster": "Osredotoči se na to gručo",
+		"collapse_topic": "Strni temo",
+		"select_cluster": "Izberi to gručo"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} zapisek",
+			"two": "{n} zapiska",
+			"few": "{n} zapiski",
+			"other": "{n} zapiskov"
+		},
+		"links": {
+			"one": "{n} povezava",
+			"two": "{n} povezavi",
+			"few": "{n} povezave",
+			"other": "{n} povezav"
+		},
+		"cluster_fallback": "Gruča {id}",
+		"connections": {
+			"one": "{count} povezava",
+			"two": "{count} povezavi",
+			"few": "{count} povezave",
+			"other": "{count} povezav"
+		},
+		"pinned": "📌 Pripeto"
+	},
+	"note_context": {
+		"title": "Kontekst",
+		"title_of": "Kontekst zapiska {name}",
+		"semantic_hint": "Pomenski sosedje se prikažejo, ko je nastavljen indeks vdelav za graf.",
+		"direction_in": "Vhodne",
+		"direction_out": "Izhodne",
+		"direction_both": "Obe",
+		"updating": "Posodabljanje …",
+		"fit": "Prilagodi graf pogledu",
+		"options": "Možnosti konteksta zapiska",
+		"close_options": "Zapri možnosti konteksta zapiska",
+		"view": "Pogled",
+		"mode_graph": "Graf",
+		"mode_list": "Seznam",
+		"show": "Prikaži",
+		"linked": "Povezani",
+		"semantic": "Pomenski",
+		"both": "Oboji",
+		"display": "Prikaz",
+		"direction_arrows": "Puščice smeri",
+		"no_neighbors": "Ni sosedov.",
+		"open_a_note": "Odprite zapisek."
+	},
+	"topic_fallback": {
+		"unsorted": "Nerazvrščeno",
+		"unsorted_with_count": "Nerazvrščeno · {count}",
+		"topic": "Tema {id}"
+	}
+}

@@ -1,0 +1,235 @@
+{
+	"tabs": {
+		"general": "Genel",
+		"search": "Arama",
+		"agents": "Ajanlar",
+		"graph": "Graf",
+		"troubleshooting": "Sorun giderme",
+		"developer": "Geliştirici"
+	},
+	"general": {
+		"providers": {
+			"heading": "Sağlayıcılar",
+			"description": "Sağlayıcılar, Smart Second Brain'i sohbet, embedding ve modelle çalışan diğer özellikler için kullanılan yapay zekâ hizmetlerine bağlar.",
+			"empty": "Henüz yapılandırılmış bir sağlayıcı yok.",
+			"add": "Sağlayıcı ekle"
+		},
+		"privacy": {
+			"heading": "Gizlilik",
+			"note_access": "Not erişim politikası",
+			"note_access_desc": "Güvenilmeyen sağlayıcıların varsayılan olarak hiçbir şeyi mi yoksa her şeyi mi göreceğini seçin, ardından ilgili dosya listesini yönetin.",
+			"manage": "Yönet",
+			"check_updates": "Güncellemeleri denetle",
+			"check_updates_desc": "Günde bir kez bu eklentinin sürüm numarasını GitHub'dan al ve daha yeni bir sürüm varsa bildirim göster. Siz veya kasanız hakkında hiçbir bilgi gönderilmez. Obsidian'ın kendi otomatik eklenti güncelleme denetimi açıkken atlanır."
+		}
+	},
+	"search": {
+		"display": {
+			"heading": "Görünüm",
+			"result_details": "Sonuç ayrıntıları",
+			"result_details_desc": "Her arama sonucunda hangi meta verilerin ve bağlamın görüneceğini seçin. Şu anda: {summary}.",
+			"configure": "Yapılandır",
+			"label_path": "Yol",
+			"label_tags": "Etiketler",
+			"label_match_badges": "Eşleşme rozetleri",
+			"label_content_snippets": "İçerik parçaları",
+			"nothing_extra": "Ek bilgi yok",
+			"navbar_search": "Gezinme çubuğunda S2B aramasını kullan",
+			"navbar_search_desc": "Alttaki gezinme çubuğundaki büyüteç düğmesinin, Obsidian'ın hızlı geçişi yerine Smart Second Brain aramasını açmasını sağla. Yalnızca o düğme değişir — hızlı geçiş, komut paletinden ve kendi kısayol tuşuyla açılmaya devam eder."
+		},
+		"indexed_content": {
+			"heading": "Dizinlenen içerik",
+			"heading_desc": "Notlar, tuvaller ve widget'lar her zaman dizinlenir. Arama ve embedding için içeriği dizinlenecek diğer dosyaları seçin — geri kalanlar yine başlık ve yola göre bulunur, ajan da gerektiğinde onları okuyabilir.",
+			"pdfs": "PDF'ler",
+			"pdfs_desc": "PDF'lerin metnini çıkar ve dizinle. Büyük kitaplıklarda yavaştır ve uzun bir PDF'in büyük kısmı nadiren işe yarar. Uzun PDF'ler yaklaşık ilk 80 sayfasına kadar dizinlenir (mobilde 4).",
+			"chats": "Sohbetler",
+			"chats_desc": "Geçmiş konuşmaları dizinle. Bunlar çoğunlukla modelin kendi yanıtlarıdır ve sonradan kaynakmış gibi geri dönebilir.",
+			"data_files": "Veri dosyaları",
+			"data_files_desc": "CSV, JSON ve YAML dosyalarını dizinle. Yapılandırılmış veriler anlama göre aramada kötü sonuç verir ve tek bir dışa aktarım binlerce girdi ekleyebilir."
+		}
+	},
+	"graph": {
+		"topic_names": {
+			"heading": "Konu adları",
+			"naming_model": "Konu adlandırma modeli",
+			"naming_model_desc": "Konuları adlandırmak için kullanılan model. Model yoksa konu, en çok bağlantıya sahip notunun adını alır.",
+			"naming_model_desc_withheld": "Konuları adlandırmak için kullanılan model. Model yoksa konu, en çok bağlantıya sahip notunun adını alır. Bu sağlayıcı gizli notlar için güvenilir değil, bu yüzden gizli başlıklar adlandırmaya dahil edilmez.",
+			"configure_provider": "Sağlayıcıyı yapılandır",
+			"configure_models": "Modelleri yapılandır",
+			"no_provider": "Henüz bir yapay zekâ sağlayıcısı yapılandırılmadı.",
+			"select_model": "Bir model seçin",
+			"clear": "Temizle",
+			"auto_name": "Konuları otomatik adlandır",
+			"auto_name_desc": "Konular her değiştiğinde adlandır. Kapalıyken adlandırma yalnızca grafın Konular panelinden çalışır."
+		}
+	},
+	"developer": {
+		"onboarding": {
+			"heading": "İlk kurulum",
+			"replay": "Tanıtımı yeniden oynat",
+			"replay_desc": "Açılış animasyonunu ve tamamlanma işaretlerini sıfırla — Hoş geldiniz görünümü tanıtımı yeniden oynatır ve (bir sağlayıcı yapılandırılana kadar) ilk çalıştırmadaymış gibi başlangıçta otomatik açılır.",
+			"reset": "Tanıtımı sıfırla",
+			"reset_notice": "İlk kurulum sıfırlandı ve yeniden açıldı — tanıtım baştan oynatılacak."
+		},
+		"chat": {
+			"heading": "Sohbet",
+			"raw_tool_io": "Ham araç girdisini/çıktısını göster",
+			"raw_tool_io_desc": "Sohbetteki araç çağrısı satırlarında tam araç argümanlarını ve ham çıktıyı göster. Varsayılan olarak kapalı — kullanıcılar yalnızca sade dildeki özeti ve düzenli yapılandırılmış sonucu görür.",
+			"restore": "Geri yükle",
+			"restore_recommendations": "Kapatılan önerileri geri yükle",
+			"restore_recommendations_desc": "Yeni sohbetin boş ekranından kapatılan tüm önerilen sorguları, eklenti becerisi hatırlatmalarını ve güncellenen varsayılan bildirimlerini geri getir.",
+			"restored_recommendations": {
+				"one": "Kapatılan {count} öneri geri yüklendi.",
+				"other": "Kapatılan {count} öneri geri yüklendi."
+			},
+			"no_recommendations": "Geri yüklenecek kapatılmış öneri yok.",
+			"restore_privacy_warning": "Entegrasyon gizlilik uyarısını geri yükle",
+			"restore_privacy_warning_desc": "Bir eklenti entegrasyonunun kod çalıştırma aracını etkinleştirmeden önce gösterilen uyarıdaki 'Bir daha sorma' seçimini geri al (bu araç sağlayıcı başına gizlilik kurallarını atlar).",
+			"privacy_warning_restored": "Entegrasyon gizlilik uyarısı geri yüklendi — bir sonraki entegrasyon etkinleştirildiğinde yeniden gösterilecek.",
+			"privacy_warning_not_suppressed": "Entegrasyon gizlilik uyarısı gizlenmemişti."
+		},
+		"observability": {
+			"heading": "Gözlemlenebilirlik",
+			"langsmith": "LangSmith entegrasyonu",
+			"langsmith_desc": "Hata ayıklama ve izleme için LangSmith telemetrisini etkinleştir",
+			"api_key": "API anahtarı",
+			"api_key_desc": "LangSmith kimlik doğrulaması için Obsidian anahtarlığından bir gizli bilgi seçin",
+			"project": "Proje adı",
+			"project_desc": "Çalıştırmaların atanacağı proje adı",
+			"endpoint": "Uç nokta URL'si",
+			"endpoint_desc": "LangSmith API temel URL'sini geçersiz kıl (isteğe bağlı)",
+			"check_aria": "LangSmith API anahtarını ve uç noktasını denetle",
+			"check_idle": "LangSmith bağlantısını denetle",
+			"check_no_key": "Önce bir LangSmith API anahtarı gizli bilgisi seçin",
+			"check_invalid_url": "Geçersiz LangSmith uç nokta URL'si",
+			"check_pending": "LangSmith bağlantısı denetleniyor...",
+			"check_success": "LangSmith bağlantısı başarılı",
+			"check_rejected": "LangSmith API anahtarını reddetti",
+			"check_not_found": "LangSmith uç noktası beklenen API'yi sunmuyor",
+			"check_failed_body": "LangSmith denetimi başarısız ({status}): {body}",
+			"check_failed_status": "LangSmith denetimi {status} durum koduyla başarısız oldu",
+			"check_unreachable": "LangSmith'e ulaşılamadı",
+			"check_failed_notice": "LangSmith denetimi başarısız: {message}"
+		}
+	},
+	"troubleshooting": {
+		"diagnostics_heading": "Tanılama",
+		"maintenance_heading": "Bakım",
+		"release_notes": "Sürüm notları",
+		"release_notes_desc": "{version} sürümünü kullanıyorsunuz. Son sürümlerde nelerin değiştiğini görün.",
+		"show_release_notes": "Sürüm notlarını göster",
+		"guide": "Sorun giderme kılavuzu",
+		"guide_desc": "Sık karşılaşılan sorunlar ve çözümleri — ajanın yanıt vermemesi, işe yaramayan arama sonuçları, dahil edilmeyen notlar, eksik MCP araçları ve mobile özgü sorunlar.",
+		"open_guide": "Kılavuzu aç",
+		"still_stuck": "Hâlâ takıldınız mı?",
+		"still_stuck_desc": "Sorunun zaten takip edilip edilmediğini görmek için mevcut GitHub issue'larına göz atın. Takip edilmiyorsa yeni bir issue açın; neler denediğinizi, hata mesajlarını ve sorunu yeniden oluşturma adımlarını ekleyin.",
+		"view_issues": "Mevcut issue'ları görüntüle",
+		"new_issue": "Yeni issue aç",
+		"clear": "Eklenti verilerini temizle",
+		"clear_desc": "Eklenti ayarlarını ve oluşturulan dizin verilerini siler. Gizli bilgiler, beceri dosyaları ve kasanızdaki sohbet dosyaları korunur.",
+		"clear_label": "Temizle",
+		"clear_modal": {
+			"title": "Eklenti verilerini temizle",
+			"description": "Eklenti ayarları ve oluşturulan dizin verileri silinsin mi? Gizli bilgiler, beceri dosyaları ve kasanızdaki sohbet dosyaları korunacak."
+		},
+		"verbose": "Geliştirici konsolu günlüğü",
+		"verbose_desc": "Geliştirici konsolunda ayrıntılı günlüğü etkinleştir.",
+		"cleared": "Eklenti verileri temizlendi.",
+		"cleared_partial": "Eklenti verileri temizlendi, ancak {indexes} için depolanan vektörler silinemedi. Ayrıntılar için konsola bakın.",
+		"clear_failed": "Eklenti verileri temizlenemedi"
+	},
+	"providers": {
+		"auth_failed": "Kimlik doğrulama başarısız",
+		"checking_auth": "Kimlik doğrulanıyor",
+		"authenticated": "Kimlik doğrulandı. Bağlantıyı yeniden denemek için tıklayın",
+		"auth_error_retry": "{message}. Bağlantıyı yeniden denemek için tıklayın",
+		"trusted": "Gizli notlar için güvenilir",
+		"configure": "Sağlayıcıyı yapılandır",
+		"remove": "Sağlayıcıyı kaldır",
+		"remove_failed": "Sağlayıcı kaldırılamadı",
+		"delete_embeddings": "Bu sağlayıcıyla oluşturulan embedding'leri de sil",
+		"delete_embeddings_desc": {
+			"one": "Dizinlenmiş {formatted} notun kullandığı depolama alanını boşaltır. Saklamak için bunu kapalı bırakın — bu sağlayıcıyı yeniden eklediğinizde, yavaş ve maliyetli olabilecek yeniden embedding yerine bunlar kullanılır.",
+			"other": "Dizinlenmiş {formatted} notun kullandığı depolama alanını boşaltır. Saklamak için bunu kapalı bırakın — bu sağlayıcıyı yeniden eklediğinizde, yavaş ve maliyetli olabilecek yeniden embedding yerine bunlar kullanılır."
+		},
+		"embeddings_kept_starting": "Sağlayıcı kaldırıldı. Embedding'leri korundu — dizin hizmeti hâlâ başlatılıyor.",
+		"embeddings_delete_failed": {
+			"one": "Sağlayıcı kaldırıldı, ancak {count} embedding dizininden {failed} tanesi silinemedi: {ids}. Ayrıntılar için konsola bakın.",
+			"other": "Sağlayıcı kaldırıldı, ancak {count} embedding dizininden {failed} tanesi silinemedi: {ids}. Ayrıntılar için konsola bakın."
+		},
+		"advanced": "Gelişmiş"
+	},
+	"embedding_index": {
+		"heading": "Embedding dizinleri",
+		"description_search": "Embedding dizinleri, notlarınız arasında anlamsal aramayı sağlar.",
+		"description_graph": "Embedding dizinleri, notlarınız arasında anlamsal graf özelliklerini sağlar.",
+		"group_search": "Arama embedding dizini",
+		"group_graph": "Graf embedding dizini",
+		"empty": "Henüz yapılandırılmış bir embedding dizini yok.",
+		"add": "Dizin ekle",
+		"notes_indexed": {
+			"one": "{count} not dizinlendi",
+			"other": "{count} not dizinlendi"
+		},
+		"use_as_search": "{model} modelini arama dizini olarak kullan",
+		"use_as_graph": "{model} modelini graf dizini olarak kullan",
+		"view_report": "Dizinleme raporunu görüntüle",
+		"export": "Dizini dosyaya aktar",
+		"delete": "Dizini sil",
+		"delete_failed": "Bu dizin silinemedi: {error}",
+		"memory_on_mobile": "Mobilde bellek"
+	},
+	"orphaned": {
+		"name": "Sahipsiz vektör veritabanları",
+		"legacy": "{label} (eski graf verileri)",
+		"chunks": {
+			"one": "{id} ({count} parça)",
+			"other": "{id} ({count} parça)"
+		},
+		"summary": {
+			"one": "Depolanan {count} veritabanı artık yapılandırılmış bir embedding dizinine ait değil{size}: {list}.",
+			"other": "Depolanan {count} veritabanı artık yapılandırılmış bir embedding dizinine ait değil{size}: {list}."
+		},
+		"size": " (en az {size} vektör verisi)",
+		"origin_usage": "Obsidian'ın bu cihazdaki depolama alanı tüm kasalarda toplam {size}.",
+		"confirm_title": "Sahipsiz dizinler silinsin mi?",
+		"confirm_desc": {
+			"one": "Bu işlem, hiçbir yapılandırılmış embedding dizininin kullanmadığı {count} depolanmış veritabanını kalıcı olarak kaldırır. Bu modellerden birini daha sonra yeniden eklerseniz dizini sıfırdan oluşturulur.",
+			"other": "Bu işlem, hiçbir yapılandırılmış embedding dizininin kullanmadığı {count} depolanmış veritabanını kalıcı olarak kaldırır. Bu modellerden birini daha sonra yeniden eklerseniz dizini sıfırdan oluşturulur."
+		},
+		"deleted": {
+			"one": "{count} sahipsiz dizin silindi.",
+			"other": "{count} sahipsiz dizin silindi."
+		},
+		"deleted_partial": "{deleted} silindi, {failed} silinemedi: {reason}",
+		"delete_button": "Sahipsiz dizinleri sil"
+	},
+	"secret_select": {
+		"nothing_selected": "(Hiçbir şey seçilmedi)",
+		"add_tooltip": "Yeni gizli bilgi ekle",
+		"missing": "\"{id}\" gizli bilgisi Obsidian anahtarlığında bulunamadı.",
+		"add_action": "Gizli bilgi ekle"
+	},
+	"model_control": {
+		"loading": "Modeller yükleniyor…"
+	},
+	"managed_entity": {
+		"select": "{name} seç"
+	},
+	"filter": {
+		"type_folder": "Klasör",
+		"type_tag": "Etiket",
+		"type_extension": "Uzantı",
+		"type_property": "Özellik",
+		"all_of": "TÜMÜ",
+		"any_of": "HERHANGİ BİRİ",
+		"none_of": "HİÇBİRİ",
+		"remove_condition": "Koşulu kaldır",
+		"property_placeholder": "özellik adı",
+		"any_value": "herhangi bir değer",
+		"no_properties": "Kasada özellik bulunamadı — yine de kullanmak için bir ad yazın.",
+		"live_placeholder": "Grafta bir seçim yapın",
+		"add_condition": "Koşul",
+		"add_group": "Grup"
+	}
+}

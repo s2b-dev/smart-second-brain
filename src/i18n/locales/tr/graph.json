@@ -1,0 +1,206 @@
+{
+	"view": {
+		"display_text": "Akıllı graf",
+		"loading": "Graf oluşturuluyor..."
+	},
+	"toolbar": {
+		"exit_immerse": "Odak modundan çık — tam grafa dön",
+		"fit": "Grafı görünüme sığdır",
+		"fit_with_key": "Grafı görünüme sığdır (F)",
+		"lasso": "Kement seçimi",
+		"lasso_with_hint": "Kement seçimi (veya Shift'e basılı tutup sürükleyin)",
+		"exit_lasso": "Kement seçiminden çık",
+		"hide_topics": "Konuları gizle — grafı kümeleme olmadan ham hâliyle göster",
+		"show_topics": "Konuları göster — notları algılanan konularına göre renklendir",
+		"computing_topics": "Konular hesaplanıyor…",
+		"collapse_needs_topics": "Daraltmak için konuları açın",
+		"expand_all": "Tüm konuları yeniden notlara genişlet (S)",
+		"collapse_all": "Tüm konuları tek düğümlere daralt (S) — veya konuları seçip Daralt'ı kullanın",
+		"show_panel": "Graf panelini göster",
+		"hide_panel": "Graf panelini gizle"
+	},
+	"controls": {
+		"aria_label": "Graf ayarları",
+		"stats": {
+			"notes": {
+				"one": "{count} not",
+				"other": "{count} not"
+			},
+			"unlinked": {
+				"one": "{count} bağlantısız",
+				"other": "{count} bağlantısız"
+			},
+			"links": {
+				"one": "{count} bağlantı",
+				"other": "{count} bağlantı"
+			},
+			"inferred": {
+				"one": "{count} çıkarımsal",
+				"other": "{count} çıkarımsal"
+			}
+		},
+		"topics": {
+			"heading": "Konular",
+			"granularity": "Ayrıntı düzeyi",
+			"granularity_desc": "Sol: birkaç geniş konu. Sağ: çok sayıda özel konu. Her not görünür kalır.",
+			"granularity_desc_with_keys": "Sol: birkaç geniş konu. Sağ: çok sayıda özel konu. Her not görünür kalır. (grafta ↑/↓)",
+			"granularity_pending": "Bu kasanın konu düzeyleri hesaplanıyor…",
+			"inferred_links": "Çıkarımsal bağlantılar"
+		},
+		"inferred_hint": {
+			"no_index": "Notları yazdığınız bağlantıların yanı sıra anlamlarına göre de bağlayın. Bir graf embedding dizini gerekir — eklentinin Graf ayarlarından bir tane seçin.",
+			"hidden_still_grouping": "Gizli, ancak notları gruplamaya devam ediyor. Konulardan da hariç tutmak için iki kez değiştirin.",
+			"off": "Kapalı — konular yazdığınız bağlantılardan oluşur.",
+			"off_coverage": "Kapalı — konular yazdığınız bağlantılardan oluşur. Bağlantılarınız tek başına {total} notun {placed} tanesini gruplar (%{percent}); kalan {unlinked} not bağlantısız.",
+			"on_no_edges": "Notları yazdığınız bağlantıların yanı sıra anlamlarına göre de bağlayın — bir graf embedding dizini gerekir.",
+			"on": "Notları yazdığınız bağlantıların yanı sıra anlamlarına göre de bağlayın: bağlantısız notların da bir konu bulabilmesi için {inferred} benzerlik bağlantısı. Kendi bağlantılarınızın neyi kapsadığını görmek için kapatın."
+		},
+		"found": {
+			"heading": "Bulunan · {count}",
+			"multi_select_hint": "shift/⌘ çoklu seçim",
+			"cancel_naming_aria": "Konuları adlandırmayı iptal et",
+			"cancel_naming": "Adlandırmayı iptal et",
+			"name_topics": "Konuları yapay zekâyla adlandır"
+		},
+		"scope": {
+			"heading": "Kapsam",
+			"markdown_only": "Yalnızca Markdown",
+			"markdown_only_desc": "Yalnızca Markdown notlarını göster; kapalıyken dizinlenebilir tüm dosyalar gösterilir",
+			"tags": "Etiketler",
+			"tags_desc": "Her etiketi, onu taşıyan notlara bağlı bir düğüm olarak çiz; ortak etiketler konuların şekillenmesine de yardımcı olur"
+		},
+		"display": {
+			"heading": "Görünüm",
+			"topic_regions": "Konu bölgeleri",
+			"topic_regions_desc": "Grupların bir bakışta okunabilmesi için her konunun arkasındaki alanı renklendir",
+			"topic_labels": "Konu etiketleri",
+			"topic_labels_desc": "Konu adlarını grafın üzerinde göster",
+			"direction_arrows": "Yön okları",
+			"direction_arrows_desc": "Yönlü wiki bağlantıları için okları göster",
+			"highlight_inferred": "Çıkarımsal bağlantıları vurgula",
+			"highlight_inferred_desc_no_index": "Çıkarımsal bağlantıları vurgu rengiyle çiz. Bir graf embedding dizini gerekir — eklentinin Graf ayarlarından bir tane seçin.",
+			"highlight_inferred_desc": "Çıkarımsal bağlantıları, yazdığınız bağlantılardan ayrışmaları için vurgu rengiyle çiz",
+			"highlight_inferred_desc_off": "Çıkarımsal bağlantıları vurgu rengiyle çiz. Çıkarımsal bağlantıların (Konular altında) açık olması gerekir.",
+			"highlight_isolated": "Yalıtılmışları vurgula",
+			"highlight_isolated_desc": "Hiç wiki bağlantısı olmayan notları vurgu rengiyle işaretle",
+			"highlight_bridges": "Köprüleri vurgula",
+			"highlight_bridges_desc": "Birden fazla konuyu birbirine bağlayan notları vurgu rengiyle işaretle"
+		}
+	},
+	"selection": {
+		"aria_label": "Graf seçimi",
+		"count_selected": {
+			"one": "{count} not seçildi",
+			"other": "{count} not seçildi"
+		},
+		"notes_selected": {
+			"one": "{number} not seçildi",
+			"other": "{number} not seçildi"
+		},
+		"immersed_suffix": " · odak modunda",
+		"notes_immersed": {
+			"one": "{number} not · odak modunda",
+			"other": "{number} not · odak modunda"
+		},
+		"immersed_into": "Odak: {topics}",
+		"clear": "Seçimi temizle",
+		"clear_with_key": "Seçimi temizle (Esc)",
+		"zoom": "Seçime yakınlaştır",
+		"zoom_with_key": "Seçime yakınlaştır (F)",
+		"zoom_tooltip": "Kamerayı seçili notları sığdıracak şekilde hareket ettir",
+		"collapse": "Daralt",
+		"expand": "Genişlet",
+		"collapse_tooltip": "Seçili konuları tek düğümlere katla",
+		"expand_tooltip": "Seçili konuları yeniden notlara aç",
+		"immerse": "Odaklan",
+		"immerse_tooltip": "Grafı yalnızca seçili notlarla yeniden oluştur",
+		"open_in_chat": "Sohbette aç",
+		"open_in_chat_tooltip": "Sohbeti göster ve seçili notları ekle",
+		"open_all": "Tümünü aç",
+		"open_all_tooltip": "Seçili tüm notları yeni sekmelerde aç",
+		"exit": "Çık",
+		"exit_immerse_tooltip": "Odak modundan çık (Esc)",
+		"immersed_count": {
+			"one": "Odak modu · {number} not",
+			"other": "Odak modu · {number} not"
+		}
+	},
+	"open_all_confirm": {
+		"title": "Tüm notları aç",
+		"message": {
+			"one": "Bu işlem {count} notu yeni bir sekmede açar. Sekmeyi elle kapatmanız gerekir.",
+			"other": "Bu işlem {count} notu yeni sekmelerde açar. Sekmeleri elle kapatmanız gerekir."
+		},
+		"confirm": {
+			"one": "{count} sekme aç",
+			"other": "{count} sekme aç"
+		}
+	},
+	"notices": {
+		"chat_not_initialized": "Sohbet henüz başlatılmadı. Lütfen önce bir sohbet açın.",
+		"private_titles_withheld": {
+			"one": "Gizli not başlıkları {count} konudan çıkarıldı. Bunları dahil etmek için graf modelinin sağlayıcısını güvenilir olarak işaretleyin.",
+			"other": "Gizli not başlıkları {count} konudan çıkarıldı. Bunları dahil etmek için graf modelinin sağlayıcısını güvenilir olarak işaretleyin."
+		},
+		"open_provider_settings": "Sağlayıcı ayarlarını aç",
+		"no_graph_chat_model": "Graf sohbet modeli seçilmediği için konular adlandırılamıyor.",
+		"open_graph_settings": "Graf ayarlarını aç"
+	},
+	"node_menu": {
+		"expand_topic": "Konuyu genişlet",
+		"open_all_notes": {
+			"one": "{count} notu aç",
+			"other": "{count} notun tümünü aç"
+		},
+		"search_tag": "Bu etiketi taşıyan notları ara",
+		"open_file": "Dosyayı aç",
+		"reveal_in_explorer": "Dosya gezgininde göster",
+		"focus_cluster": "Bu kümeye odaklan",
+		"collapse_topic": "Konuyu daralt",
+		"select_cluster": "Bu kümeyi seç"
+	},
+	"node_tooltip": {
+		"notes": {
+			"one": "{n} not",
+			"other": "{n} not"
+		},
+		"links": {
+			"one": "{n} bağlantı",
+			"other": "{n} bağlantı"
+		},
+		"cluster_fallback": "Küme {id}",
+		"connections": {
+			"one": "{count} bağlantı",
+			"other": "{count} bağlantı"
+		},
+		"pinned": "📌 Sabitlendi"
+	},
+	"note_context": {
+		"title": "Bağlam",
+		"title_of": "{name} bağlamı",
+		"semantic_hint": "Anlamsal komşular, bir graf embedding dizini yapılandırıldığında görünür.",
+		"direction_in": "Gelen",
+		"direction_out": "Giden",
+		"direction_both": "Her ikisi",
+		"updating": "Güncelleniyor…",
+		"fit": "Grafı görünüme sığdır",
+		"options": "Not bağlamı seçenekleri",
+		"close_options": "Not bağlamı seçeneklerini kapat",
+		"view": "Görünüm",
+		"mode_graph": "Graf",
+		"mode_list": "Liste",
+		"show": "Göster",
+		"linked": "Bağlantılı",
+		"semantic": "Anlamsal",
+		"both": "Her ikisi",
+		"display": "Görünüm",
+		"direction_arrows": "Yön okları",
+		"no_neighbors": "Komşu yok.",
+		"open_a_note": "Bir not açın."
+	},
+	"topic_fallback": {
+		"unsorted": "Sıralanmamış",
+		"unsorted_with_count": "Sıralanmamış · {count}",
+		"topic": "Konu {id}"
+	}
+}

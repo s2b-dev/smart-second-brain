@@ -1,0 +1,329 @@
+{
+	"commands": {
+		"open_chat": "Sohbeti aç",
+		"new_chat": "Yeni sohbet",
+		"search_notes": "Notlarda ara",
+		"open_smart_graph": "Akıllı grafı aç",
+		"show_welcome": "Hoş geldiniz ekranını göster",
+		"show_release_notes": "Sürüm notlarını göster",
+		"next_pending_change": "Sonraki bekleyen değişiklik",
+		"previous_pending_change": "Önceki bekleyen değişiklik"
+	},
+	"chat_file_menu": {
+		"rename": "Sohbeti yeniden adlandır",
+		"rename_button": "Yeniden adlandır",
+		"delete": "Sohbeti sil",
+		"rename_failed": "Sohbet yeniden adlandırılamadı: {error}",
+		"delete_failed": "Sohbet silinemedi: {error}"
+	},
+	"attach": {
+		"menu_label": {
+			"one": "Sohbete ekle",
+			"other": "{count} dosyayı sohbete ekle"
+		},
+		"add_file_failed": "Dosya sohbete eklenemedi: {error}",
+		"add_files_failed": "Dosyalar sohbete eklenemedi: {error}",
+		"no_supported_files": "Desteklenen dosya seçilmedi. Desteklenenler: txt, md, csv, json, görseller, pdf.",
+		"chat_not_initialized": "Sohbet henüz başlatılmadı. Lütfen sohbeti açıp yeniden deneyin.",
+		"queued": {
+			"one": "{count} dosya sohbet için sıraya alındı.",
+			"other": "{count} dosya sohbet için sıraya alındı."
+		},
+		"skipped_unsupported": {
+			"one": "Desteklenmeyen {count} dosya atlandı.",
+			"other": "Desteklenmeyen {count} dosya atlandı."
+		}
+	},
+	"pending_navigation": {
+		"no_chat_open": "Şu anda açık bir sohbet yok",
+		"no_pending_changes": "Bu sohbette bekleyen değişiklik yok",
+		"new_file_nothing_to_open": "Bu değişiklik yeni bir dosya oluşturuyor — henüz açılacak bir şey yok."
+	},
+	"huggingface_connected": "Hugging Face'e bağlanıldı.",
+	"update": {
+		"available": "Smart Second Brain {version} kullanılabilir.",
+		"update_link": "Güncelle",
+		"updated": "Smart Second Brain {version} sürümüne güncellendi.",
+		"whats_new_link": "Yenilikleri görün"
+	},
+	"settings_save_failed": "Smart Second Brain ayarlarınızı kaydedemedi: {error}",
+	"summarization": {
+		"history_dropped": "Smart Second Brain: en eski sohbet geçmişinin yaklaşık {tokens} token'ı özetleme modelinin bağlam penceresine sığmadı ve özete dahil edilmedi.",
+		"repeated_failure": "Smart Second Brain: bu sohbetin geçmişini özetleme art arda {failures} kez başarısız oldu, bu yüzden tüm geçmiş hâlâ gönderiliyor ve modelin bağlam sınırını aşabilir. Ajanın özetleme modelini denetleyin; hata geliştirici konsolunda yer alıyor."
+	},
+	"agent": {
+		"memory_too_large": {
+			"one": "Bellek bu model için çok büyük{window}: {names} artık her mesaja yüklenmiyor. Ajan onu yalnızca gerektiğinde okur. Notu kısaltın veya daha büyük bağlam penceresine sahip bir model kullanın.",
+			"other": "Bellek bu model için çok büyük{window}: {names} artık her mesaja yüklenmiyor. Ajan bunları yalnızca gerektiğinde okur. Notları kısaltın veya daha büyük bağlam penceresine sahip bir model kullanın."
+		},
+		"memory_window": "({k}k token)",
+		"save_prompt_failed": "Sistem istemi kaydedilemedi: {error}",
+		"open_agent_note": "Ajan notunu aç",
+		"prompt_modal_title": "Sistem istemi — {name}",
+		"save_skill_failed": "\"{skill}\" becerisi kaydedilemedi: {error}",
+		"open_skill_note": "Beceri notunu aç",
+		"skill_modal_title": "Beceri — {skill}",
+		"cannot_connect": "Şunlara bağlanılamıyor: {providers}. Hizmetin çalıştığından emin olun.",
+		"review_providers": "Sağlayıcıları gözden geçir",
+		"provider_unavailable": "\"{provider}\" sağlayıcısı artık kullanılamıyor.",
+		"select_new_model": "Yeni bir model seçin",
+		"withdrew_changes": {
+			"one": "Değiştirilen yanıtın önerdiği bekleyen {count} not değişikliği geri çekildi.",
+			"other": "Değiştirilen yanıtın önerdiği bekleyen {count} not değişikliği geri çekildi."
+		},
+		"kept_partial_changes": {
+			"one": "Kısmen uygulanmış {count} değişiklik korundu — inceleme çubuğunda çözün.",
+			"other": "Kısmen uygulanmış {count} değişiklik korundu — inceleme çubuğunda çözün."
+		}
+	},
+	"errors": {
+		"request_failed": "Model isteği başarısız oldu.",
+		"context_overflow": "Bu sohbet artık modelin bağlam penceresine sığmıyor.",
+		"context_overflow_hint": "Yeni bir sohbet başlatın veya bu model için yapılandırılan bağlam penceresini denetleyin.",
+		"refusal": "Model bu isteği yanıtlamayı reddetti.",
+		"refusal_hint": "İsteği farklı ifade etmek veya başka bir modele geçmek yardımcı olabilir."
+	},
+	"provider_auth": {
+		"unknown_provider": "Bilinmeyen sağlayıcı: {provider}",
+		"invalid_api_key": "Geçersiz API anahtarı",
+		"invalid_endpoint": "Geçersiz temel URL veya uç noktaya ulaşılamıyor",
+		"configuration_failed": "Sağlayıcı yapılandırması başarısız oldu",
+		"no_auth_config": "{provider} için kimlik doğrulama yapılandırması bulunamadı",
+		"discovery_failed": "Model keşfi başarısız oldu: {error}",
+		"server_url_required": "Sunucu URL'si gerekli",
+		"api_key_required": "API anahtarı gerekli",
+		"connection_failed": "Bağlantı başarısız: {error}",
+		"auth_failed_status": "Kimlik doğrulama başarısız ({status})",
+		"auth_failed": "Kimlik doğrulama başarısız",
+		"request_failed_status": "İstek {status} durum koduyla başarısız oldu",
+		"codex_sign_in_required": "Codex'i kullanmak için ChatGPT ile oturum açın",
+		"openai_codex_sign_in_required": "OpenAI'ı Codex üzerinden kullanmak için ChatGPT ile oturum açın",
+		"huggingface_token_rejected": "Hugging Face bu erişim token'ını reddetti",
+		"huggingface_status": "Hugging Face {status} durum kodunu döndürdü",
+		"huggingface_sign_in_required": "Bağlanmak için Hugging Face ile oturum açın"
+	},
+	"providers": {
+		"templates": {
+			"openai": "ChatGPT ile oturum açma veya API anahtarı üzerinden OpenAI modelleri.",
+			"openai_compatible": "OpenAI ve uyumlu uç noktalar için esnek, OpenAI tarzı sağlayıcı.",
+			"anthropic": "Anthropic API'si üzerinden Claude modelleri.",
+			"ollama": "Ollama API'si üzerinden yerel Ollama modelleri.",
+			"omlx": "oMLX'in OpenAI uyumlu sunucusu aracılığıyla Mac'inizdeki yerel MLX modelleri.",
+			"openrouter": "OpenRouter hesabı ve model kataloğu.",
+			"huggingface": "Hugging Face çıkarım sağlayıcılarından açık modeller."
+		},
+		"fields": {
+			"api_key": "API anahtarı",
+			"base_url": "Temel URL",
+			"server_url": "Sunucu URL'si",
+			"access_token": "Erişim token'ı",
+			"custom_headers": "Özel başlıklar",
+			"custom_headers_desc": "JSON olarak ek başlıklar (isteğe bağlı)",
+			"chatgpt_sign_in": "ChatGPT ile oturum açma"
+		},
+		"openai": {
+			"link": "OpenAI kontrol paneli",
+			"oauth_desc": "ChatGPT/Codex yetkilendirmesini tamamlamak için bir tarayıcı penceresi açın.",
+			"api_key_desc": "Kimlik doğrulama için OpenAI API anahtarınız",
+			"base_url_desc": "Özel API uç noktası (varsayılan OpenAI için boş bırakın)"
+		},
+		"openai_codex": {
+			"sign_in_desc": "Bu sağlayıcı, tarayıcı tabanlı bir ChatGPT/Codex oturum açma akışı kullanır.",
+			"sign_in_placeholder": "ChatGPT ile oturum açılarak yetkilendirildi"
+		},
+		"openai_compatible": {
+			"base_url_desc": "OpenAI uyumlu API uç noktasının temel URL'si",
+			"api_key_desc": "Kimlik doğrulama için API anahtarı (uç noktanız gerektirmiyorsa boş bırakın)"
+		},
+		"anthropic": {
+			"link": "Anthropic Console",
+			"api_key_desc": "Kimlik doğrulama için Anthropic API anahtarınız",
+			"base_url_desc": "Anthropic uyumlu API uç noktasının temel URL'si"
+		},
+		"ollama": {
+			"link": "Ollama web sitesi",
+			"server_url_desc": "Ollama sunucunuzun çalıştığı URL",
+			"api_key_desc": "Kimlik doğrulama için API anahtarı (yerel Ollama için genellikle gerekmez)"
+		},
+		"omlx": {
+			"link": "oMLX web sitesi",
+			"server_url_desc": "oMLX sunucunuzun çalıştığı URL",
+			"api_key_desc": "oMLX varsayılan olarak bir API anahtarı gerektirir (yönetim panelinin genel ayarlarında bulabilirsiniz). Yalnızca anahtar doğrulamayı devre dışı bıraktıysanız boş bırakın."
+		},
+		"openrouter": {
+			"link": "OpenRouter anahtarları",
+			"oauth_desc": "Elle API anahtarı oluşturmadan bağlanmak için tarayıcınızda yetki verin.",
+			"api_key_desc": "Kimlik doğrulama için OpenRouter API anahtarınız"
+		},
+		"huggingface": {
+			"link": "Hugging Face erişim token'ları",
+			"oauth_desc": "Erişim token'ı oluşturmadan bağlanmak için tarayıcınızda erişimi onaylayın."
+		}
+	},
+	"indexing": {
+		"status": "Dizinleniyor: {status}",
+		"cancelled_chunks": {
+			"one": "Dizinleme iptal edildi ({count} parça güncellendi)",
+			"other": "Dizinleme iptal edildi ({count} parça güncellendi)"
+		},
+		"updated_chunks": {
+			"one": "✓ Dizin güncellendi: {count} parça",
+			"other": "✓ Dizin güncellendi: {count} parça"
+		},
+		"cancelled_notes": {
+			"one": "Dizinleme iptal edildi (şu ana kadar {count} not dizinlendi)",
+			"other": "Dizinleme iptal edildi (şu ana kadar {count} not dizinlendi)"
+		},
+		"indexed_notes": {
+			"one": "✓ {count} not dizinlendi",
+			"other": "✓ {count} not dizinlendi"
+		},
+		"indexed_notes_skipped": {
+			"one": "✓ {count} not dizinlendi, {skipped} atlandı",
+			"other": "✓ {count} not dizinlendi, {skipped} atlandı"
+		},
+		"no_embedding_model": "Embedding modeli yapılandırılmadı. Lütfen varsayılan bir embedding modeli ayarlayın.",
+		"invalid_config": "Geçersiz embedding dizini yapılandırması.",
+		"provider_not_configured": "\"{provider}\" sağlayıcısı yapılandırılmadı.",
+		"embedding_init_failed": "Embedding modeli başlatılamadı.",
+		"open_search_settings": "Arama ayarlarını aç",
+		"open_provider_settings": "Sağlayıcı ayarlarını aç",
+		"provider_unreachable": "Dizinleme durdu — embedding sağlayıcısına ulaşılamıyor. Bağlantıyı denetleyin, ardından devam edin.",
+		"rate_limited": "Dizinleme duraklatıldı — embedding sağlayıcısının istek sınırına ulaşıldı. Bir sonraki başlatmada devam eder veya daha sonra arama ayarlarından devam ettirebilirsiniz.",
+		"already_in_progress": "Dizinleme zaten sürüyor...",
+		"embed_failed": "{file} için embedding başarısız: {error}",
+		"embed_empty": "{file} için embedding başarısız: modelden boş sonuç geldi",
+		"semantic_unreachable": "Anlamsal arama kullanılamıyor — embedding sağlayıcısına ulaşılamıyor. Anlamsal sonuç gösterilmiyor.",
+		"semantic_failed": "Anlamsal arama başarısız: {error}",
+		"cancelling": "Dizinleme iptal ediliyor…",
+		"export_empty": "Dizin boş — dışa aktarılacak bir şey yok.",
+		"export_dialog_title": "Embedding dizinini dışa aktar",
+		"exported": "{count} embedding dışa aktarıldı.",
+		"export_failed": "Dizin dışa aktarılamadı.",
+		"import_dialog_title": "Embedding dizinini içe aktar",
+		"import_invalid_version": "Dışa aktarım dosyasının sürüm alanı geçersiz veya eksik. Uyumlu bir dışa aktarım oluşturmak için yeniden dizinleyin.",
+		"import_outdated": "Dışa aktarım dosyasının şeması v{version} güncel değil (geçerli: v{current}). Uyumlu bir dışa aktarım oluşturmak için yeniden dizinleyin.",
+		"import_newer": "Dışa aktarım dosyası daha yeni bir eklenti sürümüyle oluşturulmuş (şema v{version}). İçe aktarmak için eklentiyi güncelleyin.",
+		"import_missing_metadata": "Dışa aktarım dosyasında sağlayıcı veya model meta verileri eksik.",
+		"imported": "{count} embedding içe aktarıldı ({model}).",
+		"import_failed": "Dizin içe aktarılamadı. Dosya bozuk olabilir.",
+		"reindex": "Yeniden dizinle"
+	},
+	"search_index": {
+		"status": "Notlar arama için dizinleniyor: {status}",
+		"updated": "✓ Arama dizini güncellendi: {count} not"
+	},
+	"bulk_progress": {
+		"skipped": "({count} atlandı)",
+		"eta": "(~{eta} kaldı)",
+		"pdfs_progress": "PDF'ler {done}/{total}",
+		"then": "ardından {pdfs}",
+		"pdfs": {
+			"one": "{count} PDF",
+			"other": "{count} PDF"
+		}
+	},
+	"tag_search": {
+		"query_not_set": "Arama bölmesi açıldı ancak etiket sorgusu ayarlanamadı",
+		"open_failed": "Etiket için arama bölmesi açılamadı: {tag}"
+	},
+	"models": {
+		"no_embedding_models": "Sağlayıcılarınız için embedding modeli bulunamadı. Birinin embedding sunduğundan emin olun.",
+		"no_models": "Model bulunamadı. Sağlayıcınızın çalıştığından ve erişilebilir olduğundan emin olun."
+	},
+	"actions": {
+		"open_settings": "Ayarları aç",
+		"add_provider": "Sağlayıcı ekle",
+		"check_provider_settings": "Sağlayıcı ayarlarını denetle",
+		"select_model": "Bir model seç",
+		"configure_embedding_index": "Embedding dizinini yapılandır",
+		"edit_agent": "Ajanı düzenle",
+		"view_report": "Raporu görüntüle",
+		"open_note": "Notu aç",
+		"open_chat": "Sohbeti aç",
+		"agent_gone_pick_model": "Bu ajan artık yok. Kullanmak istediğiniz ajandan bir model seçin.",
+		"agent_gone_not_saved": "Bu ajan artık yok, bu yüzden model kaydedilmedi."
+	},
+	"diff": {
+		"pending_change": "Bekleyen değişiklik",
+		"previous": "Önceki bekleyen değişiklik",
+		"next": "Sonraki bekleyen değişiklik",
+		"toggle_view": "Fark görünümünü aç/kapat",
+		"accept": "Kabul et",
+		"accept_aria": "Değişikliği kabul et",
+		"reject": "Reddet",
+		"reject_aria": "Değişikliği reddet",
+		"stale_tooltip": "Kabul edilemiyor — not, bu öneri yapıldıktan sonra değişti. Reddedin ve ajandan değişikliği yeniden hazırlamasını isteyin.",
+		"cross_thread_banner": {
+			"one": "{count} başka sohbette bu dosya için bekleyen bir düzenleme var. Burada yalnızca en sonuncusu gösteriliyor; önce kabul edilen geçerli olur ve diğerleri sonrasında uygulanamayabilir.",
+			"other": "{count} başka sohbette bu dosya için bekleyen bir düzenleme var. Burada yalnızca en sonuncusu gösteriliyor; önce kabul edilen geçerli olur ve diğerleri sonrasında uygulanamayabilir."
+		}
+	},
+	"model_capabilities": {
+		"tool_calls": "Araç çağırma",
+		"reasoning": "Gelişmiş akıl yürütme",
+		"vision": "Görüntü / dosya ekleri",
+		"structured_output": "Yapılandırılmış çıktı (JSON şeması)"
+	},
+	"tools": {
+		"search_notes": {
+			"name": "Notlarda ara",
+			"summary": "Obsidian notlarınızda anahtar kelimeyle arama yapar. Eşleşen dosya adlarını ve meta verileri döndürür."
+		},
+		"list_directory": {
+			"name": "Dizini listele",
+			"summary": "Kasanın klasör yapısını listeler: kökte dosya sayılarıyla bir genel bakış, bir klasörün içinde dosyalar ve alt klasörler. Çıktı, bağlam bütçesine sığacak şekilde daraltılır."
+		},
+		"read_content": {
+			"name": "İçeriği oku",
+			"summary": "Notları ve kasa dosyalarını yola veya wiki bağlantısına göre okur. Markdown/metin dosyalarını ve PDF metin çıkarmayı destekler. Görseller sohbette eklenmelidir."
+		},
+		"grep_notes": {
+			"name": "Notlarda grep",
+			"summary": "Notlarda tam bir alt dizeyi veya düzenli ifade desenini bulur; eşleşen satırları satır numaraları ve bağlamla döndürür. Notlarda ara'dan farklı olarak birebir dizeleri eşleştirir. Bir yolla tek bir nota sınırlayın veya büyük sonuç kümelerini sayfalayın."
+		},
+		"get_all_tags": {
+			"name": "Tüm etiketleri al",
+			"summary": "Kasada kullanılan tüm etiketlerin listesini getirir."
+		},
+		"get_properties": {
+			"name": "Özellikleri al",
+			"summary": "Notlardaki ön tanımlı meta veri özelliklerini getirir veya kasadaki tüm özellik anahtarlarını listeler."
+		},
+		"execute_javascript": {
+			"name": "JavaScript çalıştır",
+			"summary": "Hesaplamalar ve veri dönüştürme için yalıtılmış JavaScript çalıştırır. Nihai değer için return, ara çıktılar için console.log kullanın."
+		},
+		"manage_notes": {
+			"name": "Notları yönet",
+			"summary": "Markdown notlarını tek bir hazırlanmış toplu işlemde oluşturur, günceller veya siler. İlişkili not işlemleri kullanıcı onayı için birlikte önerilebilir."
+		},
+		"fetch_url": {
+			"name": "URL getir",
+			"summary": "Herkese açık bir web sayfasını veya metin kaynağını HTTP(S) üzerinden getirir ve ana içeriğini temizlenmiş markdown olarak döndürür. Yalnızca kullanıcının verdiği URL'lerle veya açıkça herkese açık kaynaklarla kullanın."
+		},
+		"web_search": {
+			"name": "Web araması",
+			"summary": "Web'de arama yapar ve sonuçları (başlık, URL, parça) döndürür. Sağlayıcıyı ve API anahtarını aracın Yapılandır panelinden ayarlayın. Önce kasa aramasını tercih edin."
+		},
+		"manage_skills": {
+			"name": "Becerileri yönet",
+			"summary": "Yeni beceriler oluşturur, ajanın kendi eklenmiş becerilerini düzenler veya siz istediğinizde bir beceriyi siler. Değişiklikler hemen uygulanır. Bir becerinin adı ve eklenti bağlantısı oluşturulduktan sonra kilitlenir."
+		},
+		"write_todos": {
+			"name": "Görev listesi",
+			"summary": "Ajanın çok adımlı işleri bir kontrol listesi olarak planlamasını ve ilerledikçe işaretlemesini sağlar. Liste, sohbet giriş alanının üzerinde görünür."
+		},
+		"ask_question": {
+			"name": "Soru sor",
+			"summary": "Bir istek belirsiz olduğunda ajanın durup size çoktan seçmeli bir soru sormasını sağlar. Soru, sohbet giriş alanının üzerinde görünür."
+		}
+	},
+	"web_search": {
+		"keyless_label": "{provider} (anahtarsız)",
+		"firecrawl_key_help": "İsteğe bağlı — daha yüksek istek sınırları için bir Firecrawl API anahtarı (fc-…) ekleyin. Anahtarsız katmanı kullanmak için boş bırakın.",
+		"brave_key_help": "api.search.brave.com adresinden alınan Brave Search API anahtarı.",
+		"tavily_key_help": "app.tavily.com adresinden alınan Tavily API anahtarı.",
+		"keenable_key_help": "İsteğe bağlı — daha yüksek istek sınırları için bir Keenable API anahtarı ekleyin. Ücretsiz herkese açık uç noktayı kullanmak için boş bırakın."
+	}
+}

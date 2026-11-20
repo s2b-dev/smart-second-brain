@@ -1,0 +1,47 @@
+{
+	"fallback_title": "Gradnik",
+	"block": {
+		"unbundled_library": "Ta gradnik zahteva knjižnico, ki ni priložena: {libs}. Na voljo: {available}.",
+		"generating": "Ustvarjanje gradnika …",
+		"expand": "Razširi",
+		"copy_tooltip": "Kopiraj kot blok za lepljenje v zapisek",
+		"copied_notice": "Blok gradnika je kopiran. Prilepite ga v kateri koli zapisek.",
+		"save_tooltip": "Shrani kot datoteko gradnika in jo odpri",
+		"save_failed": "Gradnika ni bilo mogoče shraniti: {error}"
+	},
+	"frame": {
+		"navigation_blocked": "Ta gradnik je bil ustavljen, ker je poskušal zapustiti svoj peskovnik."
+	},
+	"embed": {
+		"load_failed": "Gradnika ni bilo mogoče naložiti."
+	},
+	"rename": {
+		"title": "Preimenuj gradnik",
+		"name": "Ime",
+		"button": "Preimenuj",
+		"empty_name": "Vnesite ime.",
+		"invalid_chars": "Ime ne sme vsebovati \\ / : * ? \" < > | # ^ [ ]",
+		"exists": "»{name}« v tej mapi že obstaja.",
+		"failed": "Preimenovanje ni uspelo: {error}"
+	},
+	"view": {
+		"menu_show_widget": "Prikaži gradnik",
+		"menu_edit_source": "Uredi vir",
+		"menu_rename": "Preimenuj ...",
+		"review_showing_proposed": "Čakajoča sprememba iz klepeta – prikazan je predlagani gradnik",
+		"review_showing_current": "Čakajoča sprememba iz klepeta – prikazan je trenutni gradnik",
+		"show_current": "Prikaži trenutnega",
+		"show_proposed": "Prikaži predlaganega",
+		"accept": "Sprejmi",
+		"reject": "Zavrni",
+		"rejected_notice": "Predlagana sprememba tega gradnika je zavrnjena",
+		"conflict_tooltip": "Ni mogoče sprejeti – gradnik se je spremenil po tem, ko je bila sprememba predlagana. Zavrnite jo in prosite agenta, naj jo pripravi znova.",
+		"applied_notice": "Predlagana sprememba tega gradnika je uveljavljena",
+		"apply_failed": "Uveljavitev spremembe ni uspela: {error}",
+		"source_aria": "Vir gradnika",
+		"source_hint": "Začetni metapodatki (title, height, queries, libs), nato HTML.",
+		"source_stale_hint": "Med urejanjem se je spremenil na disku – za ponovno nalaganje kliknite Prekliči; Shrani je onemogočeno.",
+		"source_stale_notice": "Ta gradnik se je med vašim urejanjem spremenil na disku. Kliknite Prekliči, da ga znova naložite, nato ga uredite znova.",
+		"save_failed": "Gradnika ni bilo mogoče shraniti: {error}"
+	}
+}

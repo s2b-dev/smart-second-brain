@@ -1,0 +1,628 @@
+{
+	"editing": {
+		"label": "Urejanje sporočila",
+		"cancel": "Prekliči urejanje"
+	},
+	"branch": {
+		"previous": "Prejšnja veja",
+		"next": "Naslednja veja"
+	},
+	"message": {
+		"collapse": "Strni sporočilo",
+		"expand": "Razširi sporočilo",
+		"wait_before_edit": "Pred urejanjem počakajte, da se trenutni odgovor konča",
+		"regenerate_failed": "Ponovno ustvarjanje ni uspelo: {error}",
+		"retry_failed": "Ponovni poskus ni uspel: {error}",
+		"branch_switch_failed": "Preklop veje ni uspel: {error}",
+		"unknown_error": "Neznana napaka",
+		"copied": "Kopirano v odložišče",
+		"edit": "Uredi sporočilo",
+		"copy": "Kopiraj sporočilo",
+		"compaction_manual": "Ročno stiskanje pogovora",
+		"compaction_automatic": "Samodejno stiskanje pogovora",
+		"regenerate": "Znova ustvari odgovor",
+		"copy_response": "Kopiraj odgovor",
+		"jump_to_bottom": "Skoči na dno"
+	},
+	"model_select": {
+		"tooltip": "Izberite model"
+	},
+	"attach": {
+		"tooltip": "Dodaj kontekst",
+		"from_device": "Iz naprave",
+		"take_photo": "Fotografiraj",
+		"from_vault": "Iz sefa"
+	},
+	"running": {
+		"go_to": "Pojdi na delujoči klepet: {name}"
+	},
+	"status": {
+		"request_failed": "Zahteva za model ni uspela.",
+		"error_title": "Prišlo je do napake",
+		"retry_aria": "Ponovi to zahtevo",
+		"retry_tooltip": "Znova zaženi neuspelo zahtevo",
+		"stopped": "Ustavljeno"
+	},
+	"embed": {
+		"open_chat": "Odpri klepet",
+		"fallback_title": "Klepet",
+		"empty": "Ta klepet še nima sporočil.",
+		"load_failed": "Predogleda klepeta ni bilo mogoče naložiti."
+	},
+	"agent": {
+		"configure": "Nastavi agenta",
+		"options": "Možnosti agenta",
+		"edit": "Uredi agenta",
+		"default_badge": "privzeto",
+		"create": "Ustvari agenta",
+		"new": "Nov agent"
+	},
+	"todos": {
+		"all_done": "Vsi koraki so končani",
+		"status_pending": "Ni začeto",
+		"status_in_progress": "V teku",
+		"collapse": "Strni seznam nalog",
+		"expand": "Razširi seznam nalog",
+		"progress": "{done} od {total}"
+	},
+	"pending": {
+		"count_create": {
+			"one": "{count} ustvaritev",
+			"two": "{count} ustvaritvi",
+			"few": "{count} ustvaritve",
+			"other": "{count} ustvaritev"
+		},
+		"count_update": {
+			"one": "{count} posodobitev",
+			"two": "{count} posodobitvi",
+			"few": "{count} posodobitve",
+			"other": "{count} posodobitev"
+		},
+		"count_delete": {
+			"one": "{count} izbris",
+			"two": "{count} izbrisa",
+			"few": "{count} izbrisi",
+			"other": "{count} izbrisov"
+		},
+		"count_move": {
+			"one": "{count} premik",
+			"two": "{count} premika",
+			"few": "{count} premiki",
+			"other": "{count} premikov"
+		},
+		"summary_pending": "Čaka: {composition}",
+		"summary_partially_applied": "Delno uveljavljeno: {count}",
+		"type_create": "Ustvari",
+		"type_update": "Posodobi",
+		"type_move": "Premakni",
+		"notice_applied": "Uveljavljeno: {path}",
+		"notice_apply_failed": "Uveljavitev spremembe ni uspela: {error}",
+		"notice_rejected": "Zavrnjeno: {path}",
+		"notice_restored": "Obnovljeno: {path}",
+		"skip_conflict": "»{path}« je ostal nespremenjen – spremenil se je po delni uveljavitvi spremembe.",
+		"skip_missing": "»{path}« ni bilo mogoče obnoviti – ta zapisek ne obstaja več. Vsa uveljavljena vsebina se je premaknila z njim.",
+		"skip_failed": "Obnova »{path}« ni uspela. Podrobnosti so v konzoli.",
+		"notice_all_stale": "Vse čakajoče spremembe so zastarele – zapiski so se spremenili po tem, ko so bile predlagane. Zavrnite jih in prosite agenta, naj jih pripravi znova.",
+		"risk_deletions": {
+			"one": "{count} izbris zapiska",
+			"two": "{count} izbrisa zapiskov",
+			"few": "{count} izbrise zapiskov",
+			"other": "{count} izbrisov zapiskov"
+		},
+		"risk_deprivatizing_moves": {
+			"one": "{count} premik iz zasebne lokacije",
+			"two": "{count} premika iz zasebne lokacije",
+			"few": "{count} premike iz zasebne lokacije",
+			"other": "{count} premikov iz zasebne lokacije"
+		},
+		"risk_join": "{first} in {second}",
+		"confirm_accept_all_title": "Želite sprejeti vse spremembe?",
+		"confirm_accept_all_message": {
+			"one": "Ta paket vključuje {risks}. Želite uveljaviti {count} spremembo?",
+			"two": "Ta paket vključuje {risks}. Želite uveljaviti obe spremembi ({count})?",
+			"few": "Ta paket vključuje {risks}. Želite uveljaviti vse {count} spremembe?",
+			"other": "Ta paket vključuje {risks}. Želite uveljaviti vseh {count} sprememb?"
+		},
+		"accept_all": "Sprejmi vse",
+		"skipped_stale_suffix": ", preskočenih zastarelih: {count}",
+		"notice_applied_one": "Sprememba je uveljavljena{skipped}",
+		"notice_applied_all": "Uveljavljene so vse spremembe ({count}){skipped}",
+		"notice_applied_partial": "Uveljavljenih sprememb: {applied}{skipped}, neuspešnih: {failed}: {paths}",
+		"notice_apply_error": "Napaka pri uveljavljanju sprememb: {error}",
+		"notice_rejected_all": "Vse čakajoče spremembe so zavrnjene",
+		"notice_restored_partial": "Delno uveljavljeni zapiski so obnovljeni",
+		"notice_rejected_all_head": "Vse čakajoče spremembe so zavrnjene.",
+		"notice_undo_finished_head": "Razveljavljanje uveljavljenih sprememb je končano.",
+		"notice_open_failed": "Zapiska za to spremembo ni bilo mogoče odpreti.",
+		"collapse": "Strni čakajoče spremembe",
+		"expand": "Razširi čakajoče spremembe",
+		"diff_mode_to_split": "Preklopi razlike v zapisku na pogled z dvema podoknoma",
+		"diff_mode_to_word": "Preklopi razlike v zapisku na vrstične razlike po besedah",
+		"diff_mode_toggle": "Preklopi način prikaza razlik",
+		"accept_all_tooltip": "Sprejmi vse spremembe",
+		"reject_all_tooltip": "Zavrni vse spremembe in obnovi delno uveljavljene zapiske",
+		"undo_applied_tooltip": "Obnovi izvirno vsebino delno uveljavljenih zapiskov",
+		"reject_all": "Zavrni vse",
+		"undo_applied": "Razveljavi uveljavljeno",
+		"hide_widget_preview": "Skrij predogled gradnika",
+		"preview_widget": "Predogled gradnika",
+		"hide_changes": "Skrij spremembe",
+		"show_changes": "Prikaži spremembe",
+		"hide_content": "Skrij vsebino",
+		"show_content": "Prikaži vsebino",
+		"hide_widget_preview_aria": "Skrij predogled {path}",
+		"preview_widget_aria": "Predogled {path}",
+		"hide_changes_aria": "Skrij spremembe v {path}",
+		"show_changes_aria": "Prikaži spremembe v {path}",
+		"hide_content_aria": "Skrij vsebino {path}",
+		"show_content_aria": "Prikaži vsebino {path}",
+		"partly_applied_explanation": "Del te spremembe je bil uveljavljen v zapisku. Razveljavite ga, da obnovite izvirno vsebino zapiska.",
+		"partly_applied": "Delno uveljavljeno",
+		"stale_delete_explanation": "Ta zapisek se je spremenil po tem, ko je bil predlagan izbris – predogled se ne ujema več s tem, kar bi bilo izbrisano. Sprejem ne bo uspel; zavrnite ga in prosite agenta, naj ga pripravi znova.",
+		"stale_explanation": "Ta zapisek se je spremenil po tem, ko je bila sprememba predlagana, zato njen sprejem ne bo uspel. Zavrnite jo in prosite agenta, naj svoje urejanje znova uveljavi na trenutni vsebini.",
+		"stale": "Zastarelo",
+		"deprivatizing_explanation": "Ta zapisek je trenutno zaseben. Premik na to lokacijo ga odstrani iz filtra zasebnosti, zato bo od takrat indeksiran, iskalen in dostopen ponudnikom, ki niso zaupanja vredni.",
+		"deprivatizing": "Ni več zasebno",
+		"cross_thread_explanation": {
+			"one": "Tudi {count} drug klepet ima čakajoče urejanje te datoteke. Zmaga tisto, ki je sprejeto prvo; uveljavitev ostalih lahko nato ne uspe.",
+			"two": "Tudi {count} druga klepeta imata čakajoče urejanje te datoteke. Zmaga tisto, ki je sprejeto prvo; uveljavitev ostalih lahko nato ne uspe.",
+			"few": "Tudi {count} drugi klepeti imajo čakajoče urejanje te datoteke. Zmaga tisto, ki je sprejeto prvo; uveljavitev ostalih lahko nato ne uspe.",
+			"other": "Tudi {count} drugih klepetov ima čakajoče urejanje te datoteke. Zmaga tisto, ki je sprejeto prvo; uveljavitev ostalih lahko nato ne uspe."
+		},
+		"stale_accept_disabled": "Ni mogoče sprejeti – zapisek se je spremenil po tem, ko je bila sprememba predlagana. Zavrnite jo in prosite agenta, naj jo pripravi znova.",
+		"accept_change": "Sprejmi spremembo",
+		"accept_change_aria": "Sprejmi spremembo v {path}",
+		"reject_change": "Zavrni spremembo",
+		"reject_change_aria": "Zavrni spremembo v {path}",
+		"undo_applied_change_tooltip": "Obnovi vsebino tega zapiska izpred predloga",
+		"undo_applied_change_aria": "Razveljavi uveljavljeno spremembo v {path}",
+		"hide_source_changes": "Skrij spremembe vira",
+		"show_source_changes": "Prikaži spremembe vira",
+		"note_empty": "Ta zapisek je prazen.",
+		"no_remaining_differences": "Ni preostalih razlik.",
+		"accept_hunk": "Sprejmi to spremembo",
+		"accept_hunk_aria": "Sprejmi spremembo {index} od {total}",
+		"reject_hunk": "Zavrni to spremembo",
+		"reject_hunk_aria": "Zavrni spremembo {index} od {total}",
+		"hunk_too_large": "Ta sprememba je prevelika za predogled tukaj – odprite zapisek, da jo pregledate."
+	},
+	"question": {
+		"send_failed": "Vašega odgovora ni bilo mogoče poslati",
+		"group_aria": "Vprašanje agenta",
+		"position": "Vprašanje {index} od {total}",
+		"label": "Vprašanje",
+		"dismiss_aria": "Opusti vprašanje",
+		"dismiss_tooltip": "Opusti brez odgovora",
+		"multi_hint": "Izberite vse ustrezne",
+		"custom_placeholder": "Nekaj drugega …",
+		"answer_placeholder": "Vnesite svoj odgovor …",
+		"custom_aria": "Vaš lasten odgovor",
+		"send_answers": "Pošlji odgovore",
+		"send_answer": "Pošlji odgovor",
+		"unrenderable": "Agent je postavil vprašanje, ki ga ni bilo mogoče prikazati.",
+		"retry": "Naj poskusi znova"
+	},
+	"context_usage": {
+		"row_system": "Sistemski poziv",
+		"row_human": "Vaša sporočila",
+		"row_assistant": "Pomočnik",
+		"row_tool": "Rezultati orodij",
+		"row_draft": "Osnutek in čakajoče",
+		"tooltip_unknown_limit": "Poraba konteksta (ocena): {used}k žetonov (omejitev neznana)",
+		"tooltip": "Poraba konteksta (ocena): {percent} % ({used}k / {limit}k)",
+		"line_unknown_limit": "{tokens} žetonov · omejitev neznana",
+		"line": "{tokens} od {limit} žetonov",
+		"compaction_unknown_short": "Samodejno stiskanje potrebuje znano omejitev",
+		"compaction_unknown_long": "Samodejno povzemanje potrebuje model z znano omejitvijo konteksta.",
+		"compaction_short": "Samodejno stiskanje pri {tokens}{percent}",
+		"compaction_long": "Starejša sporočila se samodejno povzamejo pri {tokens} žetonih{percent}.",
+		"trigger_aria": "Odpri porazdelitev žetonov konteksta",
+		"heading": "Poraba konteksta (ocena)",
+		"summarize_now": "Povzemi zdaj",
+		"summarize_now_tooltip": "Zdaj povzemi starejša sporočila",
+		"nothing_to_summarize": "Zaenkrat ni ničesar za povzemanje"
+	},
+	"recommendations": {
+		"suggestion_help_overview": "Pri čem mi lahko pomagaš?",
+		"suggestion_summarize_recent": "Povzemi moje nedavne zapiske",
+		"suggestion_find_notes": "Poišči zapiske o temi",
+		"suggestion_find_notes_query": "Poišči moje zapiske o ",
+		"suggestion_tasknotes": "Katere naloge zapadejo ta teden?",
+		"suggestion_tasks": "Katere naloge so zapadle?",
+		"suggestion_dataview": "Prikaži tabelo mojih zapiskov po oznakah",
+		"skills_initializing": "Veščine se še inicializirajo – poskusite znova čez trenutek.",
+		"skill_create_failed_detail": "Veščine za {name} ni bilo mogoče ustvariti: {error}",
+		"skill_create_failed": "Veščine za {name} ni bilo mogoče ustvariti.",
+		"open_agent_skills": "Odpri veščine agenta",
+		"enabled_notice": "{name} je omogočen za {agent}.",
+		"greeting_title": "Začnite nov pogovor",
+		"greeting_sub": "Vprašajte me karkoli o svojih zapiskih.",
+		"add_provider_title": "Dodajte ponudnika AI",
+		"add_provider_sub": "Povežite ponudnika, da začnete klepetati.",
+		"select_model_title": "Izberite model za klepet",
+		"select_model_sub": "Izberite model, da začnete klepetati.",
+		"dismiss_suggestion_aria": "Opusti »{label}«",
+		"stale_not_updated": "Privzeta vsebina se je spremenila ({label}), vendar vaše kopije ni bilo mogoče samodejno posodobiti.",
+		"stale_kept": "Privzeta vsebina se je spremenila ({label}). Vaša prilagojena različica je ohranjena.",
+		"review": "Preglej",
+		"dismiss_notice_aria": "Opusti obvestilo o posodobitvi: {label}",
+		"dismiss_notice": "Opusti to obvestilo",
+		"dismiss_all_nudges_aria": "Opusti vse predloge integracij vtičnikov ({count})",
+		"dismiss_all_nudges_tooltip": "Opusti vse predloge ({count})",
+		"dismiss_all": "Opusti vse",
+		"enable": "Omogoči",
+		"dismiss_nudge_aria": "Opusti predlog {name}",
+		"dismiss_nudge": "Opusti ta predlog",
+		"show_less": "Prikaži manj",
+		"dismiss_all_aria": "Opusti vse predloge",
+		"stale_label": {
+			"system_prompt": "sistemski poziv",
+			"skill": "veščina {name}"
+		},
+		"nudge": "Omogočite veščino {skill} za tega agenta.",
+		"nudges_summary": {
+			"one": "Za tega agenta je na voljo {number} integracija vtičnika.",
+			"two": "Za tega agenta sta na voljo {number} integraciji vtičnikov.",
+			"few": "Za tega agenta so na voljo {number} integracije vtičnikov.",
+			"other": "Za tega agenta je na voljo {number} integracij vtičnikov."
+		},
+		"stale_agent_kept": "Privzeta vsebina se je spremenila ({label}). Prilagojena različica agenta {agent} je ohranjena.",
+		"stale_agent_not_updated": "Privzeta vsebina se je spremenila ({label}), vendar kopije agenta {agent} ni bilo mogoče samodejno posodobiti."
+	},
+	"context_tray": {
+		"attachment_open": "{path} (kliknite za odpiranje)",
+		"remove_attachment": "Odstrani prilogo",
+		"remove_attachment_aria": "Odstrani {name}",
+		"note_excluded": "{path} (izključeno – kliknite, da vključite kot sklic)",
+		"note_included": "{path} (odprt zapisek – kliknite za izključitev)",
+		"attach_full_content": "Sporočilu priloži celotno vsebino",
+		"graph_collapse": "Izbira v grafu – kliknite za strnitev",
+		"graph_topic_expand": "{topic} – kliknite za razširitev",
+		"graph_notes_expand": {
+			"one": "{count} zapisek iz grafa – kliknite za razširitev",
+			"two": "{count} zapiska iz grafa – kliknite za razširitev",
+			"few": "{count} zapiski iz grafa – kliknite za razširitev",
+			"other": "{count} zapiskov iz grafa – kliknite za razširitev"
+		},
+		"graph_notes_label": {
+			"one": "{count} zapisek iz grafa",
+			"two": "{count} zapiska iz grafa",
+			"few": "{count} zapiski iz grafa",
+			"other": "{count} zapiskov iz grafa"
+		},
+		"remove_graph_notes": "Odstrani vse zapiske iz grafa",
+		"graph_member": "{path} (iz grafa – kliknite za izključitev)",
+		"selection": "Izbrano besedilo iz {path} (kliknite za opustitev)\n\n{text}",
+		"selection_long": "Dolga izbira – skrajšana bo, da ustreza kontekstu modela"
+	},
+	"tool_summary": {
+		"verb": {
+			"search_notes_for": {
+				"running": "Iskanje po zapiskih: {target}",
+				"done": "Preiskani zapiski: {target}"
+			},
+			"recent_notes": {
+				"running": "Pregledovanje nedavnih zapiskov",
+				"done": "Pregledani nedavni zapiski"
+			},
+			"search_notes": {
+				"running": "Iskanje po zapiskih",
+				"done": "Preiskani zapiski"
+			},
+			"grep_for": {
+				"running": "Iskanje besedila {target}",
+				"done": "Poiskano besedilo {target}"
+			},
+			"grep": {
+				"running": "Iskanje po besedilu zapiskov",
+				"done": "Preiskano besedilo zapiskov"
+			},
+			"list_folder": {
+				"running": "Izpis mape {target}",
+				"done": "Izpisana mapa {target}"
+			},
+			"list_vault": {
+				"running": "Izpis sefa",
+				"done": "Izpisan sef"
+			},
+			"read_target": {
+				"running": "Branje: {target}",
+				"done": "Prebrano: {target}"
+			},
+			"read_note": {
+				"running": "Branje zapiska",
+				"done": "Prebran zapisek"
+			},
+			"edit_notes": {
+				"running": "Urejanje zapiskov",
+				"done": "Urejeni zapiski"
+			},
+			"edit_note": {
+				"running": "Urejanje zapiska",
+				"done": "Urejen zapisek"
+			},
+			"run_javascript": {
+				"running": "Izvajanje JavaScripta",
+				"done": "Izveden JavaScript"
+			},
+			"list_tags": {
+				"running": "Izpis vseh oznak",
+				"done": "Izpisane vse oznake"
+			},
+			"read_properties_of": {
+				"running": "Branje lastnosti: {target}",
+				"done": "Prebrane lastnosti: {target}"
+			},
+			"read_properties": {
+				"running": "Branje lastnosti zapiskov",
+				"done": "Prebrane lastnosti zapiskov"
+			},
+			"fetch_target": {
+				"running": "Pridobivanje: {target}",
+				"done": "Pridobljeno: {target}"
+			},
+			"fetch_page": {
+				"running": "Pridobivanje strani",
+				"done": "Pridobljena stran"
+			},
+			"web_search_for": {
+				"running": "Iskanje po spletu: {target}",
+				"done": "Preiskan splet: {target}"
+			},
+			"web_search": {
+				"running": "Iskanje po spletu",
+				"done": "Preiskan splet"
+			},
+			"load_skill_target": {
+				"running": "Nalaganje veščine {target}",
+				"done": "Naložena veščina {target}"
+			},
+			"load_skill": {
+				"running": "Nalaganje veščine",
+				"done": "Naložena veščina"
+			},
+			"update_todos": {
+				"running": "Posodabljanje seznama nalog",
+				"done": "Posodobljen seznam nalog"
+			},
+			"clear_todos": {
+				"running": "Čiščenje seznama nalog",
+				"done": "Počiščen seznam nalog"
+			},
+			"ask_target": {
+				"running": "Spraševanje: {target}",
+				"done": "Vprašano: {target}"
+			},
+			"generic_target": {
+				"running": "Uporaba {name}: {target}",
+				"done": "Uporabljeno {name}: {target}"
+			},
+			"generic": {
+				"running": "Uporaba {name}",
+				"done": "Uporabljeno {name}"
+			}
+		},
+		"count": {
+			"note": {
+				"one": "{count} zapisek",
+				"two": "{count} zapiska",
+				"few": "{count} zapiski",
+				"other": "{count} zapiskov"
+			},
+			"match": {
+				"one": "{count} zadetek",
+				"two": "{count} zadetka",
+				"few": "{count} zadetki",
+				"other": "{count} zadetkov"
+			},
+			"file": {
+				"one": "{count} datoteka",
+				"two": "{count} datoteki",
+				"few": "{count} datoteke",
+				"other": "{count} datotek"
+			},
+			"folder": {
+				"one": "{count} mapa",
+				"two": "{count} mapi",
+				"few": "{count} mape",
+				"other": "{count} map"
+			},
+			"line": {
+				"one": "{count} vrstica",
+				"two": "{count} vrstici",
+				"few": "{count} vrstice",
+				"other": "{count} vrstic"
+			},
+			"tag": {
+				"one": "{count} oznaka",
+				"two": "{count} oznaki",
+				"few": "{count} oznake",
+				"other": "{count} oznak"
+			},
+			"result": {
+				"one": "{count} rezultat",
+				"two": "{count} rezultata",
+				"few": "{count} rezultati",
+				"other": "{count} rezultatov"
+			},
+			"question": {
+				"one": "{count} vprašanje",
+				"two": "{count} vprašanji",
+				"few": "{count} vprašanja",
+				"other": "{count} vprašanj"
+			},
+			"operation": {
+				"one": "{count} operacija",
+				"two": "{count} operaciji",
+				"few": "{count} operacije",
+				"other": "{count} operacij"
+			},
+			"item": {
+				"one": "{count} element",
+				"two": "{count} elementa",
+				"few": "{count} elementi",
+				"other": "{count} elementov"
+			},
+			"row": {
+				"one": "{count} vrstica",
+				"two": "{count} vrstici",
+				"few": "{count} vrstice",
+				"other": "{count} vrstic"
+			},
+			"field": {
+				"one": "{count} polje",
+				"two": "{count} polji",
+				"few": "{count} polja",
+				"other": "{count} polj"
+			}
+		},
+		"found": "najdeno: {items}",
+		"found_no_matches": "ni zadetkov",
+		"found_in": "najdeno: {items} ({files})",
+		"found_folders_and_files": "najdeno: {folders} in {files}",
+		"truncated": "{lines} (prirezano)",
+		"operations_across": "{operations} ({notes})",
+		"errored": "napaka",
+		"logged": "izpisano: {lines}",
+		"returned_value": "vrnjena vrednost",
+		"duration_ms": "v {ms} ms",
+		"todos_done": "končano: {done} od {total}",
+		"dismissed": "opuščeno",
+		"answered_in_chat": "odgovorjeno v klepetu",
+		"answered": "odgovorjeno",
+		"failed": "ni uspelo",
+		"lines_total": "skupaj {lines}",
+		"list_separator": ", ",
+		"list_and": "{list} in {last}",
+		"list_and_more": "{list} in še {count}",
+		"tool_fallback": "Orodje"
+	},
+	"tool_output": {
+		"key_count": {
+			"one": "{count} ključ",
+			"two": "{count} ključa",
+			"few": "{count} ključi",
+			"other": "{count} ključev"
+		}
+	},
+	"tools": {
+		"review_accepted": "sprejeto: {count}",
+		"review_partial": "delno uveljavljeno: {count}",
+		"review_rejected": "zavrnjeno: {count}",
+		"review_pending": "čaka na pregled: {count}",
+		"label_with_outcome": "{label}, {outcome}",
+		"source_note": "Zapisek",
+		"phase_summarizing": "Povzemanje prejšnjih sporočil",
+		"phase_running_tools": {
+			"one": "Izvajanje {count} orodja",
+			"two": "Izvajanje {count} orodij",
+			"few": "Izvajanje {count} orodij",
+			"other": "Izvajanje {count} orodij"
+		},
+		"phase_loading_model": "Nalaganje modela",
+		"phase_waiting": "Čakanje na model",
+		"phase_writing": "Pisanje",
+		"phase_thinking": "Razmišljanje",
+		"running_label": "{phase} … {seconds} s",
+		"settled_label": "Razmišljanje: {seconds} s",
+		"via_subagent": "prek {name}",
+		"input": "Vhod",
+		"output": "Izhod",
+		"no_output": "(ni izhoda)",
+		"result": "Rezultat",
+		"tree_more_files": {
+			"one": "+ še {count} datoteka",
+			"two": "+ še {count} datoteki",
+			"few": "+ še {count} datoteke",
+			"other": "+ še {count} datotek"
+		},
+		"tree_unlisted_files": {
+			"one": "{count} datoteka ni navedena",
+			"two": "{count} datoteki nista navedeni",
+			"few": "{count} datoteke niso navedene",
+			"other": "{count} datotek ni navedenih"
+		},
+		"no_answer": "Ni odgovora",
+		"dismissed_without_answer": "Opuščeno brez odgovora.",
+		"chip_query": "poizvedba: {value}",
+		"chip_algorithm": "algoritem: {value}",
+		"chip_results": "rezultati: {value}",
+		"chip_shown": "prikazano: {value}",
+		"chip_recent_only": "samo nedavni",
+		"chip_skipped_private": "preskočeni zasebni: {value}",
+		"untitled": "Brez naslova",
+		"more_results": {
+			"one": "+ še {count} rezultat",
+			"two": "+ še {count} rezultata",
+			"few": "+ še {count} rezultati",
+			"other": "+ še {count} rezultatov"
+		},
+		"chip_root": "koren: {value}",
+		"chip_folders": "mape: {value}",
+		"chip_files": "datoteke: {value}",
+		"chip_depth": "globina: {value}",
+		"chip_folders_only": "samo mape",
+		"chip_collapsed": "strnjeno",
+		"tree": "Drevo",
+		"chip_operations": "operacije: {value}",
+		"chip_paths": "poti: {value}",
+		"chip_truncated": "prirezano",
+		"chip_logs": "dnevniki: {value}",
+		"chip_error": "napaka",
+		"chip_return_value": "vrnjena vrednost",
+		"console_output": "Izhod konzole",
+		"return_value": "Vrnjena vrednost",
+		"executed_code": "Izvedena koda",
+		"raw_output": "Surovi izhod"
+	},
+	"input": {
+		"drop_files": "Spustite datoteke sem",
+		"send_shortcut_hint": "↵ · {shortcut} v seznamu",
+		"edit_attachment_missing": "Priloga »{name}« v sefu ne obstaja več – ne bo del urejenega sporočila.",
+		"select_model_to_send": "Za pošiljanje izberite model za klepet.",
+		"placeholder": "Vprašajte o svojih zapiskih ...",
+		"wait_for_attachments": "Počakajte, da se priloge shranijo",
+		"select_model_before_sending": "Pred pošiljanjem izberite model za klepet.",
+		"empty_before_sending": "Pred pošiljanjem dodajte besedilo ali priložite datoteko",
+		"empty_before_saving": "Pred shranjevanjem dodajte besedilo ali priložite datoteko",
+		"select_model_before_saving": "Pred shranjevanjem izberite model za klepet.",
+		"save_edit_failed": "Shranjevanje urejanja ni uspelo",
+		"not_ready": "Klepet še ni pripravljen",
+		"question_blocks_attachments": "Preden priložite datoteke, odgovorite na agentovo vprašanje ali ga opustite",
+		"send_failed": "Pošiljanje sporočila ni uspelo",
+		"summarize_failed": "Povzemanje zgodovine ni uspelo",
+		"unsupported_file_type": "Nepodprta vrsta datoteke: .{ext}",
+		"the_selected_model": "izbrani model",
+		"vision_required_switch": "Slikovne priloge zahtevajo model z vidom. Za prilaganje slik zamenjajte model (trenutni: {model}).",
+		"vision_unknown": "Podpora za vid pri tem modelu ni znana; analiza slik morda ne bo uspela.",
+		"file_too_large": "Datoteka je prevelika: {name} presega omejitev 15 MB na datoteko.",
+		"total_too_large": "Skupna velikost prilog presega omejitev 25 MB za eno sporočilo.",
+		"attach_failed": "Prilaganje datoteke ni uspelo: {error}",
+		"vision_required": "Slikovne priloge zahtevajo model z vidom (trenutni: {model}).",
+		"switch_model": "Zamenjaj model",
+		"already_attached": "{name} je že priložen.",
+		"wait_for_current_attachments": "Počakajte, da se trenutne priloge shranijo.",
+		"file_not_found": "Datoteke ni mogoče najti: {path}",
+		"only_files": "Priložiti je mogoče samo datoteke: {path}",
+		"picker_placeholder": "Išči datoteke v sefu za prilaganje ...",
+		"picker_verb": "Priloži",
+		"current_model": "trenutni model",
+		"drag_images_unsupported": "{model} ne podpira slik. Preklopite na model z vidom.",
+		"drag_some_unsupported": "Nekatere datoteke morda niso podprte (sprejeto: txt, md, csv, json, slike, pdf).",
+		"retry_connection": "Kliknite za ponovni poskus povezave",
+		"provider_unreachable": "Povezava s ponudnikom {provider} ni mogoča – kliknite za ponovni poskus",
+		"saving": "Shranjevanje ...",
+		"save_edit_aria": "shrani urejanje",
+		"send_aria": "pošlji sporočilo",
+		"select_model_first": "Najprej izberite model za klepet",
+		"save_edit_with_hint": "Shrani urejanje ({hint})",
+		"save_edit": "Shrani urejanje",
+		"send_with_hint": "Pošlji sporočilo ({hint})",
+		"send": "Pošlji sporočilo",
+		"stop_aria": "ustavi pretakanje",
+		"stop": "Ustavi pretakanje"
+	},
+	"view": {
+		"session_unavailable": "Seja klepeta še ni na voljo. Ko se inicializacija vtičnika konča, znova odprite ta pogled."
+	}
+}
