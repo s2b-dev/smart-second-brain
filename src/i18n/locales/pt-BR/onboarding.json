@@ -9,10 +9,9 @@
 		"search": {
 			"title": "Pesquisa mais inteligente",
 			"desc": "Encontre notas por título, conteúdo, tags e pastas — com correspondência aproximada. Nenhuma configuração necessária. Adicione um modelo de embedding depois para pesquisa semântica.",
-			"hotkey_before": "Ou",
 			"hotkey_link": "defina um atalho de teclado",
-			"hotkey_after": "para acesso instantâneo.",
-			"navbar_toggle": "Abrir pela lupa da barra de navegação em vez do alternador rápido"
+			"navbar_toggle": "Abrir pela lupa da barra de navegação em vez do alternador rápido",
+			"hotkey": "Ou {link} para acesso instantâneo."
 		},
 		"graph": {
 			"title": "Grafo mais inteligente",
@@ -32,41 +31,33 @@
 		"model_step": {
 			"title": "Escolher um modelo de chat",
 			"needs_provider_desc": "Conecte um provedor primeiro e depois escolha um modelo para conversar.",
-			"using_before": "Usando",
-			"using_after": ". Tudo pronto para começar a conversar.",
 			"desc": "Escolha um modelo do seu provedor conectado para ativar o chat.",
 			"change": "Trocar modelo",
-			"choose": "Escolher modelo"
+			"choose": "Escolher modelo",
+			"using": "Usando {model}. Tudo pronto para começar a conversar."
 		},
 		"privacy": {
 			"public_title": "Suas notas são compartilhadas por padrão",
 			"all_trusted_title": "O acesso às notas está liberado",
 			"untrusted_title": "Suas notas ainda são privadas",
 			"no_provider_title": "O acesso às notas é privado por padrão",
-			"no_provider_before": "Suas notas",
 			"no_provider_strong": "não",
-			"no_provider_after": "são compartilhadas com provedores de IA a menos que você permita. Depois de conectar um provedor acima, você pode conceder acesso a ele — nada sai do seu cofre antes disso.",
-			"public_before": "O acesso às notas está definido como",
 			"public_strong": "público por padrão",
-			"public_after": ", então os provedores podem ler suas notas, exceto as que você excluir.",
-			"public_end": ".",
 			"review_access": "Revisar acesso às notas",
 			"trusted": "de confiança",
-			"all_trusted_before": {
-				"one": "Seu provedor está marcado como",
-				"many": "Seus provedores estão marcados como",
-				"other": "Seus provedores estão marcados como"
-			},
-			"all_trusted_after": ", então o agente pode ler suas notas.",
-			"all_trusted_end": "para manter notas específicas privadas.",
-			"untrusted_before": {
-				"one": "ainda não pode ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-o como",
-				"many": "ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como",
-				"other": "ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como"
-			},
-			"untrusted_middle": "nas configurações do provedor ou",
 			"change_access": "altere o acesso às notas",
-			"untrusted_end": "para permitir todos os provedores."
+			"no_provider": "Suas notas {not} são compartilhadas com provedores de IA a menos que você permita. Depois de conectar um provedor acima, você pode conceder acesso a ele — nada sai do seu cofre antes disso.",
+			"public": "O acesso às notas está definido como {mode}, então os provedores podem ler suas notas, exceto as que você excluir. {review}.",
+			"all_trusted": {
+				"one": "Seu provedor está marcado como {trusted}, então o agente pode ler suas notas. {review} para manter notas específicas privadas.",
+				"many": "Seus provedores estão marcados como {trusted}, então o agente pode ler suas notas. {review} para manter notas específicas privadas.",
+				"other": "Seus provedores estão marcados como {trusted}, então o agente pode ler suas notas. {review} para manter notas específicas privadas."
+			},
+			"untrusted": {
+				"one": "{providers} ainda não pode ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-o como {trusted} nas configurações do provedor ou {change} para permitir todos os provedores.",
+				"many": "{providers} ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como {trusted} nas configurações do provedor ou {change} para permitir todos os provedores.",
+				"other": "{providers} ainda não podem ler suas notas — o chat funcionará, mas as respostas não serão baseadas no seu cofre. Marque-os como {trusted} nas configurações do provedor ou {change} para permitir todos os provedores."
+			}
 		},
 		"skip": "Pular",
 		"documentation": "Documentação ↗",

@@ -67,10 +67,7 @@
 		"api_scripting": "API-Scripting",
 		"auto_integration_desc": "Automatisch erkanntes Plugin mit öffentlicher API. Beim Aktivieren wird ein bearbeitbarer API-Scripting-Skill erstellt – der Agent untersucht die API, bevor er sie aufruft. Läuft im Hauptthread (nicht in einer Sandbox).",
 		"subagents_heading": "Subagenten",
-		"subagents_intro": {
-			"before": "Andere Agenten, an die dieser über das Tool",
-			"after": "delegieren kann – jeder Subagent läuft mit eigenem Modell, eigenen Tools und eigenem Prompt. Aktivierst du diesen Agenten selbst, delegiert er an eine frische Kopie von sich mit isoliertem Kontext (nützlich, um die Hauptunterhaltung übersichtlich zu halten). Die Delegation reicht eine Ebene tief (die Subagenten eines Subagenten werden ignoriert)."
-		},
+		"subagents_intro": "Andere Agenten, an die dieser über das Tool {task} delegieren kann – jeder Subagent läuft mit eigenem Modell, eigenen Tools und eigenem Prompt. Aktivierst du diesen Agenten selbst, delegiert er an eine frische Kopie von sich mit isoliertem Kontext (nützlich, um die Hauptunterhaltung übersichtlich zu halten). Die Delegation reicht eine Ebene tief (die Subagenten eines Subagenten werden ignoriert).",
 		"this_agent": "{name} (dieser Agent)",
 		"subagent_unavailable": "Kein Chat-Modell konfiguriert – kann nicht als Subagent verwendet werden",
 		"custom_heading": "Eigene",
@@ -199,9 +196,7 @@
 		"headers_label": "Header",
 		"headers_desc": "Optional – einer pro Zeile, Header-Name: Wert",
 		"status": {
-			"held_before": "Anderer Host als beim gespeicherten Server – Header werden erst gesendet, wenn du",
 			"held_link": "jetzt prüfst",
-			"held_after": "oder speicherst.",
 			"checking": "Verbindung wird geprüft…",
 			"connected_no_tools": "Verbunden – keine Tools angeboten",
 			"connected_tools": {
@@ -209,7 +204,8 @@
 				"other": "Verbunden – {count} Tools"
 			},
 			"failed": "Verbindung fehlgeschlagen",
-			"idle": "Gib die Server-URL ein – die Verbindung wird automatisch geprüft."
+			"idle": "Gib die Server-URL ein – die Verbindung wird automatisch geprüft.",
+			"held": "Anderer Host als beim gespeicherten Server – Header werden erst gesendet, wenn du {check} oder speicherst."
 		},
 		"add_server": "Server hinzufügen"
 	},

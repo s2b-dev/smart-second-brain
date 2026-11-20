@@ -234,26 +234,14 @@
 		"select_model_title": "Sélectionner un modèle de chat",
 		"select_model_sub": "Choisissez un modèle pour commencer à discuter.",
 		"dismiss_suggestion_aria": "Ignorer « {label} »",
-		"stale_agent_not_updated_before": "La version par défaut de « {label} » a changé, mais la copie de ",
-		"stale_agent_not_updated_after": " n’a pas pu être mise à jour automatiquement.",
 		"stale_not_updated": "La version par défaut de « {label} » a changé, mais votre copie n’a pas pu être mise à jour automatiquement.",
-		"stale_agent_kept_before": "La version par défaut de « {label} » a changé. La version personnalisée de ",
-		"stale_agent_kept_after": " a été conservée.",
 		"stale_kept": "La version par défaut de « {label} » a changé. Votre version personnalisée a été conservée.",
 		"review": "Vérifier",
 		"dismiss_notice_aria": "Ignorer la notification de mise à jour de « {label} »",
 		"dismiss_notice": "Ignorer cette notification",
-		"nudges_summary_before": "",
-		"nudges_summary_after": {
-			"one": " intégration de plugin disponible pour cet agent.",
-			"many": " intégrations de plugins disponibles pour cet agent.",
-			"other": " intégrations de plugins disponibles pour cet agent."
-		},
 		"dismiss_all_nudges_aria": "Ignorer les {count} suggestions d’intégration de plugins",
 		"dismiss_all_nudges_tooltip": "Ignorer les {count} suggestions",
 		"dismiss_all": "Tout ignorer",
-		"nudge_before": "Activer la compétence ",
-		"nudge_after": " pour cet agent.",
 		"enable": "Activer",
 		"dismiss_nudge_aria": "Ignorer la suggestion {name}",
 		"dismiss_nudge": "Ignorer cette suggestion",
@@ -262,7 +250,15 @@
 		"stale_label": {
 			"system_prompt": "prompt système",
 			"skill": "compétence « {name} »"
-		}
+		},
+		"nudge": "Activer la compétence {skill} pour cet agent.",
+		"nudges_summary": {
+			"one": "{number} intégration de plugin disponible pour cet agent.",
+			"many": "{number} intégrations de plugins disponibles pour cet agent.",
+			"other": "{number} intégrations de plugins disponibles pour cet agent."
+		},
+		"stale_agent_kept": "La version par défaut de « {label} » a changé. La version personnalisée de {agent} a été conservée.",
+		"stale_agent_not_updated": "La version par défaut de « {label} » a changé, mais la copie de {agent} n’a pas pu être mise à jour automatiquement."
 	},
 	"context_tray": {
 		"attachment_open": "{path} (cliquer pour ouvrir)",

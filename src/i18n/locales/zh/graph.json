@@ -89,17 +89,13 @@
 			"other": "已选中 {count} 篇笔记"
 		},
 		"notes_selected": {
-			"other": "篇笔记已选中"
+			"other": "已选中 {number} 篇笔记"
 		},
 		"immersed_suffix": " · 沉浸中",
 		"notes_immersed": {
-			"other": "篇笔记 · 沉浸中"
+			"other": "{number} 篇笔记 · 沉浸中"
 		},
-		"immersed_into": "沉浸于",
-		"immersed_prefix": "沉浸中 ·",
-		"note_noun": {
-			"other": "篇笔记"
-		},
+		"immersed_into": "沉浸于{topics}",
 		"clear": "清除选择",
 		"clear_with_key": "清除选择（Esc）",
 		"zoom": "缩放至选区",
@@ -116,7 +112,10 @@
 		"open_all": "全部打开",
 		"open_all_tooltip": "在新标签页中打开所有所选笔记",
 		"exit": "退出",
-		"exit_immerse_tooltip": "退出沉浸（Esc）"
+		"exit_immerse_tooltip": "退出沉浸（Esc）",
+		"immersed_count": {
+			"other": "沉浸中 · {number} 篇笔记"
+		}
 	},
 	"open_all_confirm": {
 		"title": "打开所有笔记",

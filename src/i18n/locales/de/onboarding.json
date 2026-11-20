@@ -9,10 +9,9 @@
 		"search": {
 			"title": "Smartere Suche",
 			"desc": "Finde Notizen nach Titel, Inhalt, Tags und Ordnern – mit unscharfer Suche. Keine Einrichtung nötig. Füge später ein Embedding-Modell für die semantische Suche hinzu.",
-			"hotkey_before": "Oder",
 			"hotkey_link": "lege ein Tastenkürzel fest",
-			"hotkey_after": "für den Sofortzugriff.",
-			"navbar_toggle": "Über die Lupe in der Navigationsleiste statt über den Schnellwechsler öffnen"
+			"navbar_toggle": "Über die Lupe in der Navigationsleiste statt über den Schnellwechsler öffnen",
+			"hotkey": "Oder {link} für den Sofortzugriff."
 		},
 		"graph": {
 			"title": "Smarterer Graph",
@@ -32,39 +31,31 @@
 		"model_step": {
 			"title": "Chat-Modell wählen",
 			"needs_provider_desc": "Verbinde zuerst einen Anbieter und wähle dann ein Modell zum Chatten.",
-			"using_before": "Aktives Modell:",
-			"using_after": ". Du kannst jetzt loschatten.",
 			"desc": "Wähle ein Modell deines verbundenen Anbieters, um den Chat zu aktivieren.",
 			"change": "Modell ändern",
-			"choose": "Modell wählen"
+			"choose": "Modell wählen",
+			"using": "Aktives Modell: {model}. Du kannst jetzt loschatten."
 		},
 		"privacy": {
 			"public_title": "Deine Notizen werden standardmäßig geteilt",
 			"all_trusted_title": "Notizzugriff ist gewährt",
 			"untrusted_title": "Deine Notizen sind noch privat",
 			"no_provider_title": "Notizzugriff ist standardmäßig privat",
-			"no_provider_before": "Deine Notizen werden",
 			"no_provider_strong": "nicht",
-			"no_provider_after": "mit KI-Anbietern geteilt, außer du erlaubst es. Sobald du oben einen Anbieter verbindest, kannst du ihm Zugriff gewähren – bis dahin verlässt nichts deinen Tresor.",
-			"public_before": "Der Notizzugriff ist",
 			"public_strong": "standardmäßig öffentlich",
-			"public_after": ", daher können Anbieter deine Notizen lesen – außer denen, die du ausschließt.",
-			"public_end": ".",
 			"review_access": "Notizzugriff prüfen",
 			"trusted": "vertrauenswürdig",
-			"all_trusted_before": {
-				"one": "Dein Anbieter ist als",
-				"other": "Deine Anbieter sind als"
-			},
-			"all_trusted_after": " markiert, daher kann der Agent deine Notizen lesen.",
-			"all_trusted_end": "– dort kannst du bestimmte Notizen privat halten.",
-			"untrusted_before": {
-				"one": "kann deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere ihn als",
-				"other": "können deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere sie als"
-			},
-			"untrusted_middle": "in den Anbietereinstellungen oder",
 			"change_access": "ändere den Notizzugriff",
-			"untrusted_end": "für alle Anbieter."
+			"no_provider": "Deine Notizen werden {not} mit KI-Anbietern geteilt, außer du erlaubst es. Sobald du oben einen Anbieter verbindest, kannst du ihm Zugriff gewähren – bis dahin verlässt nichts deinen Tresor.",
+			"public": "Der Notizzugriff ist {mode}, daher können Anbieter deine Notizen lesen – außer denen, die du ausschließt. {review}.",
+			"all_trusted": {
+				"one": "Dein Anbieter ist als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten.",
+				"other": "Deine Anbieter sind als {trusted} markiert, daher kann der Agent deine Notizen lesen. {review} – dort kannst du bestimmte Notizen privat halten."
+			},
+			"untrusted": {
+				"one": "{providers} kann deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere ihn als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter.",
+				"other": "{providers} können deine Notizen noch nicht lesen – der Chat funktioniert, aber die Antworten stützen sich nicht auf deinen Tresor. Markiere sie als {trusted} in den Anbietereinstellungen oder {change} für alle Anbieter."
+			}
 		},
 		"skip": "Überspringen",
 		"documentation": "Dokumentation ↗",

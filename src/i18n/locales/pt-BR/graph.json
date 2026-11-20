@@ -99,23 +99,17 @@
 			"other": "{count} notas selecionadas"
 		},
 		"notes_selected": {
-			"one": "nota selecionada",
-			"many": "notas selecionadas",
-			"other": "notas selecionadas"
+			"one": "{number} nota selecionada",
+			"many": "{number} notas selecionadas",
+			"other": "{number} notas selecionadas"
 		},
 		"immersed_suffix": " · em imersão",
 		"notes_immersed": {
-			"one": "nota · em imersão",
-			"many": "notas · em imersão",
-			"other": "notas · em imersão"
+			"one": "{number} nota · em imersão",
+			"many": "{number} notas · em imersão",
+			"other": "{number} notas · em imersão"
 		},
-		"immersed_into": "Em imersão em",
-		"immersed_prefix": "Em imersão ·",
-		"note_noun": {
-			"one": "nota",
-			"many": "notas",
-			"other": "notas"
-		},
+		"immersed_into": "Em imersão em {topics}",
 		"clear": "Limpar seleção",
 		"clear_with_key": "Limpar seleção (Esc)",
 		"zoom": "Aproximar da seleção",
@@ -132,7 +126,12 @@
 		"open_all": "Abrir todas",
 		"open_all_tooltip": "Abrir todas as notas selecionadas em novas abas",
 		"exit": "Sair",
-		"exit_immerse_tooltip": "Sair da imersão (Esc)"
+		"exit_immerse_tooltip": "Sair da imersão (Esc)",
+		"immersed_count": {
+			"one": "Em imersão · {number} nota",
+			"many": "Em imersão · {number} notas",
+			"other": "Em imersão · {number} notas"
+		}
 	},
 	"open_all_confirm": {
 		"title": "Abrir todas as notas",

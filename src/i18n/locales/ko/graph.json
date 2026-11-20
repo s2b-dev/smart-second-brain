@@ -89,17 +89,13 @@
 			"other": "노트 {count}개 선택됨"
 		},
 		"notes_selected": {
-			"other": "노트 선택됨"
+			"other": "노트 {number}개 선택됨"
 		},
 		"immersed_suffix": " · 몰입",
 		"notes_immersed": {
-			"other": "노트 · 몰입"
+			"other": "노트 {number}개 · 몰입"
 		},
-		"immersed_into": "몰입 대상:",
-		"immersed_prefix": "몰입 ·",
-		"note_noun": {
-			"other": "노트"
-		},
+		"immersed_into": "몰입 대상: {topics}",
 		"clear": "선택 해제",
 		"clear_with_key": "선택 해제 (Esc)",
 		"zoom": "선택 항목으로 확대",
@@ -116,7 +112,10 @@
 		"open_all": "모두 열기",
 		"open_all_tooltip": "선택한 모든 노트를 새 탭에서 열기",
 		"exit": "종료",
-		"exit_immerse_tooltip": "몰입 종료 (Esc)"
+		"exit_immerse_tooltip": "몰입 종료 (Esc)",
+		"immersed_count": {
+			"other": "몰입 · 노트 {number}개"
+		}
 	},
 	"open_all_confirm": {
 		"title": "모든 노트 열기",

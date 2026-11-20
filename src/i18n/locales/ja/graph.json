@@ -89,17 +89,13 @@
 			"other": "{count} 件のノートを選択中"
 		},
 		"notes_selected": {
-			"other": "件のノートを選択中"
+			"other": "{number} 件のノートを選択中"
 		},
 		"immersed_suffix": " · 没入中",
 		"notes_immersed": {
-			"other": "件のノート · 没入中"
+			"other": "{number} 件のノート · 没入中"
 		},
-		"immersed_into": "没入中:",
-		"immersed_prefix": "没入中 ·",
-		"note_noun": {
-			"other": "件のノート"
-		},
+		"immersed_into": "没入中: {topics}",
 		"clear": "選択を解除",
 		"clear_with_key": "選択を解除 (Esc)",
 		"zoom": "選択範囲にズーム",
@@ -116,7 +112,10 @@
 		"open_all": "すべて開く",
 		"open_all_tooltip": "選択したノートをすべて新しいタブで開きます",
 		"exit": "終了",
-		"exit_immerse_tooltip": "没入を終了 (Esc)"
+		"exit_immerse_tooltip": "没入を終了 (Esc)",
+		"immersed_count": {
+			"other": "没入中 · {number} 件のノート"
+		}
 	},
 	"open_all_confirm": {
 		"title": "すべてのノートを開く",

@@ -9,10 +9,9 @@
 		"search": {
 			"title": "Recherche plus intelligente",
 			"desc": "Trouvez des notes par titre, contenu, tags et dossiers — avec une correspondance approximative. Aucune configuration nécessaire. Ajoutez plus tard un modèle d’embedding pour la recherche sémantique.",
-			"hotkey_before": "Ou",
 			"hotkey_link": "définissez un raccourci clavier",
-			"hotkey_after": "pour un accès instantané.",
-			"navbar_toggle": "Ouvrir depuis la loupe de la barre de navigation au lieu du sélecteur rapide"
+			"navbar_toggle": "Ouvrir depuis la loupe de la barre de navigation au lieu du sélecteur rapide",
+			"hotkey": "Ou {link} pour un accès instantané."
 		},
 		"graph": {
 			"title": "Graphe plus intelligent",
@@ -32,41 +31,33 @@
 		"model_step": {
 			"title": "Choisir un modèle de chat",
 			"needs_provider_desc": "Connectez d’abord un fournisseur, puis choisissez un modèle avec lequel discuter.",
-			"using_before": "Modèle utilisé :",
-			"using_after": ". Vous êtes prêt à discuter.",
 			"desc": "Choisissez un modèle de votre fournisseur connecté pour activer le chat.",
 			"change": "Changer de modèle",
-			"choose": "Choisir un modèle"
+			"choose": "Choisir un modèle",
+			"using": "Modèle utilisé : {model}. Vous êtes prêt à discuter."
 		},
 		"privacy": {
 			"public_title": "Vos notes sont partagées par défaut",
 			"all_trusted_title": "L’accès aux notes est accordé",
 			"untrusted_title": "Vos notes sont encore privées",
 			"no_provider_title": "L’accès aux notes est privé par défaut",
-			"no_provider_before": "Vos notes ne sont",
 			"no_provider_strong": "pas",
-			"no_provider_after": "partagées avec les fournisseurs d’IA, sauf si vous l’autorisez. Une fois un fournisseur connecté ci-dessus, vous pourrez lui accorder l’accès — rien ne quitte votre coffre d’ici là.",
-			"public_before": "L’accès aux notes est défini sur",
 			"public_strong": "public par défaut",
-			"public_after": " : les fournisseurs peuvent donc lire vos notes, sauf celles que vous excluez.",
-			"public_end": ".",
 			"review_access": "Vérifier l’accès aux notes",
 			"trusted": "de confiance",
-			"all_trusted_before": {
-				"one": "Votre fournisseur est marqué",
-				"many": "Vos fournisseurs sont marqués",
-				"other": "Vos fournisseurs sont marqués"
-			},
-			"all_trusted_after": ", l’agent peut donc lire vos notes.",
-			"all_trusted_end": "pour garder certaines notes privées.",
-			"untrusted_before": {
-				"one": "ne peut pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-le comme",
-				"many": "ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme",
-				"other": "ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme"
-			},
-			"untrusted_middle": "dans les paramètres du fournisseur, ou",
 			"change_access": "modifiez l’accès aux notes",
-			"untrusted_end": "pour autoriser tous les fournisseurs."
+			"no_provider": "Vos notes ne sont {not} partagées avec les fournisseurs d’IA, sauf si vous l’autorisez. Une fois un fournisseur connecté ci-dessus, vous pourrez lui accorder l’accès — rien ne quitte votre coffre d’ici là.",
+			"public": "L’accès aux notes est défini sur {mode} : les fournisseurs peuvent donc lire vos notes, sauf celles que vous excluez. {review}.",
+			"all_trusted": {
+				"one": "Votre fournisseur est marqué {trusted}, l’agent peut donc lire vos notes. {review} pour garder certaines notes privées.",
+				"many": "Vos fournisseurs sont marqués {trusted}, l’agent peut donc lire vos notes. {review} pour garder certaines notes privées.",
+				"other": "Vos fournisseurs sont marqués {trusted}, l’agent peut donc lire vos notes. {review} pour garder certaines notes privées."
+			},
+			"untrusted": {
+				"one": "{providers} ne peut pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-le comme {trusted} dans les paramètres du fournisseur, ou {change} pour autoriser tous les fournisseurs.",
+				"many": "{providers} ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme {trusted} dans les paramètres du fournisseur, ou {change} pour autoriser tous les fournisseurs.",
+				"other": "{providers} ne peuvent pas encore lire vos notes — le chat fonctionnera, mais les réponses ne s’appuieront pas sur votre coffre. Marquez-les comme {trusted} dans les paramètres du fournisseur, ou {change} pour autoriser tous les fournisseurs."
+			}
 		},
 		"skip": "Passer",
 		"documentation": "Documentation ↗",

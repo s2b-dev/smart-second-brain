@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { Notice } from "obsidian";
 import { onMount } from "svelte";
@@ -594,11 +595,11 @@ async function probeConnection(key: string, target: string, headerText: string):
       {#if connectionStatus === "held"}
         <span class="mcp-connection-icon is-muted"><Icon name="shield-alert" size="xs" /></span>
         <span class="mcp-connection-text is-muted">
-          {t("agents.mcp.status.held_before")}
-          <button type="button" class="mcp-connection-link" onclick={() => (heldKeyReleased = probeKey)}>
-            {t("agents.mcp.status.held_link")}
-          </button>
-          {t("agents.mcp.status.held_after")}
+          <I18nText message={t("agents.mcp.status.held")}>
+            {#snippet check()}<button type="button" class="mcp-connection-link" onclick={() => (heldKeyReleased = probeKey)}
+                >{t("agents.mcp.status.held_link")}</button
+              >{/snippet}
+          </I18nText>
         </span>
       {:else if connectionStatus === "checking"}
         <CircularLoader size={16} color="var(--text-muted)" />

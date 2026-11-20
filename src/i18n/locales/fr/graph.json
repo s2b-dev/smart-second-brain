@@ -99,23 +99,17 @@
 			"other": "{count} notes sélectionnées"
 		},
 		"notes_selected": {
-			"one": "note sélectionnée",
-			"many": "notes sélectionnées",
-			"other": "notes sélectionnées"
+			"one": "{number} note sélectionnée",
+			"many": "{number} notes sélectionnées",
+			"other": "{number} notes sélectionnées"
 		},
 		"immersed_suffix": " · en immersion",
 		"notes_immersed": {
-			"one": "note · en immersion",
-			"many": "notes · en immersion",
-			"other": "notes · en immersion"
+			"one": "{number} note · en immersion",
+			"many": "{number} notes · en immersion",
+			"other": "{number} notes · en immersion"
 		},
-		"immersed_into": "Immersion dans",
-		"immersed_prefix": "Immersion ·",
-		"note_noun": {
-			"one": "note",
-			"many": "notes",
-			"other": "notes"
-		},
+		"immersed_into": "Immersion dans {topics}",
 		"clear": "Effacer la sélection",
 		"clear_with_key": "Effacer la sélection (Échap)",
 		"zoom": "Zoomer sur la sélection",
@@ -132,7 +126,12 @@
 		"open_all": "Tout ouvrir",
 		"open_all_tooltip": "Ouvrir toutes les notes sélectionnées dans de nouveaux onglets",
 		"exit": "Quitter",
-		"exit_immerse_tooltip": "Quitter l’immersion (Échap)"
+		"exit_immerse_tooltip": "Quitter l’immersion (Échap)",
+		"immersed_count": {
+			"one": "Immersion · {number} note",
+			"many": "Immersion · {number} notes",
+			"other": "Immersion · {number} notes"
+		}
 	},
 	"open_all_confirm": {
 		"title": "Ouvrir toutes les notes",

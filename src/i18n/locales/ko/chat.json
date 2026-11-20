@@ -218,24 +218,14 @@
 		"select_model_title": "채팅 모델 선택",
 		"select_model_sub": "채팅을 시작하려면 모델을 선택하세요.",
 		"dismiss_suggestion_aria": "\"{label}\" 닫기",
-		"stale_agent_not_updated_before": "기본 {label}이(가) 변경되었지만 ",
-		"stale_agent_not_updated_after": "의 사본은 자동으로 업데이트할 수 없었습니다.",
 		"stale_not_updated": "기본 {label}이(가) 변경되었지만 내 사본은 자동으로 업데이트할 수 없었습니다.",
-		"stale_agent_kept_before": "기본 {label}이(가) 변경되었습니다. ",
-		"stale_agent_kept_after": "의 사용자 지정 버전은 유지되었습니다.",
 		"stale_kept": "기본 {label}이(가) 변경되었습니다. 사용자 지정 버전은 유지되었습니다.",
 		"review": "검토",
 		"dismiss_notice_aria": "{label} 업데이트 알림 닫기",
 		"dismiss_notice": "이 알림 닫기",
-		"nudges_summary_before": "이 에이전트에서 사용할 수 있는 플러그인 통합: ",
-		"nudges_summary_after": {
-			"other": "개"
-		},
 		"dismiss_all_nudges_aria": "플러그인 통합 제안 {count}개 모두 닫기",
 		"dismiss_all_nudges_tooltip": "제안 {count}개 모두 닫기",
 		"dismiss_all": "모두 닫기",
-		"nudge_before": "이 에이전트에서 ",
-		"nudge_after": " 스킬을 활성화하세요.",
 		"enable": "활성화",
 		"dismiss_nudge_aria": "{name} 제안 닫기",
 		"dismiss_nudge": "이 제안 닫기",
@@ -244,7 +234,13 @@
 		"stale_label": {
 			"system_prompt": "시스템 프롬프트",
 			"skill": "{name} 스킬"
-		}
+		},
+		"nudge": "이 에이전트에서 {skill} 스킬을 활성화하세요.",
+		"nudges_summary": {
+			"other": "이 에이전트에서 사용할 수 있는 플러그인 통합: {number}개"
+		},
+		"stale_agent_kept": "기본 {label}이(가) 변경되었습니다. {agent}의 사용자 지정 버전은 유지되었습니다.",
+		"stale_agent_not_updated": "기본 {label}이(가) 변경되었지만 {agent}의 사본은 자동으로 업데이트할 수 없었습니다."
 	},
 	"context_tray": {
 		"attachment_open": "{path} (클릭하여 열기)",

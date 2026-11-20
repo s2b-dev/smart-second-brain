@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import { Notice } from "obsidian";
 import { editAgentAction, showActionNotice } from "../../utils/actionNotice";
 import { buildPersistedChatModel } from "../../utils/persistedChatModel";
@@ -418,16 +419,16 @@ function reviewNotice(notice: UpdateNotice): void {
                  assert an edit the user never made. -->
             {#if notice.customized === false}
               {#if notice.agentName}
-                {t("chat.recommendations.stale_agent_not_updated_before", { label: notice.label })}<strong
-                  >{notice.agentName}</strong
-                >{t("chat.recommendations.stale_agent_not_updated_after")}
+                <I18nText message={t("chat.recommendations.stale_agent_not_updated", { label: notice.label })}>
+                  {#snippet agent()}<strong>{notice.agentName}</strong>{/snippet}
+                </I18nText>
               {:else}
                 {t("chat.recommendations.stale_not_updated", { label: notice.label })}
               {/if}
             {:else if notice.agentName}
-              {t("chat.recommendations.stale_agent_kept_before", { label: notice.label })}<strong
-                >{notice.agentName}</strong
-              >{t("chat.recommendations.stale_agent_kept_after")}
+              <I18nText message={t("chat.recommendations.stale_agent_kept", { label: notice.label })}>
+                {#snippet agent()}<strong>{notice.agentName}</strong>{/snippet}
+              </I18nText>
             {:else}
               {t("chat.recommendations.stale_kept", { label: notice.label })}
             {/if}
@@ -469,9 +470,9 @@ function reviewNotice(notice: UpdateNotice): void {
               {/each}
             </span>
             <span class="s2b-notice-text">
-              {t("chat.recommendations.nudges_summary_before", { count: pluginNudges.length })}<strong
-                >{pluginNudges.length}</strong
-              >{t("chat.recommendations.nudges_summary_after", { count: pluginNudges.length })}
+              <I18nText message={t("chat.recommendations.nudges_summary", { count: pluginNudges.length })}>
+                {#snippet number()}<strong>{pluginNudges.length}</strong>{/snippet}
+              </I18nText>
             </span>
             <button
               type="button"
@@ -502,8 +503,9 @@ function reviewNotice(notice: UpdateNotice): void {
             <div class="s2b-notice">
               <span class="s2b-notice-icon" use:icon={nudge.icon} style="--icon-size: 14px"></span>
               <span class="s2b-notice-text">
-                {t("chat.recommendations.nudge_before")}<strong>{nudge.displayName}</strong
-                >{t("chat.recommendations.nudge_after")}
+                <I18nText message={t("chat.recommendations.nudge")}>
+                  {#snippet skill()}<strong>{nudge.displayName}</strong>{/snippet}
+                </I18nText>
               </span>
               <button type="button" class="s2b-notice-action" onclick={() => void enablePlugin(nudge)}>
                 {t("chat.recommendations.enable")}

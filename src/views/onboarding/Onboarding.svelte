@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../../components/ui/I18nText.svelte";
 import { Notice } from "obsidian";
 import { ModelSelectionModal } from "../../components/modal/ModelSelectionModal";
 import { PrivacyListModal } from "../../components/modal/PrivacyListModal";
@@ -268,9 +269,11 @@ function openHotkeysSettings() {
 				<div class="s2b-onboarding-pillar-desc">
 					{t("onboarding.welcome.search.desc")}
 					{#if !isMobileUI()}
-						{t("onboarding.welcome.search.hotkey_before")} <button class="s2b-onboarding-link" onclick={openHotkeysSettings}
-							>{t("onboarding.welcome.search.hotkey_link")}</button
-						> {t("onboarding.welcome.search.hotkey_after")}
+						<I18nText message={t("onboarding.welcome.search.hotkey")}>
+							{#snippet link()}<button class="s2b-onboarding-link" onclick={openHotkeysSettings}
+									>{t("onboarding.welcome.search.hotkey_link")}</button
+								>{/snippet}
+						</I18nText>
 					{/if}
 				</div>
 				<!-- A hotkey is meaningless on a phone with no keyboard, so the quick
@@ -361,7 +364,9 @@ function openHotkeysSettings() {
 					{#if !hasProvider}
 						{t("onboarding.welcome.model_step.needs_provider_desc")}
 					{:else if hasChatModel}
-						{t("onboarding.welcome.model_step.using_before")} <strong>{selectedAgent?.chatModel?.model}</strong>{t("onboarding.welcome.model_step.using_after")}
+						<I18nText message={t("onboarding.welcome.model_step.using")}>
+							{#snippet model()}<strong>{selectedAgent?.chatModel?.model}</strong>{/snippet}
+						</I18nText>
 					{:else}
 						{t("onboarding.welcome.model_step.desc")}
 					{/if}
@@ -404,24 +409,31 @@ function openHotkeysSettings() {
 			</div>
 			<div class="s2b-onboarding-privacy-desc">
 				{#if privacyCase === "no-provider"}
-					{t("onboarding.welcome.privacy.no_provider_before")} <strong>{t("onboarding.welcome.privacy.no_provider_strong")}</strong>
-					{t("onboarding.welcome.privacy.no_provider_after")}
+					<I18nText message={t("onboarding.welcome.privacy.no_provider")}>
+						{#snippet not()}<strong>{t("onboarding.welcome.privacy.no_provider_strong")}</strong>{/snippet}
+					</I18nText>
 				{:else if privacyCase === "public"}
-					{t("onboarding.welcome.privacy.public_before")} <strong>{t("onboarding.welcome.privacy.public_strong")}</strong>{t("onboarding.welcome.privacy.public_after")}
-					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.review_access")}</button
-					>{t("onboarding.welcome.privacy.public_end")}
+					<I18nText message={t("onboarding.welcome.privacy.public")}>
+						{#snippet mode()}<strong>{t("onboarding.welcome.privacy.public_strong")}</strong>{/snippet}
+						{#snippet review()}<button class="s2b-onboarding-link" onclick={openPrivacySettings}
+								>{t("onboarding.welcome.privacy.review_access")}</button
+							>{/snippet}
+					</I18nText>
 				{:else if privacyCase === "all-trusted"}
-					{t("onboarding.welcome.privacy.all_trusted_before", { count: configuredProviders.length })}
-					<strong>{t("onboarding.welcome.privacy.trusted")}</strong>{t("onboarding.welcome.privacy.all_trusted_after")}
-					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.review_access")}</button
-					> {t("onboarding.welcome.privacy.all_trusted_end")}
+					<I18nText message={t("onboarding.welcome.privacy.all_trusted", { count: configuredProviders.length })}>
+						{#snippet trusted()}<strong>{t("onboarding.welcome.privacy.trusted")}</strong>{/snippet}
+						{#snippet review()}<button class="s2b-onboarding-link" onclick={openPrivacySettings}
+								>{t("onboarding.welcome.privacy.review_access")}</button
+							>{/snippet}
+					</I18nText>
 				{:else}
-					<strong>{untrustedLabel}</strong>
-					{t("onboarding.welcome.privacy.untrusted_before", { count: untrustedNames.length })}
-					<strong>{t("onboarding.welcome.privacy.trusted")}</strong>
-					{t("onboarding.welcome.privacy.untrusted_middle")}
-					<button class="s2b-onboarding-link" onclick={openPrivacySettings}>{t("onboarding.welcome.privacy.change_access")}</button
-					> {t("onboarding.welcome.privacy.untrusted_end")}
+					<I18nText message={t("onboarding.welcome.privacy.untrusted", { count: untrustedNames.length })}>
+						{#snippet providers()}<strong>{untrustedLabel}</strong>{/snippet}
+						{#snippet trusted()}<strong>{t("onboarding.welcome.privacy.trusted")}</strong>{/snippet}
+						{#snippet change()}<button class="s2b-onboarding-link" onclick={openPrivacySettings}
+								>{t("onboarding.welcome.privacy.change_access")}</button
+							>{/snippet}
+					</I18nText>
 				{/if}
 			</div>
 		</div>

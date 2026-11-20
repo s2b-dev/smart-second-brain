@@ -68,10 +68,7 @@
 		"api_scripting": "Scripts na API",
 		"auto_integration_desc": "Plugin descoberto automaticamente que expõe uma API pública. Ativar cria uma habilidade editável de scripts na API — o agente inspeciona a API antes de chamá-la. Executa na thread principal (sem isolamento).",
 		"subagents_heading": "Subagentes",
-		"subagents_intro": {
-			"before": "Outros agentes aos quais este pode delegar tarefas por meio da ferramenta",
-			"after": "— cada subagente roda com seu próprio modelo, ferramentas e prompt. Ativar este próprio agente delega a uma cópia nova dele com contexto isolado (útil para manter a conversa principal limpa). A delegação tem apenas um nível (os subagentes de um subagente são ignorados)."
-		},
+		"subagents_intro": "Outros agentes aos quais este pode delegar tarefas por meio da ferramenta {task} — cada subagente roda com seu próprio modelo, ferramentas e prompt. Ativar este próprio agente delega a uma cópia nova dele com contexto isolado (útil para manter a conversa principal limpa). A delegação tem apenas um nível (os subagentes de um subagente são ignorados).",
 		"this_agent": "{name} (este agente)",
 		"subagent_unavailable": "Nenhum modelo de chat configurado — não pode ser usado como subagente",
 		"custom_heading": "Personalizado",
@@ -200,9 +197,7 @@
 		"headers_label": "Cabeçalhos",
 		"headers_desc": "Opcional — um por linha, Nome-Do-Cabeçalho: valor",
 		"status": {
-			"held_before": "Host diferente do servidor salvo — os cabeçalhos não são enviados até que você",
 			"held_link": "verifique agora",
-			"held_after": "ou salve.",
 			"checking": "Verificando conexão…",
 			"connected_no_tools": "Conectado — nenhuma ferramenta oferecida",
 			"connected_tools": {
@@ -211,7 +206,8 @@
 				"other": "Conectado — {count} ferramentas"
 			},
 			"failed": "Falha na conexão",
-			"idle": "Digite a URL do servidor — a conexão é verificada automaticamente."
+			"idle": "Digite a URL do servidor — a conexão é verificada automaticamente.",
+			"held": "Host diferente do servidor salvo — os cabeçalhos não são enviados até que você {check} ou salve."
 		},
 		"add_server": "Adicionar servidor"
 	},

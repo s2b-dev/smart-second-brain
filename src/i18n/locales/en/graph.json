@@ -94,20 +94,15 @@
 			"other": "{count} notes selected"
 		},
 		"notes_selected": {
-			"one": "note selected",
-			"other": "notes selected"
+			"one": "{number} note selected",
+			"other": "{number} notes selected"
 		},
 		"immersed_suffix": " · immersed",
 		"notes_immersed": {
-			"one": "note · immersed",
-			"other": "notes · immersed"
+			"one": "{number} note · immersed",
+			"other": "{number} notes · immersed"
 		},
-		"immersed_into": "Immersed into",
-		"immersed_prefix": "Immersed ·",
-		"note_noun": {
-			"one": "note",
-			"other": "notes"
-		},
+		"immersed_into": "Immersed into {topics}",
 		"clear": "Clear selection",
 		"clear_with_key": "Clear selection (Esc)",
 		"zoom": "Zoom to selection",
@@ -124,7 +119,11 @@
 		"open_all": "Open all",
 		"open_all_tooltip": "Open all selected notes in new tabs",
 		"exit": "Exit",
-		"exit_immerse_tooltip": "Exit immerse (Esc)"
+		"exit_immerse_tooltip": "Exit immerse (Esc)",
+		"immersed_count": {
+			"one": "Immersed · {number} note",
+			"other": "Immersed · {number} notes"
+		}
 	},
 	"open_all_confirm": {
 		"title": "Open all notes",

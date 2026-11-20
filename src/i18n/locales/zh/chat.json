@@ -218,24 +218,14 @@
 		"select_model_title": "选择对话模型",
 		"select_model_sub": "选择一个模型即可开始对话。",
 		"dismiss_suggestion_aria": "忽略“{label}”",
-		"stale_agent_not_updated_before": "默认的{label}已更改，但",
-		"stale_agent_not_updated_after": "的副本无法自动更新。",
 		"stale_not_updated": "默认的{label}已更改，但你的副本无法自动更新。",
-		"stale_agent_kept_before": "默认的{label}已更改。",
-		"stale_agent_kept_after": "的自定义版本已保留。",
 		"stale_kept": "默认的{label}已更改。你的自定义版本已保留。",
 		"review": "查看",
 		"dismiss_notice_aria": "忽略{label}更新通知",
 		"dismiss_notice": "忽略此通知",
-		"nudges_summary_before": "此智能体有 ",
-		"nudges_summary_after": {
-			"other": " 个可用的插件集成。"
-		},
 		"dismiss_all_nudges_aria": "忽略全部 {count} 条插件集成建议",
 		"dismiss_all_nudges_tooltip": "忽略全部 {count} 条建议",
 		"dismiss_all": "全部忽略",
-		"nudge_before": "为此智能体启用 ",
-		"nudge_after": " 技能。",
 		"enable": "启用",
 		"dismiss_nudge_aria": "忽略 {name} 建议",
 		"dismiss_nudge": "忽略此建议",
@@ -244,7 +234,13 @@
 		"stale_label": {
 			"system_prompt": "系统提示词",
 			"skill": "“{name}”技能"
-		}
+		},
+		"nudge": "为此智能体启用 {skill} 技能。",
+		"nudges_summary": {
+			"other": "此智能体有 {number} 个可用的插件集成。"
+		},
+		"stale_agent_kept": "默认的{label}已更改。{agent}的自定义版本已保留。",
+		"stale_agent_not_updated": "默认的{label}已更改，但{agent}的副本无法自动更新。"
 	},
 	"context_tray": {
 		"attachment_open": "{path}（点击打开）",

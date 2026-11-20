@@ -68,10 +68,7 @@
 		"api_scripting": "Scripting de la API",
 		"auto_integration_desc": "Plugin detectado automáticamente que expone una API pública. Al activarlo se crea una habilidad editable de scripting de la API: el agente inspecciona la API antes de llamarla. Se ejecuta en el hilo principal (sin aislamiento).",
 		"subagents_heading": "Subagentes",
-		"subagents_intro": {
-			"before": "Otros agentes en los que este puede delegar mediante la herramienta",
-			"after": ": cada subagente se ejecuta con su propio modelo, herramientas y prompt. Si activas este mismo agente, delega en una copia nueva de sí mismo con contexto aislado (útil para mantener limpia la conversación principal). La delegación tiene un solo nivel (los subagentes de un subagente se ignoran)."
-		},
+		"subagents_intro": "Otros agentes en los que este puede delegar mediante la herramienta {task}: cada subagente se ejecuta con su propio modelo, herramientas y prompt. Si activas este mismo agente, delega en una copia nueva de sí mismo con contexto aislado (útil para mantener limpia la conversación principal). La delegación tiene un solo nivel (los subagentes de un subagente se ignoran).",
 		"this_agent": "{name} (este agente)",
 		"subagent_unavailable": "No hay ningún modelo de chat configurado; no se puede usar como subagente",
 		"custom_heading": "Personalizado",
@@ -200,9 +197,7 @@
 		"headers_label": "Cabeceras",
 		"headers_desc": "Opcional: una por línea, Header-Name: value",
 		"status": {
-			"held_before": "Host distinto del servidor guardado: las cabeceras no se envían hasta que",
 			"held_link": "compruebes ahora",
-			"held_after": "o guardes.",
 			"checking": "Comprobando conexión…",
 			"connected_no_tools": "Conectado — no ofrece herramientas",
 			"connected_tools": {
@@ -211,7 +206,8 @@
 				"other": "Conectado — {count} herramientas"
 			},
 			"failed": "Error de conexión",
-			"idle": "Introduce la URL del servidor; la conexión se comprueba automáticamente."
+			"idle": "Introduce la URL del servidor; la conexión se comprueba automáticamente.",
+			"held": "Host distinto del servidor guardado: las cabeceras no se envían hasta que {check} o guardes."
 		},
 		"add_server": "Añadir servidor"
 	},

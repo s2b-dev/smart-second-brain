@@ -68,10 +68,7 @@
 		"api_scripting": "Scripts via l’API",
 		"auto_integration_desc": "Plugin découvert automatiquement qui expose une API publique. L’activer crée une compétence de scripts via l’API modifiable — l’agent inspecte l’API avant de l’appeler. S’exécute sur le thread principal (sans bac à sable).",
 		"subagents_heading": "Sous-agents",
-		"subagents_intro": {
-			"before": "Autres agents auxquels celui-ci peut déléguer via l’outil",
-			"after": "— chaque sous-agent s’exécute avec son propre modèle, ses outils et son prompt. Activer cet agent lui-même délègue à une copie neuve de lui-même, au contexte isolé (utile pour garder la conversation principale propre). La délégation se limite à un niveau (les sous-agents d’un sous-agent sont ignorés)."
-		},
+		"subagents_intro": "Autres agents auxquels celui-ci peut déléguer via l’outil {task} — chaque sous-agent s’exécute avec son propre modèle, ses outils et son prompt. Activer cet agent lui-même délègue à une copie neuve de lui-même, au contexte isolé (utile pour garder la conversation principale propre). La délégation se limite à un niveau (les sous-agents d’un sous-agent sont ignorés).",
 		"this_agent": "{name} (cet agent)",
 		"subagent_unavailable": "Aucun modèle de chat configuré — ne peut pas être utilisé comme sous-agent",
 		"custom_heading": "Personnalisé",
@@ -200,9 +197,7 @@
 		"headers_label": "En-têtes",
 		"headers_desc": "Facultatif — un par ligne, Nom-En-tête: valeur",
 		"status": {
-			"held_before": "Hôte différent du serveur enregistré — les en-têtes ne sont pas envoyés tant que vous n’avez pas cliqué sur",
 			"held_link": "vérifier maintenant",
-			"held_after": "ou enregistré.",
 			"checking": "Vérification de la connexion…",
 			"connected_no_tools": "Connecté — aucun outil proposé",
 			"connected_tools": {
@@ -211,7 +206,8 @@
 				"other": "Connecté — {count} outils"
 			},
 			"failed": "Échec de la connexion",
-			"idle": "Saisissez l’URL du serveur — la connexion est vérifiée automatiquement."
+			"idle": "Saisissez l’URL du serveur — la connexion est vérifiée automatiquement.",
+			"held": "Hôte différent du serveur enregistré — les en-têtes ne sont pas envoyés tant que vous n’avez pas cliqué sur {check} ou enregistré."
 		},
 		"add_server": "Ajouter le serveur"
 	},

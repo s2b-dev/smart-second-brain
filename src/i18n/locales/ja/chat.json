@@ -218,24 +218,14 @@
 		"select_model_title": "チャットモデルを選択",
 		"select_model_sub": "モデルを選んでチャットを始めましょう。",
 		"dismiss_suggestion_aria": "「{label}」を非表示",
-		"stale_agent_not_updated_before": "デフォルトの{label}が変更されましたが、",
-		"stale_agent_not_updated_after": " のコピーを自動で更新できませんでした。",
 		"stale_not_updated": "デフォルトの{label}が変更されましたが、あなたのコピーを自動で更新できませんでした。",
-		"stale_agent_kept_before": "デフォルトの{label}が変更されました。",
-		"stale_agent_kept_after": " のカスタマイズ版はそのまま保持されています。",
 		"stale_kept": "デフォルトの{label}が変更されました。カスタマイズ版はそのまま保持されています。",
 		"review": "確認",
 		"dismiss_notice_aria": "{label} の更新通知を閉じる",
 		"dismiss_notice": "この通知を閉じる",
-		"nudges_summary_before": "このエージェントで利用できるプラグイン連携が ",
-		"nudges_summary_after": {
-			"other": " 件あります。"
-		},
 		"dismiss_all_nudges_aria": "{count} 件のプラグイン連携の提案をすべて非表示",
 		"dismiss_all_nudges_tooltip": "{count} 件の提案をすべて非表示",
 		"dismiss_all": "すべて非表示",
-		"nudge_before": "このエージェントで ",
-		"nudge_after": " スキルを有効にします。",
 		"enable": "有効にする",
 		"dismiss_nudge_aria": "{name} の提案を非表示",
 		"dismiss_nudge": "この提案を非表示",
@@ -244,7 +234,13 @@
 		"stale_label": {
 			"system_prompt": "システムプロンプト",
 			"skill": "スキル「{name}」"
-		}
+		},
+		"nudge": "このエージェントで {skill} スキルを有効にします。",
+		"nudges_summary": {
+			"other": "このエージェントで利用できるプラグイン連携が {number} 件あります。"
+		},
+		"stale_agent_kept": "デフォルトの{label}が変更されました。{agent} のカスタマイズ版はそのまま保持されています。",
+		"stale_agent_not_updated": "デフォルトの{label}が変更されましたが、{agent} のコピーを自動で更新できませんでした。"
 	},
 	"context_tray": {
 		"attachment_open": "{path}(クリックして開く)",

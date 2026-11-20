@@ -94,20 +94,15 @@
 			"other": "{count} Notizen ausgewählt"
 		},
 		"notes_selected": {
-			"one": "Notiz ausgewählt",
-			"other": "Notizen ausgewählt"
+			"one": "{number} Notiz ausgewählt",
+			"other": "{number} Notizen ausgewählt"
 		},
 		"immersed_suffix": " · eingetaucht",
 		"notes_immersed": {
-			"one": "Notiz · eingetaucht",
-			"other": "Notizen · eingetaucht"
+			"one": "{number} Notiz · eingetaucht",
+			"other": "{number} Notizen · eingetaucht"
 		},
-		"immersed_into": "Eingetaucht in",
-		"immersed_prefix": "Eingetaucht ·",
-		"note_noun": {
-			"one": "Notiz",
-			"other": "Notizen"
-		},
+		"immersed_into": "Eingetaucht in {topics}",
 		"clear": "Auswahl aufheben",
 		"clear_with_key": "Auswahl aufheben (Esc)",
 		"zoom": "Auf Auswahl zoomen",
@@ -124,7 +119,11 @@
 		"open_all": "Alle öffnen",
 		"open_all_tooltip": "Alle ausgewählten Notizen in neuen Tabs öffnen",
 		"exit": "Beenden",
-		"exit_immerse_tooltip": "Eintauchen beenden (Esc)"
+		"exit_immerse_tooltip": "Eintauchen beenden (Esc)",
+		"immersed_count": {
+			"one": "Eingetaucht · {number} Notiz",
+			"other": "Eingetaucht · {number} Notizen"
+		}
 	},
 	"open_all_confirm": {
 		"title": "Alle Notizen öffnen",

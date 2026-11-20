@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import { untrack, tick, onDestroy } from "svelte";
 import { getAllTags, Notice, TFile, type TAbstractFile, type WorkspaceLeaf } from "obsidian";
 import { settingsAction, showActionNotice } from "../../utils/actionNotice";
@@ -2527,8 +2528,9 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
           ? t("graph.selection.immersed_suffix")
           : ""}
       {:else}
-        <strong>{selectedPaths.length}</strong>
-        {t("graph.selection.notes_selected", { count: selectedPaths.length })}{isImmersed
+        <I18nText message={t("graph.selection.notes_selected", { count: selectedPaths.length })}>
+          {#snippet number()}<strong>{selectedPaths.length}</strong>{/snippet}
+        </I18nText>{isImmersed
           ? t("graph.selection.immersed_suffix")
           : ""}
       {/if}
@@ -2542,11 +2544,14 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
            selected, what mode you are in), which is right when the left side is
            a count. A topic name isn't independent of the mode — it's the thing
            immersed into — so it reads as the object of the verb instead. -->
-      {t("graph.selection.immersed_into")}
-      <strong title={immerseTopicLabels.join(", ")}>{immerseTopicLabels.join(", ")}</strong>
+      {@const topicNames = immerseTopicLabels.join(", ")}
+      <I18nText message={t("graph.selection.immersed_into")}>
+        {#snippet topics()}<strong title={topicNames}>{topicNames}</strong>{/snippet}
+      </I18nText>
     {:else}
-      <strong>{noteNodeCount}</strong>
-      {t("graph.selection.notes_immersed", { count: noteNodeCount })}
+      <I18nText message={t("graph.selection.notes_immersed", { count: noteNodeCount })}>
+        {#snippet number()}<strong>{noteNodeCount}</strong>{/snippet}
+      </I18nText>
     {/if}
   {/snippet}
 
@@ -2566,13 +2571,16 @@ function handleHoverPreview(event: MouseEvent, path: string, targetEl: HTMLEleme
     <div class="graph-immerse-banner">
       <span class="selection-count">
         {#if immerseTopicLabels}
-          {t("graph.selection.immersed_into")}
-          <strong>{immerseTopicLabels.join(", ")}</strong>
+          {@const topicNames = immerseTopicLabels.join(", ")}
+          <I18nText message={t("graph.selection.immersed_into")}>
+            {#snippet topics()}<strong>{topicNames}</strong>{/snippet}
+          </I18nText>
         {:else}
           <!-- A raw lasso has no name to give, so fall back to the size of what
                you're in — the same thing the desktop bar says in this case. -->
-          {t("graph.selection.immersed_prefix")} <strong>{noteNodeCount}</strong>
-          {t("graph.selection.note_noun", { count: noteNodeCount })}
+          <I18nText message={t("graph.selection.immersed_count", { count: noteNodeCount })}>
+            {#snippet number()}<strong>{noteNodeCount}</strong>{/snippet}
+          </I18nText>
         {/if}
       </span>
     </div>

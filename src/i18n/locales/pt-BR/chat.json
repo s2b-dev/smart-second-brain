@@ -234,26 +234,14 @@
 		"select_model_title": "Selecionar um modelo de chat",
 		"select_model_sub": "Escolha um modelo para começar a conversar.",
 		"dismiss_suggestion_aria": "Dispensar “{label}”",
-		"stale_agent_not_updated_before": "O padrão de {label} mudou, mas a cópia de ",
-		"stale_agent_not_updated_after": " não pôde ser atualizada automaticamente.",
 		"stale_not_updated": "O padrão de {label} mudou, mas sua cópia não pôde ser atualizada automaticamente.",
-		"stale_agent_kept_before": "O padrão de {label} mudou. A versão personalizada de ",
-		"stale_agent_kept_after": " foi mantida.",
 		"stale_kept": "O padrão de {label} mudou. Sua versão personalizada foi mantida.",
 		"review": "Revisar",
 		"dismiss_notice_aria": "Dispensar o aviso de atualização de {label}",
 		"dismiss_notice": "Dispensar este aviso",
-		"nudges_summary_before": "",
-		"nudges_summary_after": {
-			"one": " integração de plugin disponível para este agente.",
-			"many": " integrações de plugins disponíveis para este agente.",
-			"other": " integrações de plugins disponíveis para este agente."
-		},
 		"dismiss_all_nudges_aria": "Dispensar todas as {count} sugestões de integração de plugins",
 		"dismiss_all_nudges_tooltip": "Dispensar todas as {count} sugestões",
 		"dismiss_all": "Dispensar todas",
-		"nudge_before": "Ative a habilidade ",
-		"nudge_after": " para este agente.",
 		"enable": "Ativar",
 		"dismiss_nudge_aria": "Dispensar a sugestão de {name}",
 		"dismiss_nudge": "Dispensar esta sugestão",
@@ -262,7 +250,15 @@
 		"stale_label": {
 			"system_prompt": "prompt do sistema",
 			"skill": "habilidade “{name}”"
-		}
+		},
+		"nudge": "Ative a habilidade {skill} para este agente.",
+		"nudges_summary": {
+			"one": "{number} integração de plugin disponível para este agente.",
+			"many": "{number} integrações de plugins disponíveis para este agente.",
+			"other": "{number} integrações de plugins disponíveis para este agente."
+		},
+		"stale_agent_kept": "O padrão de {label} mudou. A versão personalizada de {agent} foi mantida.",
+		"stale_agent_not_updated": "O padrão de {label} mudou, mas a cópia de {agent} não pôde ser atualizada automaticamente."
 	},
 	"context_tray": {
 		"attachment_open": "{path} (clique para abrir)",

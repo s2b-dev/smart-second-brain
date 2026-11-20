@@ -1,4 +1,5 @@
 <script lang="ts">
+import I18nText from "../ui/I18nText.svelte";
 import { Notice, getIconIds, normalizePath, type Modal } from "obsidian";
 import { t } from "../../i18n";
 import { obsidianSettingsAction, showActionNotice } from "../../utils/actionNotice";
@@ -1048,7 +1049,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         <div class="setting-item agent-section-intro">
           <div class="setting-item-info">
             <div class="setting-item-description">
-              {t("agents.editor.subagents_intro.before")} <code>task</code> {t("agents.editor.subagents_intro.after")}
+              <I18nText message={t("agents.editor.subagents_intro")}>{#snippet task()}<code>task</code>{/snippet}</I18nText>
             </div>
           </div>
         </div>

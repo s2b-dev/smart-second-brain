@@ -9,10 +9,9 @@
 		"search": {
 			"title": "更智能的搜索",
 			"desc": "按标题、内容、标签和文件夹查找笔记，支持模糊匹配，无需任何设置。之后添加嵌入模型即可使用语义搜索。",
-			"hotkey_before": "也可以",
 			"hotkey_link": "设置快捷键",
-			"hotkey_after": "以便随时调用。",
-			"navbar_toggle": "从导航栏的放大镜打开，而不是快速切换"
+			"navbar_toggle": "从导航栏的放大镜打开，而不是快速切换",
+			"hotkey": "也可以{link}以便随时调用。"
 		},
 		"graph": {
 			"title": "更智能的关系图谱",
@@ -32,37 +31,29 @@
 		"model_step": {
 			"title": "选择对话模型",
 			"needs_provider_desc": "请先连接提供商，然后选择一个用于对话的模型。",
-			"using_before": "正在使用",
-			"using_after": "。一切就绪，可以开始对话了。",
 			"desc": "从已连接的提供商中选择一个模型以启用对话。",
 			"change": "更换模型",
-			"choose": "选择模型"
+			"choose": "选择模型",
+			"using": "正在使用 {model}。一切就绪，可以开始对话了。"
 		},
 		"privacy": {
 			"public_title": "你的笔记默认会被共享",
 			"all_trusted_title": "已授予笔记访问权限",
 			"untrusted_title": "你的笔记仍为私密",
 			"no_provider_title": "笔记访问默认为私密",
-			"no_provider_before": "除非你允许，否则你的笔记",
 			"no_provider_strong": "不会",
-			"no_provider_after": "与 AI 提供商共享。在上方连接提供商后，你可以授予其访问权限——在此之前，任何内容都不会离开你的仓库。",
-			"public_before": "笔记访问已设置为",
 			"public_strong": "默认公开",
-			"public_after": "，因此提供商可以读取你的笔记，被你排除的笔记除外。",
-			"public_end": "。",
 			"review_access": "检查笔记访问权限",
 			"trusted": "受信任",
-			"all_trusted_before": {
-				"other": "你的提供商已被标记为"
-			},
-			"all_trusted_after": "，因此智能体可以读取你的笔记。",
-			"all_trusted_end": "，可将特定笔记设为私密。",
-			"untrusted_before": {
-				"other": "还无法读取你的笔记——对话仍可使用，但回答不会以你的仓库为依据。请在提供商设置中将其标记为"
-			},
-			"untrusted_middle": "，或",
 			"change_access": "更改笔记访问权限",
-			"untrusted_end": "以允许所有提供商。"
+			"no_provider": "除非你允许，否则你的笔记{not}与 AI 提供商共享。在上方连接提供商后，你可以授予其访问权限——在此之前，任何内容都不会离开你的仓库。",
+			"public": "笔记访问已设置为{mode}，因此提供商可以读取你的笔记，被你排除的笔记除外。{review}。",
+			"all_trusted": {
+				"other": "你的提供商已被标记为{trusted}，因此智能体可以读取你的笔记。{review}，可将特定笔记设为私密。"
+			},
+			"untrusted": {
+				"other": "{providers} 还无法读取你的笔记——对话仍可使用，但回答不会以你的仓库为依据。请在提供商设置中将其标记为{trusted}，或{change}以允许所有提供商。"
+			}
 		},
 		"skip": "跳过",
 		"documentation": "文档 ↗",

@@ -9,10 +9,9 @@
 		"search": {
 			"title": "더 똑똑한 검색",
 			"desc": "제목, 내용, 태그, 폴더로 노트를 찾으세요 — 퍼지 매칭도 지원합니다. 별도 설정이 필요 없습니다. 나중에 임베딩 모델을 추가하면 의미 기반 검색을 사용할 수 있습니다.",
-			"hotkey_before": "또는",
 			"hotkey_link": "단축키를 설정해",
-			"hotkey_after": "바로 실행하세요.",
-			"navbar_toggle": "빠른 전환기 대신 내비게이션 바의 돋보기에서 열기"
+			"navbar_toggle": "빠른 전환기 대신 내비게이션 바의 돋보기에서 열기",
+			"hotkey": "또는 {link} 바로 실행하세요."
 		},
 		"graph": {
 			"title": "더 똑똑한 그래프",
@@ -32,37 +31,29 @@
 		"model_step": {
 			"title": "채팅 모델 선택",
 			"needs_provider_desc": "먼저 제공자를 연결한 다음 채팅에 사용할 모델을 고르세요.",
-			"using_before": "사용 중인 모델:",
-			"using_after": ". 이제 채팅을 시작할 준비가 되었습니다.",
 			"desc": "연결된 제공자에서 모델을 골라 채팅을 사용하세요.",
 			"change": "모델 변경",
-			"choose": "모델 선택"
+			"choose": "모델 선택",
+			"using": "사용 중인 모델: {model}. 이제 채팅을 시작할 준비가 되었습니다."
 		},
 		"privacy": {
 			"public_title": "노트가 기본적으로 공유됩니다",
 			"all_trusted_title": "노트 접근이 허용되었습니다",
 			"untrusted_title": "노트가 아직 비공개 상태입니다",
 			"no_provider_title": "노트 접근은 기본적으로 비공개입니다",
-			"no_provider_before": "노트는 허용하기 전까지 AI 제공자와",
 			"no_provider_strong": "공유되지 않습니다",
-			"no_provider_after": "— 위에서 제공자를 연결한 뒤 접근 권한을 부여할 수 있으며, 그 전에는 어떤 것도 보관소 밖으로 나가지 않습니다.",
-			"public_before": "노트 접근이",
 			"public_strong": "기본적으로 공개",
-			"public_after": "로 설정되어 있어, 제외한 노트를 빼고는 제공자가 노트를 읽을 수 있습니다. 설정은",
-			"public_end": "에서 확인하세요.",
 			"review_access": "노트 접근 검토",
 			"trusted": "신뢰함",
-			"all_trusted_before": {
-				"other": "제공자가"
-			},
-			"all_trusted_after": "으로 표시되어 있어 에이전트가 노트를 읽을 수 있습니다. 특정 노트를 비공개로 유지하려면",
-			"all_trusted_end": "메뉴를 이용하세요.",
-			"untrusted_before": {
-				"other": "— 아직 노트를 읽을 수 없습니다. 채팅은 작동하지만 답변이 보관소 내용에 근거하지 않습니다. 제공자 설정에서"
-			},
-			"untrusted_middle": "옵션을 켜거나, 모든 제공자를 허용하려면",
 			"change_access": "노트 접근 변경",
-			"untrusted_end": "메뉴를 이용하세요."
+			"no_provider": "노트는 허용하기 전까지 AI 제공자와 {not} — 위에서 제공자를 연결한 뒤 접근 권한을 부여할 수 있으며, 그 전에는 어떤 것도 보관소 밖으로 나가지 않습니다.",
+			"public": "노트 접근이 {mode}로 설정되어 있어, 제외한 노트를 빼고는 제공자가 노트를 읽을 수 있습니다. 설정은 {review}에서 확인하세요.",
+			"all_trusted": {
+				"other": "제공자가 {trusted}으로 표시되어 있어 에이전트가 노트를 읽을 수 있습니다. 특정 노트를 비공개로 유지하려면 {review} 메뉴를 이용하세요."
+			},
+			"untrusted": {
+				"other": "{providers}은(는) 아직 노트를 읽을 수 없습니다. 채팅은 작동하지만 답변이 보관소 내용에 근거하지 않습니다. 제공자 설정에서 {trusted} 옵션을 켜거나, 모든 제공자를 허용하려면 {change} 메뉴를 이용하세요."
+			}
 		},
 		"skip": "건너뛰기",
 		"documentation": "문서 ↗",

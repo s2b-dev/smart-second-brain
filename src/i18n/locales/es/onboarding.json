@@ -9,10 +9,9 @@
 		"search": {
 			"title": "Búsqueda más inteligente",
 			"desc": "Encuentra notas por título, contenido, etiquetas y carpetas, con coincidencia aproximada. Sin configuración. Añade más tarde un modelo de embeddings para la búsqueda semántica.",
-			"hotkey_before": "O",
 			"hotkey_link": "asigna un atajo de teclado",
-			"hotkey_after": "para acceder al instante.",
-			"navbar_toggle": "Abrir desde la lupa de la barra de navegación en lugar del selector rápido"
+			"navbar_toggle": "Abrir desde la lupa de la barra de navegación en lugar del selector rápido",
+			"hotkey": "O {link} para acceder al instante."
 		},
 		"graph": {
 			"title": "Grafo más inteligente",
@@ -32,41 +31,33 @@
 		"model_step": {
 			"title": "Elige un modelo de chat",
 			"needs_provider_desc": "Primero conecta un proveedor y luego elige un modelo con el que chatear.",
-			"using_before": "Usando",
-			"using_after": ". Ya puedes empezar a chatear.",
 			"desc": "Elige un modelo de tu proveedor conectado para activar el chat.",
 			"change": "Cambiar modelo",
-			"choose": "Elegir modelo"
+			"choose": "Elegir modelo",
+			"using": "Usando {model}. Ya puedes empezar a chatear."
 		},
 		"privacy": {
 			"public_title": "Tus notas se comparten de forma predeterminada",
 			"all_trusted_title": "El acceso a las notas está concedido",
 			"untrusted_title": "Tus notas siguen siendo privadas",
 			"no_provider_title": "El acceso a las notas es privado de forma predeterminada",
-			"no_provider_before": "Tus notas",
 			"no_provider_strong": "no",
-			"no_provider_after": "se comparten con proveedores de IA a menos que lo permitas. Cuando conectes un proveedor arriba, podrás darle acceso; hasta entonces nada sale de tu bóveda.",
-			"public_before": "El acceso a las notas está configurado como",
 			"public_strong": "público de forma predeterminada",
-			"public_after": ", así que los proveedores pueden leer tus notas excepto las que excluyas.",
-			"public_end": ".",
 			"review_access": "Revisar acceso a las notas",
 			"trusted": "de confianza",
-			"all_trusted_before": {
-				"one": "Tu proveedor está marcado como",
-				"many": "Tus proveedores están marcados como",
-				"other": "Tus proveedores están marcados como"
-			},
-			"all_trusted_after": ", así que el agente puede leer tus notas.",
-			"all_trusted_end": "para mantener privadas notas concretas.",
-			"untrusted_before": {
-				"one": "aún no puede leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalo como",
-				"many": "aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como",
-				"other": "aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como"
-			},
-			"untrusted_middle": "en la configuración del proveedor, o",
 			"change_access": "cambia el acceso a las notas",
-			"untrusted_end": "para permitir a todos los proveedores."
+			"no_provider": "Tus notas {not} se comparten con proveedores de IA a menos que lo permitas. Cuando conectes un proveedor arriba, podrás darle acceso; hasta entonces nada sale de tu bóveda.",
+			"public": "El acceso a las notas está configurado como {mode}, así que los proveedores pueden leer tus notas excepto las que excluyas. {review}.",
+			"all_trusted": {
+				"one": "Tu proveedor está marcado como {trusted}, así que el agente puede leer tus notas. {review} para mantener privadas notas concretas.",
+				"many": "Tus proveedores están marcados como {trusted}, así que el agente puede leer tus notas. {review} para mantener privadas notas concretas.",
+				"other": "Tus proveedores están marcados como {trusted}, así que el agente puede leer tus notas. {review} para mantener privadas notas concretas."
+			},
+			"untrusted": {
+				"one": "{providers} aún no puede leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalo como {trusted} en la configuración del proveedor, o {change} para permitir a todos los proveedores.",
+				"many": "{providers} aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como {trusted} en la configuración del proveedor, o {change} para permitir a todos los proveedores.",
+				"other": "{providers} aún no pueden leer tus notas: el chat funcionará, pero las respuestas no se basarán en tu bóveda. Márcalos como {trusted} en la configuración del proveedor, o {change} para permitir a todos los proveedores."
+			}
 		},
 		"skip": "Omitir",
 		"documentation": "Documentación ↗",

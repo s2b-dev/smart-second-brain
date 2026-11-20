@@ -226,25 +226,14 @@
 		"select_model_title": "Chat-Modell auswählen",
 		"select_model_sub": "Wähle ein Modell, um mit dem Chatten zu beginnen.",
 		"dismiss_suggestion_aria": "„{label}“ verwerfen",
-		"stale_agent_not_updated_before": "Der Standard für {label} hat sich geändert, aber die Kopie von ",
-		"stale_agent_not_updated_after": " konnte nicht automatisch aktualisiert werden.",
 		"stale_not_updated": "Der Standard für {label} hat sich geändert, aber deine Kopie konnte nicht automatisch aktualisiert werden.",
-		"stale_agent_kept_before": "Der Standard für {label} hat sich geändert. Die angepasste Version von ",
-		"stale_agent_kept_after": " wurde beibehalten.",
 		"stale_kept": "Der Standard für {label} hat sich geändert. Deine angepasste Version wurde beibehalten.",
 		"review": "Prüfen",
 		"dismiss_notice_aria": "Update-Hinweis für {label} verwerfen",
 		"dismiss_notice": "Diesen Hinweis verwerfen",
-		"nudges_summary_before": "",
-		"nudges_summary_after": {
-			"one": " Plugin-Integration für diesen Agenten verfügbar.",
-			"other": " Plugin-Integrationen für diesen Agenten verfügbar."
-		},
 		"dismiss_all_nudges_aria": "Alle {count} Vorschläge für Plugin-Integrationen verwerfen",
 		"dismiss_all_nudges_tooltip": "Alle {count} Vorschläge verwerfen",
 		"dismiss_all": "Alle verwerfen",
-		"nudge_before": "Aktiviere den Skill ",
-		"nudge_after": " für diesen Agenten.",
 		"enable": "Aktivieren",
 		"dismiss_nudge_aria": "Vorschlag {name} verwerfen",
 		"dismiss_nudge": "Diesen Vorschlag verwerfen",
@@ -253,7 +242,14 @@
 		"stale_label": {
 			"system_prompt": "Systemprompt",
 			"skill": "Skill „{name}“"
-		}
+		},
+		"nudge": "Aktiviere den Skill {skill} für diesen Agenten.",
+		"nudges_summary": {
+			"one": "{number} Plugin-Integration für diesen Agenten verfügbar.",
+			"other": "{number} Plugin-Integrationen für diesen Agenten verfügbar."
+		},
+		"stale_agent_kept": "Der Standard für {label} hat sich geändert. Die angepasste Version von {agent} wurde beibehalten.",
+		"stale_agent_not_updated": "Der Standard für {label} hat sich geändert, aber die Kopie von {agent} konnte nicht automatisch aktualisiert werden."
 	},
 	"context_tray": {
 		"attachment_open": "{path} (zum Öffnen klicken)",

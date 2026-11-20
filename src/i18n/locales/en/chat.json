@@ -226,25 +226,14 @@
 		"select_model_title": "Select a chat model",
 		"select_model_sub": "Choose a model to start chatting.",
 		"dismiss_suggestion_aria": "Dismiss \"{label}\"",
-		"stale_agent_not_updated_before": "The default {label} changed, but ",
-		"stale_agent_not_updated_after": "'s copy couldn't be updated automatically.",
 		"stale_not_updated": "The default {label} changed, but your copy couldn't be updated automatically.",
-		"stale_agent_kept_before": "The default {label} changed. ",
-		"stale_agent_kept_after": "'s customized version was kept.",
 		"stale_kept": "The default {label} changed. Your customized version was kept.",
 		"review": "Review",
 		"dismiss_notice_aria": "Dismiss {label} update notice",
 		"dismiss_notice": "Dismiss this notice",
-		"nudges_summary_before": "",
-		"nudges_summary_after": {
-			"one": " plugin integration available for this agent.",
-			"other": " plugin integrations available for this agent."
-		},
 		"dismiss_all_nudges_aria": "Dismiss all {count} plugin integration suggestions",
 		"dismiss_all_nudges_tooltip": "Dismiss all {count} suggestions",
 		"dismiss_all": "Dismiss all",
-		"nudge_before": "Enable the ",
-		"nudge_after": " skill for this agent.",
 		"enable": "Enable",
 		"dismiss_nudge_aria": "Dismiss {name} suggestion",
 		"dismiss_nudge": "Dismiss this suggestion",
@@ -253,7 +242,14 @@
 		"stale_label": {
 			"system_prompt": "system prompt",
 			"skill": "{name} skill"
-		}
+		},
+		"nudge": "Enable the {skill} skill for this agent.",
+		"nudges_summary": {
+			"one": "{number} plugin integration available for this agent.",
+			"other": "{number} plugin integrations available for this agent."
+		},
+		"stale_agent_kept": "The default {label} changed. {agent}'s customized version was kept.",
+		"stale_agent_not_updated": "The default {label} changed, but {agent}'s copy couldn't be updated automatically."
 	},
 	"context_tray": {
 		"attachment_open": "{path} (click to open)",

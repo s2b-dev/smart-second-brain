@@ -67,10 +67,7 @@
 		"api_scripting": "API scripting",
 		"auto_integration_desc": "Auto-discovered plugin exposing a public API. Enabling creates an editable API-scripting skill — the agent introspects the API before calling it. Runs on the main thread (not sandboxed).",
 		"subagents_heading": "Subagents",
-		"subagents_intro": {
-			"before": "Other agents this one can delegate to via the",
-			"after": "tool — each subagent runs with its own model, tools, and prompt. Enabling this agent itself delegates to a fresh, isolated-context copy of it (useful for keeping the main conversation clean). Delegation is one level deep (a subagent's own subagents are ignored)."
-		},
+		"subagents_intro": "Other agents this one can delegate to via the {task} tool — each subagent runs with its own model, tools, and prompt. Enabling this agent itself delegates to a fresh, isolated-context copy of it (useful for keeping the main conversation clean). Delegation is one level deep (a subagent's own subagents are ignored).",
 		"this_agent": "{name} (this agent)",
 		"subagent_unavailable": "No chat model configured — cannot be used as a subagent",
 		"custom_heading": "Custom",
@@ -199,9 +196,7 @@
 		"headers_label": "Headers",
 		"headers_desc": "Optional — one per line, Header-Name: value",
 		"status": {
-			"held_before": "Different host than the saved server — headers are not sent until you",
 			"held_link": "check now",
-			"held_after": "or save.",
 			"checking": "Checking connection…",
 			"connected_no_tools": "Connected — no tools offered",
 			"connected_tools": {
@@ -209,7 +204,8 @@
 				"other": "Connected — {count} tools"
 			},
 			"failed": "Connection failed",
-			"idle": "Enter the server URL — the connection is checked automatically."
+			"idle": "Enter the server URL — the connection is checked automatically.",
+			"held": "Different host than the saved server — headers are not sent until you {check} or save."
 		},
 		"add_server": "Add Server"
 	},

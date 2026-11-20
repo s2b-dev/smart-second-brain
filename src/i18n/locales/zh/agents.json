@@ -66,10 +66,7 @@
 		"api_scripting": "API 脚本",
 		"auto_integration_desc": "自动发现的、提供公开 API 的插件。启用后会创建一个可编辑的 API 脚本技能——智能体会在调用前先检查该 API。在主线程上运行（未沙盒隔离）。",
 		"subagents_heading": "子智能体",
-		"subagents_intro": {
-			"before": "此智能体可以通过",
-			"after": "工具将任务委派给其他智能体——每个子智能体都使用自己的模型、工具和提示词。若启用此智能体本身，则会委派给它的一个全新、上下文隔离的副本（有助于保持主对话简洁）。委派只有一层（子智能体自己的子智能体会被忽略）。"
-		},
+		"subagents_intro": "此智能体可以通过 {task} 工具将任务委派给其他智能体——每个子智能体都使用自己的模型、工具和提示词。若启用此智能体本身，则会委派给它的一个全新、上下文隔离的副本（有助于保持主对话简洁）。委派只有一层（子智能体自己的子智能体会被忽略）。",
 		"this_agent": "{name}（此智能体）",
 		"subagent_unavailable": "未配置对话模型——无法用作子智能体",
 		"custom_heading": "自定义",
@@ -198,16 +195,15 @@
 		"headers_label": "请求头",
 		"headers_desc": "可选——每行一个，格式为 Header-Name: value",
 		"status": {
-			"held_before": "与已保存服务器的主机不同——在你",
 			"held_link": "立即检查",
-			"held_after": "或保存之前，不会发送请求头。",
 			"checking": "正在检查连接…",
 			"connected_no_tools": "已连接——未提供工具",
 			"connected_tools": {
 				"other": "已连接——{count} 个工具"
 			},
 			"failed": "连接失败",
-			"idle": "请输入服务器 URL——连接会自动检查。"
+			"idle": "请输入服务器 URL——连接会自动检查。",
+			"held": "与已保存服务器的主机不同——在你{check}或保存之前，不会发送请求头。"
 		},
 		"add_server": "添加服务器"
 	},
