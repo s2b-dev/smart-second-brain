@@ -21,6 +21,12 @@
  * `Ancient Egypt` 0.35, and every chat 0.26-0.33 — the right order, from the same
  * index. Only the query changes, so this needs no reindex.
  *
+ * Some families also mark the *document* side (EmbeddingGemma's
+ * `title: none | text: `). Those get a `formatDocument`, applied to every chunk
+ * at index time. Unlike the query prefix, that one is baked into the stored
+ * vectors: an index built before a family gained its document prefix must be
+ * rebuilt to benefit (the query and document markers are trained as a pair).
+ *
  * Pure module: the family table is keyed on the model id alone so it can be unit
  * tested without a provider, and so a new family is one table row.
  */
@@ -39,15 +45,18 @@ interface QueryInstructionFamily {
 	readonly pattern: RegExp;
 	/** Wraps a raw query in the family's query-side format. */
 	readonly format: (query: string) => string;
+	/**
+	 * Static prefix for every document chunk at index time, for families trained
+	 * with a document-side marker. Absent means documents are embedded raw.
+	 */
+	readonly documentPrefix?: string;
 }
 
 /**
- * Families whose *documents* are embedded raw and only the *query* carries a
- * prefix. That is the constraint for inclusion here: the index stores documents
- * exactly as chunked, so a family that also needs a document-side marker (e5's
- * `passage: `, nomic's `search_document: `) cannot be served by a query-only
- * change and is deliberately absent — adding its query prefix alone is
- * unvalidated against an index built without the matching document prefix.
+ * Asymmetric families. Most take documents raw and prefix only the query; a
+ * family with a document-side marker declares it in `documentPrefix`. Families
+ * not listed (plain e5's `passage: `, nomic's `search_document: `) are not yet
+ * validated here and pass through raw on both sides.
  */
 const FAMILIES: readonly QueryInstructionFamily[] = [
 	{
@@ -72,6 +81,19 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 		pattern: /bge-(?:small|base|large)-en|mxbai-embed-large/,
 		format: (query) => `Represent this sentence for searching relevant passages: ${query}`,
 	},
+	{
+		// EmbeddingGemma v1 (300m) and v2 (270m text backbone, Gemma 4 based;
+		// Ollama `embeddinggemma-2`, which ships the same strings but does NOT
+		// apply them). Google's card: retrieval queries are
+		// `task: search result | query: {q}`, documents
+		// `title: {title | "none"} | text: {content}`, and quality drops without
+		// them. Every chunk already starts with the note's title line
+		// (`chunkText`), so the title slot stays "none" rather than repeating it.
+		name: "embeddinggemma",
+		pattern: /embeddinggemma/,
+		format: (query) => `task: search result | query: ${query}`,
+		documentPrefix: "title: none | text: ",
+	},
 ];
 
 /**
@@ -84,6 +106,20 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 export function formatRetrievalQuery(modelId: string, query: string): string {
 	const family = findQueryInstructionFamily(modelId);
 	return family ? family.format(query) : query;
+}
+
+/**
+ * Returns a document chunk as the given model expects to receive it at index
+ * time. Raw for every family without a `documentPrefix`.
+ */
+export function formatRetrievalDocument(modelId: string, text: string): string {
+	const prefix = findQueryInstructionFamily(modelId)?.documentPrefix;
+	return prefix ? `${prefix}${text}` : text;
+}
+
+/** Characters the document prefix adds to each chunk, for the chunk budget. */
+export function documentPrefixLength(modelId: string): number {
+	return findQueryInstructionFamily(modelId)?.documentPrefix?.length ?? 0;
 }
 
 /** Name of the family a model id falls into, or `null` for symmetric models. */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	RETRIEVAL_TASK_INSTRUCTION,
+	documentPrefixLength,
+	formatRetrievalDocument,
 	formatRetrievalQuery,
 	queryInstructionFamilyName,
 } from "../../src/vectorstore/queryInstruction";
@@ -58,5 +60,39 @@ describe("formatRetrievalQuery", () => {
 	it("matches the family case-insensitively", () => {
 		expect(queryInstructionFamilyName("QWEN3-EMBEDDING-8B")).toBe("qwen3-instruct");
 		expect(queryInstructionFamilyName("Harrier-OSS-v1-270m")).toBe("qwen3-instruct");
+	});
+});
+
+describe("EmbeddingGemma", () => {
+	const ids = ["embeddinggemma", "embeddinggemma-2:latest", "google/embeddinggemma-300m", "EmbeddingGemma-2-270m"];
+
+	it("prefixes queries with the card's search-result task", () => {
+		for (const id of ids) {
+			expect(formatRetrievalQuery(id, "history")).toBe("task: search result | query: history");
+			expect(queryInstructionFamilyName(id)).toBe("embeddinggemma");
+		}
+	});
+
+	it("prefixes documents with an empty title slot", () => {
+		for (const id of ids) {
+			expect(formatRetrievalDocument(id, "# Ancient Egypt\n\nPyramids")).toBe(
+				"title: none | text: # Ancient Egypt\n\nPyramids",
+			);
+			expect(documentPrefixLength(id)).toBe("title: none | text: ".length);
+		}
+	});
+});
+
+describe("formatRetrievalDocument", () => {
+	it("leaves documents raw for query-only and symmetric families", () => {
+		for (const id of [
+			"qwen3-embedding:0.6b",
+			"harrier-oss-v1-0.6b",
+			"bge-large-en-v1.5",
+			"text-embedding-3-small",
+		]) {
+			expect(formatRetrievalDocument(id, "body")).toBe("body");
+			expect(documentPrefixLength(id)).toBe(0);
+		}
 	});
 });
