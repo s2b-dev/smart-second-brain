@@ -3,12 +3,22 @@ import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { Notice } from "obsidian";
 import { onMount } from "svelte";
 import { installObsidianFetch } from "../../lib/obsidianFetch";
+import {
+	McpOAuthCancelledError,
+	canSignInToMcpServer,
+	createBackgroundMcpOAuthProvider,
+	hasMcpOAuthSession,
+	secretStorageAdapter,
+	signInToMcpServer,
+	signOutOfMcpServer,
+} from "../../lib/mcpOAuth";
 import type SecondBrainPlugin from "../../main";
 import type { MCPServerConfig } from "../../types/plugin";
 import { getData } from "../../stores/dataStore.svelte";
 import { Logger } from "../../utils/logging";
 import Button from "../ui/Button.svelte";
 import CircularLoader from "../ui/CircularLoader.svelte";
+import Dropdown from "../ui/Dropdown.svelte";
 import Icon from "../ui/Icon.svelte";
 import Text from "../ui/Text.svelte";
 import { confirmDelete } from "./ConfirmModal";
@@ -71,6 +81,55 @@ let headers = $state(
 		.map(([k, v]) => `${k}: ${v}`)
 		.join("\n"),
 );
+
+// Authentication. "headers" is the original static-header mode; "oauth" signs in
+// through the browser (MCP authorization spec) and keeps the token in
+// SecretStorage, keyed by the server URL — see lib/mcpOAuth.ts. Headers still
+// apply in OAuth mode, for servers that want an extra static header.
+type AuthMode = "headers" | "oauth";
+let authMode = $state<AuthMode>(initialConfig?.oauth ? "oauth" : "headers");
+// IIFE like the other captured values: the plugin prop never changes for a modal.
+const oauthStorage = (() => secretStorageAdapter(plugin.app))();
+// Bumped after sign-in/out so the session status and the probe re-run.
+let oauthVersion = $state(0);
+let signingIn = $state(false);
+let signInAbort: AbortController | null = null;
+const oauthSignedIn = $derived.by(() => {
+	void oauthVersion;
+	const target = url.trim();
+	return authMode === "oauth" && target.length > 0 && hasMcpOAuthSession(oauthStorage, target);
+});
+
+async function handleSignIn() {
+	const target = url.trim();
+	if (!target || signingIn) return;
+	signingIn = true;
+	signInAbort = new AbortController();
+	try {
+		await signInToMcpServer(target, { storage: oauthStorage, signal: signInAbort.signal });
+		new Notice("Signed in to the MCP server.");
+	} catch (err) {
+		if (!(err instanceof McpOAuthCancelledError)) {
+			Logger.error("MCP sign-in failed:", err);
+			new Notice(`MCP sign-in failed: ${err instanceof Error ? err.message : String(err)}`, 10_000);
+		}
+	} finally {
+		signingIn = false;
+		signInAbort = null;
+		oauthVersion++;
+	}
+}
+
+function cancelSignIn() {
+	signInAbort?.abort();
+}
+
+function handleSignOut() {
+	const target = url.trim();
+	if (!target) return;
+	signOutOfMcpServer(oauthStorage, target);
+	oauthVersion++;
+}
 
 // JSON import. There's no separate import UI: pasting a config snippet into any
 // text field is detected and unpacked into the form, the same way the chat
@@ -140,7 +199,9 @@ const probeTarget = $derived.by(() => {
 	const trimmed = url.trim();
 	return trimmed && originOf(trimmed) !== null ? trimmed : null;
 });
-const probeKey = $derived(probeTarget === null ? null : `${probeTarget}\n${probeHeaders}`);
+const probeKey = $derived(
+	probeTarget === null || signingIn ? null : `${probeTarget}\n${probeHeaders}\n${authMode}:${oauthVersion}`,
+);
 const probeHeld = $derived(
 	probeKey !== null &&
 		probeTarget !== null &&
@@ -169,6 +230,7 @@ function normalizeHeaders(record: Record<string, string> | undefined): string {
 const connectionUnchanged = $derived(
 	initialConfig !== null &&
 		url.trim() === initialConfig.url &&
+		(authMode === "oauth") === !!initialConfig.oauth &&
 		normalizeHeaders(parseHeaders(headers)) === normalizeHeaders(initialConfig.headers),
 );
 const canSave = $derived(connectionStatus === "connected" || (isEditing && connectionUnchanged));
@@ -177,8 +239,9 @@ $effect(() => {
 	const key = probeKey;
 	const target = probeTarget;
 	const headerText = probeHeaders;
+	const useOAuth = authMode === "oauth";
 	if (key === null || target === null || probeHeld) return;
-	void probeConnection(key, target, headerText);
+	void probeConnection(key, target, headerText, useOAuth);
 });
 
 onMount(() => {
@@ -408,6 +471,7 @@ function handleSave() {
 		enabled,
 		url: url.trim(),
 		headers: parseHeaders(headers),
+		...(authMode === "oauth" && { oauth: true }),
 	};
 
 	onSave(newServerId, config);
@@ -430,6 +494,7 @@ async function handleDelete() {
  */
 function describeProbeError(err: unknown): string {
 	const message = err instanceof Error ? err.message : String(err);
+	if (message.includes("Sign-in required for MCP server")) return "Not signed in — click Sign in";
 	const cause = message.replace(/^Failed to connect to [^"]*"[^"]*":\s*/, "").replace(/^Error:\s*/, "");
 	return cause.trim() || "Connection failed";
 }
@@ -439,10 +504,16 @@ function describeProbeError(err: unknown): string {
  * under `key`. The result is dropped if the form has moved on by the time it
  * lands (see `probeKey`).
  */
-async function probeConnection(key: string, target: string, headerText: string): Promise<void> {
+async function probeConnection(key: string, target: string, headerText: string, useOAuth: boolean): Promise<void> {
 	const config = {
 		mcpServers: {
-			"probe-server": { transport: "http" as const, url: target, headers: parseHeaders(headerText) },
+			"probe-server": {
+				transport: "http" as const,
+				url: target,
+				headers: parseHeaders(headerText),
+				// Background provider: probes reuse a stored session, never open a browser.
+				...(useOAuth && { authProvider: createBackgroundMcpOAuthProvider(plugin.app, target) }),
+			},
 		},
 	};
 	let result: ProbeResult;
@@ -553,6 +624,47 @@ async function probeConnection(key: string, target: string, headerText: string):
           placeholder={"Authorization: Bearer token\nX-Custom-Header: value"}
         />
       </SettingContainer>
+
+      <SettingContainer
+        name="Authentication"
+        desc="Headers only, or sign in with your own account through the browser (OAuth)"
+      >
+        <Dropdown
+          id="mcp-server-auth"
+          type="options"
+          dropdown={[
+            { display: "Headers", value: "headers" },
+            { display: "OAuth sign-in", value: "oauth" },
+          ]}
+          bind:selected={authMode}
+        />
+      </SettingContainer>
+
+      {#if authMode === "oauth"}
+        <SettingContainer
+          name="Account"
+          desc={!canSignInToMcpServer()
+            ? "Sign in on desktop. Tokens are stored per device and not synced."
+            : signingIn
+              ? "Finish the sign-in in your browser…"
+              : oauthSignedIn
+                ? "Signed in. The token is stored on this device and refreshed automatically."
+                : "Not signed in on this device."}
+        >
+          {#if signingIn}
+            <Button buttonText="Cancel sign-in" onClick={cancelSignIn} />
+          {:else if oauthSignedIn}
+            <Button buttonText="Sign out" onClick={handleSignOut} />
+          {:else}
+            <Button
+              buttonText="Sign in"
+              cta
+              disabled={!canSignInToMcpServer() || !url.trim()}
+              onClick={handleSignIn}
+            />
+          {/if}
+        </SettingContainer>
+      {/if}
   </SettingGroup>
 
   <!-- Discovered tools. Shown only once the probe connects, so the panel doubles
