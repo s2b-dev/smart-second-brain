@@ -1083,6 +1083,37 @@ On the core tier semantic is *ahead* and widened slightly, δ=-0.0537 (sign test
 5 / hybrid 2 / 7 tied). Neither is significant, and with ~7 of 10 results still unjudged
 the remaining holes plausibly cover the rest of the hard-tier gap.
 
+##### 2026-11-20 — prefixes for nomic, e5 and snowflake-arctic, measured per model
+
+Same vault and day as the EmbeddingGemma run below. Each model was measured twice
+from a fresh index: with its card's prefixes and with them disabled. nomic and arctic
+via Ollama 0.17.7 (`nomic-embed-text`, `snowflake-arctic-embed2`), e5 via oMLX
+(`mlx-community/multilingual-e5-large-mlx`).
+
+| nDCG@10 (prefixed / raw)   | nomic-embed-text | multilingual-e5-large | arctic-embed2   |
+| -------------------------- | ---------------- | --------------------- | --------------- |
+| hybrid core (n=14)         | 0.8975 / 0.9291  | 0.8397 / 0.8031       | 0.9414 / 0.9544 |
+| hybrid hard (n=25)         | 0.6480 / 0.6204  | 0.5904 / 0.5931       | 0.8271 / 0.7888 |
+| semantic core (n=14)       | 0.9240 / 0.9243  | 0.8911 / 0.8574       | 0.9324 / 0.9530 |
+| semantic hard (n=25)       | 0.5898 / 0.5672  | 0.4352 / 0.3650       | 0.8250 / 0.7737 |
+
+Paired bootstrap, prefixed minus raw, per hybrid tier (10k resamples, 95% CI):
+
+| model  | core δ (CI), better/worse         | hard δ (CI), better/worse         |
+| ------ | --------------------------------- | --------------------------------- |
+| nomic  | −0.0316 [−0.0710, −0.0046] **sig**, 0/7 | +0.0277 [−0.0435, +0.1049], 8/8 |
+| e5     | +0.0366 [−0.0051, +0.1002], 3/2   | −0.0026 [−0.0628, +0.0566], 3/7   |
+| arctic | −0.0130 [−0.0400, +0.0063], 1/2   | +0.0382 [−0.0194, +0.0946], 8/4   |
+
+Outcome: e5 and arctic ship with their prefixes (nothing significant against the
+cards, and both lean the cards' way on the tier each moves most). nomic does not: the
+only significant result in the matrix is its hybrid-core loss, while semantic-only core
+is unchanged (0.924 both), which points at the fusion weight (tuned on harrier) meeting
+nomic's shifted score range rather than at worse vectors. arctic-embed2 is the find of
+the run: its prefixed hard tier (0.827 hybrid, 0.825 semantic) matches harrier's 0.826
+and beats its 0.798. nomic and e5 sit under the suite's core (0.92) and recency (0.96)
+floors with or without prefixes; those floors were set on harrier and Qwen3.
+
 ##### 2026-11-20 — EmbeddingGemma 2 vs harrier, and what its prefixes are worth
 
 Slot vault `S2B WT2`, 381 notes, all three indexes built the same day through oMLX.

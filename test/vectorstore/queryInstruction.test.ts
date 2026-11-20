@@ -40,7 +40,13 @@ describe("formatRetrievalQuery", () => {
 	});
 
 	it("leaves symmetric models untouched", () => {
-		for (const id of ["text-embedding-3-small", "text-embedding-ada-002", "bge-m3", "all-minilm"]) {
+		for (const id of [
+			"text-embedding-3-small",
+			"text-embedding-ada-002",
+			"bge-m3",
+			"all-minilm",
+			"nomic-embed-text",
+		]) {
 			expect(formatRetrievalQuery(id, "history")).toBe("history");
 			expect(queryInstructionFamilyName(id)).toBeNull();
 		}
@@ -87,16 +93,6 @@ describe("formatRetrievalDocument", () => {
 		]) {
 			expect(formatRetrievalDocument(id, "body")).toBe("body");
 			expect(documentPrefixLength(id)).toBe(0);
-		}
-	});
-});
-
-describe("nomic-embed-text", () => {
-	it("prefixes queries and documents for v1, v1.5 and v2-moe", () => {
-		for (const id of ["nomic-embed-text", "nomic-embed-text:v1.5", "nomic-ai/nomic-embed-text-v2-moe"]) {
-			expect(formatRetrievalQuery(id, "history")).toBe("search_query: history");
-			expect(formatRetrievalDocument(id, "body")).toBe("search_document: body");
-			expect(queryInstructionFamilyName(id)).toBe("nomic");
 		}
 	});
 });

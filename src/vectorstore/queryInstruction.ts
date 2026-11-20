@@ -57,6 +57,14 @@ interface QueryInstructionFamily {
  * family with a document-side marker declares it in `documentPrefix`. The
  * first matching row wins, so a narrower family must come before a broader one
  * that would also match its ids (instruct e5 before plain e5, arctic v2 before v1).
+ *
+ * nomic-embed-text is deliberately absent despite its card requiring
+ * `search_query: ` / `search_document: `. Measured 2026-11-20 on the relevance
+ * benchmark (fresh index per arm), the prefixes made hybrid core significantly
+ * worse (nDCG@10 0.929 → 0.898, paired bootstrap CI below zero, 7 queries worse,
+ * none better) with semantic-only core unchanged and the hard tier not
+ * significantly better — see `integration/README.md`. Revisit if the fusion
+ * weight is ever tuned per model.
  */
 const FAMILIES: readonly QueryInstructionFamily[] = [
 	{
@@ -97,16 +105,6 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 		name: "arctic-v1",
 		pattern: /snowflake-arctic-embed/,
 		format: (query) => `Represent this sentence for searching relevant passages: ${query}`,
-	},
-	{
-		// nomic-embed-text v1, v1.5 and v2-moe. The card: the text "*must* include
-		// a task instruction prefix" — `search_query: ` for queries,
-		// `search_document: ` for documents. Ollama's `nomic-embed-text` does not
-		// add them.
-		name: "nomic",
-		pattern: /nomic-embed-text/,
-		format: (query) => `search_query: ${query}`,
-		documentPrefix: "search_document: ",
 	},
 	{
 		// Plain e5 and multilingual-e5 (small/base/large, v1/v2; community Ollama

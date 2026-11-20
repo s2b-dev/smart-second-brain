@@ -874,7 +874,7 @@ export class VectorStoreService {
 
 	/**
 	 * Embed document chunks in the form the model was trained on: raw for most
-	 * families, prefixed for those with a document-side marker (nomic, e5, EmbeddingGemma).
+	 * families, prefixed for those with a document-side marker (e5, EmbeddingGemma).
 	 * Every index-time `embedDocuments` goes through here so the build, the
 	 * per-entry retry and single-note reindex can never disagree.
 	 */
@@ -2394,7 +2394,7 @@ export class VectorStoreService {
 		if (!embeddings) return [];
 
 		try {
-			// Asymmetric models (Qwen3-Embedding, harrier, BGE, arctic, nomic, e5, EmbeddingGemma)
+			// Asymmetric models (Qwen3-Embedding, harrier, BGE, arctic, e5, EmbeddingGemma)
 			// want the query wrapped in a task instruction — see
 			// `queryInstruction.ts` for the families and the measured effect.
 			// Documents carry their own marker only where the family has one
