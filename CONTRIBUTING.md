@@ -21,6 +21,10 @@ You do not have to write TypeScript to make a real difference.
 - **Improve the documentation.** The user docs live in the separate
   [`s2b-dev/site`](https://github.com/s2b-dev/site) repository and are published at
   [smartsecondbrain.dev](https://smartsecondbrain.dev). The README in this repo is deliberately minimal.
+- **Translate the interface.** The UI follows Obsidian's language setting and ships in ten
+  languages, all machine-translated so far. If you're a native speaker, reviewing and
+  correcting your language is one of the most useful contributions there is, and adding a new
+  language needs no TypeScript — see [Translating the UI](#translating-the-ui).
 - **Add a provider.** The most common code contribution. See the recipe below.
 - **Fix bugs and build features.** Look for issues labelled
   [`good first issue`](https://github.com/s2b-dev/smart-second-brain/labels/good%20first%20issue) or
@@ -172,6 +176,31 @@ even without a bundled skill — the skill is what makes the agent *good* at usi
 Changing a bundled skill later means bumping `metadata.version` and recording the previous body
 in `src/skills/shippedSkills.ts`; that history is what lets existing vaults tell an old default
 from the user's own edits. The file documents the procedure, and a test enforces it.
+
+### Translating the UI
+
+Every UI string lives in `src/i18n/locales/<locale>/<namespace>.json`. English (`en/`) is the
+source of truth; every other locale has the same files and the same keys.
+
+- **To fix a translation**, edit the string in your language's file. Keep each `{placeholder}`
+  exactly as written; you may move it wherever your language's word order wants it. Some
+  placeholders mark where a link or bold word goes (`{link}`, `{model}`), so the sentence around
+  them should read naturally with that word in place.
+- **To add a language**, copy `en/` to a folder named with Obsidian's language code (the one
+  Obsidian uses in *Settings → General → Language*, e.g. `it`, `pl`, `nl`), translate every
+  string, and add the code to `SUPPORTED_LOCALES` in `src/i18n/index.ts`.
+- **Plurals** are objects keyed by your language's [CLDR plural
+  categories](https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html):
+  English has `one`/`other`, Russian `one`/`few`/`many`/`other`, Japanese only `other`.
+- **Use Obsidian's own terms** (vault, note, plugin, graph view, …) so the plugin reads like
+  the app around it. Obsidian's glossary is
+  [`terms.txt`](https://github.com/obsidianmd/obsidian-translations/blob/master/terms.txt) in
+  `obsidianmd/obsidian-translations`; where it disagrees with Obsidian's shipped UI, follow the UI.
+- Only UI text is translated. Prompts, tool descriptions and skill bodies are read by the model
+  and stay English; so do default folder and file names.
+
+`bun run test -- test/i18n` checks your locale for missing or extra keys, changed placeholders,
+and missing plural forms. To see it live, switch Obsidian's language and restart Obsidian.
 
 ## Documentation
 
