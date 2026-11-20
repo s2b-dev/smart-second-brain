@@ -560,6 +560,10 @@ const canFinish = $derived(
 
         {#if revealApiKey}
           <AuthConfigFields provider={providerId} />
+        {:else}
+          <!-- Non-credential settings (e.g. OpenRouter's region) apply to the signed-in
+               key too, so they stay reachable without revealing the key field. -->
+          <AuthConfigFields provider={providerId} kinds={["select"]} />
         {/if}
       {:else}
         <AuthConfigFields provider={providerId} />

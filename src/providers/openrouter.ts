@@ -32,8 +32,22 @@ import {
 // Constants
 // =============================================================================
 
-/** OpenRouter API base URL */
+/** OpenRouter API base URL (global routing) */
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+
+/**
+ * In-region routing endpoints. Same API, keys and model ids as the global host;
+ * requests are decrypted and served only inside the region, and a model with no
+ * in-region provider fails instead of leaving it. Needs a Business/Enterprise plan.
+ * @see https://openrouter.ai/docs/guides/features/in-region-routing
+ */
+export const OPENROUTER_EU_BASE_URL = "https://eu.openrouter.ai/api/v1";
+export const OPENROUTER_US_BASE_URL = "https://us.openrouter.ai/api/v1";
+
+/** The base URL every request goes to: the chosen region's, or the global one. */
+export function openRouterBaseUrl(auth: AuthObject): string {
+	return auth.baseUrl?.trim() || OPENROUTER_BASE_URL;
+}
 
 // =============================================================================
 // Helper Functions
@@ -114,6 +128,18 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			required: true,
 			placeholder: "sk-or-...",
 		},
+		baseUrl: {
+			label: "Region",
+			description:
+				"Where requests are processed. EU and US keep every request inside that region and need an OpenRouter Business or Enterprise plan; models with no provider in the region are unavailable.",
+			kind: "select",
+			required: false,
+			options: [
+				{ value: "", label: "Global" },
+				{ value: OPENROUTER_EU_BASE_URL, label: "EU" },
+				{ value: OPENROUTER_US_BASE_URL, label: "US" },
+			],
+		},
 		headers: {
 			label: "Custom Headers",
 			description: "Additional headers as JSON (optional)",
@@ -132,7 +158,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			model: modelId,
 			apiKey: auth.apiKey,
 			configuration: {
-				baseURL: OPENROUTER_BASE_URL,
+				baseURL: openRouterBaseUrl(auth),
 			},
 		};
 
@@ -152,7 +178,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 		const config: Record<string, unknown> = {
 			model: modelId,
 			apiKey: auth.apiKey,
-			configuration: { baseURL: OPENROUTER_BASE_URL },
+			configuration: { baseURL: openRouterBaseUrl(auth) },
 		};
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;
@@ -171,7 +197,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			// providers don't support, causing malformed responses. Use 'float' explicitly.
 			encodingFormat: "float",
 			configuration: {
-				baseURL: OPENROUTER_BASE_URL,
+				baseURL: openRouterBaseUrl(auth),
 			},
 		};
 
@@ -200,7 +226,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 
 		try {
 			const response = await requestUrl({
-				url: `${OPENROUTER_BASE_URL}/key`,
+				url: `${openRouterBaseUrl(auth)}/key`,
 				method: "GET",
 				headers,
 				throw: false,
@@ -250,7 +276,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			Object.assign(headers, auth.headers);
 		}
 
-		const response = await window.fetch(`${OPENROUTER_BASE_URL}/models`, {
+		const response = await window.fetch(`${openRouterBaseUrl(auth)}/models`, {
 			method: "GET",
 			headers,
 		});
@@ -287,7 +313,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 		// Use Obsidian's requestUrl to bypass CORS for the dedicated embeddings models endpoint
 		try {
 			const response = await requestUrl({
-				url: `${OPENROUTER_BASE_URL}/embeddings/models`,
+				url: `${openRouterBaseUrl(auth)}/embeddings/models`,
 				method: "GET",
 				headers,
 			});
@@ -297,7 +323,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
 		} catch {
 			// If the dedicated endpoint fails, fall back to filtering all models
-			const response = await window.fetch(`${OPENROUTER_BASE_URL}/models`, {
+			const response = await window.fetch(`${openRouterBaseUrl(auth)}/models`, {
 				method: "GET",
 				headers,
 			});

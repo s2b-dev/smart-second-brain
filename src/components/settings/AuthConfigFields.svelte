@@ -5,6 +5,7 @@ import { suggestSecretId } from "../../lib/secretStorage";
 import { type AuthFieldDefinition, getProviderDefinition } from "../../providers/index";
 import { getPlugin } from "../../stores/state.svelte";
 import { getData } from "../../stores/dataStore.svelte";
+import Dropdown from "../ui/Dropdown.svelte";
 import Text from "../ui/Text.svelte";
 import SecretSelect from "./SecretSelect.svelte";
 import SettingItem from "./SettingItem.svelte";
@@ -14,9 +15,14 @@ interface Props {
 	// Optional content rendered after the required fields (and setup link) but before the
 	// Advanced disclosure — e.g. the "Trusted with private notes" toggle in provider setup.
 	afterRequired?: Snippet;
+	// Render only fields of these kinds. The OAuth sign-in path passes ["select"]: those are
+	// settings that apply whichever credential is used (e.g. OpenRouter's region), unlike the
+	// key/header fields that only matter when the user pastes a key. Also drops the setup link,
+	// which points at where to get a key.
+	kinds?: AuthFieldDefinition["kind"][];
 }
 
-const { provider, afterRequired }: Props = $props();
+const { provider, afterRequired, kinds }: Props = $props();
 
 const data = getData();
 const plugin = getPlugin();
@@ -41,27 +47,28 @@ let storedAuth = $derived(data.getStoredAuthState(provider));
 // Get auth fields from provider definition
 let authFields = $derived(providerDefinition?.auth ?? null);
 
+// The fields this instance renders, after the optional `kinds` filter.
+let shownFields = $derived((): [string, AuthFieldDefinition][] => {
+	if (!authFields) return [];
+	const entries = Object.entries(authFields) as [string, AuthFieldDefinition][];
+	return kinds ? entries.filter(([_, field]) => kinds.includes(field.kind)) : entries;
+});
+
 // Optional link to where the user can obtain credentials (e.g. an API-key page)
-let setupLink = $derived(providerDefinition?.setupInstructions?.link ?? null);
+let setupLink = $derived(kinds ? null : (providerDefinition?.setupInstructions?.link ?? null));
 
 // Split fields into required and optional
-let requiredFields = $derived((): [string, AuthFieldDefinition][] => {
-	if (!authFields) return [];
-	return (Object.entries(authFields) as [string, AuthFieldDefinition][]).filter(([_, field]) => field.required);
-});
+let requiredFields = $derived((): [string, AuthFieldDefinition][] => shownFields().filter(([_, f]) => f.required));
 
-let optionalFields = $derived((): [string, AuthFieldDefinition][] => {
-	if (!authFields) return [];
-	return (Object.entries(authFields) as [string, AuthFieldDefinition][]).filter(([_, field]) => !field.required);
-});
+let optionalFields = $derived((): [string, AuthFieldDefinition][] => shownFields().filter(([_, f]) => !f.required));
 
 let hasOptionalFields = $derived(optionalFields().length > 0);
 
 // Auto-expand advanced when optional fields have configured values
 $effect(() => {
-	if (!storedAuth || !authFields) return;
+	if (!storedAuth) return;
 
-	for (const [fieldKey, field] of Object.entries(authFields) as [string, AuthFieldDefinition][]) {
+	for (const [fieldKey, field] of shownFields()) {
 		if (!field.required) {
 			const hasValue = storedAuth.values[fieldKey] || storedAuth.secretIds[fieldKey];
 			if (hasValue) {
@@ -123,6 +130,16 @@ function getFieldStyles(fieldKey: string): string {
                 value={getFieldValue(fieldKey)}
                 suggestedId={suggestSecretId(plugin.app, providerLabel, fieldKey)}
                 onChange={(value) => handleSecretChange(fieldKey, value)}
+            />
+        </SettingItem>
+    {:else if field.kind === "select"}
+        <!-- Fixed choices (e.g., a region that maps to a base URL) -->
+        <SettingItem name={field.label} desc={field.description}>
+            <Dropdown
+                type="options"
+                dropdown={(field.options ?? []).map((o) => ({ display: o.label, value: o.value }))}
+                selected={getFieldValue(fieldKey)}
+                onchange={(value: string) => handleFieldChange(fieldKey, value)}
             />
         </SettingItem>
     {:else if field.kind === "textarea"}

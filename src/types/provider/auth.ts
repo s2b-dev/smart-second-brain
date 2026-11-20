@@ -42,8 +42,9 @@ export interface AuthFieldDefinition {
 	 * - 'text': Regular text input
 	 * - 'secret': Password-style input (hidden characters)
 	 * - 'textarea': Multi-line text input (for headers, etc.)
+	 * - 'select': Dropdown over a fixed set of `options` (e.g. a region that maps to a base URL)
 	 */
-	kind: "text" | "secret" | "textarea";
+	kind: "text" | "secret" | "textarea" | "select";
 
 	/**
 	 * Whether the field must be filled for the provider to work.
@@ -55,6 +56,18 @@ export interface AuthFieldDefinition {
 	 * Placeholder text shown when the field is empty.
 	 */
 	placeholder?: string;
+
+	/**
+	 * Choices for a `select` field. The stored value is the option's `value`; an
+	 * empty-string value stands for "unset", so the provider's default applies.
+	 */
+	options?: AuthFieldOption[];
+}
+
+/** One choice of a `select` auth field. */
+export interface AuthFieldOption {
+	value: string;
+	label: string;
 }
 
 /**
