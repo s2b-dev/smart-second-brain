@@ -54,9 +54,9 @@ interface QueryInstructionFamily {
 
 /**
  * Asymmetric families. Most take documents raw and prefix only the query; a
- * family with a document-side marker declares it in `documentPrefix`. Families
- * not listed (plain e5's `passage: `, nomic's `search_document: `) are not yet
- * validated here and pass through raw on both sides.
+ * family with a document-side marker declares it in `documentPrefix`. The
+ * first matching row wins, so a narrower family must come before a broader one
+ * that would also match its ids (instruct e5 before plain e5, arctic v2 before v1).
  */
 const FAMILIES: readonly QueryInstructionFamily[] = [
 	{
@@ -68,7 +68,7 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 		// multilingual-e5-large-instruct) share the template and, unlike the
 		// plain e5 models, take documents raw; their cards state the query
 		// instruction is required "otherwise you will see a performance
-		// degradation". Plain e5 stays excluded (see above).
+		// degradation". Plain e5 has its own row below; this one must stay first.
 		name: "qwen3-instruct",
 		pattern: /qwen3-embedding|harrier|gte-qwen|e5-mistral|multilingual-e5-large-instruct/,
 		format: (query) => `Instruct: ${RETRIEVAL_TASK_INSTRUCTION}\nQuery: ${query}`,
@@ -80,6 +80,44 @@ const FAMILIES: readonly QueryInstructionFamily[] = [
 		name: "bge-en",
 		pattern: /bge-(?:small|base|large)-en|mxbai-embed-large/,
 		format: (query) => `Represent this sentence for searching relevant passages: ${query}`,
+	},
+	{
+		// snowflake-arctic-embed v2.0 (Ollama `snowflake-arctic-embed2`, HF
+		// `snowflake-arctic-embed-{m,l}-v2.0`). Its sentence-transformers config
+		// and card: `query: ` "just on the query", documents raw. Before v1 below,
+		// whose pattern also matches these ids.
+		name: "arctic-v2",
+		pattern: /snowflake-arctic-embed(?:2|-[a-z]+-v2)/,
+		format: (query) => `query: ${query}`,
+	},
+	{
+		// snowflake-arctic-embed v1/v1.5 (Ollama `snowflake-arctic-embed:<size>`).
+		// Same query sentence as BGE per its card and sentence-transformers
+		// config, documents raw.
+		name: "arctic-v1",
+		pattern: /snowflake-arctic-embed/,
+		format: (query) => `Represent this sentence for searching relevant passages: ${query}`,
+	},
+	{
+		// nomic-embed-text v1, v1.5 and v2-moe. The card: the text "*must* include
+		// a task instruction prefix" — `search_query: ` for queries,
+		// `search_document: ` for documents. Ollama's `nomic-embed-text` does not
+		// add them.
+		name: "nomic",
+		pattern: /nomic-embed-text/,
+		format: (query) => `search_query: ${query}`,
+		documentPrefix: "search_document: ",
+	},
+	{
+		// Plain e5 and multilingual-e5 (small/base/large, v1/v2; community Ollama
+		// tags like `jeffh/intfloat-multilingual-e5-large`). The card: every input
+		// starts with `query: ` or `passage: `, "otherwise you will see a
+		// performance degradation". The instruct variants matched the Qwen3 row
+		// above first; e5-mistral is never `e5-{small,base,large}`.
+		name: "e5",
+		pattern: /(?:^|[^a-z0-9])(?:multilingual-)?e5-(?:small|base|large)/,
+		format: (query) => `query: ${query}`,
+		documentPrefix: "passage: ",
 	},
 	{
 		// EmbeddingGemma v1 (300m) and v2 (270m text backbone, Gemma 4 based;

@@ -40,16 +40,10 @@ describe("formatRetrievalQuery", () => {
 	});
 
 	it("leaves symmetric models untouched", () => {
-		for (const id of ["text-embedding-3-small", "text-embedding-ada-002", "bge-m3", "nomic-embed-text"]) {
+		for (const id of ["text-embedding-3-small", "text-embedding-ada-002", "bge-m3", "all-minilm"]) {
 			expect(formatRetrievalQuery(id, "history")).toBe("history");
 			expect(queryInstructionFamilyName(id)).toBeNull();
 		}
-	});
-
-	it("does not touch documents-side families that also need a passage prefix", () => {
-		// e5 needs `passage: ` on documents, which the index does not store; adding
-		// only `query: ` would be unvalidated, so the model must pass through raw.
-		expect(formatRetrievalQuery("multilingual-e5-large", "history")).toBe("history");
 	});
 
 	it("preserves the query verbatim inside the prefix", () => {
@@ -93,6 +87,72 @@ describe("formatRetrievalDocument", () => {
 		]) {
 			expect(formatRetrievalDocument(id, "body")).toBe("body");
 			expect(documentPrefixLength(id)).toBe(0);
+		}
+	});
+});
+
+describe("nomic-embed-text", () => {
+	it("prefixes queries and documents for v1, v1.5 and v2-moe", () => {
+		for (const id of ["nomic-embed-text", "nomic-embed-text:v1.5", "nomic-ai/nomic-embed-text-v2-moe"]) {
+			expect(formatRetrievalQuery(id, "history")).toBe("search_query: history");
+			expect(formatRetrievalDocument(id, "body")).toBe("search_document: body");
+			expect(queryInstructionFamilyName(id)).toBe("nomic");
+		}
+	});
+});
+
+describe("plain e5", () => {
+	it("prefixes queries and passages across hosts' spellings", () => {
+		for (const id of [
+			"intfloat/e5-large-v2",
+			"e5-small",
+			"multilingual-e5-large",
+			"intfloat/multilingual-e5-base",
+			"jeffh/intfloat-multilingual-e5-large:f16",
+		]) {
+			expect(formatRetrievalQuery(id, "history")).toBe("query: history");
+			expect(formatRetrievalDocument(id, "body")).toBe("passage: body");
+			expect(queryInstructionFamilyName(id)).toBe("e5");
+		}
+	});
+
+	it("leaves the instruct e5 models in the Qwen3 family, documents raw", () => {
+		for (const id of ["multilingual-e5-large-instruct", "intfloat/e5-mistral-7b-instruct"]) {
+			expect(queryInstructionFamilyName(id)).toBe("qwen3-instruct");
+			expect(formatRetrievalDocument(id, "body")).toBe("body");
+		}
+	});
+
+	it("does not match unrelated ids that merely contain e5", () => {
+		expect(queryInstructionFamilyName("gte5-large")).toBeNull();
+		expect(queryInstructionFamilyName("model-e5x-large")).toBeNull();
+	});
+});
+
+describe("snowflake-arctic-embed", () => {
+	it("uses `query: ` for v2.0 and documents raw", () => {
+		for (const id of [
+			"snowflake-arctic-embed2",
+			"snowflake-arctic-embed2:568m",
+			"Snowflake/snowflake-arctic-embed-l-v2.0",
+		]) {
+			expect(formatRetrievalQuery(id, "history")).toBe("query: history");
+			expect(formatRetrievalDocument(id, "body")).toBe("body");
+			expect(queryInstructionFamilyName(id)).toBe("arctic-v2");
+		}
+	});
+
+	it("uses the BGE sentence for v1/v1.5", () => {
+		for (const id of [
+			"snowflake-arctic-embed",
+			"snowflake-arctic-embed:335m",
+			"Snowflake/snowflake-arctic-embed-m-v1.5",
+		]) {
+			expect(formatRetrievalQuery(id, "history")).toBe(
+				"Represent this sentence for searching relevant passages: history",
+			);
+			expect(formatRetrievalDocument(id, "body")).toBe("body");
+			expect(queryInstructionFamilyName(id)).toBe("arctic-v1");
 		}
 	});
 });
