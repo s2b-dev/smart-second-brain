@@ -15,6 +15,7 @@ import SettingContainer from "../settings/SettingContainer.svelte";
 import SettingGroup from "../settings/SettingGroup.svelte";
 import SettingItem from "../settings/SettingItem.svelte";
 import Badge from "../ui/Badge.svelte";
+import Dropdown from "../ui/Dropdown.svelte";
 import Button from "../ui/Button.svelte";
 import DocsLink from "../ui/DocsLink.svelte";
 import Icon from "../ui/Icon.svelte";
@@ -48,6 +49,8 @@ import {
 	type SkillDisplayInfo,
 } from "../../types/plugin";
 import { getProviderDefinition } from "../../providers/index";
+import { getReasoningEffortSupport } from "../../providers/reasoningSupport";
+import { REASONING_EFFORTS, type ReasoningEffort } from "../../types/provider/models";
 import { buildPersistedChatModel } from "../../utils/persistedChatModel";
 import { getData } from "../../stores/dataStore.svelte";
 
@@ -159,6 +162,41 @@ const currentTitleModelDisplay = $derived.by(() => {
 		logo: providerDef && "logo" in providerDef && providerDef.logo ? providerDef.logo : GenericAIIcon,
 	};
 });
+
+// Offered unless the provider itself says the model doesn't take an effort (Anthropic's
+// capability tree, OpenRouter's supported parameters, LiteLLM's model info; see
+// providers/reasoningSupport.ts), or the plugin doesn't translate it for this provider
+// (Ollama). A provider that reports nothing leaves it offered: a model that then rejects
+// the effort gets a notice with a reset (agent/reasoningEffortErrors.ts).
+const showReasoningEffort = $derived.by(() => {
+	const chatModel = selectedAgent?.chatModel;
+	if (!chatModel) return false;
+	const providerDef = getProviderDefinition(chatModel.provider, pluginData.getAllProviderMeta());
+	if (!providerDef?.supportsReasoningEffort) return false;
+	const templateId = pluginData.getAllProviderMeta()[chatModel.provider]?.templateId ?? chatModel.provider;
+	return getReasoningEffortSupport(chatModel.provider, chatModel.model, templateId) !== false;
+});
+
+const REASONING_EFFORT_DEFAULT = "default";
+const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = { low: "Low", medium: "Medium", high: "High" };
+const reasoningEffortOptions = [
+	{ display: "Model default", value: REASONING_EFFORT_DEFAULT },
+	...REASONING_EFFORTS.map((effort) => ({ display: REASONING_EFFORT_LABELS[effort], value: effort })),
+];
+
+function updateReasoningEffort(value: string) {
+	const chatModel = selectedAgent?.chatModel;
+	if (!chatModel) return;
+	const reasoningEffort = (REASONING_EFFORTS as readonly string[]).includes(value)
+		? (value as ReasoningEffort)
+		: undefined;
+	if (reasoningEffort === chatModel.modelConfig?.reasoningEffort) return;
+	const { reasoningEffort: _, ...rest } = chatModel.modelConfig ?? {};
+	pluginData.updateAgent(agentId, {
+		chatModel: { ...chatModel, modelConfig: reasoningEffort ? { ...rest, reasoningEffort } : rest },
+	});
+	void applyChanges();
+}
 
 function formatContextWindowLabel(tokens: number): string {
 	if (tokens >= 1000) {
@@ -833,6 +871,19 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               />
             {/key}
           </SettingItem>
+          {#if showReasoningEffort}
+            <SettingItem
+              name="Reasoning effort"
+              desc="How long the model thinks before it answers. Higher is slower and uses more tokens; lower is quicker. Model default sends nothing. If the model rejects a level, set this back to Model default."
+            >
+              <Dropdown
+                type="options"
+                dropdown={reasoningEffortOptions}
+                selected={selectedAgent.chatModel.modelConfig?.reasoningEffort ?? REASONING_EFFORT_DEFAULT}
+                onchange={updateReasoningEffort}
+              />
+            </SettingItem>
+          {/if}
         {/if}
 
         <!-- The agent's whole definition is one note: base instructions, the current-date

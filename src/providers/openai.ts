@@ -33,6 +33,7 @@ import {
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
 import { t } from "../i18n";
+import { openAIReasoningFields } from "./reasoningEffort";
 
 // =============================================================================
 // Constants
@@ -87,6 +88,7 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 	// =========================================================================
 	id: "openai",
 	displayName: "OpenAI",
+	supportsReasoningEffort: true,
 	logo: OpenAILogo,
 
 	// =========================================================================
@@ -168,12 +170,14 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 					fetch: createOpenAICodexFetch(),
 				},
 				temperature: options?.temperature,
+				...openAIReasoningFields(options),
 			});
 		}
 
 		const config: Record<string, unknown> = {
 			model: modelId,
 			apiKey: auth.apiKey,
+			...openAIReasoningFields(options),
 		};
 
 		if (options?.temperature !== undefined) {
@@ -217,10 +221,15 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 					fetch: createOpenAICodexFetch(),
 				},
 				temperature: options?.temperature,
+				...openAIReasoningFields(options),
 			});
 		}
 
-		const config: Record<string, unknown> = { model: modelId, apiKey: auth.apiKey };
+		const config: Record<string, unknown> = {
+			model: modelId,
+			apiKey: auth.apiKey,
+			...openAIReasoningFields(options),
+		};
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;
 		}

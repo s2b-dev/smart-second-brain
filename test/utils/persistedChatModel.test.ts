@@ -80,4 +80,19 @@ describe("buildPersistedChatModel", () => {
 
 		expect(result.modelConfig).toEqual({ contextWindow: 16384, supportsVision: true, temperature: 0.2 });
 	});
+
+	it("keeps the reasoning effort on a re-pick and drops it for a different model", () => {
+		const existing = {
+			provider: "anthropic",
+			model: "claude-opus-5-5",
+			modelConfig: { contextWindow: 1000000, reasoningEffort: "high" as const },
+		};
+
+		expect(buildPersistedChatModel("anthropic", "claude-opus-5-5", existing).modelConfig.reasoningEffort).toBe(
+			"high",
+		);
+		expect(
+			buildPersistedChatModel("anthropic", "claude-haiku-4-5", existing).modelConfig.reasoningEffort,
+		).toBeUndefined();
+	});
 });

@@ -16,6 +16,7 @@ import {
 import { getCodexSession } from "../stores/providerRuntime.svelte";
 import { fetchOpenRouterModels, isEmbeddingModel, type OpenRouterModelInfo } from "./openrouterModels";
 import { t } from "../i18n";
+import { openAIReasoningFields } from "./reasoningEffort";
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
@@ -71,6 +72,7 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 			disconnect: clearOpenAICodexSession,
 			supportsApiKey: false,
 		},
+		supportsReasoningEffort: true,
 		auth: {
 			apiKey: {
 				label: t("plugin.providers.fields.chatgpt_sign_in"),
@@ -95,6 +97,7 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 					fetch: createOpenAICodexFetch(),
 				},
 				temperature: options?.temperature,
+				...openAIReasoningFields(options),
 			}),
 		validateAuth: async (_auth: AuthObject): Promise<AuthValidationResult> => {
 			const session = await getValidOpenAICodexSession();

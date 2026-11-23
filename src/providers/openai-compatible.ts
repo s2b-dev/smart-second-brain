@@ -27,6 +27,8 @@ import {
 	setCompatibleContextWindows,
 } from "./openaiCompatibleModels";
 import { t } from "../i18n";
+import { chatCompletionsReasoningFields } from "./reasoningEffort";
+import { liteLLMReasoningEffortSupport, setReasoningEffortSupport } from "./reasoningSupport";
 
 function sanitizeBaseUrl(url: string): string {
 	return url.replace(/\/+$/, "").replace(/\/v1$/i, "");
@@ -128,6 +130,7 @@ export function createOpenAICompatibleProvider(
 	const baseDefinition: BaseProviderDefinition = {
 		id: config.id,
 		displayName: config.displayName,
+		supportsReasoningEffort: true,
 		logo: config.logo,
 		setupInstructions: config.setupInstructions ?? {
 			steps: [
@@ -173,6 +176,7 @@ export function createOpenAICompatibleProvider(
 				model: modelId,
 				apiKey: auth.apiKey || "not-required",
 				configuration,
+				...chatCompletionsReasoningFields(options),
 			};
 
 			if (options?.temperature !== undefined) {
@@ -191,6 +195,7 @@ export function createOpenAICompatibleProvider(
 				model: modelId,
 				apiKey: auth.apiKey || "not-required",
 				configuration,
+				...chatCompletionsReasoningFields(options),
 			};
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
@@ -239,6 +244,7 @@ export function createOpenAICompatibleProvider(
 				fetchLiteLLMModelInfo(auth, defaultBaseUrl),
 			]);
 			setCompatibleContextWindows(config.id, extractContextWindows(entries, liteLLMInfo));
+			setReasoningEffortSupport(config.id, liteLLMReasoningEffortSupport(liteLLMInfo));
 			return entries.filter((r) => r.id && !isEmbeddingEntry(r)).map((r) => r.id as string);
 		},
 	};

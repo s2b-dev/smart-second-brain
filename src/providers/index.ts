@@ -7,7 +7,7 @@
 
 import type { BaseProviderDefinition, ProviderInstanceMeta, ProviderTemplateId } from "../types/provider/index";
 import { createOpenAICompatibleProvider } from "./openai-compatible";
-import { anthropicProvider } from "./anthropic";
+import { anthropicProvider, discoverAnthropicModels } from "./anthropic";
 import { ollamaProvider } from "./ollama";
 import { openaiProvider } from "./openai";
 import { openrouterProvider } from "./openrouter";
@@ -90,6 +90,7 @@ function createTemplateDefinition(
 				...anthropicProvider,
 				id: instanceId,
 				displayName: meta.displayName,
+				discoverModels: (auth) => discoverAnthropicModels(auth, instanceId),
 			};
 		case "ollama":
 			return {

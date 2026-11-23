@@ -19,6 +19,12 @@ import type {
 } from "../types/provider/index";
 import { createBufferedTransportedChatAnthropic, createTransportedChatAnthropic } from "./chatProviders";
 import { t } from "../i18n";
+import { anthropicReasoningFields } from "./reasoningEffort";
+import {
+	type AnthropicModelCapabilities,
+	anthropicReasoningEffortSupport,
+	setReasoningEffortSupport,
+} from "./reasoningSupport";
 
 // =============================================================================
 // Constants
@@ -62,6 +68,7 @@ interface AnthropicModelResponse {
 		created_at?: string;
 		display_name?: string;
 		type?: string;
+		capabilities?: AnthropicModelCapabilities | null;
 	}>;
 	has_more?: boolean;
 }
@@ -81,6 +88,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 	// =========================================================================
 	id: "anthropic",
 	displayName: "Anthropic",
+	supportsReasoningEffort: true,
 	logo: AnthropicLogo,
 
 	// =========================================================================
@@ -138,6 +146,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 				baseURL: resolvedBaseUrl,
 				defaultHeaders: auth.headers,
 			},
+			...anthropicReasoningFields(options),
 		};
 
 		if (options?.temperature !== undefined) {
@@ -159,6 +168,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 			model: modelId,
 			apiKey: auth.apiKey,
 			clientOptions: { baseURL: resolvedBaseUrl, defaultHeaders: auth.headers },
+			...anthropicReasoningFields(options),
 		};
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;
@@ -217,26 +227,35 @@ export const anthropicProvider: BaseProviderDefinition = {
 		}
 	},
 
-	discoverModels: async (auth: AuthObject): Promise<string[]> => {
-		if (!auth.apiKey?.trim()) {
-			throw new Error("Anthropic model discovery requires an API key.");
-		}
-
-		const baseUrl = sanitizeBaseUrl(auth.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-		const response = await requestUrl({
-			url: `${baseUrl}/v1/models`,
-			method: "GET",
-			headers: buildAnthropicHeaders(auth),
-			throw: false,
-		});
-
-		if (response.status < 200 || response.status >= 300) {
-			throw new Error(`Model discovery failed: ${response.text || `status ${response.status}`}`);
-		}
-
-		const payload = response.json as AnthropicModelResponse;
-		const resources = Array.isArray(payload.data) ? payload.data : [];
-
-		return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
-	},
+	discoverModels: (auth: AuthObject) => discoverAnthropicModels(auth, "anthropic"),
 };
+
+/**
+ * Lists the models on an Anthropic endpoint and records, per `providerId`, which take a
+ * reasoning effort. Extra Anthropic instances (`providers/index.ts`) bind their own id.
+ */
+export async function discoverAnthropicModels(auth: AuthObject, providerId: string): Promise<string[]> {
+	if (!auth.apiKey?.trim()) {
+		throw new Error("Anthropic model discovery requires an API key.");
+	}
+
+	const baseUrl = sanitizeBaseUrl(auth.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
+	const response = await requestUrl({
+		url: `${baseUrl}/v1/models`,
+		method: "GET",
+		headers: buildAnthropicHeaders(auth),
+		throw: false,
+	});
+
+	if (response.status < 200 || response.status >= 300) {
+		throw new Error(`Model discovery failed: ${response.text || `status ${response.status}`}`);
+	}
+
+	const payload = response.json as AnthropicModelResponse;
+	const resources = Array.isArray(payload.data) ? payload.data : [];
+	// The capability tree says which models take an effort; proxies that strip it leave
+	// every model unknown, which still offers the setting.
+	setReasoningEffortSupport(providerId, anthropicReasoningEffortSupport(resources));
+
+	return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
+}

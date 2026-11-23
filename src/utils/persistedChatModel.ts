@@ -9,6 +9,8 @@ import { useAvailableModels } from "../hooks/useAvailableModels.svelte";
  * which falls back to a 128k default when the provider reports nothing — must not
  * silently replace it (#542). Picking a different model takes the hydrated catalogue
  * value. Vision support follows the catalogue where known; temperature is always kept.
+ * Reasoning effort is kept only on a re-pick: levels are model-specific (older Claude
+ * models reject the parameter outright), so a different model starts at its default.
  *
  * Shared by every model picker (composer pill, agent editor, onboarding, and the
  * "select a model" notice action) so a model selected from any of them persists
@@ -27,6 +29,7 @@ export function buildPersistedChatModel(provider: string, model: string, existin
 				storedContextWindow ?? hydrated?.contextWindow ?? existing?.modelConfig?.contextWindow ?? 128000,
 			supportsVision: hydrated?.capabilities.vision ?? existing?.modelConfig?.supportsVision,
 			temperature: existing?.modelConfig?.temperature,
+			reasoningEffort: sameModel ? existing?.modelConfig?.reasoningEffort : undefined,
 		},
 	};
 }

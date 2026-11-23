@@ -20,6 +20,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
+import { offerReasoningEffortReset } from "../agent/reasoningEffortErrors";
 import { isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
@@ -748,6 +749,8 @@ export class ChatSession {
 	) {
 		const pair = this.findPair(pairId);
 		if (!pair) return;
+		// The agent this turn runs as; the tab's selection can change before it fails.
+		const runAgentId = this.selectedAgentId;
 
 		if (this.abortController) {
 			throw new Error("A response is already in progress for this chat.");
@@ -871,6 +874,7 @@ export class ChatSession {
 				pair.assistantMessage.state = AssistantState.error;
 				pair.assistantMessage.errorCode = extractErrorMessage(_err);
 				Logger.error("[ChatSession] Run failed:", _err);
+				offerReasoningEffortReset(runAgentId, pair.assistantMessage.errorCode);
 				await this.markPlaceholderFailed();
 			}
 		} finally {

@@ -228,11 +228,22 @@ async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams>
 }
 
 function resolveSummarizationChatModel(chatModel: ChatModel, summarizationModel: ChatModel | null): ChatModel {
-	return summarizationModel ?? chatModel;
+	return summarizationModel ?? withoutReasoningEffort(chatModel);
 }
 
 function resolveTitleChatModel(chatModel: ChatModel, titleModel: ChatModel | null): ChatModel {
-	return titleModel ?? chatModel;
+	return titleModel ?? withoutReasoningEffort(chatModel);
+}
+
+/**
+ * When summarization or titling falls back to the chat model, it runs at the provider's
+ * default effort: the user raised the effort for answering, and a "High" title would
+ * only make every new chat slower to name.
+ */
+function withoutReasoningEffort(model: ChatModel): ChatModel {
+	if (model.modelConfig?.reasoningEffort === undefined) return model;
+	const { reasoningEffort: _, ...modelConfig } = model.modelConfig;
+	return { ...model, modelConfig };
 }
 
 async function resolveVisionSupportCached(providerId: string, modelId: string): Promise<boolean> {
@@ -1655,6 +1666,9 @@ export class AgentManager {
 				id,
 				systemPrompt: promptFiles?.getAgentPrompt(id) ?? null,
 				chatModel: sub.chatModel ? `${sub.chatModel.provider}:${sub.chatModel.model}` : null,
+				// The child's model instance is built into the parent's runnable with its
+				// effort baked in, so editing only the child's effort must rebuild the parent.
+				reasoningEffort: sub.chatModel?.modelConfig?.reasoningEffort ?? null,
 				toolsConfig: sub.toolsConfig,
 				pluginExecTools: sub.pluginExecTools ?? null,
 			};
@@ -1688,6 +1702,8 @@ export class AgentManager {
 			model: chatModel.model,
 			contextWindow: chatModel.modelConfig?.contextWindow ?? null,
 			supportsVision: chatModel.modelConfig?.supportsVision ?? null,
+			// The model instance is built with the effort baked in (see providers/reasoningEffort.ts).
+			reasoningEffort: chatModel.modelConfig?.reasoningEffort ?? null,
 			summ: `${summarizationModel.provider}:${summarizationModel.model}`,
 			agentId: agent.id,
 			agentRev: this.agentConfigRevision(agent),

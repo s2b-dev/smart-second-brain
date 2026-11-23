@@ -30,6 +30,7 @@ import {
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
 import { t } from "../i18n";
+import { chatCompletionsReasoningFields } from "./reasoningEffort";
 
 // =============================================================================
 // Constants
@@ -179,6 +180,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 		id: instanceId,
 		displayName,
 		logo: OmlxLogo,
+		supportsReasoningEffort: true,
 
 		// =====================================================================
 		// Setup Instructions
@@ -231,6 +233,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 				model: modelId,
 				apiKey: auth.apiKey || "not-required",
 				configuration: buildClientConfiguration(auth),
+				...chatCompletionsReasoningFields(options),
 			};
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
@@ -243,6 +246,7 @@ export function createOmlxProvider(instanceId: string, displayName: string): Emb
 				model: modelId,
 				apiKey: auth.apiKey || "not-required",
 				configuration: buildClientConfiguration(auth),
+				...chatCompletionsReasoningFields(options),
 			};
 			if (options?.temperature !== undefined) {
 				chatConfig.temperature = options.temperature;
