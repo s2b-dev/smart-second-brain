@@ -253,6 +253,30 @@ function updateChatContextWindow(value: number) {
 	void applyChanges();
 }
 
+// What the chat model's provider reports, for the rows below to say when it reports nothing.
+const chatModelMetadata = $derived(
+	selectedAgent?.chatModel
+		? models.hydratedChatModelsByKey.get(`${selectedAgent.chatModel.provider}:${selectedAgent.chatModel.model}`)
+		: undefined,
+);
+const contextWindowUnreported = $derived(
+	chatModelMetadata !== undefined && chatModelMetadata.contextWindow === undefined,
+);
+const visionUnreported = $derived(
+	chatModelMetadata !== undefined && chatModelMetadata.capabilities.vision === undefined,
+);
+
+// Image input follows the provider when it reports it; when it doesn't, this is the only way to
+// turn it on. Re-picking the same model keeps the choice (buildPersistedChatModel).
+function updateChatSupportsVision(supportsVision: boolean) {
+	const chatModel = selectedAgent?.chatModel;
+	if (!chatModel || chatModel.modelConfig?.supportsVision === supportsVision) return;
+	pluginData.updateAgent(agentId, {
+		chatModel: { ...chatModel, modelConfig: { ...chatModel.modelConfig, supportsVision } },
+	});
+	void applyChanges();
+}
+
 function openSummarizationModelSelectionModal() {
 	const currentSelection = selectedAgent?.summarizationModel
 		? {
@@ -861,7 +885,9 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
         {#if selectedAgent.chatModel}
           <SettingItem
             name={t("agents.editor.context_window_name")}
-            desc={t("agents.editor.context_window_desc")}
+            desc={contextWindowUnreported
+              ? t("agents.editor.context_window_desc_unreported")
+              : t("agents.editor.context_window_desc")}
           >
             {#key contextWindowFieldKey}
               <Text
@@ -884,6 +910,15 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
               />
             </SettingItem>
           {/if}
+          <SettingItem
+            name={t("agents.editor.image_input_name")}
+            desc={visionUnreported ? t("agents.editor.image_input_desc_unreported") : t("agents.editor.image_input_desc")}
+          >
+            <Toggle
+              checked={selectedAgent.chatModel.modelConfig?.supportsVision ?? false}
+              onchange={(checked: boolean) => updateChatSupportsVision(checked)}
+            />
+          </SettingItem>
         {/if}
 
         <!-- The agent's whole definition is one note: base instructions, the current-date

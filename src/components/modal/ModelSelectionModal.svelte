@@ -462,9 +462,12 @@ function getProviderListDisplay(): string {
 
                   <div class="model-meta">
                     {#if model.kind === "chat"}
-                      <span class="meta-tag" title={t("modals.model_selection.context_window")}>
-                        {t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) })}
-                      </span>
+                      <!-- No tag when the provider doesn't report a window, rather than a guessed one. -->
+                      {#if model.contextWindow}
+                        <span class="meta-tag" title={t("modals.model_selection.context_window")}>
+                          {t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) })}
+                        </span>
+                      {/if}
                     {:else}
                       <span class="meta-tag" title={t("modals.model_selection.max_input_tokens")}>
                         {t("modals.model_selection.max_input_tag", { tokens: formatTokenLimit(model.maxInputTokens) })}

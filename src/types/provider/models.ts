@@ -37,8 +37,9 @@ export interface ChatModelConfig {
 
 	/**
 	 * Whether the model supports vision (image input).
-	 * Populated from provider metadata (OpenRouter, Ollama, models.dev).
-	 * Used at runtime to determine if images can be sent to the model.
+	 * Populated from what the provider reports, or set by the user in the Agent editor when the
+	 * provider reports nothing. Used at runtime to determine if images can be sent to the model;
+	 * undefined is treated as no.
 	 */
 	supportsVision?: boolean;
 

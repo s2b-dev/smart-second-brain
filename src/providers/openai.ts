@@ -9,8 +9,7 @@
  * Authentication: apiKey (required), baseUrl (optional), headers (optional)
  */
 
-import { fetchModelsDevData, isEmbeddingModel } from "./modelsDevApi";
-import { getPlugin } from "../stores/state.svelte";
+import { populateCodexCache } from "./codexModels";
 import OpenAILogo from "../components/ui/logos/OpenAILogo.svelte";
 import type {
 	AuthObject,
@@ -22,6 +21,7 @@ import {
 	cancelOpenAICodexSignIn,
 	clearOpenAICodexSession,
 	createOpenAICodexFetch,
+	fetchCodexModelEntries,
 	getValidOpenAICodexSession,
 	signInWithOpenAICodex,
 } from "./openaiCodex";
@@ -41,7 +41,6 @@ import { openAIReasoningFields } from "./reasoningEffort";
 
 /** Default base URL for OpenAI API */
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const FALLBACK_OPENAI_CHAT_MODELS = ["chatgpt-4o-latest", "gpt-4.1-mini-2025-04-14", "gpt-4.1", "o4-mini", "o1"];
 
 // =============================================================================
 // Helper Functions
@@ -348,72 +347,57 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 		};
 	},
 
-	discoverModels: async (auth: AuthObject): Promise<string[]> => {
-		if (auth.authMode === "codex") {
-			const modelsDevData = await fetchModelsDevData();
-			const modelsDevOpenAI = modelsDevData?.openai;
-			if (modelsDevOpenAI) {
-				const discovered = Array.from(
-					new Set(
-						Object.values(modelsDevOpenAI.models)
-							.filter((model) => !isEmbeddingModel(model))
-							.map((model) => model.id?.split("/").pop()?.trim())
-							.filter((id): id is string => Boolean(id)),
-					),
-				);
-
-				if (discovered.length > 0) {
-					return discovered.sort((a, b) => a.localeCompare(b));
-				}
-			}
-
-			return Array.from(
-				new Set([
-					...FALLBACK_OPENAI_CHAT_MODELS,
-					...Object.keys(getPlugin().pluginData.getChatModels("openai")),
-				]),
-			).sort((a, b) => a.localeCompare(b));
-		}
-
-		if (!auth.apiKey) {
-			throw new Error("OpenAI model discovery requires an API key.");
-		}
-
-		const baseUrl =
-			auth.baseUrl && auth.baseUrl.trim() !== "" ? sanitizeBaseUrl(auth.baseUrl) : OPENAI_DEFAULT_BASE_URL;
-
-		const headers: Record<string, string> = {
-			Authorization: `Bearer ${auth.apiKey}`,
-			"Content-Type": "application/json",
-		};
-
-		// Add custom headers if provided
-		if (auth.headers) {
-			Object.assign(headers, auth.headers);
-		}
-
-		const response = await window.fetch(`${baseUrl}/models`, {
-			method: "GET",
-			headers,
-		});
-
-		if (!response.ok) {
-			const errorBody = await safeReadText(response);
-			throw new Error(`Model discovery failed: ${errorBody || response.statusText}`);
-		}
-
-		const payload = (await response.json()) as OpenAIModelResponse;
-		const resources = Array.isArray(payload.data) ? payload.data : [];
-
-		return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
-	},
+	discoverModels: (auth: AuthObject): Promise<string[]> => discoverOpenAIModels(auth, "openai"),
 
 	discoverEmbeddingModels: async (auth: AuthObject): Promise<string[]> => {
 		if (auth.authMode === "codex") {
 			return [];
 		}
 
-		const allModels = await openaiProvider.discoverModels(auth);
+		const allModels = await discoverOpenAIModels(auth, "openai");
 		return allModels.filter((model) => model.toLowerCase().includes("embed"));
 	},
 };
+
+/**
+ * List an OpenAI instance's models. With ChatGPT sign-in that is the account's Codex catalogue,
+ * which also fills the per-instance cache hydration reads (context window, image input); the
+ * API's `/v1/models` lists ids only.
+ */
+export async function discoverOpenAIModels(auth: AuthObject, providerId: string): Promise<string[]> {
+	if (auth.authMode === "codex") {
+		return populateCodexCache(providerId, await fetchCodexModelEntries());
+	}
+
+	if (!auth.apiKey) {
+		throw new Error("OpenAI model discovery requires an API key.");
+	}
+
+	const baseUrl =
+		auth.baseUrl && auth.baseUrl.trim() !== "" ? sanitizeBaseUrl(auth.baseUrl) : OPENAI_DEFAULT_BASE_URL;
+
+	const headers: Record<string, string> = {
+		Authorization: `Bearer ${auth.apiKey}`,
+		"Content-Type": "application/json",
+	};
+
+	// Add custom headers if provided
+	if (auth.headers) {
+		Object.assign(headers, auth.headers);
+	}
+
+	const response = await window.fetch(`${baseUrl}/models`, {
+		method: "GET",
+		headers,
+	});
+
+	if (!response.ok) {
+		const errorBody = await safeReadText(response);
+		throw new Error(`Model discovery failed: ${errorBody || response.statusText}`);
+	}
+
+	const payload = (await response.json()) as OpenAIModelResponse;
+	const resources = Array.isArray(payload.data) ? payload.data : [];
+
+	return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
+}

@@ -9,7 +9,7 @@ import { getData } from "../stores/dataStore.svelte";
 import { getPendingChangesStore } from "../stores/pendingChangesStore.svelte";
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type AgentConfig, type SkillMetadata } from "../types/plugin";
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
-import { lookupModelInfo } from "../providers/modelsDevApi";
+import { hydrateChatModel } from "../lib/modelMetadataNormalizer";
 import { fetchOllamaModelsInfo } from "../providers/ollamaModels";
 import { SystemPromptModal } from "../components/modal/SystemPromptModal";
 import {
@@ -167,7 +167,7 @@ export type AgentManagerStreamChunk =
 	| { type: "result"; result: unknown };
 
 const resolvedVisionSupportCache = new Map<string, boolean>();
-const inflightVisionSupportRequests = new Map<string, Promise<boolean>>();
+const inflightVisionSupportRequests = new Map<string, Promise<boolean | undefined>>();
 
 function getVisionSupportCacheKey(providerId: string, modelId: string): string {
 	return `${providerId}::${modelId}`;
@@ -197,8 +197,9 @@ function persistResolvedVisionSupport(model: ChatModel, supportsVision: boolean)
 
 /**
  * Maps the UI ChatModel type to papa-ts ChooseModelParams.
- * Enriches supportsVision from provider-native APIs first (Ollama, OpenRouter),
- * then falls back to models.dev for other providers.
+ * Enriches supportsVision from what the model's provider reports. When it reports nothing,
+ * this run treats the model as text-only and nothing is persisted, so the answer can still
+ * arrive later or come from the user (the Agent editor's image-input toggle).
  */
 async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams> {
 	const options = { ...model.modelConfig };
@@ -212,9 +213,9 @@ async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams>
 	if (options.supportsVision === undefined) {
 		try {
 			const resolvedSupportsVision = await resolveVisionSupportCached(model.provider, model.model);
-			options.supportsVision = resolvedSupportsVision;
+			options.supportsVision = resolvedSupportsVision ?? false;
 			// Persist resolved capability via store update helper (avoid mutating model reference directly).
-			persistResolvedVisionSupport(model, resolvedSupportsVision);
+			if (resolvedSupportsVision !== undefined) persistResolvedVisionSupport(model, resolvedSupportsVision);
 		} catch {
 			// Non-critical: default to false if all lookups fail
 		}
@@ -246,7 +247,7 @@ function withoutReasoningEffort(model: ChatModel): ChatModel {
 	return { ...model, modelConfig };
 }
 
-async function resolveVisionSupportCached(providerId: string, modelId: string): Promise<boolean> {
+async function resolveVisionSupportCached(providerId: string, modelId: string): Promise<boolean | undefined> {
 	const cacheKey = getVisionSupportCacheKey(providerId, modelId);
 
 	const cached = resolvedVisionSupportCache.get(cacheKey);
@@ -261,7 +262,7 @@ async function resolveVisionSupportCached(providerId: string, modelId: string): 
 
 	const request = resolveVisionSupport(providerId, modelId)
 		.then((supportsVision) => {
-			resolvedVisionSupportCache.set(cacheKey, supportsVision);
+			if (supportsVision !== undefined) resolvedVisionSupportCache.set(cacheKey, supportsVision);
 			return supportsVision;
 		})
 		.finally(() => {
@@ -273,18 +274,20 @@ async function resolveVisionSupportCached(providerId: string, modelId: string): 
 }
 
 /**
- * Resolves vision support from provider-native APIs.
- * Priority: Ollama /api/show → OpenRouter /api/v1/models → models.dev fallback
+ * Resolves vision support from what the model's provider reports: Ollama's /api/show and
+ * OpenRouter's catalogue are fetched here; everything else (Anthropic, ChatGPT sign-in,
+ * Hugging Face, OpenAI-compatible endpoints) comes from the caches model discovery fills.
+ * Undefined when the provider doesn't say.
  */
-async function resolveVisionSupport(providerId: string, modelId: string): Promise<boolean> {
+async function resolveVisionSupport(providerId: string, modelId: string): Promise<boolean | undefined> {
+	const data = getData();
 	// 1. Ollama: use /api/show capabilities (cached)
 	if (providerId === "ollama") {
-		const data = getData();
 		const auth = data.getResolvedAuthState("ollama");
 		if (auth?.baseUrl) {
 			const models = await fetchOllamaModelsInfo(auth.baseUrl, [modelId]);
 			const info = models.get(modelId);
-			if (info) return info.supportsVision ?? false;
+			if (info) return info.supportsVision;
 		}
 	}
 
@@ -297,11 +300,9 @@ async function resolveVisionSupport(providerId: string, modelId: string): Promis
 		}
 	}
 
-	// 3. Fallback: models.dev for other providers (OpenAI, Anthropic, etc.)
-	const mdInfo = await lookupModelInfo(providerId, modelId);
-	if (mdInfo) return mdInfo.attachment ?? false;
-
-	return false;
+	// 3. The per-instance catalogues discovery filled.
+	return hydrateChatModel(providerId, modelId, { templateId: data.getProviderTemplateId(providerId) }).capabilities
+		.vision;
 }
 
 export class AgentManager {
@@ -1537,7 +1538,7 @@ export class AgentManager {
 
 	/**
 	 * Performs network-dependent setup in the background to avoid blocking plugin startup.
-	 * - Resolves vision support from external APIs (Ollama, OpenRouter, models.dev)
+	 * - Resolves vision support from what the model's provider reports
 	 * - Warms the per-agent MCP tool cache
 	 * These are awaited before the first agent invocation via awaitDeferredSetup().
 	 */
@@ -1548,7 +1549,9 @@ export class AgentManager {
 		if (chatModel && chatModel.modelConfig.supportsVision === undefined) {
 			promises.push(
 				resolveVisionSupportCached(chatModel.provider, chatModel.model)
-					.then((supportsVision) => persistResolvedVisionSupport(chatModel, supportsVision))
+					.then((supportsVision) => {
+						if (supportsVision !== undefined) persistResolvedVisionSupport(chatModel, supportsVision);
+					})
 					.catch(() => {
 						// Non-critical: vision defaults to false
 					}),

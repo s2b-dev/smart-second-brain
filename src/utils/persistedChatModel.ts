@@ -1,16 +1,17 @@
 import type { ChatModel } from "../stores/chatTimeline";
 import { useAvailableModels } from "../hooks/useAvailableModels.svelte";
+import { ASSUMED_CONTEXT_WINDOW } from "../lib/modelMetadataNormalizer";
 
 /**
  * Build the `ChatModel` record persisted on an agent when a model is picked.
  *
- * Re-picking the model already stored keeps its stored context window: that value may be
- * user-tuned (e.g. an Ollama `num_ctx` sized to the machine), and catalogue metadata —
- * which falls back to a 128k default when the provider reports nothing — must not
- * silently replace it (#542). Picking a different model takes the hydrated catalogue
- * value. Vision support follows the catalogue where known; temperature is always kept.
- * Reasoning effort is kept only on a re-pick: levels are model-specific (older Claude
- * models reject the parameter outright), so a different model starts at its default.
+ * Re-picking the model already stored keeps its stored context window and image-input
+ * setting: both may be user-set (e.g. an Ollama `num_ctx` sized to the machine, or vision
+ * turned on for a provider that doesn't report it) and must not be silently replaced (#542).
+ * Picking a different model takes what its provider reports; a window the provider doesn't
+ * report is stored as {@link ASSUMED_CONTEXT_WINDOW} and image input as unknown. Temperature
+ * is always kept. Reasoning effort is kept only on a re-pick: levels are model-specific (older
+ * Claude models reject the parameter outright), so a different model starts at its default.
  *
  * Shared by every model picker (composer pill, agent editor, onboarding, and the
  * "select a model" notice action) so a model selected from any of them persists
@@ -20,14 +21,13 @@ export function buildPersistedChatModel(provider: string, model: string, existin
 	const models = useAvailableModels();
 	const hydrated = models.hydratedChatModelsByKey.get(`${provider}:${model}`);
 	const sameModel = existing?.provider === provider && existing?.model === model;
-	const storedContextWindow = sameModel ? existing?.modelConfig?.contextWindow : undefined;
+	const stored = sameModel ? existing?.modelConfig : undefined;
 	return {
 		provider,
 		model,
 		modelConfig: {
-			contextWindow:
-				storedContextWindow ?? hydrated?.contextWindow ?? existing?.modelConfig?.contextWindow ?? 128000,
-			supportsVision: hydrated?.capabilities.vision ?? existing?.modelConfig?.supportsVision,
+			contextWindow: stored?.contextWindow ?? hydrated?.contextWindow ?? ASSUMED_CONTEXT_WINDOW,
+			supportsVision: stored?.supportsVision ?? hydrated?.capabilities.vision,
 			temperature: existing?.modelConfig?.temperature,
 			reasoningEffort: sameModel ? existing?.modelConfig?.reasoningEffort : undefined,
 		},

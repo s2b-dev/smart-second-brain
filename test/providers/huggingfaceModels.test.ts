@@ -5,7 +5,6 @@
 
 import { describe, expect, it } from "vitest";
 import { hydrateChatModel } from "../../src/lib/modelMetadataNormalizer";
-import type { ModelsDevApiResponse } from "../../src/providers/modelsDevApi";
 import { huggingFaceDisplayName, populateHuggingFaceCache } from "../../src/providers/huggingfaceModels";
 
 const CATALOG = [
@@ -41,20 +40,6 @@ const CATALOG = [
 	},
 ];
 
-/** models.dev knows one of the models, under a curated name and a stale context window. */
-const MODELS_DEV = {
-	huggingface: {
-		models: {
-			"nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16": {
-				id: "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
-				name: "Nemotron 3 Nano 30B A3B",
-				limit: { context: 65536 },
-				reasoning: true,
-			},
-		},
-	},
-} as unknown as ModelsDevApiResponse;
-
 describe("populateHuggingFaceCache", () => {
 	it("lists only models a live provider serves with tool calling", () => {
 		expect(populateHuggingFaceCache(CATALOG)).toEqual([
@@ -67,17 +52,15 @@ describe("populateHuggingFaceCache", () => {
 
 describe("hydrateChatModel for a Hugging Face instance", () => {
 	populateHuggingFaceCache(CATALOG);
-	const hydrate = (id: string, provider = "hf-work") =>
-		hydrateChatModel(provider, id, { templateId: "huggingface", modelsDevData: MODELS_DEV });
+	const hydrate = (id: string, provider = "hf-work") => hydrateChatModel(provider, id, { templateId: "huggingface" });
 
-	it("never shows the owner prefix, with or without a models.dev entry", () => {
+	it("never shows the owner prefix", () => {
 		expect(hydrate("nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8").displayName).toBe(
 			"NVIDIA Nemotron 3 Super 120B A12B FP8",
 		);
-		expect(hydrate("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16").displayName).toBe("Nemotron 3 Nano 30B A3B");
 	});
 
-	it("takes the context window from the router, over models.dev", () => {
+	it("takes the context window from the router", () => {
 		expect(hydrate("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16").contextWindow).toBe(262144);
 	});
 
@@ -85,14 +68,14 @@ describe("hydrateChatModel for a Hugging Face instance", () => {
 		expect(hydrate("google/gemma-4-31B-it").contextWindow).toBe(65536);
 	});
 
-	it("reports capabilities from the router, reasoning from models.dev", () => {
+	it("reports capabilities from the router, and reasoning as unknown", () => {
 		expect(hydrate("google/gemma-4-31B-it").capabilities).toMatchObject({ toolCalls: true, vision: true });
 		expect(hydrate("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16").capabilities).toMatchObject({
 			toolCalls: true,
 			vision: false,
 			structuredOutput: true,
-			reasoning: true,
 		});
+		expect(hydrate("nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16").capabilities.reasoning).toBeUndefined();
 	});
 
 	it("leaves other providers' models alone", () => {
@@ -100,7 +83,7 @@ describe("hydrateChatModel for a Hugging Face instance", () => {
 			templateId: "openai-compatible",
 		});
 		expect(custom.displayName).toBe("nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8");
-		expect(custom.contextWindow).toBe(128000);
+		expect(custom.contextWindow).toBeUndefined();
 	});
 });
 

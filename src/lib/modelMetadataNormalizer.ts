@@ -1,4 +1,5 @@
-import { lookupModelInfoSync, type ModelsDevApiResponse } from "../providers/modelsDevApi";
+import { type AnthropicModelInfo, getAnthropicModelInfo } from "../providers/anthropicModels";
+import { type CodexModelInfo, getCodexModelInfo } from "../providers/codexModels";
 import { formatParameterSize, OLLAMA_EMBED_NUM_CTX, type OllamaModelInfo } from "../providers/ollamaModels";
 import {
 	extractCapabilities as extractOpenRouterCapabilities,
@@ -9,11 +10,16 @@ import {
 	type HuggingFaceModelInfo,
 	huggingFaceDisplayName,
 } from "../providers/huggingfaceModels";
-import { getCompatibleContextWindow } from "../providers/openaiCompatibleModels";
+import { type CompatibleModelInfo, getCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import type { ProviderTemplateId } from "../types/provider";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
 
-const DEFAULT_CHAT_CONTEXT_WINDOW = 128000;
+/**
+ * Context window stored on an agent for a model whose provider reports none. The Agent editor
+ * says the provider doesn't report one, so the user can set the real limit. Never shown in the
+ * model picker, which leaves an unreported window out.
+ */
+export const ASSUMED_CONTEXT_WINDOW = 128000;
 const DEFAULT_EMBEDDING_MAX_INPUT_TOKENS = 8191;
 const DEFAULT_SIMILARITY_THRESHOLD = 0.7;
 const DEFAULT_EMBED_MAX_INPUT_TOKENS_BY_PROVIDER: Record<string, number> = {
@@ -43,13 +49,19 @@ export function knownEmbeddingMaxInputTokens(modelId: string): number | undefine
 	return KNOWN_EMBED_MAX_INPUT_TOKENS.find(([family]) => id.includes(family))?.[1];
 }
 
+/**
+ * Inputs to hydration. Every fact comes from the provider serving the model: the catalogues
+ * passed in here (OpenRouter, Ollama) or the per-instance caches discovery fills (Anthropic,
+ * Codex, Hugging Face, OpenAI-compatible endpoints). There is deliberately no third-party
+ * fallback; what the provider doesn't report stays undefined.
+ */
 export interface ModelHydrationSourceData {
-	modelsDevData?: ModelsDevApiResponse | null;
 	openRouterData?: Map<string, OpenRouterModelInfo> | null;
 	ollamaData?: Map<string, OllamaModelInfo> | null;
 	/**
 	 * Template of the provider instance. Needed where the instance id alone can't tell:
-	 * a Hugging Face instance may be named anything ("hugging-face", "hf-work", …).
+	 * a Hugging Face instance may be named anything ("hugging-face", "hf-work", …), and
+	 * the per-instance caches are only read for the template that fills them.
 	 */
 	templateId?: ProviderTemplateId;
 	temperature?: number;
@@ -109,30 +121,32 @@ function buildDisplayName(
 	return baseName;
 }
 
-function lookupMetadata(
-	provider: string,
-	variantKey: string,
-	sourceData: ModelHydrationSourceData,
-): {
+interface ProviderMetadata {
 	openRouter?: OpenRouterModelInfo;
 	ollama?: OllamaModelInfo;
 	huggingFace?: HuggingFaceModelInfo;
-	modelsDev?: ReturnType<typeof lookupModelInfoSync>;
-} {
-	const isHuggingFace = sourceData.templateId === "huggingface";
-	const openRouter =
-		provider === "openrouter" && sourceData.openRouterData ? sourceData.openRouterData.get(variantKey) : undefined;
+	anthropic?: AnthropicModelInfo;
+	codex?: CodexModelInfo;
+	compatible?: CompatibleModelInfo;
+}
 
-	const ollama = provider === "ollama" && sourceData.ollamaData ? sourceData.ollamaData.get(variantKey) : undefined;
-
-	const huggingFace = isHuggingFace ? getCachedHuggingFaceModels().get(variantKey) : undefined;
-
-	// models.dev keys Hugging Face's catalogue as "huggingface", whatever the instance is called.
-	const modelsDev = sourceData.modelsDevData
-		? lookupModelInfoSync(sourceData.modelsDevData, isHuggingFace ? "huggingface" : provider, variantKey)
-		: null;
-
-	return { openRouter, ollama, huggingFace, modelsDev };
+function lookupMetadata(provider: string, variantKey: string, sourceData: ModelHydrationSourceData): ProviderMetadata {
+	const { templateId } = sourceData;
+	return {
+		openRouter:
+			provider === "openrouter" && sourceData.openRouterData
+				? sourceData.openRouterData.get(variantKey)
+				: undefined,
+		ollama: provider === "ollama" && sourceData.ollamaData ? sourceData.ollamaData.get(variantKey) : undefined,
+		huggingFace: templateId === "huggingface" ? getCachedHuggingFaceModels().get(variantKey) : undefined,
+		anthropic: templateId === "anthropic" ? getAnthropicModelInfo(provider, variantKey) : undefined,
+		// Only filled for an instance signed in with ChatGPT; an API-key OpenAI instance has none.
+		codex:
+			templateId === "openai" || templateId === "openai-codex"
+				? getCodexModelInfo(provider, variantKey)
+				: undefined,
+		compatible: templateId === "openai-compatible" ? getCompatibleModelInfo(provider, variantKey) : undefined,
+	};
 }
 
 export function hydrateChatModel(
@@ -140,7 +154,11 @@ export function hydrateChatModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedChatModelMetadata {
-	const { openRouter, ollama, huggingFace, modelsDev } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, huggingFace, anthropic, codex, compatible } = lookupMetadata(
+		provider,
+		variantKey,
+		sourceData,
+	);
 	const paramSize = normalizeParamSize(ollama?.parameterSize);
 	const quantization = ollama?.quantization;
 
@@ -149,28 +167,26 @@ export function hydrateChatModel(
 		variantKey,
 		openRouter?.name ||
 			ollama?.name ||
-			modelsDev?.name ||
+			anthropic?.displayName ||
+			codex?.displayName ||
 			(sourceData.templateId === "huggingface" ? huggingFaceDisplayName(variantKey) : undefined),
 		paramSize,
 	);
-
-	// An OpenAI-compatible endpoint's own figure outranks models.dev: a custom-named model
-	// either isn't in the catalogue or matches some other model's entry there (#479).
-	const endpointWindow =
-		sourceData.templateId === "openai-compatible" ? getCompatibleContextWindow(provider, variantKey) : undefined;
 
 	const contextWindow =
 		openRouter?.context_length ||
 		ollama?.contextLength ||
 		huggingFace?.contextLength ||
-		endpointWindow ||
-		modelsDev?.limit?.context ||
-		DEFAULT_CHAT_CONTEXT_WINDOW;
+		anthropic?.maxInputTokens ||
+		codex?.contextWindow ||
+		compatible?.contextWindow ||
+		undefined;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
 	const outputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.completion);
 	const hasPricing = inputUsdPer1M !== undefined || outputUsdPer1M !== undefined;
 	const openRouterCapabilities = openRouter ? extractOpenRouterCapabilities(openRouter) : undefined;
+	const effortLevels = anthropic?.effortLevels ?? codex?.effortLevels;
 
 	return {
 		kind: "chat",
@@ -186,20 +202,25 @@ export function hydrateChatModel(
 				openRouterCapabilities?.supportsToolCalls ??
 				ollama?.supportsTools ??
 				huggingFace?.supportsTools ??
-				modelsDev?.tool_call ??
-				undefined,
+				compatible?.toolCalls,
 			vision:
 				openRouterCapabilities?.supportsVision ??
 				ollama?.supportsVision ??
 				huggingFace?.supportsVision ??
-				modelsDev?.attachment ??
-				undefined,
-			reasoning: openRouterCapabilities?.supportsReasoning ?? modelsDev?.reasoning ?? undefined,
+				anthropic?.vision ??
+				codex?.vision ??
+				compatible?.vision,
+			reasoning:
+				openRouterCapabilities?.supportsReasoning ??
+				anthropic?.thinking ??
+				(effortLevels ? effortLevels.length > 0 : undefined) ??
+				compatible?.reasoning,
 			structuredOutput:
 				openRouterCapabilities?.supportsStructuredOutput ??
 				huggingFace?.supportsStructuredOutput ??
-				modelsDev?.structured_output ??
-				undefined,
+				anthropic?.structuredOutput ??
+				compatible?.structuredOutput,
+			effortLevels,
 		},
 		pricing: hasPricing ? { inputUsdPer1M, outputUsdPer1M } : undefined,
 	};
@@ -210,16 +231,11 @@ export function hydrateEmbeddingModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedEmbeddingModelMetadata {
-	const { openRouter, ollama, modelsDev } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, compatible } = lookupMetadata(provider, variantKey, sourceData);
 	const paramSize = normalizeParamSize(ollama?.parameterSize);
 	const quantization = ollama?.quantization;
 
-	const displayName = buildDisplayName(
-		provider,
-		variantKey,
-		openRouter?.name || ollama?.name || modelsDev?.name,
-		paramSize,
-	);
+	const displayName = buildDisplayName(provider, variantKey, openRouter?.name || ollama?.name, paramSize);
 
 	const maxInputFromOpenRouter =
 		toNumber(openRouter?.per_request_limits?.prompt_tokens) || openRouter?.context_length;
@@ -229,8 +245,7 @@ export function hydrateEmbeddingModel(
 	const advertisedMaxInputTokens =
 		maxInputFromOpenRouter ||
 		ollama?.contextLength ||
-		modelsDev?.limit?.input ||
-		modelsDev?.limit?.context ||
+		compatible?.contextWindow ||
 		knownEmbeddingMaxInputTokens(variantKey) ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;

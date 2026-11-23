@@ -77,7 +77,7 @@ export function getCachedHuggingFaceModels(): ReadonlyMap<string, HuggingFaceMod
  * Display name for a Hugging Face model id when no catalogue supplies one: the repo name
  * without its owner, dashes turned into spaces ("meta-llama/Llama-3.1-8B-Instruct" →
  * "Llama 3.1 8B Instruct"). The full id stays visible as the subtitle, so nothing is lost,
- * and every model of the provider reads the same way whether or not models.dev knows it.
+ * and every model of the provider reads the same way.
  */
 export function huggingFaceDisplayName(id: string): string {
 	const repo = id.slice(id.indexOf("/") + 1);

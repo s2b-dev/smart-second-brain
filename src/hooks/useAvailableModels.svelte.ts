@@ -1,7 +1,6 @@
 import { Notice } from "obsidian";
 import { invalidateAllProviders, type ProviderState, subscribeProviderState } from "../lib/query";
-import { hydrateChatModel, hydrateEmbeddingModel } from "../lib/modelMetadataNormalizer";
-import { fetchModelsDevData, type ModelsDevApiResponse } from "../providers/modelsDevApi";
+import { ASSUMED_CONTEXT_WINDOW, hydrateChatModel, hydrateEmbeddingModel } from "../lib/modelMetadataNormalizer";
 import { getOllamaModelsCache, type OllamaModelInfo } from "../providers/ollamaModels";
 import { fetchOpenRouterModels, type OpenRouterModelInfo } from "../providers/openrouterModels";
 import { getProviderDefinition, isEmbeddingProvider } from "../providers/index";
@@ -31,9 +30,6 @@ export interface EmbedModel {
 	provider: string;
 	modelConfig: EmbedModelConfig;
 }
-
-/** Default context window when models.dev lookup fails */
-const DEFAULT_CONTEXT_WINDOW = 128000;
 
 /**
  * Heuristic to detect embedding models by name.
@@ -65,7 +61,6 @@ function isLikelyEmbeddingModel(modelName: string): boolean {
 export class AvailableModels {
 	#data = getData();
 	#plugin = getPlugin();
-	#modelsDevData = $state<ModelsDevApiResponse | null>(null);
 	#openRouterData = $state<Map<string, OpenRouterModelInfo> | null>(null);
 	#metadataLoadStarted = false;
 	/**
@@ -156,9 +151,7 @@ export class AvailableModels {
 			return;
 		}
 		this.#metadataLoadStarted = true;
-		const [modelsDevData, openRouterData] = await Promise.all([fetchModelsDevData(), fetchOpenRouterModels()]);
-		this.#modelsDevData = modelsDevData;
-		this.#openRouterData = openRouterData;
+		this.#openRouterData = await fetchOpenRouterModels();
 	}
 
 	#getOllamaData(): Map<string, OllamaModelInfo> | null {
@@ -223,11 +216,11 @@ export class AvailableModels {
 					continue;
 				}
 
-				// Use default config - will be enriched from models.dev at runtime
+				// Placeholder config; the picker persists the hydrated values (buildPersistedChatModel).
 				out.push({
 					model: modelName,
 					provider,
-					modelConfig: { contextWindow: DEFAULT_CONTEXT_WINDOW },
+					modelConfig: { contextWindow: ASSUMED_CONTEXT_WINDOW },
 				});
 			}
 		});
@@ -298,7 +291,6 @@ export class AvailableModels {
 		const ollamaData = this.#getOllamaData();
 		return this.#availableModels.map((model) =>
 			hydrateChatModel(model.provider, model.model, {
-				modelsDevData: this.#modelsDevData,
 				openRouterData: this.#openRouterData,
 				ollamaData,
 				templateId: this.#data.getProviderTemplateId(model.provider),
@@ -319,9 +311,9 @@ export class AvailableModels {
 		const ollamaData = this.#getOllamaData();
 		return this.#availableEmbedModels.map((model) =>
 			hydrateEmbeddingModel(model.provider, model.model, {
-				modelsDevData: this.#modelsDevData,
 				openRouterData: this.#openRouterData,
 				ollamaData,
+				templateId: this.#data.getProviderTemplateId(model.provider),
 				similarityThresholdDefault: model.modelConfig.similarityThreshold,
 			}),
 		);

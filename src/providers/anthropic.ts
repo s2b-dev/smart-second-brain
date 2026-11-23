@@ -18,6 +18,7 @@ import type {
 	ChatModelConfig,
 } from "../types/provider/index";
 import { createBufferedTransportedChatAnthropic, createTransportedChatAnthropic } from "./chatProviders";
+import { type AnthropicModelEntry, populateAnthropicCache } from "./anthropicModels";
 import { t } from "../i18n";
 import { anthropicReasoningFields } from "./reasoningEffort";
 import {
@@ -63,14 +64,9 @@ function buildAnthropicHeaders(auth: AuthObject): Record<string, string> {
 // =============================================================================
 
 interface AnthropicModelResponse {
-	data: Array<{
-		id: string;
-		created_at?: string;
-		display_name?: string;
-		type?: string;
-		capabilities?: AnthropicModelCapabilities | null;
-	}>;
+	data?: AnthropicModelEntry[];
 	has_more?: boolean;
+	last_id?: string;
 }
 
 // =============================================================================
@@ -227,12 +223,15 @@ export const anthropicProvider: BaseProviderDefinition = {
 		}
 	},
 
-	discoverModels: (auth: AuthObject) => discoverAnthropicModels(auth, "anthropic"),
+	discoverModels: (auth: AuthObject): Promise<string[]> => discoverAnthropicModels(auth, "anthropic"),
 };
 
+/** Page size for `/v1/models`; the API's maximum, so one request covers the whole list. */
+const MODELS_PAGE_LIMIT = 1000;
+
 /**
- * Lists the models on an Anthropic endpoint and records, per `providerId`, which take a
- * reasoning effort. Extra Anthropic instances (`providers/index.ts`) bind their own id.
+ * List an Anthropic instance's models and cache what `/v1/models` reports about each one
+ * (name, context window, capabilities; see `anthropicModels.ts`) for hydration.
  */
 export async function discoverAnthropicModels(auth: AuthObject, providerId: string): Promise<string[]> {
 	if (!auth.apiKey?.trim()) {
@@ -240,22 +239,35 @@ export async function discoverAnthropicModels(auth: AuthObject, providerId: stri
 	}
 
 	const baseUrl = sanitizeBaseUrl(auth.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-	const response = await requestUrl({
-		url: `${baseUrl}/v1/models`,
-		method: "GET",
-		headers: buildAnthropicHeaders(auth),
-		throw: false,
-	});
+	const entries: AnthropicModelEntry[] = [];
+	let afterId: string | undefined;
+	do {
+		const query = `limit=${MODELS_PAGE_LIMIT}${afterId ? `&after_id=${encodeURIComponent(afterId)}` : ""}`;
+		const response = await requestUrl({
+			url: `${baseUrl}/v1/models?${query}`,
+			method: "GET",
+			headers: buildAnthropicHeaders(auth),
+			throw: false,
+		});
 
-	if (response.status < 200 || response.status >= 300) {
-		throw new Error(`Model discovery failed: ${response.text || `status ${response.status}`}`);
-	}
+		if (response.status < 200 || response.status >= 300) {
+			throw new Error(`Model discovery failed: ${response.text || `status ${response.status}`}`);
+		}
 
-	const payload = response.json as AnthropicModelResponse;
-	const resources = Array.isArray(payload.data) ? payload.data : [];
-	// The capability tree says which models take an effort; proxies that strip it leave
+		const payload = response.json as AnthropicModelResponse;
+		const page = Array.isArray(payload?.data) ? payload.data : [];
+		entries.push(...page);
+		const lastId = payload?.last_id ?? page[page.length - 1]?.id;
+		afterId = payload?.has_more && lastId && lastId !== afterId ? lastId : undefined;
+	} while (afterId);
+
+	// The capability tree also says which models take an effort; proxies that strip it leave
 	// every model unknown, which still offers the setting.
-	setReasoningEffortSupport(providerId, anthropicReasoningEffortSupport(resources));
-
-	return resources.map((r) => r.id).filter((id): id is string => typeof id === "string" && id.trim() !== "");
+	setReasoningEffortSupport(
+		providerId,
+		anthropicReasoningEffortSupport(
+			entries as { id?: string; capabilities?: AnthropicModelCapabilities | null }[],
+		),
+	);
+	return populateAnthropicCache(providerId, entries);
 }

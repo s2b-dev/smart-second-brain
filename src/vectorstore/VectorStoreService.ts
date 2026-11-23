@@ -11,7 +11,6 @@ import { decode, encode } from "@msgpack/msgpack";
 import { Notice, Platform, TFile, getAllTags } from "obsidian";
 import { hydrateEmbeddingModel } from "../lib/modelMetadataNormalizer";
 import type SecondBrainPlugin from "../main";
-import { fetchModelsDevData } from "../providers/modelsDevApi";
 import { getOllamaModelsCache } from "../providers/ollamaModels";
 import { fetchOpenRouterModels } from "../providers/openrouterModels";
 import { getRegistry } from "../providers/registry";
@@ -824,10 +823,7 @@ export class VectorStoreService {
 			return inst.maxInputTokensCache.maxInputTokens;
 		}
 
-		const [modelsDevData, openRouterData] = await Promise.all([
-			fetchModelsDevData(),
-			defaultModel.provider === "openrouter" ? fetchOpenRouterModels() : Promise.resolve(null),
-		]);
+		const openRouterData = defaultModel.provider === "openrouter" ? await fetchOpenRouterModels() : null;
 
 		const ollamaData =
 			defaultModel.provider === "ollama"
@@ -839,9 +835,9 @@ export class VectorStoreService {
 				: null;
 
 		const metadata = hydrateEmbeddingModel(defaultModel.provider, defaultModel.model, {
-			modelsDevData,
 			openRouterData,
 			ollamaData,
+			templateId: getData().getProviderTemplateId(defaultModel.provider),
 		});
 
 		inst.maxInputTokensCache = {

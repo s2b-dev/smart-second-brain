@@ -9,7 +9,7 @@ import type { BaseProviderDefinition, ProviderInstanceMeta, ProviderTemplateId }
 import { createOpenAICompatibleProvider } from "./openai-compatible";
 import { anthropicProvider, discoverAnthropicModels } from "./anthropic";
 import { ollamaProvider } from "./ollama";
-import { openaiProvider } from "./openai";
+import { discoverOpenAIModels, openaiProvider } from "./openai";
 import { openrouterProvider } from "./openrouter";
 import { huggingfaceProvider } from "./huggingface";
 import { openAICodexProvider } from "./openai-codex";
@@ -74,6 +74,7 @@ function createTemplateDefinition(
 				...openaiProvider,
 				id: instanceId,
 				displayName: meta.displayName,
+				discoverModels: (auth) => discoverOpenAIModels(auth, instanceId),
 			};
 		case "openai-compatible":
 			return createOpenAICompatibleProvider({
