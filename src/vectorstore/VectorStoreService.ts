@@ -13,6 +13,7 @@ import { hydrateEmbeddingModel } from "../lib/modelMetadataNormalizer";
 import type SecondBrainPlugin from "../main";
 import { getOllamaModelsCache } from "../providers/ollamaModels";
 import { fetchOpenRouterModels } from "../providers/openrouterModels";
+import { hasCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import { getRegistry } from "../providers/registry";
 import {
 	BULK_CHECKPOINT_INTERVAL,
@@ -824,6 +825,20 @@ export class VectorStoreService {
 		}
 
 		const openRouterData = defaultModel.provider === "openrouter" ? await fetchOpenRouterModels() : null;
+		const templateId = getData().getProviderTemplateId(defaultModel.provider);
+
+		// An OpenAI-compatible endpoint's limits arrive with its model discovery, which may not
+		// have run yet this early in startup. Run it now rather than memoizing the fallback for
+		// the whole session: an embedder below the chunk cap would then reject long notes.
+		if (templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) {
+			try {
+				if (ensureProviderRegistered(getData(), defaultModel.provider)) {
+					await getRegistry().discoverModels(defaultModel.provider);
+				}
+			} catch (error) {
+				Logger.warn("[VectorStore] Embedding model discovery failed; sizing chunks from the fallback:", error);
+			}
+		}
 
 		const ollamaData =
 			defaultModel.provider === "ollama"
@@ -837,7 +852,7 @@ export class VectorStoreService {
 		const metadata = hydrateEmbeddingModel(defaultModel.provider, defaultModel.model, {
 			openRouterData,
 			ollamaData,
-			templateId: getData().getProviderTemplateId(defaultModel.provider),
+			templateId,
 		});
 
 		inst.maxInputTokensCache = {

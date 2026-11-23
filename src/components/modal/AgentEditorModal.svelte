@@ -915,7 +915,7 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
             desc={visionUnreported ? t("agents.editor.image_input_desc_unreported") : t("agents.editor.image_input_desc")}
           >
             <Toggle
-              checked={selectedAgent.chatModel.modelConfig?.supportsVision ?? false}
+              checked={selectedAgent.chatModel.modelConfig?.supportsVision ?? chatModelMetadata?.capabilities.vision ?? false}
               onchange={(checked: boolean) => updateChatSupportsVision(checked)}
             />
           </SettingItem>

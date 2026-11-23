@@ -10,6 +10,7 @@ import { createOpenAICompatibleProvider, MODEL_INFO_TIMEOUT_MS } from "../../src
 import {
 	extractCompatibleModelInfo,
 	getCompatibleModelInfo,
+	hasCompatibleModelInfo,
 	setCompatibleModelInfo,
 } from "../../src/providers/openaiCompatibleModels";
 
@@ -149,8 +150,11 @@ describe("openai-compatible discoverModels", () => {
 			return { status: 404, text: "Not Found", json: null };
 		}) as never);
 		const provider = createOpenAICompatibleProvider({ id: "plain-server", displayName: "Plain" });
+		expect(hasCompatibleModelInfo("plain-server")).toBe(false);
 		expect(await provider.discoverModels?.(auth)).toEqual(["plain"]);
 		expect(windowOf("plain-server", "plain")).toBeUndefined();
+		// Discovery ran and reported nothing: callers waiting on it can stop waiting.
+		expect(hasCompatibleModelInfo("plain-server")).toBe(true);
 	});
 
 	it("lists models without /v1/model/info when that request never answers", async () => {

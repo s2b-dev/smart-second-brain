@@ -136,6 +136,11 @@ export function setCompatibleModelInfo(providerId: string, models: Map<string, C
 	cachedInfo.set(providerId, models);
 }
 
+/** Whether model discovery has run for this provider instance (it may still have reported nothing). */
+export function hasCompatibleModelInfo(providerId: string): boolean {
+	return cachedInfo.has(providerId);
+}
+
 /** What the endpoint reported for a model, if discovery has run and it reported anything. */
 export function getCompatibleModelInfo(providerId: string, modelId: string): CompatibleModelInfo | undefined {
 	return cachedInfo.get(providerId)?.get(modelId);

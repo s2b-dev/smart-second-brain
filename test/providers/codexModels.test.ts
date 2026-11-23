@@ -3,9 +3,10 @@
  * picker reads it.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { hydrateChatModel } from "../../src/lib/modelMetadataNormalizer";
 import { getCodexModelInfo, populateCodexCache } from "../../src/providers/codexModels";
+import { discoverOpenAIModels } from "../../src/providers/openai";
 
 /** Entries trimmed from a real Codex CLI `models_cache.json` (client_version 0.118.0). */
 const CATALOG = [
@@ -76,5 +77,21 @@ describe("hydrateChatModel for a ChatGPT-signed-in OpenAI instance", () => {
 		expect(model.displayName).toBe("gpt-5.4");
 		expect(model.contextWindow).toBeUndefined();
 		expect(model.capabilities.vision).toBeUndefined();
+	});
+});
+
+describe("discoverOpenAIModels with an API key", () => {
+	it("drops the Codex facts an instance kept from an earlier ChatGPT sign-in", async () => {
+		populateCodexCache("switched", CATALOG);
+		const fetchSpy = vi
+			.spyOn(window, "fetch")
+			.mockResolvedValue(new Response(JSON.stringify({ data: [{ id: "gpt-5.4" }] }), { status: 200 }));
+		try {
+			expect(await discoverOpenAIModels({ apiKey: "sk-test" }, "switched")).toEqual(["gpt-5.4"]);
+		} finally {
+			fetchSpy.mockRestore();
+		}
+		expect(getCodexModelInfo("switched", "gpt-5.4")).toBeUndefined();
+		expect(hydrateChatModel("switched", "gpt-5.4", { templateId: "openai" }).contextWindow).toBeUndefined();
 	});
 });

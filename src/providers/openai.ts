@@ -9,7 +9,7 @@
  * Authentication: apiKey (required), baseUrl (optional), headers (optional)
  */
 
-import { populateCodexCache } from "./codexModels";
+import { clearCodexCache, populateCodexCache } from "./codexModels";
 import OpenAILogo from "../components/ui/logos/OpenAILogo.svelte";
 import type {
 	AuthObject,
@@ -368,6 +368,9 @@ export async function discoverOpenAIModels(auth: AuthObject, providerId: string)
 	if (auth.authMode === "codex") {
 		return populateCodexCache(providerId, await fetchCodexModelEntries());
 	}
+	// Signed out of ChatGPT in favour of an API key: the Codex facts no longer describe
+	// what this instance serves.
+	clearCodexCache(providerId);
 
 	if (!auth.apiKey) {
 		throw new Error("OpenAI model discovery requires an API key.");

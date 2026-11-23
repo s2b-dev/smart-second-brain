@@ -85,6 +85,11 @@ export function populateCodexCache(providerId: string, entries: readonly CodexMo
 	return listed.sort((a, b) => a.localeCompare(b));
 }
 
+/** Forget an instance's catalogue, e.g. once it lists models with an API key instead. */
+export function clearCodexCache(providerId: string): void {
+	cachedModels.delete(providerId);
+}
+
 /** What the Codex catalogue reported for a model, if discovery has run for that instance. */
 export function getCodexModelInfo(providerId: string, modelId: string): CodexModelInfo | undefined {
 	return cachedModels.get(providerId)?.get(modelId);
