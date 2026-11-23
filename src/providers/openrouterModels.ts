@@ -8,7 +8,7 @@
  */
 
 import { Logger } from "../utils/logging";
-import { setReasoningEffortSupport } from "./reasoningSupport";
+import { OPENROUTER_SUPPORT_KEY, setReasoningEffortSupport } from "./reasoningSupport";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
@@ -134,7 +134,7 @@ function cacheModels(models: Map<string, OpenRouterModelInfo>): void {
 		if (!Array.isArray(params)) continue;
 		effort.set(id, params.includes("reasoning") || params.includes("reasoning_effort"));
 	}
-	setReasoningEffortSupport("openrouter", effort);
+	setReasoningEffortSupport(OPENROUTER_SUPPORT_KEY, effort);
 }
 
 /**

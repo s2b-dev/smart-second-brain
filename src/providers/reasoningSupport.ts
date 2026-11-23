@@ -8,12 +8,21 @@
  * offers the setting then, and a model that rejects it gets a reset notice
  * (`agent/reasoningEffortErrors.ts`).
  *
- * Module-level per provider instance, read synchronously, like `openaiCompatibleModels.ts`.
+ * Module-level per provider instance (OpenRouter: once for all instances), read synchronously,
+ * like `openaiCompatibleModels.ts`.
  */
 
+import { SvelteMap } from "svelte/reactivity";
 import type { LiteLLMModelInfoEntry } from "./openaiCompatibleModels";
 
-const support = new Map<string, Map<string, boolean>>();
+// Reactive at the provider level, so an open Agent editor updates when discovery lands.
+const support = new SvelteMap<string, Map<string, boolean>>();
+
+/**
+ * Where OpenRouter's support is kept. Its model catalogue is public and the same for every
+ * OpenRouter instance, so it is stored once and looked up by template, not instance id.
+ */
+export const OPENROUTER_SUPPORT_KEY = "openrouter";
 
 /** Replace what one provider instance reported. Models it said nothing about are left out. */
 export function setReasoningEffortSupport(providerId: string, byModel: Map<string, boolean>): void {
@@ -21,8 +30,13 @@ export function setReasoningEffortSupport(providerId: string, byModel: Map<strin
 }
 
 /** `true`/`false` when the provider reported it, `undefined` when it didn't (or discovery hasn't run). */
-export function getReasoningEffortSupport(providerId: string, modelId: string): boolean | undefined {
-	return support.get(providerId)?.get(modelId);
+export function getReasoningEffortSupport(
+	providerId: string,
+	modelId: string,
+	templateId?: string,
+): boolean | undefined {
+	const key = templateId === "openrouter" ? OPENROUTER_SUPPORT_KEY : providerId;
+	return support.get(key)?.get(modelId);
 }
 
 /** The fields of an Anthropic `/v1/models` entry's `capabilities` tree that this reads. */

@@ -173,7 +173,8 @@ const showReasoningEffort = $derived.by(() => {
 	if (!chatModel) return false;
 	const providerDef = getProviderDefinition(chatModel.provider, pluginData.getAllProviderMeta());
 	if (!providerDef?.supportsReasoningEffort) return false;
-	return getReasoningEffortSupport(chatModel.provider, chatModel.model) !== false;
+	const templateId = pluginData.getAllProviderMeta()[chatModel.provider]?.templateId ?? chatModel.provider;
+	return getReasoningEffortSupport(chatModel.provider, chatModel.model, templateId) !== false;
 });
 
 const REASONING_EFFORT_DEFAULT = "default";

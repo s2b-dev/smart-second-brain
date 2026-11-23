@@ -54,5 +54,8 @@ describe("OpenRouter support", () => {
 		expect(getReasoningEffortSupport("openrouter", "openai/gpt-4o")).toBe(false);
 		expect(getReasoningEffortSupport("openrouter", "some/model")).toBe(false);
 		expect(getReasoningEffortSupport("openrouter", "unknown/model")).toBeUndefined();
+		// A second OpenRouter instance reads the same public catalogue by template.
+		expect(getReasoningEffortSupport("openrouter-work", "openai/gpt-4o", "openrouter")).toBe(false);
+		expect(getReasoningEffortSupport("openrouter-work", "openai/gpt-4o")).toBeUndefined();
 	});
 });
