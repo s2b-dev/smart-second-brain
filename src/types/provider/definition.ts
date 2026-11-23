@@ -123,6 +123,12 @@ export interface BaseProviderDefinition {
 	/** Optional browser-based OAuth sign-in capability (rendered by the setup modal). */
 	oauth?: ProviderOAuthCapability;
 
+	/**
+	 * Whether {@link createChatInstance} honours `options.reasoningEffort`. The Agent
+	 * editor only offers the setting for providers that do.
+	 */
+	supportsReasoningEffort?: boolean;
+
 	/** Authentication field definitions for this provider. At least one field must be required. */
 	auth: ProviderAuthConfig;
 

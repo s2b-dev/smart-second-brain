@@ -28,6 +28,7 @@ import {
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
 import { t } from "../i18n";
+import { openRouterReasoningFields } from "./reasoningEffort";
 
 // =============================================================================
 // Constants
@@ -74,6 +75,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 	// =========================================================================
 	id: "openrouter",
 	displayName: "OpenRouter",
+	supportsReasoningEffort: true,
 	logo: OpenRouterLogo,
 
 	// =========================================================================
@@ -135,6 +137,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			configuration: {
 				baseURL: OPENROUTER_BASE_URL,
 			},
+			...openRouterReasoningFields(options),
 		};
 
 		if (options?.temperature !== undefined) {
@@ -154,6 +157,7 @@ export const openrouterProvider: EmbeddingProviderDefinition = {
 			model: modelId,
 			apiKey: auth.apiKey,
 			configuration: { baseURL: OPENROUTER_BASE_URL },
+			...openRouterReasoningFields(options),
 		};
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;

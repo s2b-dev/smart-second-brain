@@ -31,6 +31,7 @@ import {
 	signInWithHuggingFace,
 } from "./huggingfaceOAuth";
 import { t } from "../i18n";
+import { chatCompletionsReasoningFields } from "./reasoningEffort";
 
 const HF_WHOAMI_URL = "https://huggingface.co/api/whoami-v2";
 
@@ -60,6 +61,7 @@ function chatConfig(auth: AuthObject, modelId: string, options?: Partial<ChatMod
 		apiKey: () => resolveToken(auth),
 		temperature: options?.temperature,
 		configuration,
+		...chatCompletionsReasoningFields(options),
 	};
 }
 
@@ -87,6 +89,7 @@ async function validatePastedToken(token: string): Promise<AuthValidationResult>
 export const huggingfaceProvider: BaseProviderDefinition = {
 	id: "huggingface",
 	displayName: "Hugging Face",
+	supportsReasoningEffort: true,
 	logo: HuggingFaceLogo,
 
 	setupInstructions: {

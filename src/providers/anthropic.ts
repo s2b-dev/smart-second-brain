@@ -19,6 +19,7 @@ import type {
 } from "../types/provider/index";
 import { createBufferedTransportedChatAnthropic, createTransportedChatAnthropic } from "./chatProviders";
 import { t } from "../i18n";
+import { anthropicReasoningFields } from "./reasoningEffort";
 
 // =============================================================================
 // Constants
@@ -81,6 +82,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 	// =========================================================================
 	id: "anthropic",
 	displayName: "Anthropic",
+	supportsReasoningEffort: true,
 	logo: AnthropicLogo,
 
 	// =========================================================================
@@ -138,6 +140,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 				baseURL: resolvedBaseUrl,
 				defaultHeaders: auth.headers,
 			},
+			...anthropicReasoningFields(options),
 		};
 
 		if (options?.temperature !== undefined) {
@@ -159,6 +162,7 @@ export const anthropicProvider: BaseProviderDefinition = {
 			model: modelId,
 			apiKey: auth.apiKey,
 			clientOptions: { baseURL: resolvedBaseUrl, defaultHeaders: auth.headers },
+			...anthropicReasoningFields(options),
 		};
 		if (options?.temperature !== undefined) {
 			config.temperature = options.temperature;

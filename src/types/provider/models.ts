@@ -5,6 +5,15 @@
  */
 
 /**
+ * How hard a reasoning model thinks before answering. One scale for every provider;
+ * each provider translates it to its own parameter (OpenAI `reasoning.effort`,
+ * Anthropic `output_config.effort` with adaptive thinking, OpenRouter `reasoning`,
+ * OpenAI-compatible `reasoning_effort`). See `providers/reasoningEffort.ts`.
+ */
+export const REASONING_EFFORTS = ["low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
  * Configuration for a chat model.
  * Stored in data.json under provider.chatModels[modelId]
  *
@@ -32,6 +41,13 @@ export interface ChatModelConfig {
 	 * Used at runtime to determine if images can be sent to the model.
 	 */
 	supportsVision?: boolean;
+
+	/**
+	 * Reasoning effort to request. Unset means "send nothing": the provider's own
+	 * default applies, which is the only safe choice for models that reject the
+	 * parameter.
+	 */
+	reasoningEffort?: ReasoningEffort;
 }
 
 /**
