@@ -265,9 +265,7 @@ export async function discoverAnthropicModels(auth: AuthObject, providerId: stri
 	// every model unknown, which still offers the setting.
 	setReasoningEffortSupport(
 		providerId,
-		anthropicReasoningEffortSupport(
-			entries as { id?: string; capabilities?: AnthropicModelCapabilities | null }[],
-		),
+		anthropicReasoningEffortSupport(entries as { id?: string; capabilities?: AnthropicModelCapabilities | null }[]),
 	);
 	return populateAnthropicCache(providerId, entries);
 }
