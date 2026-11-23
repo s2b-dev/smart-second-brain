@@ -163,6 +163,13 @@ const DEFAULT_EMBED_MAX_INPUT_TOKENS = 8191;
 const MODIFY_DEBOUNCE_MS = 5_000;
 
 /**
+ * How long chunk sizing waits for an OpenAI-compatible endpoint's model discovery before
+ * using the fallback budget. Discovery hits `/v1/models`, which can stall while the
+ * embeddings route works; indexing must not stall with it.
+ */
+const EMBED_LIMITS_DISCOVERY_WAIT_MS = 5_000;
+
+/**
  * Chars per token for sizing chunks against a model's input cap.
  *
  * Four is the usual English-prose figure, but a chunk budget has to hold for
@@ -451,6 +458,9 @@ export class VectorStoreService {
 	private readonly initializingInstances = new Map<string, Promise<IndexInstance>>();
 	private readonly progressListeners = new Map<string, Set<(progress: IndexingProgress) => void>>();
 	private readonly modifyTimers = new Map<string, number>();
+	/** OpenAI-compatible providers whose model discovery chunk sizing started / saw finish. */
+	private readonly startedEmbedLimits = new Set<string>();
+	private readonly settledEmbedLimits = new Set<string>();
 	private isInitialized = false;
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-embedding-bulk-attempts`, vault-scoped). */
@@ -828,16 +838,11 @@ export class VectorStoreService {
 		const templateId = getData().getProviderTemplateId(defaultModel.provider);
 
 		// An OpenAI-compatible endpoint's limits arrive with its model discovery, which may not
-		// have run yet this early in startup. Run it now rather than memoizing the fallback for
-		// the whole session: an embedder below the chunk cap would then reject long notes.
+		// have run yet this early in startup. Start it (once) and wait a bounded time; until it
+		// lands, size from the fallback without memoizing it, so the real limit applies once known.
+		let limitsPending = false;
 		if (templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) {
-			try {
-				if (ensureProviderRegistered(getData(), defaultModel.provider)) {
-					await getRegistry().discoverModels(defaultModel.provider);
-				}
-			} catch (error) {
-				Logger.warn("[VectorStore] Embedding model discovery failed; sizing chunks from the fallback:", error);
-			}
+			limitsPending = await this.awaitEmbedLimitsDiscovery(defaultModel.provider);
 		}
 
 		const ollamaData =
@@ -855,13 +860,47 @@ export class VectorStoreService {
 			templateId,
 		});
 
-		inst.maxInputTokensCache = {
-			provider: defaultModel.provider,
-			model: defaultModel.model,
-			maxInputTokens: metadata.maxInputTokens,
-		};
+		if (!limitsPending) {
+			inst.maxInputTokensCache = {
+				provider: defaultModel.provider,
+				model: defaultModel.model,
+				maxInputTokens: metadata.maxInputTokens,
+			};
+		}
 
 		return metadata.maxInputTokens;
+	}
+
+	/**
+	 * Run an OpenAI-compatible provider's model discovery for its embedding limits, waiting at
+	 * most `EMBED_LIMITS_DISCOVERY_WAIT_MS`. Only the call that starts discovery waits; later
+	 * ones return at once while it is still out. Returns true while it is still out, so the
+	 * caller knows its fallback is provisional. A failed discovery counts as settled: the
+	 * fallback is then all there is, and retrying on every batch would only repeat the failure.
+	 */
+	private async awaitEmbedLimitsDiscovery(providerId: string): Promise<boolean> {
+		if (this.startedEmbedLimits.has(providerId)) return !this.settledEmbedLimits.has(providerId);
+		this.startedEmbedLimits.add(providerId);
+
+		const discovery = (async () => {
+			try {
+				if (ensureProviderRegistered(getData(), providerId)) {
+					await getRegistry().discoverModels(providerId);
+				}
+			} catch (error) {
+				Logger.warn("[VectorStore] Embedding model discovery failed; sizing chunks from the fallback:", error);
+			} finally {
+				this.settledEmbedLimits.add(providerId);
+			}
+		})();
+
+		let timer: number | undefined;
+		const timedOut = new Promise<void>((resolve) => {
+			timer = window.setTimeout(resolve, EMBED_LIMITS_DISCOVERY_WAIT_MS);
+		});
+		await Promise.race([discovery, timedOut]);
+		window.clearTimeout(timer);
+		return !this.settledEmbedLimits.has(providerId);
 	}
 
 	private async getMaxEmbeddingContentLength(

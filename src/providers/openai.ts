@@ -354,7 +354,9 @@ export const openaiProvider: EmbeddingProviderDefinition = {
 			return [];
 		}
 
-		const allModels = await discoverOpenAIModels(auth, "openai");
+		// Lists ids only, never touching a Codex cache: embedding discovery has no instance id,
+		// so clearing here would wipe whichever instance it guessed at.
+		const allModels = await listOpenAIApiModels(auth);
 		return allModels.filter((model) => model.toLowerCase().includes("embed"));
 	},
 };
@@ -371,7 +373,11 @@ export async function discoverOpenAIModels(auth: AuthObject, providerId: string)
 	// Signed out of ChatGPT in favour of an API key: the Codex facts no longer describe
 	// what this instance serves.
 	clearCodexCache(providerId);
+	return listOpenAIApiModels(auth);
+}
 
+/** The API's `/v1/models` listing with an API key: ids only. */
+async function listOpenAIApiModels(auth: AuthObject): Promise<string[]> {
 	if (!auth.apiKey) {
 		throw new Error("OpenAI model discovery requires an API key.");
 	}

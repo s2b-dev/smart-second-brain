@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { hydrateChatModel } from "../../src/lib/modelMetadataNormalizer";
 import { getCodexModelInfo, populateCodexCache } from "../../src/providers/codexModels";
-import { discoverOpenAIModels } from "../../src/providers/openai";
+import { discoverOpenAIModels, openaiProvider } from "../../src/providers/openai";
 
 /** Entries trimmed from a real Codex CLI `models_cache.json` (client_version 0.118.0). */
 const CATALOG = [
@@ -93,5 +93,24 @@ describe("discoverOpenAIModels with an API key", () => {
 		}
 		expect(getCodexModelInfo("switched", "gpt-5.4")).toBeUndefined();
 		expect(hydrateChatModel("switched", "gpt-5.4", { templateId: "openai" }).contextWindow).toBeUndefined();
+	});
+});
+
+describe("OpenAI embedding discovery", () => {
+	it("leaves every instance's Codex catalogue alone", async () => {
+		populateCodexCache("openai", CATALOG);
+		const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue(
+			new Response(JSON.stringify({ data: [{ id: "text-embedding-3-small" }, { id: "gpt-5.4" }] }), {
+				status: 200,
+			}),
+		);
+		try {
+			expect(await openaiProvider.discoverEmbeddingModels?.({ apiKey: "sk-test" })).toEqual([
+				"text-embedding-3-small",
+			]);
+		} finally {
+			fetchSpy.mockRestore();
+		}
+		expect(getCodexModelInfo("openai", "gpt-5.4")).toBeDefined();
 	});
 });
