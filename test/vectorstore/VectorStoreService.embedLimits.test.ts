@@ -30,6 +30,7 @@ import { VectorStoreService } from "../../src/vectorstore/VectorStoreService";
 
 interface Internals {
 	getEmbeddingMaxInputTokens(inst: { maxInputTokensCache: unknown }, model: unknown): Promise<number>;
+	isEmbedLimitProvisional(providerId: string): boolean;
 }
 
 const MODEL = { provider: "gateway", model: "embed" };
@@ -79,11 +80,14 @@ describe("embedding limits from OpenAI-compatible discovery", () => {
 		expect(inst.maxInputTokensCache).toBeNull();
 		expect(await service.getEmbeddingMaxInputTokens(inst, MODEL)).toBe(8191);
 		expect(discoverModels).toHaveBeenCalledTimes(1);
+		// Rejections of notes chunked now are not remembered as the note's fault.
+		expect(service.isEmbedLimitProvisional("gateway")).toBe(true);
 
 		finish();
 		await vi.advanceTimersByTimeAsync(0);
 		expect(await service.getEmbeddingMaxInputTokens(inst, MODEL)).toBe(512);
 		expect(discoverModels).toHaveBeenCalledTimes(1);
+		expect(service.isEmbedLimitProvisional("gateway")).toBe(false);
 	});
 
 	it("memoizes the fallback after a failed discovery instead of retrying every batch", async () => {

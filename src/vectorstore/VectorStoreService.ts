@@ -871,6 +871,11 @@ export class VectorStoreService {
 		return metadata.maxInputTokens;
 	}
 
+	/** True while chunk sizing for this provider runs on a fallback awaiting its discovery. */
+	private isEmbedLimitProvisional(providerId: string): boolean {
+		return this.startedEmbedLimits.has(providerId) && !this.settledEmbedLimits.has(providerId);
+	}
+
 	/**
 	 * Run an OpenAI-compatible provider's model discovery for its embedding limits, waiting at
 	 * most `EMBED_LIMITS_DISCOVERY_WAIT_MS`. Only the call that starts discovery waits; later
@@ -879,7 +884,7 @@ export class VectorStoreService {
 	 * fallback is then all there is, and retrying on every batch would only repeat the failure.
 	 */
 	private async awaitEmbedLimitsDiscovery(providerId: string): Promise<boolean> {
-		if (this.startedEmbedLimits.has(providerId)) return !this.settledEmbedLimits.has(providerId);
+		if (this.startedEmbedLimits.has(providerId)) return this.isEmbedLimitProvisional(providerId);
 		this.startedEmbedLimits.add(providerId);
 
 		const discovery = (async () => {
@@ -900,7 +905,7 @@ export class VectorStoreService {
 		});
 		await Promise.race([discovery, timedOut]);
 		window.clearTimeout(timer);
-		return !this.settledEmbedLimits.has(providerId);
+		return this.isEmbedLimitProvisional(providerId);
 	}
 
 	private async getMaxEmbeddingContentLength(
@@ -1819,7 +1824,12 @@ export class VectorStoreService {
 		// Lowered for the rest of the run when a batch times out and has to be
 		// split (see `embedBatch`), so later batches do not repeat the timeout.
 		let batchSize = this.getBatchSize(inst.indexId, model.provider);
-		const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+		// Re-read per note: an OpenAI-compatible endpoint's reported limit can arrive mid-run
+		// (see `awaitEmbedLimitsDiscovery`), and later notes should be chunked to it.
+		let maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+		// Notes chunked while that limit was still a fallback: a rejection may only mean the
+		// fallback was too big for the model, so it is not remembered and the next run retries.
+		const provisionallyChunked = new Set<string>();
 		const ordered = orderForBulkIndexing(files);
 		// The extraction tail (PDFs, last in `ordered`) gets its own progress phase.
 		const extractionPaths = new Set(ordered.filter(needsExtraction).map((file) => file.path));
@@ -1924,7 +1934,9 @@ export class VectorStoreService {
 			failedPaths.add(entry.file.path);
 			pendingNotes.delete(entry.file.path);
 			noteSkipped(entry.file.path, reason);
-			if (remember) await this.rejectNote(inst, entry.file.path, entry.mtime);
+			if (remember && !provisionallyChunked.has(entry.file.path)) {
+				await this.rejectNote(inst, entry.file.path, entry.mtime);
+			}
 		};
 
 		// Consecutive transport-level failures. Reset on any success, so a flaky
@@ -2126,6 +2138,8 @@ export class VectorStoreService {
 					emptiesUnsaved = true;
 					continue;
 				}
+				maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+				if (this.isEmbedLimitProvisional(model.provider)) provisionallyChunked.add(file.path);
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				pendingNotes.set(file.path, { mtime, expected: chunks.length, vectors: new Map() });
 				for (const chunk of chunks) {
@@ -2306,7 +2320,10 @@ export class VectorStoreService {
 			new Notice(t("plugin.indexing.embed_failed", { file: file.basename, error: reason }));
 			// Only a verdict on this document is remembered; a dead or misconfigured
 			// provider is not the note's fault, and the next validation retries it.
-			if (isDocumentRejectionError(error)) await this.rejectNote(inst, file.path, mtime);
+			// A rejection under a fallback chunk size may only mean the fallback was too big.
+			if (isDocumentRejectionError(error) && !this.isEmbedLimitProvisional(model.provider)) {
+				await this.rejectNote(inst, file.path, mtime);
+			}
 			return;
 		}
 		const vectors: Float32Array[] = [];
