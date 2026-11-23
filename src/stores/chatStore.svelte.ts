@@ -20,6 +20,7 @@ import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
 import { extractErrorMessage } from "../utils/errorMessage";
+import { offerReasoningEffortReset } from "../agent/reasoningEffortErrors";
 import { isDefaultChatTitle, needsChatTitle } from "../utils/chatTitle";
 import {
 	MANUAL_SUMMARIZATION_PROMPT,
@@ -871,6 +872,7 @@ export class ChatSession {
 				pair.assistantMessage.state = AssistantState.error;
 				pair.assistantMessage.errorCode = extractErrorMessage(_err);
 				Logger.error("[ChatSession] Run failed:", _err);
+				offerReasoningEffortReset(this.selectedAgentId, pair.assistantMessage.errorCode);
 				await this.markPlaceholderFailed();
 			}
 		} finally {

@@ -28,6 +28,7 @@ import {
 } from "./openaiCompatibleModels";
 import { t } from "../i18n";
 import { chatCompletionsReasoningFields } from "./reasoningEffort";
+import { liteLLMReasoningEffortSupport, setReasoningEffortSupport } from "./reasoningSupport";
 
 function sanitizeBaseUrl(url: string): string {
 	return url.replace(/\/+$/, "").replace(/\/v1$/i, "");
@@ -243,6 +244,7 @@ export function createOpenAICompatibleProvider(
 				fetchLiteLLMModelInfo(auth, defaultBaseUrl),
 			]);
 			setCompatibleContextWindows(config.id, extractContextWindows(entries, liteLLMInfo));
+			setReasoningEffortSupport(config.id, liteLLMReasoningEffortSupport(liteLLMInfo));
 			return entries.filter((r) => r.id && !isEmbeddingEntry(r)).map((r) => r.id as string);
 		},
 	};

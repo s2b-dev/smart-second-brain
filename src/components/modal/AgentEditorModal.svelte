@@ -49,6 +49,7 @@ import {
 	type SkillDisplayInfo,
 } from "../../types/plugin";
 import { getProviderDefinition } from "../../providers/index";
+import { getReasoningEffortSupport } from "../../providers/reasoningSupport";
 import { REASONING_EFFORTS, type ReasoningEffort } from "../../types/provider/models";
 import { buildPersistedChatModel } from "../../utils/persistedChatModel";
 import { getData } from "../../stores/dataStore.svelte";
@@ -162,16 +163,17 @@ const currentTitleModelDisplay = $derived.by(() => {
 	};
 });
 
-// Offered only where it can do something: the provider translates the setting (Ollama
-// doesn't yet), and the catalogue doesn't say the model can't reason. Unknown capability
-// still shows the row, since most catalogues leave `reasoning` unset.
+// Offered unless the provider itself says the model doesn't take an effort (Anthropic's
+// capability tree, OpenRouter's supported parameters, LiteLLM's model info; see
+// providers/reasoningSupport.ts), or the plugin doesn't translate it for this provider
+// (Ollama). A provider that reports nothing leaves it offered: a model that then rejects
+// the effort gets a notice with a reset (agent/reasoningEffortErrors.ts).
 const showReasoningEffort = $derived.by(() => {
 	const chatModel = selectedAgent?.chatModel;
 	if (!chatModel) return false;
 	const providerDef = getProviderDefinition(chatModel.provider, pluginData.getAllProviderMeta());
 	if (!providerDef?.supportsReasoningEffort) return false;
-	const hydrated = models.hydratedChatModelsByKey.get(`${chatModel.provider}:${chatModel.model}`);
-	return hydrated?.capabilities.reasoning !== false;
+	return getReasoningEffortSupport(chatModel.provider, chatModel.model) !== false;
 });
 
 const REASONING_EFFORT_DEFAULT = "default";

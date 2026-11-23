@@ -8,6 +8,7 @@
  */
 
 import { Logger } from "../utils/logging";
+import { setReasoningEffortSupport } from "./reasoningSupport";
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
@@ -117,10 +118,23 @@ export function populateOpenRouterCache(models: OpenRouterModelInfo[]): void {
 			modelMap.set(model.id, model);
 		}
 	}
-	cachedResponse = {
-		models: modelMap,
-		timestamp: Date.now(),
-	};
+	cacheModels(modelMap);
+}
+
+/**
+ * Store a fresh model map and record which models take a reasoning effort. OpenRouter
+ * lists the request parameters each model accepts; `include_reasoning` alone only returns
+ * reasoning text and says nothing about effort, so it doesn't count.
+ */
+function cacheModels(models: Map<string, OpenRouterModelInfo>): void {
+	cachedResponse = { models, timestamp: Date.now() };
+	const effort = new Map<string, boolean>();
+	for (const [id, info] of models) {
+		const params = info.supported_parameters;
+		if (!Array.isArray(params)) continue;
+		effort.set(id, params.includes("reasoning") || params.includes("reasoning_effort"));
+	}
+	setReasoningEffortSupport("openrouter", effort);
 }
 
 /**
@@ -158,11 +172,7 @@ export async function fetchOpenRouterModels(): Promise<Map<string, OpenRouterMod
 			}
 		}
 
-		// Cache the response
-		cachedResponse = {
-			models,
-			timestamp: Date.now(),
-		};
+		cacheModels(models);
 
 		return models;
 	} catch (error) {

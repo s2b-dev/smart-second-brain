@@ -27,7 +27,7 @@ export interface CompatibleModelEntry {
 /** One deployment in LiteLLM's `/v1/model/info` response (only the fields we read). */
 export interface LiteLLMModelInfoEntry {
 	model_name?: string;
-	model_info?: { max_input_tokens?: unknown } | null;
+	model_info?: { max_input_tokens?: unknown; supports_reasoning?: unknown } | null;
 }
 
 const cachedWindows = new Map<string, Map<string, number>>();
