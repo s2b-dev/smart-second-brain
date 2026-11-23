@@ -1666,6 +1666,9 @@ export class AgentManager {
 				id,
 				systemPrompt: promptFiles?.getAgentPrompt(id) ?? null,
 				chatModel: sub.chatModel ? `${sub.chatModel.provider}:${sub.chatModel.model}` : null,
+				// The child's model instance is built into the parent's runnable with its
+				// effort baked in, so editing only the child's effort must rebuild the parent.
+				reasoningEffort: sub.chatModel?.modelConfig?.reasoningEffort ?? null,
 				toolsConfig: sub.toolsConfig,
 				pluginExecTools: sub.pluginExecTools ?? null,
 			};
