@@ -5,7 +5,12 @@
  * persisted provider instances created from those templates.
  */
 
-import type { BaseProviderDefinition, ProviderInstanceMeta, ProviderTemplateId } from "../types/provider/index";
+import type {
+	BaseProviderDefinition,
+	EmbeddingProviderDefinition,
+	ProviderInstanceMeta,
+	ProviderTemplateId,
+} from "../types/provider/index";
 import { createOpenAICompatibleProvider } from "./openai-compatible";
 import { anthropicProvider, discoverAnthropicModels } from "./anthropic";
 import { ollamaProvider } from "./ollama";
@@ -13,6 +18,7 @@ import { discoverOpenAIModels, openaiProvider } from "./openai";
 import { openrouterProvider } from "./openrouter";
 import { huggingfaceProvider } from "./huggingface";
 import { createGoogleProvider } from "./google";
+import { discoverMistralEmbeddingModels, discoverMistralModels, mistralProvider } from "./mistral";
 import { openAICodexProvider } from "./openai-codex";
 import { createOmlxProvider } from "./omlx";
 
@@ -62,6 +68,11 @@ const PROVIDER_TEMPLATES: readonly ProviderTemplateDefinition[] = [
 		id: "google",
 		displayName: "Google Gemini",
 		description: t("plugin.providers.templates.google"),
+	},
+	{
+		id: "mistral",
+		displayName: "Mistral",
+		description: t("plugin.providers.templates.mistral"),
 	},
 ] as const;
 
@@ -119,6 +130,16 @@ function createTemplateDefinition(
 			};
 		case "google":
 			return createGoogleProvider(instanceId, meta.displayName);
+		case "mistral": {
+			const mistral: EmbeddingProviderDefinition = {
+				...mistralProvider,
+				id: instanceId,
+				displayName: meta.displayName,
+				discoverModels: (auth) => discoverMistralModels(auth, instanceId),
+				discoverEmbeddingModels: (auth) => discoverMistralEmbeddingModels(auth, instanceId),
+			};
+			return mistral;
+		}
 		default:
 			return undefined;
 	}

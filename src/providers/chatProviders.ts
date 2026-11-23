@@ -16,6 +16,7 @@ import { isConnectionRefusedError, isRequestTimeoutError } from "../lib/transpor
 import { AsyncCaller } from "@langchain/core/utils/async_caller";
 import { Logger } from "../utils/logging";
 import { ChatOpenAIResponses, type ChatOpenAIResponsesConfig } from "./langchainOpenAIResponses";
+import { createMistralFetch } from "./mistralTransport";
 
 function parseToolArgs(args: unknown): Record<string, unknown> {
 	if (typeof args === "string") {
@@ -470,5 +471,91 @@ export function createTransportedOllamaEmbeddings(
 		onFailedAttempt: embedFailedAttempt,
 		...baseConfig,
 		fetch: baseConfig.fetch ?? createObsidianFetch(),
+	});
+}
+
+/**
+ * `ChatOpenAI` against Mistral's OpenAI-compatible API, with requests and responses
+ * adapted to it (see `mistralTransport.ts`). `streamUsage: false` keeps
+ * `stream_options` out of the request; Mistral reports usage on the last chunk anyway.
+ */
+export function createTransportedChatMistral(
+	providerId: string,
+	config: ConstructorParameters<typeof ChatOpenAI>[0],
+): ChatOpenAI {
+	return createTransportedChatOpenAI(providerId, {
+		...config,
+		streamUsage: false,
+		configuration: {
+			...(config?.configuration ?? {}),
+			fetch: createMistralFetch(createAiProviderFetch(providerId)),
+		},
+	});
+}
+
+/** Subagent variant of {@link createTransportedChatMistral}: buffered transport + non-streaming. */
+export function createBufferedTransportedChatMistral(
+	providerId: string,
+	config: ConstructorParameters<typeof ChatOpenAI>[0],
+): ChatOpenAI {
+	return createBufferedTransportedChatOpenAI(providerId, {
+		...config,
+		streamUsage: false,
+		configuration: {
+			...(config?.configuration ?? {}),
+			fetch: createMistralFetch(createBufferedAiProviderFetch(providerId)),
+		},
+	});
+}
+
+/**
+ * Characters of text per Mistral embedding request. Mistral caps a request at about
+ * 16k tokens *in total* and answers anything larger with 400 "Too many tokens overall,
+ * split into more batches", which the indexer can't recover from by itself (it splits
+ * only on timeouts). 24k characters stays under the cap down to 1.5 characters per
+ * token, which covers code and non-Latin scripts, while a batch of short chunks still
+ * goes out in one request.
+ */
+export const MISTRAL_EMBED_REQUEST_CHARS = 24_000;
+
+/** Splits `texts` into consecutive groups of at most `maxCount` texts and `maxChars` characters (never empty). */
+export function packBySize(texts: string[], maxCount: number, maxChars: number): string[][] {
+	const groups: string[][] = [];
+	let start = 0;
+	while (start < texts.length) {
+		let end = start;
+		let chars = 0;
+		while (end < texts.length && end - start < maxCount) {
+			chars += texts[end].length;
+			if (end > start && chars > maxChars) break;
+			end++;
+		}
+		groups.push(texts.slice(start, end));
+		start = end;
+	}
+	return groups;
+}
+
+/** `OpenAIEmbeddings` that packs Mistral requests by size, not only by count. */
+class SizeBoundMistralEmbeddings extends OpenAIEmbeddings {
+	override async embedDocuments(texts: string[]): Promise<number[][]> {
+		const vectors: number[][] = [];
+		for (const group of packBySize(texts, this.batchSize, MISTRAL_EMBED_REQUEST_CHARS)) {
+			vectors.push(...(await super.embedDocuments(group)));
+		}
+		return vectors;
+	}
+}
+
+export function createTransportedMistralEmbeddings(
+	config: ConstructorParameters<typeof OpenAIEmbeddings>[0],
+): OpenAIEmbeddings {
+	const baseConfig = config ?? {};
+	return new SizeBoundMistralEmbeddings({
+		onFailedAttempt: embedFailedAttempt,
+		// The OpenAI SDK asks for base64 by default; Mistral answers floats when asked.
+		encodingFormat: "float",
+		...baseConfig,
+		configuration: { ...(baseConfig.configuration ?? {}), fetch: createObsidianFetch() },
 	});
 }

@@ -196,6 +196,10 @@ export function extractVendor(
 		return "openai";
 	}
 
+	if (model.templateId === "mistral") {
+		return "mistralai";
+	}
+
 	if (model.templateId === "anthropic" || model.provider === "anthropic") {
 		return "anthropic";
 	}

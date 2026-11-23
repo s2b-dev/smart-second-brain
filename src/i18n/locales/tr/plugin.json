@@ -111,7 +111,8 @@
 			"omlx": "oMLX'in OpenAI uyumlu sunucusu aracılığıyla Mac'inizdeki yerel MLX modelleri.",
 			"openrouter": "OpenRouter hesabı ve model kataloğu.",
 			"huggingface": "Hugging Face çıkarım sağlayıcılarından açık modeller.",
-			"google": "Google AI Studio API anahtarıyla Gemini modelleri."
+			"google": "Google AI Studio API anahtarıyla Gemini modelleri.",
+			"mistral": "La Plateforme üzerinden Mistral modelleri, AB'de barındırılır."
 		},
 		"fields": {
 			"api_key": "API anahtarı",
@@ -164,6 +165,10 @@
 			"link": "Google AI Studio API anahtarları",
 			"api_key_desc": "Google AI Studio'dan aldığınız Gemini API anahtarı",
 			"base_url_desc": "Özel Gemini API uç noktası (Google'ınki için boş bırakın)"
+		},
+		"mistral": {
+			"link": "Mistral API anahtarları",
+			"api_key_desc": "console.mistral.ai adresinden aldığınız Mistral API anahtarı"
 		}
 	},
 	"indexing": {
