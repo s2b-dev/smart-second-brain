@@ -2291,6 +2291,9 @@ export class VectorStoreService {
 		// A read that fails is a local, usually transient matter; the next
 		// validation retries the note. Only the provider's verdict is remembered.
 		let chunks: ReturnType<typeof chunkText>;
+		// Whether the chunk size below is still a fallback, taken when chunking: discovery can
+		// land before the provider answers, and that answer is about these chunks.
+		let chunkedProvisionally = false;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
 			if (hasNoEmbeddableText(file, content)) {
@@ -2298,6 +2301,7 @@ export class VectorStoreService {
 				return;
 			}
 			const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+			chunkedProvisionally = this.isEmbedLimitProvisional(model.provider);
 			chunks = chunkText(content, file.basename, maxContentLength);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to read ${file.path} (${inst.indexId}):`, error);
@@ -2321,7 +2325,7 @@ export class VectorStoreService {
 			// Only a verdict on this document is remembered; a dead or misconfigured
 			// provider is not the note's fault, and the next validation retries it.
 			// A rejection under a fallback chunk size may only mean the fallback was too big.
-			if (isDocumentRejectionError(error) && !this.isEmbedLimitProvisional(model.provider)) {
+			if (isDocumentRejectionError(error) && !chunkedProvisionally) {
 				await this.rejectNote(inst, file.path, mtime);
 			}
 			return;
