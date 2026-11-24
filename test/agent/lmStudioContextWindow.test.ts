@@ -21,7 +21,9 @@ vi.mock("../../src/stores/dataStore.svelte", () => ({
 	}),
 }));
 
-const { clampLmStudioContextWindows } = await import("../../src/agent/lmStudioContextWindow");
+const { clampLmStudioContextWindows, LMSTUDIO_CHECK_TIMEOUT_MS } = await import(
+	"../../src/agent/lmStudioContextWindow"
+);
 
 /** `/api/v1/models` listing one LLM, loaded at `loadedAt` tokens (or not loaded). */
 function serveModel(loadedAt: number | null): void {
@@ -114,6 +116,29 @@ describe("clampLmStudioContextWindows", () => {
 		const agent = await running;
 		expect(updateAgent).not.toHaveBeenCalled();
 		expect(agent.chatModel).toEqual(picked);
+	});
+
+	it("goes ahead without the check when LM Studio stalls", async () => {
+		vi.useFakeTimers();
+		try {
+			vi.mocked(requestUrl).mockImplementation((() => new Promise(() => {})) as never);
+			const running = clampLmStudioContextWindows(agentWith("lm-studio", 131072));
+			await vi.advanceTimersByTimeAsync(LMSTUDIO_CHECK_TIMEOUT_MS);
+			const agent = await running;
+			expect(agent.chatModel?.modelConfig?.contextWindow).toBe(131072);
+			expect(updateAgent).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("stops waiting as soon as the turn is cancelled", async () => {
+		vi.mocked(requestUrl).mockImplementation((() => new Promise(() => {})) as never);
+		const controller = new AbortController();
+		const running = clampLmStudioContextWindows(agentWith("lm-studio", 131072), controller.signal);
+		controller.abort();
+		await expect(running).resolves.toMatchObject({ id: "a1" });
+		expect(updateAgent).not.toHaveBeenCalled();
 	});
 
 	it("never queries for other providers", async () => {

@@ -1758,7 +1758,10 @@ export class AgentManager {
 		this.agent?.invalidateRunnable(agentId);
 	}
 
-	private async prepareAgentForStream(agentId: string): Promise<{
+	private async prepareAgentForStream(
+		agentId: string,
+		signal?: AbortSignal,
+	): Promise<{
 		agent: Agent;
 		resolved: ResolvedRun;
 		chatModel: ChatModel;
@@ -1780,7 +1783,7 @@ export class AgentManager {
 			if (!found) throw new Error(`Agent "${agentId}" no longer exists — please select a different agent.`);
 			selectedAgent = found;
 		}
-		selectedAgent = await clampLmStudioContextWindows(selectedAgent);
+		selectedAgent = await clampLmStudioContextWindows(selectedAgent, signal);
 		const chatModel = selectedAgent.chatModel;
 		if (!chatModel) throw new Error("No chat model configured");
 		const summarizationModel = resolveSummarizationChatModel(chatModel, selectedAgent.summarizationModel);
@@ -1852,7 +1855,10 @@ export class AgentManager {
 		reviewStatus?: ReviewStatusRef,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.streamTokens({
@@ -1888,7 +1894,10 @@ export class AgentManager {
 		attachments?: ChatAttachment[],
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.editFromCheckpoint({
@@ -1918,7 +1927,10 @@ export class AgentManager {
 		signal?: AbortSignal,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.regenerateFromCheckpoint({
@@ -1947,7 +1959,10 @@ export class AgentManager {
 		signal?: AbortSignal,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.resumeFromInterrupt({

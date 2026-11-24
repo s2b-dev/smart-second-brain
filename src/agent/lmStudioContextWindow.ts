@@ -2,6 +2,25 @@ import { fetchLoadedContextLength } from "../providers/lmstudio";
 import { getData } from "../stores/dataStore.svelte";
 import type { AgentConfig } from "../types/plugin";
 
+/** How long a turn waits for LM Studio to report a model's loaded length before going ahead. */
+export const LMSTUDIO_CHECK_TIMEOUT_MS = 2_000;
+
+/** The query's result, or undefined if it fails, outlasts the deadline, or the turn is cancelled. */
+function withinDeadline<T>(query: Promise<T>, signal?: AbortSignal): Promise<T | undefined> {
+	if (signal?.aborted) return Promise.resolve(undefined);
+	return new Promise((resolve) => {
+		const finish = (value: T | undefined) => {
+			window.clearTimeout(timer);
+			signal?.removeEventListener("abort", onAbort);
+			resolve(value);
+		};
+		const onAbort = () => finish(undefined);
+		const timer = window.setTimeout(onAbort, LMSTUDIO_CHECK_TIMEOUT_MS);
+		signal?.addEventListener("abort", onAbort, { once: true });
+		query.then(finish, () => finish(undefined));
+	});
+}
+
 /**
  * Lowers an LM Studio model's saved context window to the length LM Studio has it loaded with.
  *
@@ -12,11 +31,15 @@ import type { AgentConfig } from "../types/plugin";
  * smaller saved value is the user's own choice and always fits. Unreachable server or a model that
  * isn't loaded leaves the agent as it is; the run then fails or JIT-loads as it would have.
  *
+ * The check is optional, so it never holds a turn up: each query gets
+ * `LMSTUDIO_CHECK_TIMEOUT_MS` and stops at once when the turn is cancelled, and either way the
+ * agent is left as it is.
+ *
  * The server is queried before anything is written, and a field is written only if it still holds
  * the model and window that were queried: the user may pick another model or edit the window in
  * the meantime, and that choice wins.
  */
-export async function clampLmStudioContextWindows(agent: AgentConfig): Promise<AgentConfig> {
+export async function clampLmStudioContextWindows(agent: AgentConfig, signal?: AbortSignal): Promise<AgentConfig> {
 	const data = getData();
 	const lowered: Partial<Record<"chatModel" | "summarizationModel", number>> = {};
 	for (const field of ["chatModel", "summarizationModel"] as const) {
@@ -24,7 +47,7 @@ export async function clampLmStudioContextWindows(agent: AgentConfig): Promise<A
 		if (!model || data.getProviderTemplateId(model.provider) !== "lmstudio") continue;
 		const auth = data.getResolvedAuthState(model.provider);
 		if (!auth) continue;
-		const loaded = await fetchLoadedContextLength(model.provider, auth, model.model).catch(() => undefined);
+		const loaded = await withinDeadline(fetchLoadedContextLength(model.provider, auth, model.model), signal);
 		const saved = model.modelConfig?.contextWindow;
 		if (loaded !== undefined && (saved === undefined || saved > loaded)) lowered[field] = loaded;
 	}

@@ -171,6 +171,9 @@ const MODIFY_DEBOUNCE_MS = 5_000;
  */
 const EMBED_LIMITS_DISCOVERY_WAIT_MS = 5_000;
 
+/** How often chunk sizing re-reads LM Studio's loaded context lengths. */
+const LMSTUDIO_LIMITS_REFRESH_MS = 60_000;
+
 /**
  * Chars per token for sizing chunks against a model's input cap.
  *
@@ -463,6 +466,8 @@ export class VectorStoreService {
 	/** OpenAI-compatible providers whose model discovery chunk sizing started / saw finish. */
 	private readonly startedEmbedLimits = new Set<string>();
 	private readonly settledEmbedLimits = new Set<string>();
+	/** When each LM Studio provider's listing was last refreshed for chunk sizing. */
+	private readonly lmStudioLimitsRefreshedAt = new Map<string, number>();
 	private isInitialized = false;
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-embedding-bulk-attempts`, vault-scoped). */
@@ -829,7 +834,16 @@ export class VectorStoreService {
 			return DEFAULT_EMBED_MAX_INPUT_TOKENS;
 		}
 
+		// LM Studio's limit is the length the model is *loaded* with, which changes when the user
+		// reloads it. Keep the listing fresh and don't memoize, so the next note is chunked to the
+		// current limit; hydration only reads the discovery cache, so recomputing is cheap.
+		const isLmStudio = getData().getProviderTemplateId(defaultModel.provider) === "lmstudio";
+		if (isLmStudio && hasLmStudioModels(defaultModel.provider)) {
+			this.refreshLmStudioLimits(defaultModel.provider);
+		}
+
 		if (
+			!isLmStudio &&
 			inst.maxInputTokensCache?.provider === defaultModel.provider &&
 			inst.maxInputTokensCache.model === defaultModel.model
 		) {
@@ -868,7 +882,7 @@ export class VectorStoreService {
 			templateId,
 		});
 
-		if (!limitsPending) {
+		if (!limitsPending && !isLmStudio) {
 			inst.maxInputTokensCache = {
 				provider: defaultModel.provider,
 				model: defaultModel.model,
@@ -877,6 +891,22 @@ export class VectorStoreService {
 		}
 
 		return metadata.maxInputTokens;
+	}
+
+	/** Re-lists an LM Studio provider's models in the background, at most once a minute. */
+	private refreshLmStudioLimits(providerId: string): void {
+		const now = Date.now();
+		if (now - (this.lmStudioLimitsRefreshedAt.get(providerId) ?? 0) < LMSTUDIO_LIMITS_REFRESH_MS) return;
+		this.lmStudioLimitsRefreshedAt.set(providerId, now);
+		void (async () => {
+			try {
+				if (ensureProviderRegistered(getData(), providerId)) {
+					await getRegistry().discoverModels(providerId);
+				}
+			} catch (error) {
+				Logger.warn("[VectorStore] LM Studio model refresh failed; keeping the last known limit:", error);
+			}
+		})();
 	}
 
 	/** True while chunk sizing for this provider runs on a fallback awaiting its discovery. */
