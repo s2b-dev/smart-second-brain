@@ -11,6 +11,7 @@ import {
 	huggingFaceDisplayName,
 } from "../providers/huggingfaceModels";
 import { type CompatibleModelInfo, getCompatibleModelInfo } from "../providers/openaiCompatibleModels";
+import { type GeminiModelInfo, getGeminiModelInfo } from "../providers/googleModels";
 import type { ProviderTemplateId } from "../types/provider";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
 
@@ -52,7 +53,7 @@ export function knownEmbeddingMaxInputTokens(modelId: string): number | undefine
 /**
  * Inputs to hydration. Every fact comes from the provider serving the model: the catalogues
  * passed in here (OpenRouter, Ollama) or the per-instance caches discovery fills (Anthropic,
- * Codex, Hugging Face, OpenAI-compatible endpoints). There is deliberately no third-party
+ * Codex, Gemini, Hugging Face, OpenAI-compatible endpoints). There is deliberately no third-party
  * fallback; what the provider doesn't report stays undefined.
  */
 export interface ModelHydrationSourceData {
@@ -128,6 +129,7 @@ interface ProviderMetadata {
 	anthropic?: AnthropicModelInfo;
 	codex?: CodexModelInfo;
 	compatible?: CompatibleModelInfo;
+	gemini?: GeminiModelInfo;
 }
 
 function lookupMetadata(provider: string, variantKey: string, sourceData: ModelHydrationSourceData): ProviderMetadata {
@@ -146,6 +148,7 @@ function lookupMetadata(provider: string, variantKey: string, sourceData: ModelH
 				? getCodexModelInfo(provider, variantKey)
 				: undefined,
 		compatible: templateId === "openai-compatible" ? getCompatibleModelInfo(provider, variantKey) : undefined,
+		gemini: templateId === "google" ? getGeminiModelInfo(provider, variantKey) : undefined,
 	};
 }
 
@@ -154,7 +157,7 @@ export function hydrateChatModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedChatModelMetadata {
-	const { openRouter, ollama, huggingFace, anthropic, codex, compatible } = lookupMetadata(
+	const { openRouter, ollama, huggingFace, anthropic, codex, compatible, gemini } = lookupMetadata(
 		provider,
 		variantKey,
 		sourceData,
@@ -169,6 +172,7 @@ export function hydrateChatModel(
 			ollama?.name ||
 			anthropic?.displayName ||
 			codex?.displayName ||
+			gemini?.displayName ||
 			(sourceData.templateId === "huggingface" ? huggingFaceDisplayName(variantKey) : undefined),
 		paramSize,
 	);
@@ -180,6 +184,7 @@ export function hydrateChatModel(
 		anthropic?.maxInputTokens ||
 		codex?.contextWindow ||
 		compatible?.contextWindow ||
+		gemini?.inputTokenLimit ||
 		undefined;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
@@ -214,7 +219,8 @@ export function hydrateChatModel(
 				openRouterCapabilities?.supportsReasoning ??
 				anthropic?.thinking ??
 				(effortLevels ? effortLevels.length > 0 : undefined) ??
-				compatible?.reasoning,
+				compatible?.reasoning ??
+				gemini?.thinking,
 			structuredOutput:
 				openRouterCapabilities?.supportsStructuredOutput ??
 				huggingFace?.supportsStructuredOutput ??
@@ -231,11 +237,16 @@ export function hydrateEmbeddingModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedEmbeddingModelMetadata {
-	const { openRouter, ollama, compatible } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, compatible, gemini } = lookupMetadata(provider, variantKey, sourceData);
 	const paramSize = normalizeParamSize(ollama?.parameterSize);
 	const quantization = ollama?.quantization;
 
-	const displayName = buildDisplayName(provider, variantKey, openRouter?.name || ollama?.name, paramSize);
+	const displayName = buildDisplayName(
+		provider,
+		variantKey,
+		openRouter?.name || ollama?.name || gemini?.displayName,
+		paramSize,
+	);
 
 	const maxInputFromOpenRouter =
 		toNumber(openRouter?.per_request_limits?.prompt_tokens) || openRouter?.context_length;
@@ -246,6 +257,7 @@ export function hydrateEmbeddingModel(
 		maxInputFromOpenRouter ||
 		ollama?.contextLength ||
 		compatible?.contextWindow ||
+		gemini?.inputTokenLimit ||
 		knownEmbeddingMaxInputTokens(variantKey) ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;

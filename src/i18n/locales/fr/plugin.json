@@ -116,7 +116,8 @@
 			"ollama": "Modèles Ollama locaux via l’API Ollama.",
 			"omlx": "Modèles MLX locaux sur votre Mac via le serveur compatible OpenAI d’oMLX.",
 			"openrouter": "Compte et catalogue de modèles OpenRouter.",
-			"huggingface": "Modèles ouverts via les fournisseurs d’inférence de Hugging Face."
+			"huggingface": "Modèles ouverts via les fournisseurs d’inférence de Hugging Face.",
+			"google": "Modèles Gemini via une clé API Google AI Studio."
 		},
 		"fields": {
 			"api_key": "Clé API",
@@ -164,6 +165,11 @@
 		"huggingface": {
 			"link": "Jetons d’accès Hugging Face",
 			"oauth_desc": "Approuvez l’accès dans votre navigateur pour vous connecter, sans créer de jeton d’accès."
+		},
+		"google": {
+			"link": "Clés API Google AI Studio",
+			"api_key_desc": "Votre clé API Gemini issue de Google AI Studio",
+			"base_url_desc": "Point de terminaison personnalisé de l’API Gemini (laisser vide pour celui de Google)"
 		}
 	},
 	"indexing": {

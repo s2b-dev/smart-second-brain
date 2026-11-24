@@ -122,7 +122,8 @@
 			"ollama": "Lokalni modeli Ollama prek API-ja Ollama.",
 			"omlx": "Lokalni modeli MLX na vašem Macu prek strežnika oMLX, združljivega z OpenAI.",
 			"openrouter": "Račun OpenRouter in katalog modelov.",
-			"huggingface": "Odprti modeli ponudnikov sklepanja Hugging Face."
+			"huggingface": "Odprti modeli ponudnikov sklepanja Hugging Face.",
+			"google": "Modeli Gemini prek ključa API iz Google AI Studio."
 		},
 		"fields": {
 			"api_key": "Ključ API",
@@ -170,6 +171,11 @@
 		"huggingface": {
 			"link": "Dostopni žetoni Hugging Face",
 			"oauth_desc": "Za povezavo odobrite dostop v brskalniku, ne da bi ustvarili dostopni žeton."
+		},
+		"google": {
+			"link": "Ključi API v Google AI Studio",
+			"api_key_desc": "Vaš ključ API za Gemini iz Google AI Studio",
+			"base_url_desc": "Lastna končna točka API-ja Gemini (pustite prazno za Googlovo)"
 		}
 	},
 	"indexing": {

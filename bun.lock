@@ -7,6 +7,7 @@
       "dependencies": {
         "@langchain/anthropic": "^1.6.5",
         "@langchain/core": "^1.4.1",
+        "@langchain/google-genai": "2.3.6",
         "@langchain/langgraph": "^1.7.5",
         "@langchain/langgraph-checkpoint": "^1.2.3",
         "@langchain/langgraph-sdk": "~1.17.0",
@@ -195,6 +196,8 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
 
+    "@google/generative-ai": ["@google/generative-ai@0.24.1", "", {}, "sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q=="],
+
     "@hono/node-server": ["@hono/node-server@1.19.17", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ=="],
 
     "@internationalized/date": ["@internationalized/date@3.10.1", "", { "dependencies": { "@swc/helpers": "^0.5.0" } }, "sha512-oJrXtQiAXLvT9clCf1K4kxp3eKsQhIaZqxEyowkBcsvZDdZkbWrVmnGknxs5flTD0VGsxrxKgBCZty1EzoiMzA=="],
@@ -212,6 +215,8 @@
     "@langchain/anthropic": ["@langchain/anthropic@1.6.5", "", { "dependencies": { "@anthropic-ai/sdk": "^1.7.0", "zod": "^4.6.6" }, "peerDependencies": { "@langchain/core": "^1.4.1" } }, "sha512-qB9bMeyRm46TI5ozkS66tPSnLu4Eayv+2R0aB7Uz79jwXZSEFRQ1i0uyov7xtPJW1R3EjbhpT2UuHy4x38pbAA=="],
 
     "@langchain/core": ["@langchain/core@1.4.1", "", { "dependencies": { "@cfworker/json-schema": "^4.1.4", "@standard-schema/spec": "^1.1.0", "js-tiktoken": "^1.0.12", "langsmith": ">=0.11.0 <1.0.0", "mustache": "^4.2.0", "p-queue": "^6.6.2", "zod": "^4.6.6" } }, "sha512-dHY2boSPhbOrguEcFxhR+uPjI21pKiuLO19Q4Wa5wbAPPa9pGr6vaSXM9iDyRbZfI+coadeH6fMWTMdplgszJg=="],
+
+    "@langchain/google-genai": ["@langchain/google-genai@2.3.6", "", { "dependencies": { "@google/generative-ai": "^0.24.1" }, "peerDependencies": { "@langchain/core": "^1.3.5" } }, "sha512-swtEcRAREBgxGUIWG8D49ePA0qEtUwkXpjdTRwPiMPBlyJ1LNkiWjh3Rs0QsyTAkJC3UJNl86Wsgs4gVmwhD5w=="],
 
     "@langchain/langgraph": ["@langchain/langgraph@1.7.5", "", { "dependencies": { "@langchain/langgraph-checkpoint": "^1.2.3", "@langchain/langgraph-sdk": "~1.17.0", "@langchain/protocol": "^0.0.21", "@standard-schema/spec": "1.1.0" }, "peerDependencies": { "@langchain/core": "^1.3.4", "zod": "^3.25.32 || ^4.2.0" } }, "sha512-HeT0O1aOrOIUXLEER5uEvb4HjuYhYOfLKr2vid2HR+NjRVsHnhTfF+wZdzARTBYvWmP83xJx6ItQOPFN3KcfuQ=="],
 

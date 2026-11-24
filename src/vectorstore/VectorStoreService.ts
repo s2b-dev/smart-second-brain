@@ -14,6 +14,7 @@ import type SecondBrainPlugin from "../main";
 import { getOllamaModelsCache } from "../providers/ollamaModels";
 import { fetchOpenRouterModels } from "../providers/openrouterModels";
 import { hasCompatibleModelInfo } from "../providers/openaiCompatibleModels";
+import { hasGeminiModelInfo } from "../providers/googleModels";
 import { getRegistry } from "../providers/registry";
 import {
 	BULK_CHECKPOINT_INTERVAL,
@@ -837,11 +838,15 @@ export class VectorStoreService {
 		const openRouterData = defaultModel.provider === "openrouter" ? await fetchOpenRouterModels() : null;
 		const templateId = getData().getProviderTemplateId(defaultModel.provider);
 
-		// An OpenAI-compatible endpoint's limits arrive with its model discovery, which may not
-		// have run yet this early in startup. Start it (once) and wait a bounded time; until it
-		// lands, size from the fallback without memoizing it, so the real limit applies once known.
+		// An OpenAI-compatible endpoint's or Gemini's limits arrive with its model discovery, which
+		// may not have run yet this early in startup. Start it (once) and wait a bounded time; until
+		// it lands, size from the fallback without memoizing it, so the real limit applies once known.
+		// Gemini needs it most: gemini-embedding-001 takes 2048 tokens, a quarter of the fallback.
 		let limitsPending = false;
-		if (templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) {
+		if (
+			(templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) ||
+			(templateId === "google" && !hasGeminiModelInfo(defaultModel.provider))
+		) {
 			limitsPending = await this.awaitEmbedLimitsDiscovery(defaultModel.provider);
 		}
 
@@ -877,7 +882,7 @@ export class VectorStoreService {
 	}
 
 	/**
-	 * Run an OpenAI-compatible provider's model discovery for its embedding limits, waiting at
+	 * Run an OpenAI-compatible or Gemini provider's model discovery for its embedding limits, waiting at
 	 * most `EMBED_LIMITS_DISCOVERY_WAIT_MS`. Only the call that starts discovery waits; later
 	 * ones return at once while it is still out. Returns true while it is still out, so the
 	 * caller knows its fallback is provisional. A failed discovery counts as settled: the

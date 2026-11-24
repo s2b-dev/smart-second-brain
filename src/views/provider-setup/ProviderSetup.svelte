@@ -17,6 +17,7 @@ import OpenAILogo from "../../components/ui/logos/OpenAILogo.svelte";
 import OpenRouterLogo from "../../components/ui/logos/OpenRouterLogo.svelte";
 import OmlxLogo from "../../components/ui/logos/OmlxLogo.svelte";
 import HuggingFaceLogo from "../../components/ui/logos/HuggingFaceLogo.svelte";
+import GoogleLogo from "../../components/ui/logos/GoogleLogo.svelte";
 import {
 	createAuthStateQuery,
 	getProviderStateQueryOptions,
@@ -70,6 +71,7 @@ const PICKER_ORDER: ProviderTemplateId[] = [
 	"openai",
 	"anthropic",
 	"huggingface",
+	"google",
 ];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
 const providerTemplates = [...getAllProviderTemplates()]
@@ -245,6 +247,7 @@ const TEMPLATE_LOGOS: Partial<Record<ProviderTemplateId, Component<LogoProps>>> 
 	omlx: OmlxLogo,
 	openrouter: OpenRouterLogo,
 	huggingface: HuggingFaceLogo,
+	google: GoogleLogo,
 };
 
 function getTemplateLogo(id: ProviderTemplateId): Component<LogoProps> {

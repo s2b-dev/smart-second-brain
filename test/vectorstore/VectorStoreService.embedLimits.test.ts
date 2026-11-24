@@ -7,13 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 let limitsKnown = false;
+let templateId = "openai-compatible";
 let discover: () => Promise<string[]> = async () => [];
 const discoverModels = vi.fn((_providerId: string) => discover());
 
 vi.mock("../../src/stores/dataStore.svelte", () => ({
 	getData: () => ({
 		vaultSlug: "vault-1",
-		getProviderTemplateId: () => "openai-compatible",
+		getProviderTemplateId: () => templateId,
 		getResolvedProviderAuth: () => null,
 	}),
 }));
@@ -22,6 +23,7 @@ vi.mock("../../src/providers/registry", () => ({
 	getRegistry: () => ({ discoverModels: (id: string) => discoverModels(id) }),
 }));
 vi.mock("../../src/providers/openaiCompatibleModels", () => ({ hasCompatibleModelInfo: () => limitsKnown }));
+vi.mock("../../src/providers/googleModels", () => ({ hasGeminiModelInfo: () => limitsKnown }));
 vi.mock("../../src/lib/modelMetadataNormalizer", () => ({
 	hydrateEmbeddingModel: () => ({ maxInputTokens: limitsKnown ? 512 : 8191 }),
 }));
@@ -43,6 +45,7 @@ function makeService(): Internals {
 beforeEach(() => {
 	vi.useFakeTimers();
 	limitsKnown = false;
+	templateId = "openai-compatible";
 	discoverModels.mockClear();
 });
 
@@ -99,5 +102,25 @@ describe("embedding limits from OpenAI-compatible discovery", () => {
 		expect(await service.getEmbeddingMaxInputTokens(inst, MODEL)).toBe(8191);
 		expect(inst.maxInputTokensCache).toMatchObject({ maxInputTokens: 8191 });
 		expect(discoverModels).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("embedding limits from Gemini discovery", () => {
+	it("waits for the catalog, whose embedding limit is far below the fallback", async () => {
+		templateId = "google";
+		discover = async () => {
+			limitsKnown = true;
+			return ["gemini-2.5-flash"];
+		};
+		const inst = { maxInputTokensCache: null };
+		expect(await makeService().getEmbeddingMaxInputTokens(inst, MODEL)).toBe(512);
+		expect(discoverModels).toHaveBeenCalledTimes(1);
+	});
+
+	it("doesn't wait for providers whose limits need no discovery", async () => {
+		templateId = "ollama";
+		const inst = { maxInputTokensCache: null };
+		expect(await makeService().getEmbeddingMaxInputTokens(inst, MODEL)).toBe(8191);
+		expect(discoverModels).not.toHaveBeenCalled();
 	});
 });

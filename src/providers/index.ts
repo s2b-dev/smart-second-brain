@@ -12,6 +12,7 @@ import { ollamaProvider } from "./ollama";
 import { discoverOpenAIModels, openaiProvider } from "./openai";
 import { openrouterProvider } from "./openrouter";
 import { huggingfaceProvider } from "./huggingface";
+import { createGoogleProvider } from "./google";
 import { openAICodexProvider } from "./openai-codex";
 import { createOmlxProvider } from "./omlx";
 
@@ -56,6 +57,11 @@ const PROVIDER_TEMPLATES: readonly ProviderTemplateDefinition[] = [
 		id: "huggingface",
 		displayName: "Hugging Face",
 		description: t("plugin.providers.templates.huggingface"),
+	},
+	{
+		id: "google",
+		displayName: "Google Gemini",
+		description: t("plugin.providers.templates.google"),
 	},
 ] as const;
 
@@ -111,6 +117,8 @@ function createTemplateDefinition(
 				id: instanceId,
 				displayName: meta.displayName,
 			};
+		case "google":
+			return createGoogleProvider(instanceId, meta.displayName);
 		default:
 			return undefined;
 	}

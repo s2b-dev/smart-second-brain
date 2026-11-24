@@ -104,7 +104,8 @@
 			"ollama": "Ollama API를 통한 로컬 Ollama 모델.",
 			"omlx": "oMLX의 OpenAI 호환 서버를 통해 Mac에서 실행하는 로컬 MLX 모델.",
 			"openrouter": "OpenRouter 계정과 모델 카탈로그.",
-			"huggingface": "Hugging Face 추론 제공자의 오픈 모델."
+			"huggingface": "Hugging Face 추론 제공자의 오픈 모델.",
+			"google": "Google AI Studio API 키를 통한 Gemini 모델."
 		},
 		"fields": {
 			"api_key": "API 키",
@@ -152,6 +153,11 @@
 		"huggingface": {
 			"link": "Hugging Face 액세스 토큰",
 			"oauth_desc": "브라우저에서 접근을 승인하면 액세스 토큰을 만들지 않고 연결할 수 있습니다."
+		},
+		"google": {
+			"link": "Google AI Studio API 키",
+			"api_key_desc": "Google AI Studio에서 발급한 Gemini API 키",
+			"base_url_desc": "사용자 지정 Gemini API 엔드포인트 (Google 기본값을 쓰려면 비워 두세요)"
 		}
 	},
 	"indexing": {
