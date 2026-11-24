@@ -44,7 +44,7 @@ import {
 import { StartupProfiler } from "../utils/startupProfiler";
 import {
 	Agent,
-	NATIVE_PDF_PROVIDERS,
+	supportsNativePdf,
 	type AgentStreamChunk,
 	type CheckpointHistoryItem,
 	type ChooseModelParams,
@@ -837,7 +837,7 @@ export class AgentManager {
 	 */
 	private autoProcessorFromChatModel(chatModel: ChatModel | null, kind: "image" | "pdf"): ChatModel | null {
 		if (!chatModel?.modelConfig?.supportsVision) return null;
-		if (kind === "pdf" && !NATIVE_PDF_PROVIDERS.has(chatModel.provider)) return null;
+		if (kind === "pdf" && !supportsNativePdf(chatModel.provider)) return null;
 		return chatModel;
 	}
 

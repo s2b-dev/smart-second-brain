@@ -77,8 +77,18 @@ const MAX_IMAGE_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 const MAX_TEXT_ATTACHMENT_CHARS = 120_000;
 const MAX_PDF_EXTRACT_CHARS = 180_000;
 
-/** Providers whose APIs accept native PDF file content blocks. */
-export const NATIVE_PDF_PROVIDERS = new Set(["anthropic", "openai", "openrouter"]);
+/** Provider templates whose APIs accept native PDF file content blocks. */
+const NATIVE_PDF_TEMPLATES: ReadonlySet<string> = new Set(["anthropic", "openai", "openrouter", "google"]);
+
+/**
+ * Whether a provider instance takes PDFs as native file blocks. Keyed by template, not
+ * instance id: an instance is named after its display name ("google-gemini",
+ * "anthropic-work"), so the id alone says nothing about the API behind it.
+ */
+export function supportsNativePdf(providerId: string): boolean {
+	const templateId = getPlugin().pluginData?.getProviderTemplateId(providerId);
+	return NATIVE_PDF_TEMPLATES.has(templateId ?? providerId);
+}
 
 function truncateContent(content: string, maxChars: number): string {
 	if (content.length <= maxChars) return content;
@@ -525,12 +535,13 @@ export class Agent {
 				}
 				const buffer = await app.vault.readBinary(file);
 
-				if (NATIVE_PDF_PROVIDERS.has(currentProvider)) {
+				if (supportsNativePdf(currentProvider)) {
 					// Native PDF: use LangChain's standardized file content block.
 					// LangChain auto-converts to each provider's native format:
 					//   Anthropic → type: "document" with source.type: "base64"
 					//   OpenAI    → type: "file" with file.file_data data URI
 					//   OpenRouter → type: "file" (same as OpenAI, uses ChatOpenAI)
+					//   Gemini    → inlineData with the PDF's mime type
 					contentParts.push({
 						type: "file",
 						source_type: "base64",

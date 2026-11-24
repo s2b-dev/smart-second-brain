@@ -104,7 +104,8 @@
 			"ollama": "通过 Ollama API 使用本地 Ollama 模型。",
 			"omlx": "通过 oMLX 的 OpenAI 兼容服务器，在你的 Mac 上使用本地 MLX 模型。",
 			"openrouter": "OpenRouter 账户及模型目录。",
-			"huggingface": "来自 Hugging Face 推理提供商的开放模型。"
+			"huggingface": "来自 Hugging Face 推理提供商的开放模型。",
+			"google": "通过 Google AI Studio API 密钥使用 Gemini 模型。"
 		},
 		"fields": {
 			"api_key": "API 密钥",
@@ -152,6 +153,11 @@
 		"huggingface": {
 			"link": "Hugging Face 访问令牌",
 			"oauth_desc": "在浏览器中批准访问即可连接，无需创建访问令牌。"
+		},
+		"google": {
+			"link": "Google AI Studio API 密钥",
+			"api_key_desc": "你在 Google AI Studio 创建的 Gemini API 密钥",
+			"base_url_desc": "自定义 Gemini API 端点（留空则使用 Google 的端点）"
 		}
 	},
 	"indexing": {

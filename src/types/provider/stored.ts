@@ -15,7 +15,8 @@ export type ProviderTemplateId =
 	| "ollama"
 	| "omlx"
 	| "openrouter"
-	| "huggingface";
+	| "huggingface"
+	| "google";
 
 /**
  * Persisted metadata for a configured provider instance.

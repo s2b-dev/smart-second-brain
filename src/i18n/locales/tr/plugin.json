@@ -110,7 +110,8 @@
 			"ollama": "Ollama API'si üzerinden yerel Ollama modelleri.",
 			"omlx": "oMLX'in OpenAI uyumlu sunucusu aracılığıyla Mac'inizdeki yerel MLX modelleri.",
 			"openrouter": "OpenRouter hesabı ve model kataloğu.",
-			"huggingface": "Hugging Face çıkarım sağlayıcılarından açık modeller."
+			"huggingface": "Hugging Face çıkarım sağlayıcılarından açık modeller.",
+			"google": "Google AI Studio API anahtarıyla Gemini modelleri."
 		},
 		"fields": {
 			"api_key": "API anahtarı",
@@ -158,6 +159,11 @@
 		"huggingface": {
 			"link": "Hugging Face erişim token'ları",
 			"oauth_desc": "Erişim token'ı oluşturmadan bağlanmak için tarayıcınızda erişimi onaylayın."
+		},
+		"google": {
+			"link": "Google AI Studio API anahtarları",
+			"api_key_desc": "Google AI Studio'dan aldığınız Gemini API anahtarı",
+			"base_url_desc": "Özel Gemini API uç noktası (Google'ınki için boş bırakın)"
 		}
 	},
 	"indexing": {

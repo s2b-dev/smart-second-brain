@@ -10,7 +10,7 @@ import type { BuiltInToolId, SearchAlgorithm, ToolConfig } from "../../types/plu
 import type { ChatModel } from "../../stores/chatTimeline";
 import type SecondBrainPlugin from "../../main";
 import { ModelSelectionModal, type SelectedModel } from "./ModelSelectionModal";
-import { NATIVE_PDF_PROVIDERS } from "../../agent/Agent";
+import { supportsNativePdf } from "../../agent/Agent";
 import { suggestSecretId } from "../../lib/secretStorage";
 import SecretSelect from "../settings/SecretSelect.svelte";
 import SettingContainer from "../settings/SettingContainer.svelte";
@@ -100,7 +100,7 @@ const selectedAgent = pluginData.getSelectedAgent();
 const chatModel = selectedAgent.chatModel;
 const chatModelLabel = chatModel ? `${chatModel.provider}/${chatModel.model}` : null;
 const chatModelSupportsVision = !!chatModel?.modelConfig?.supportsVision;
-const chatModelSupportsPdf = chatModelSupportsVision && !!chatModel && NATIVE_PDF_PROVIDERS.has(chatModel.provider);
+const chatModelSupportsPdf = chatModelSupportsVision && !!chatModel && supportsNativePdf(chatModel.provider);
 
 function autoLabel(capability: boolean): string {
 	if (!chatModelLabel) return t("agents.tool_config.auto_no_model");
