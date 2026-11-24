@@ -111,7 +111,8 @@
 			"omlx": "Lokale MLX-Modelle auf deinem Mac über den OpenAI-kompatiblen Server von oMLX.",
 			"openrouter": "OpenRouter-Konto und Modellkatalog.",
 			"huggingface": "Offene Modelle über die Inferenzanbieter von Hugging Face.",
-			"google": "Gemini-Modelle über einen API-Schlüssel aus Google AI Studio."
+			"google": "Gemini-Modelle über einen API-Schlüssel aus Google AI Studio.",
+			"mistral": "Mistral-Modelle über La Plateforme, gehostet in der EU."
 		},
 		"fields": {
 			"api_key": "API-Schlüssel",
@@ -164,6 +165,10 @@
 			"link": "API-Schlüssel in Google AI Studio",
 			"api_key_desc": "Dein Gemini-API-Schlüssel aus Google AI Studio",
 			"base_url_desc": "Eigener Gemini-API-Endpunkt (leer lassen für den von Google)"
+		},
+		"mistral": {
+			"link": "Mistral-API-Schlüssel",
+			"api_key_desc": "Dein Mistral-API-Schlüssel von console.mistral.ai"
 		}
 	},
 	"indexing": {

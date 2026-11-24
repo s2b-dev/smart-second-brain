@@ -18,6 +18,7 @@ import OpenRouterLogo from "../../components/ui/logos/OpenRouterLogo.svelte";
 import OmlxLogo from "../../components/ui/logos/OmlxLogo.svelte";
 import HuggingFaceLogo from "../../components/ui/logos/HuggingFaceLogo.svelte";
 import GoogleLogo from "../../components/ui/logos/GoogleLogo.svelte";
+import MistralLogo from "../../components/ui/logos/MistralLogo.svelte";
 import {
 	createAuthStateQuery,
 	getProviderStateQueryOptions,
@@ -72,6 +73,7 @@ const PICKER_ORDER: ProviderTemplateId[] = [
 	"anthropic",
 	"huggingface",
 	"google",
+	"mistral",
 ];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
 const providerTemplates = [...getAllProviderTemplates()]
@@ -248,6 +250,7 @@ const TEMPLATE_LOGOS: Partial<Record<ProviderTemplateId, Component<LogoProps>>> 
 	openrouter: OpenRouterLogo,
 	huggingface: HuggingFaceLogo,
 	google: GoogleLogo,
+	mistral: MistralLogo,
 };
 
 function getTemplateLogo(id: ProviderTemplateId): Component<LogoProps> {

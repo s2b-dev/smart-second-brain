@@ -105,7 +105,8 @@
 			"omlx": "oMLX의 OpenAI 호환 서버를 통해 Mac에서 실행하는 로컬 MLX 모델.",
 			"openrouter": "OpenRouter 계정과 모델 카탈로그.",
 			"huggingface": "Hugging Face 추론 제공자의 오픈 모델.",
-			"google": "Google AI Studio API 키를 통한 Gemini 모델."
+			"google": "Google AI Studio API 키를 통한 Gemini 모델.",
+			"mistral": "La Plateforme를 통한 Mistral 모델(EU에서 호스팅)."
 		},
 		"fields": {
 			"api_key": "API 키",
@@ -158,6 +159,10 @@
 			"link": "Google AI Studio API 키",
 			"api_key_desc": "Google AI Studio에서 발급한 Gemini API 키",
 			"base_url_desc": "사용자 지정 Gemini API 엔드포인트 (Google 기본값을 쓰려면 비워 두세요)"
+		},
+		"mistral": {
+			"link": "Mistral API 키",
+			"api_key_desc": "console.mistral.ai에서 발급한 Mistral API 키"
 		}
 	},
 	"indexing": {

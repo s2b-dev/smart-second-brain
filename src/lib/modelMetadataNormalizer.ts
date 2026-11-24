@@ -10,6 +10,7 @@ import {
 	type HuggingFaceModelInfo,
 	huggingFaceDisplayName,
 } from "../providers/huggingfaceModels";
+import { getMistralModelInfo, type MistralModelInfo } from "../providers/mistralModels";
 import { type CompatibleModelInfo, getCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import { type GeminiModelInfo, getGeminiModelInfo } from "../providers/googleModels";
 import type { ProviderTemplateId } from "../types/provider";
@@ -130,6 +131,7 @@ interface ProviderMetadata {
 	codex?: CodexModelInfo;
 	compatible?: CompatibleModelInfo;
 	gemini?: GeminiModelInfo;
+	mistral?: MistralModelInfo;
 }
 
 function lookupMetadata(provider: string, variantKey: string, sourceData: ModelHydrationSourceData): ProviderMetadata {
@@ -149,6 +151,7 @@ function lookupMetadata(provider: string, variantKey: string, sourceData: ModelH
 				: undefined,
 		compatible: templateId === "openai-compatible" ? getCompatibleModelInfo(provider, variantKey) : undefined,
 		gemini: templateId === "google" ? getGeminiModelInfo(provider, variantKey) : undefined,
+		mistral: templateId === "mistral" ? getMistralModelInfo(provider, variantKey) : undefined,
 	};
 }
 
@@ -157,7 +160,7 @@ export function hydrateChatModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedChatModelMetadata {
-	const { openRouter, ollama, huggingFace, anthropic, codex, compatible, gemini } = lookupMetadata(
+	const { openRouter, ollama, huggingFace, anthropic, codex, compatible, gemini, mistral } = lookupMetadata(
 		provider,
 		variantKey,
 		sourceData,
@@ -185,6 +188,7 @@ export function hydrateChatModel(
 		codex?.contextWindow ||
 		compatible?.contextWindow ||
 		gemini?.inputTokenLimit ||
+		mistral?.contextLength ||
 		undefined;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
@@ -207,14 +211,16 @@ export function hydrateChatModel(
 				openRouterCapabilities?.supportsToolCalls ??
 				ollama?.supportsTools ??
 				huggingFace?.supportsTools ??
-				compatible?.toolCalls,
+				compatible?.toolCalls ??
+				mistral?.supportsTools,
 			vision:
 				openRouterCapabilities?.supportsVision ??
 				ollama?.supportsVision ??
 				huggingFace?.supportsVision ??
 				anthropic?.vision ??
 				codex?.vision ??
-				compatible?.vision,
+				compatible?.vision ??
+				mistral?.supportsVision,
 			reasoning:
 				openRouterCapabilities?.supportsReasoning ??
 				anthropic?.thinking ??
@@ -237,7 +243,7 @@ export function hydrateEmbeddingModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedEmbeddingModelMetadata {
-	const { openRouter, ollama, compatible, gemini } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, compatible, gemini, mistral } = lookupMetadata(provider, variantKey, sourceData);
 	const paramSize = normalizeParamSize(ollama?.parameterSize);
 	const quantization = ollama?.quantization;
 
@@ -258,6 +264,7 @@ export function hydrateEmbeddingModel(
 		ollama?.contextLength ||
 		compatible?.contextWindow ||
 		gemini?.inputTokenLimit ||
+		mistral?.contextLength ||
 		knownEmbeddingMaxInputTokens(variantKey) ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;
