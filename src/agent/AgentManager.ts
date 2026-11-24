@@ -12,7 +12,7 @@ import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { hydrateChatModel } from "../lib/modelMetadataNormalizer";
 import { fetchOllamaModelsInfo } from "../providers/ollamaModels";
 import { hasLmStudioModels } from "../providers/lmstudioModels";
-import { clampLmStudioContextWindows } from "./lmStudioContextWindow";
+import { clampLmStudioContextWindows, withinDeadline } from "./lmStudioContextWindow";
 import { SystemPromptModal } from "../components/modal/SystemPromptModal";
 import {
 	extractCapabilities as extractOpenRouterCapabilities,
@@ -293,14 +293,12 @@ async function resolveVisionSupport(providerId: string, modelId: string): Promis
 		}
 	}
 
-	// LM Studio: discovery fills the cache step 3 reads; run it if this session hasn't yet.
+	// LM Studio: discovery fills the cache step 3 reads; run it if this session hasn't yet. Bounded
+	// like the context-window check, so a stalled server leaves vision unknown instead of holding the turn.
 	if (data.getProviderTemplateId(providerId) === "lmstudio" && !hasLmStudioModels(providerId)) {
 		const auth = data.getResolvedAuthState(providerId);
-		if (auth) {
-			await getProviderDefinition(providerId, data.getAllProviderMeta())
-				?.discoverModels(auth)
-				.catch(() => undefined);
-		}
+		const discovery = auth && getProviderDefinition(providerId, data.getAllProviderMeta())?.discoverModels(auth);
+		if (discovery) await withinDeadline(discovery);
 	}
 
 	// 2. OpenRouter: derive vision from architecture.input_modalities (cached)

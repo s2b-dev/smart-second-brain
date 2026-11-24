@@ -251,7 +251,11 @@ export function hydrateEmbeddingModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedEmbeddingModelMetadata {
-	const { openRouter, ollama, compatible, gemini, mistral, lmStudio } = lookupMetadata(provider, variantKey, sourceData);
+	const { openRouter, ollama, compatible, gemini, mistral, lmStudio } = lookupMetadata(
+		provider,
+		variantKey,
+		sourceData,
+	);
 	const paramSize = normalizeParamSize(ollama?.parameterSize ?? lmStudio?.paramSize);
 	const quantization = ollama?.quantization ?? lmStudio?.quantization;
 

@@ -6,7 +6,7 @@ import type { AgentConfig } from "../types/plugin";
 export const LMSTUDIO_CHECK_TIMEOUT_MS = 2_000;
 
 /** The query's result, or undefined if it fails, outlasts the deadline, or the turn is cancelled. */
-function withinDeadline<T>(query: Promise<T>, signal?: AbortSignal): Promise<T | undefined> {
+export function withinDeadline<T>(query: Promise<T>, signal?: AbortSignal): Promise<T | undefined> {
 	if (signal?.aborted) return Promise.resolve(undefined);
 	return new Promise((resolve) => {
 		const finish = (value: T | undefined) => {
