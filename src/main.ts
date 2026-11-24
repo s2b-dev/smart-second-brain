@@ -53,6 +53,7 @@ import { registerWidgetEmbed, unregisterWidgetEmbed } from "./views/widget/widge
 import { ChatView, VIEW_TYPE_CHAT } from "./views/chat/Chat";
 import { navigateToPendingChange } from "./lib/pendingChangeNavigation";
 import { registerChatEmbed, unregisterChatEmbed } from "./views/chat/chatEmbed";
+import { registerExplorerChatIcons } from "./views/chat/explorerChatIcon";
 import RunningIndicator from "./components/chat/RunningIndicator.svelte";
 // DISABLED FOR INITIAL RELEASE — Note Context view; see the registerView block in onload().
 // import { NoteContextView, VIEW_TYPE_NOTE_CONTEXT } from "./views/note-context/NoteContextView";
@@ -496,6 +497,9 @@ export default class SecondBrainPlugin extends Plugin {
 
 		// Read-only preview for embedded (![[chat.chat]]) and hovered .chat links.
 		registerChatEmbed(this);
+
+		// Chat icon in front of .chat files in the file explorer.
+		registerExplorerChatIcons(this);
 
 		// Intercept .chat file opens so they go directly to the sidebar
 		// without ever replacing the note in the main editor area.

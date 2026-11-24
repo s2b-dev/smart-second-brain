@@ -1816,3 +1816,13 @@ body.is-mobile .s2b-tool-output-content pre .clickable-icon {
 		animation: none;
 	}
 }
+
+/* Chat icon in front of .chat files in the file explorer (views/chat/explorerChatIcon.ts). */
+.s2b-explorer-file-icon {
+	--icon-size: var(--icon-xs);
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	margin-inline-end: var(--size-4-1);
+	color: var(--icon-color);
+}
