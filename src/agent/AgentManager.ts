@@ -198,12 +198,26 @@ function persistResolvedVisionSupport(model: ChatModel, supportsVision: boolean)
 }
 
 /**
+ * The query's result, or undefined as soon as the turn is cancelled. Lets Stop end a turn still
+ * waiting on a provider lookup; the lookup itself carries on and caches its answer for later.
+ */
+function untilAborted<T>(query: Promise<T>, signal?: AbortSignal): Promise<T | undefined> {
+	if (!signal) return query;
+	if (signal.aborted) return Promise.resolve(undefined);
+	return new Promise((resolve, reject) => {
+		const onAbort = () => resolve(undefined);
+		signal.addEventListener("abort", onAbort, { once: true });
+		query.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+	});
+}
+
+/**
  * Maps the UI ChatModel type to papa-ts ChooseModelParams.
  * Enriches supportsVision from what the model's provider reports. When it reports nothing,
  * this run treats the model as text-only and nothing is persisted, so the answer can still
  * arrive later or come from the user (the Agent editor's image-input toggle).
  */
-async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams> {
+async function toChooseModelParams(model: ChatModel, signal?: AbortSignal): Promise<ChooseModelParams> {
 	const options = { ...model.modelConfig };
 	const cacheKey = getVisionSupportCacheKey(model.provider, model.model);
 
@@ -214,7 +228,10 @@ async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams>
 	// If supportsVision is not explicitly set, resolve it from provider APIs
 	if (options.supportsVision === undefined) {
 		try {
-			const resolvedSupportsVision = await resolveVisionSupportCached(model.provider, model.model);
+			const resolvedSupportsVision = await untilAborted(
+				resolveVisionSupportCached(model.provider, model.model),
+				signal,
+			);
 			options.supportsVision = resolvedSupportsVision ?? false;
 			// Persist resolved capability via store update helper (avoid mutating model reference directly).
 			if (resolvedSupportsVision !== undefined) persistResolvedVisionSupport(model, resolvedSupportsVision);
@@ -1767,7 +1784,7 @@ export class AgentManager {
 		resolvedAgentId: string;
 	}> {
 		const agent = await this.ensureAgent();
-		await this.awaitDeferredSetup();
+		await untilAborted(this.awaitDeferredSetup(), signal);
 		const pluginData = getData();
 		// Empty agentId ("" default) → intentionally use global selection.
 		// Non-empty but unknown agentId → agent was deleted; throw rather than silently
@@ -1813,9 +1830,9 @@ export class AgentManager {
 		let resolved: ResolvedRun;
 		try {
 			resolved = await agent.resolveRun({
-				...(await toChooseModelParams(chatModel)),
-				summarizationModel: await toChooseModelParams(summarizationModel),
-				titleModel: await toChooseModelParams(titleModel),
+				...(await toChooseModelParams(chatModel, signal)),
+				summarizationModel: await toChooseModelParams(summarizationModel, signal),
+				titleModel: await toChooseModelParams(titleModel, signal),
 				cacheKey,
 				systemPrompt,
 				tools,
