@@ -23,7 +23,9 @@ function decorateRow(row: HTMLElement): void {
 }
 
 function decorateWithin(node: Node): void {
-	if (!(node instanceof HTMLElement)) return;
+	// Obsidian's cross-window check: an explorer in a popped-out window builds its rows with
+	// that window's HTMLElement, which a plain `instanceof HTMLElement` would reject.
+	if (!node.instanceOf(HTMLElement)) return;
 	if (node.matches(ROW_SELECTOR)) decorateRow(node);
 	for (const row of Array.from(node.querySelectorAll<HTMLElement>(ROW_SELECTOR))) decorateRow(row);
 }
