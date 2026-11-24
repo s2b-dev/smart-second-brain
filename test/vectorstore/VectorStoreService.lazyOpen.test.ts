@@ -190,6 +190,7 @@ const fakeData = {
 		return () => contentIndexingListeners.delete(listener);
 	},
 	getResolvedProviderAuth: () => null,
+	getProviderTemplateId: () => undefined,
 };
 
 vi.mock("../../src/stores/dataStore.svelte", () => ({ getData: () => fakeData }));
@@ -219,7 +220,6 @@ vi.mock("../../src/providers/registry", () => ({
 		createEmbeddingInstance: () => ({ embedDocuments, embedQuery }),
 	}),
 }));
-vi.mock("../../src/providers/modelsDevApi", () => ({ fetchModelsDevData: async () => null }));
 vi.mock("../../src/providers/openrouterModels", () => ({ fetchOpenRouterModels: async () => null }));
 vi.mock("../../src/providers/ollamaModels", () => ({ getOllamaModelsCache: () => null }));
 vi.mock("../../src/lib/modelMetadataNormalizer", () => ({

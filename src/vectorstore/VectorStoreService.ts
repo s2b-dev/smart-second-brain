@@ -11,9 +11,9 @@ import { decode, encode } from "@msgpack/msgpack";
 import { Notice, Platform, TFile, getAllTags } from "obsidian";
 import { hydrateEmbeddingModel } from "../lib/modelMetadataNormalizer";
 import type SecondBrainPlugin from "../main";
-import { fetchModelsDevData } from "../providers/modelsDevApi";
 import { getOllamaModelsCache } from "../providers/ollamaModels";
 import { fetchOpenRouterModels } from "../providers/openrouterModels";
+import { hasCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import { getRegistry } from "../providers/registry";
 import {
 	BULK_CHECKPOINT_INTERVAL,
@@ -161,6 +161,13 @@ const DEFAULT_EMBED_MAX_INPUT_TOKENS = 8191;
 
 /** Debounce delay before re-embedding a modified file (ms) */
 const MODIFY_DEBOUNCE_MS = 5_000;
+
+/**
+ * How long chunk sizing waits for an OpenAI-compatible endpoint's model discovery before
+ * using the fallback budget. Discovery hits `/v1/models`, which can stall while the
+ * embeddings route works; indexing must not stall with it.
+ */
+const EMBED_LIMITS_DISCOVERY_WAIT_MS = 5_000;
 
 /**
  * Chars per token for sizing chunks against a model's input cap.
@@ -451,6 +458,9 @@ export class VectorStoreService {
 	private readonly initializingInstances = new Map<string, Promise<IndexInstance>>();
 	private readonly progressListeners = new Map<string, Set<(progress: IndexingProgress) => void>>();
 	private readonly modifyTimers = new Map<string, number>();
+	/** OpenAI-compatible providers whose model discovery chunk sizing started / saw finish. */
+	private readonly startedEmbedLimits = new Set<string>();
+	private readonly settledEmbedLimits = new Set<string>();
 	private isInitialized = false;
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-embedding-bulk-attempts`, vault-scoped). */
@@ -824,10 +834,16 @@ export class VectorStoreService {
 			return inst.maxInputTokensCache.maxInputTokens;
 		}
 
-		const [modelsDevData, openRouterData] = await Promise.all([
-			fetchModelsDevData(),
-			defaultModel.provider === "openrouter" ? fetchOpenRouterModels() : Promise.resolve(null),
-		]);
+		const openRouterData = defaultModel.provider === "openrouter" ? await fetchOpenRouterModels() : null;
+		const templateId = getData().getProviderTemplateId(defaultModel.provider);
+
+		// An OpenAI-compatible endpoint's limits arrive with its model discovery, which may not
+		// have run yet this early in startup. Start it (once) and wait a bounded time; until it
+		// lands, size from the fallback without memoizing it, so the real limit applies once known.
+		let limitsPending = false;
+		if (templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) {
+			limitsPending = await this.awaitEmbedLimitsDiscovery(defaultModel.provider);
+		}
 
 		const ollamaData =
 			defaultModel.provider === "ollama"
@@ -839,18 +855,57 @@ export class VectorStoreService {
 				: null;
 
 		const metadata = hydrateEmbeddingModel(defaultModel.provider, defaultModel.model, {
-			modelsDevData,
 			openRouterData,
 			ollamaData,
+			templateId,
 		});
 
-		inst.maxInputTokensCache = {
-			provider: defaultModel.provider,
-			model: defaultModel.model,
-			maxInputTokens: metadata.maxInputTokens,
-		};
+		if (!limitsPending) {
+			inst.maxInputTokensCache = {
+				provider: defaultModel.provider,
+				model: defaultModel.model,
+				maxInputTokens: metadata.maxInputTokens,
+			};
+		}
 
 		return metadata.maxInputTokens;
+	}
+
+	/** True while chunk sizing for this provider runs on a fallback awaiting its discovery. */
+	private isEmbedLimitProvisional(providerId: string): boolean {
+		return this.startedEmbedLimits.has(providerId) && !this.settledEmbedLimits.has(providerId);
+	}
+
+	/**
+	 * Run an OpenAI-compatible provider's model discovery for its embedding limits, waiting at
+	 * most `EMBED_LIMITS_DISCOVERY_WAIT_MS`. Only the call that starts discovery waits; later
+	 * ones return at once while it is still out. Returns true while it is still out, so the
+	 * caller knows its fallback is provisional. A failed discovery counts as settled: the
+	 * fallback is then all there is, and retrying on every batch would only repeat the failure.
+	 */
+	private async awaitEmbedLimitsDiscovery(providerId: string): Promise<boolean> {
+		if (this.startedEmbedLimits.has(providerId)) return this.isEmbedLimitProvisional(providerId);
+		this.startedEmbedLimits.add(providerId);
+
+		const discovery = (async () => {
+			try {
+				if (ensureProviderRegistered(getData(), providerId)) {
+					await getRegistry().discoverModels(providerId);
+				}
+			} catch (error) {
+				Logger.warn("[VectorStore] Embedding model discovery failed; sizing chunks from the fallback:", error);
+			} finally {
+				this.settledEmbedLimits.add(providerId);
+			}
+		})();
+
+		let timer: number | undefined;
+		const timedOut = new Promise<void>((resolve) => {
+			timer = window.setTimeout(resolve, EMBED_LIMITS_DISCOVERY_WAIT_MS);
+		});
+		await Promise.race([discovery, timedOut]);
+		window.clearTimeout(timer);
+		return this.isEmbedLimitProvisional(providerId);
 	}
 
 	private async getMaxEmbeddingContentLength(
@@ -1769,7 +1824,12 @@ export class VectorStoreService {
 		// Lowered for the rest of the run when a batch times out and has to be
 		// split (see `embedBatch`), so later batches do not repeat the timeout.
 		let batchSize = this.getBatchSize(inst.indexId, model.provider);
-		const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+		// Re-read per note: an OpenAI-compatible endpoint's reported limit can arrive mid-run
+		// (see `awaitEmbedLimitsDiscovery`), and later notes should be chunked to it.
+		let maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+		// Notes chunked while that limit was still a fallback: a rejection may only mean the
+		// fallback was too big for the model, so it is not remembered and the next run retries.
+		const provisionallyChunked = new Set<string>();
 		const ordered = orderForBulkIndexing(files);
 		// The extraction tail (PDFs, last in `ordered`) gets its own progress phase.
 		const extractionPaths = new Set(ordered.filter(needsExtraction).map((file) => file.path));
@@ -1874,7 +1934,9 @@ export class VectorStoreService {
 			failedPaths.add(entry.file.path);
 			pendingNotes.delete(entry.file.path);
 			noteSkipped(entry.file.path, reason);
-			if (remember) await this.rejectNote(inst, entry.file.path, entry.mtime);
+			if (remember && !provisionallyChunked.has(entry.file.path)) {
+				await this.rejectNote(inst, entry.file.path, entry.mtime);
+			}
 		};
 
 		// Consecutive transport-level failures. Reset on any success, so a flaky
@@ -2076,6 +2138,8 @@ export class VectorStoreService {
 					emptiesUnsaved = true;
 					continue;
 				}
+				maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+				if (this.isEmbedLimitProvisional(model.provider)) provisionallyChunked.add(file.path);
 				const chunks = chunkText(content, file.basename, maxContentLength);
 				pendingNotes.set(file.path, { mtime, expected: chunks.length, vectors: new Map() });
 				for (const chunk of chunks) {
@@ -2227,6 +2291,9 @@ export class VectorStoreService {
 		// A read that fails is a local, usually transient matter; the next
 		// validation retries the note. Only the provider's verdict is remembered.
 		let chunks: ReturnType<typeof chunkText>;
+		// Whether the chunk size below is still a fallback, taken when chunking: discovery can
+		// land before the provider answers, and that answer is about these chunks.
+		let chunkedProvisionally = false;
 		try {
 			const content = await readIndexableContent(this.plugin.app.vault, file);
 			if (hasNoEmbeddableText(file, content)) {
@@ -2234,6 +2301,7 @@ export class VectorStoreService {
 				return;
 			}
 			const maxContentLength = await this.getMaxEmbeddingChunkLength(inst, model);
+			chunkedProvisionally = this.isEmbedLimitProvisional(model.provider);
 			chunks = chunkText(content, file.basename, maxContentLength);
 		} catch (error) {
 			Logger.error(`[VectorStore] Failed to read ${file.path} (${inst.indexId}):`, error);
@@ -2256,7 +2324,10 @@ export class VectorStoreService {
 			new Notice(t("plugin.indexing.embed_failed", { file: file.basename, error: reason }));
 			// Only a verdict on this document is remembered; a dead or misconfigured
 			// provider is not the note's fault, and the next validation retries it.
-			if (isDocumentRejectionError(error)) await this.rejectNote(inst, file.path, mtime);
+			// A rejection under a fallback chunk size may only mean the fallback was too big.
+			if (isDocumentRejectionError(error) && !chunkedProvisionally) {
+				await this.rejectNote(inst, file.path, mtime);
+			}
 			return;
 		}
 		const vectors: Float32Array[] = [];

@@ -22,9 +22,9 @@ import type {
 } from "../types/provider/index";
 import {
 	type CompatibleModelEntry,
-	extractContextWindows,
+	extractCompatibleModelInfo,
 	type LiteLLMModelInfoEntry,
-	setCompatibleContextWindows,
+	setCompatibleModelInfo,
 } from "./openaiCompatibleModels";
 import { t } from "../i18n";
 import { chatCompletionsReasoningFields } from "./reasoningEffort";
@@ -243,7 +243,7 @@ export function createOpenAICompatibleProvider(
 				fetchModelEntries(auth, config.id, defaultBaseUrl),
 				fetchLiteLLMModelInfo(auth, defaultBaseUrl),
 			]);
-			setCompatibleContextWindows(config.id, extractContextWindows(entries, liteLLMInfo));
+			setCompatibleModelInfo(config.id, extractCompatibleModelInfo(entries, liteLLMInfo));
 			setReasoningEffortSupport(config.id, liteLLMReasoningEffortSupport(liteLLMInfo));
 			return entries.filter((r) => r.id && !isEmbeddingEntry(r)).map((r) => r.id as string);
 		},

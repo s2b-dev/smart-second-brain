@@ -10,42 +10,16 @@ import {
 	cancelOpenAICodexSignIn,
 	clearOpenAICodexSession,
 	createOpenAICodexFetch,
+	fetchCodexModelEntries,
 	getValidOpenAICodexSession,
 	signInWithOpenAICodex,
 } from "./openaiCodex";
 import { getCodexSession } from "../stores/providerRuntime.svelte";
-import { fetchOpenRouterModels, isEmbeddingModel, type OpenRouterModelInfo } from "./openrouterModels";
+import { populateCodexCache } from "./codexModels";
 import { t } from "../i18n";
 import { openAIReasoningFields } from "./reasoningEffort";
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
-
-function isCodexDiscoverableOpenAIModel(model: OpenRouterModelInfo): boolean {
-	if (!model.id.startsWith("openai/")) {
-		return false;
-	}
-
-	if (isEmbeddingModel(model)) {
-		return false;
-	}
-
-	const modelId = model.id.slice("openai/".length).toLowerCase();
-	if (!modelId || modelId.includes(":")) {
-		return false;
-	}
-
-	const outputModalities = model.architecture?.output_modalities ?? [];
-	if (outputModalities.length > 0 && !outputModalities.includes("text")) {
-		return false;
-	}
-
-	return !(
-		modelId.includes("audio") ||
-		modelId.includes("image") ||
-		modelId.includes("deep-research") ||
-		modelId.includes("safeguard")
-	);
-}
 
 export function openAICodexProvider(providerId: string, displayName = "OpenAI Codex"): BaseProviderDefinition {
 	return {
@@ -106,20 +80,6 @@ export function openAICodexProvider(providerId: string, displayName = "OpenAI Co
 			}
 			return { valid: true };
 		},
-		discoverModels: async (): Promise<string[]> => {
-			const models = await fetchOpenRouterModels();
-			if (!models) {
-				return [];
-			}
-
-			return Array.from(
-				new Set(
-					Array.from(models.values())
-						.filter(isCodexDiscoverableOpenAIModel)
-						.map((model) => model.id.split("/").pop()?.trim())
-						.filter((modelId): modelId is string => Boolean(modelId)),
-				),
-			).sort((a, b) => a.localeCompare(b));
-		},
+		discoverModels: async (): Promise<string[]> => populateCodexCache(providerId, await fetchCodexModelEntries()),
 	};
 }

@@ -202,22 +202,3 @@ export function extractCapabilities(info: OpenRouterModelInfo): {
 		supportsStructuredOutput: params.includes("structured_outputs"),
 	};
 }
-
-/**
- * Checks if a model is an embedding model based on its architecture/modality
- */
-export function isEmbeddingModel(info: OpenRouterModelInfo): boolean {
-	const id = info.id.toLowerCase();
-	const modality = info.architecture?.modality?.toLowerCase() ?? "";
-
-	return (
-		modality.includes("embedding") ||
-		id.includes("embed") ||
-		id.includes("bge-") ||
-		id.includes("voyage") ||
-		id.includes("e5-") ||
-		id.includes("gte-") ||
-		id.includes("nomic-") ||
-		id.includes("-embedding")
-	);
-}

@@ -280,7 +280,9 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 		tag(this.getProviderDisplayName(model.provider), "s2b-model-suggestion-tag--provider");
 
 		if (model.kind === "chat") {
-			tag(t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) }));
+			// No tag when the provider doesn't report a window, rather than a guessed one.
+			if (model.contextWindow)
+				tag(t("modals.model_selection.context_tag", { tokens: formatTokenLimit(model.contextWindow) }));
 			if (model.pricing?.inputUsdPer1M !== undefined || model.pricing?.outputUsdPer1M !== undefined) {
 				tag(`${formatCost(model.pricing?.inputUsdPer1M)}/${formatCost(model.pricing?.outputUsdPer1M)}`);
 			}

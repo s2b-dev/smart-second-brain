@@ -10,7 +10,7 @@ import { t } from "../i18n";
  * schema-valid output), since an icon alone can't carry that.
  */
 export const MODEL_CAPABILITY_ICONS: Record<
-	keyof HydratedChatModelMetadata["capabilities"],
+	Exclude<keyof HydratedChatModelMetadata["capabilities"], "effortLevels">,
 	{ icon: string; label: string }
 > = {
 	toolCalls: { icon: "wrench", label: t("plugin.model_capabilities.tool_calls") },

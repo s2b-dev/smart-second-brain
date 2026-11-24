@@ -5,6 +5,7 @@ import type { CodexSession } from "../types/provider";
 import { Logger } from "../utils/logging";
 import { performAiFetch } from "../lib/aiTransport";
 import { escapeHtml } from "../utils/html";
+import { CODEX_MODELS_CLIENT_VERSION, type CodexModelEntry } from "./codexModels";
 import {
 	arrayBufferToBase64Url,
 	base64UrlToString,
@@ -21,6 +22,7 @@ const CALLBACK_PATH = "/auth/callback";
 const HEALTHCHECK_PATH = "/health";
 const CALLBACK_HOST = "localhost";
 const CODEX_API_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses";
+const CODEX_MODELS_ENDPOINT = "https://chatgpt.com/backend-api/codex/models";
 const REFRESH_BUFFER_MS = 60_000;
 const OAUTH_TIMEOUT_MS = 5 * 60_000;
 
@@ -587,6 +589,30 @@ function injectCodexDefaults(init: RequestInit | undefined): RequestInit | undef
 	} catch {
 		return init;
 	}
+}
+
+/**
+ * The model catalogue the signed-in ChatGPT account can use, as the Codex CLI loads it
+ * (see `codexModels.ts`). Throws when signed out or when the server refuses.
+ */
+export async function fetchCodexModelEntries(): Promise<CodexModelEntry[]> {
+	const session = await getValidOpenAICodexSession();
+	if (!session) {
+		throw new Error("ChatGPT sign-in required");
+	}
+	const headers = buildHeaders(undefined, session.accountId);
+	headers.set("Authorization", `Bearer ${session.accessToken}`);
+	const response = await requestUrl({
+		url: `${CODEX_MODELS_ENDPOINT}?client_version=${CODEX_MODELS_CLIENT_VERSION}`,
+		method: "GET",
+		headers: Object.fromEntries(headers.entries()),
+		throw: false,
+	});
+	if (response.status < 200 || response.status >= 300) {
+		throw new Error(`Codex model discovery failed: status ${response.status}`);
+	}
+	const models = (response.json as { models?: unknown } | null)?.models;
+	return Array.isArray(models) ? (models as CodexModelEntry[]) : [];
 }
 
 export function createOpenAICodexFetch(): typeof fetch {

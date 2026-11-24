@@ -9,7 +9,7 @@ vi.mock("../../src/hooks/useAvailableModels.svelte", () => ({
 
 import { buildPersistedChatModel } from "../../src/utils/persistedChatModel";
 
-function hydrated(provider: string, variantKey: string, contextWindow: number, vision?: boolean) {
+function hydrated(provider: string, variantKey: string, contextWindow: number | undefined, vision?: boolean) {
 	hydratedChatModelsByKey.set(`${provider}:${variantKey}`, {
 		kind: "chat",
 		provider,
@@ -61,14 +61,15 @@ describe("buildPersistedChatModel", () => {
 		expect(result.modelConfig.contextWindow).toBe(40960);
 	});
 
-	it("falls back to the previous value, then 128000, when the catalogue has no entry", () => {
+	it("stores 128000 when the provider reports no window, never another model's value", () => {
+		hydrated("openai", "gpt-5.4", undefined);
 		const existing = { provider: "ollama", model: "qwen3:8b", modelConfig: { contextWindow: 16384 } };
 
-		expect(buildPersistedChatModel("ollama", "llama3.2:3b", existing).modelConfig.contextWindow).toBe(16384);
+		expect(buildPersistedChatModel("openai", "gpt-5.4", existing).modelConfig.contextWindow).toBe(128000);
 		expect(buildPersistedChatModel("ollama", "llama3.2:3b", null).modelConfig.contextWindow).toBe(128000);
 	});
 
-	it("follows the catalogue for vision and keeps the stored temperature", () => {
+	it("keeps the stored image-input setting and temperature when the same model is re-picked", () => {
 		hydrated("ollama", "qwen3:8b", 40960, true);
 		const existing = {
 			provider: "ollama",
@@ -78,7 +79,20 @@ describe("buildPersistedChatModel", () => {
 
 		const result = buildPersistedChatModel("ollama", "qwen3:8b", existing);
 
-		expect(result.modelConfig).toEqual({ contextWindow: 16384, supportsVision: true, temperature: 0.2 });
+		expect(result.modelConfig).toEqual({ contextWindow: 16384, supportsVision: false, temperature: 0.2 });
+	});
+
+	it("takes image input from the provider for a different model, and leaves it unknown when unreported", () => {
+		hydrated("ollama", "llava:7b", 4096, true);
+		hydrated("openai", "gpt-5.4", undefined);
+		const existing = {
+			provider: "ollama",
+			model: "qwen3:8b",
+			modelConfig: { contextWindow: 16384, supportsVision: true },
+		};
+
+		expect(buildPersistedChatModel("ollama", "llava:7b", existing).modelConfig.supportsVision).toBe(true);
+		expect(buildPersistedChatModel("openai", "gpt-5.4", existing).modelConfig.supportsVision).toBeUndefined();
 	});
 
 	it("keeps the reasoning effort on a re-pick and drops it for a different model", () => {
