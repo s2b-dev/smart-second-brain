@@ -44,7 +44,13 @@ const suggestedBatchSize = $derived.by(() => {
 	}
 
 	const existingIndex = plugin.pluginData.getEmbeddingIndex(`${selectedModel.provider}:${selectedModel.model}`);
-	return existingIndex?.batchSize ?? getDefaultEmbeddingBatchSize(selectedModel.provider);
+	return (
+		existingIndex?.batchSize ??
+		getDefaultEmbeddingBatchSize(
+			selectedModel.provider,
+			plugin.pluginData.getProviderTemplateId(selectedModel.provider),
+		)
+	);
 });
 
 let batchSize = $state(0);
@@ -114,7 +120,14 @@ function handleSave() {
 	}
 
 	error = "";
-	onSave(selectedModel, normalizeEmbeddingBatchSize(batchSize, selectedModel.provider));
+	onSave(
+		selectedModel,
+		normalizeEmbeddingBatchSize(
+			batchSize,
+			selectedModel.provider,
+			plugin.pluginData.getProviderTemplateId(selectedModel.provider),
+		),
+	);
 	modal.close();
 }
 

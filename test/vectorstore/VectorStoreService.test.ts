@@ -11,6 +11,14 @@ describe("embedding batch size helpers", () => {
 		expect(getDefaultEmbeddingBatchSize("custom-provider")).toBe(50);
 	});
 
+	it("gives every instance of a local template the local default, whatever its id", () => {
+		expect(getDefaultEmbeddingBatchSize("lm-studio", "lmstudio")).toBe(10);
+		expect(getDefaultEmbeddingBatchSize("my-lm-studio-2", "lmstudio")).toBe(10);
+		expect(getDefaultEmbeddingBatchSize("ollama-2", "ollama")).toBe(10);
+		expect(getDefaultEmbeddingBatchSize("custom-provider", "openai-compatible")).toBe(50);
+		expect(normalizeEmbeddingBatchSize(undefined, "my-lm-studio-2", "lmstudio")).toBe(10);
+	});
+
 	it("normalizes invalid custom values", () => {
 		expect(normalizeEmbeddingBatchSize(undefined, "openai")).toBe(100);
 		expect(normalizeEmbeddingBatchSize(0, "openai")).toBe(1);

@@ -15,6 +15,7 @@ import { getOllamaModelsCache } from "../providers/ollamaModels";
 import { fetchOpenRouterModels } from "../providers/openrouterModels";
 import { hasCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import { hasGeminiModelInfo } from "../providers/googleModels";
+import { hasLmStudioModels } from "../providers/lmstudioModels";
 import { getRegistry } from "../providers/registry";
 import {
 	BULK_CHECKPOINT_INTERVAL,
@@ -169,6 +170,9 @@ const MODIFY_DEBOUNCE_MS = 5_000;
  * embeddings route works; indexing must not stall with it.
  */
 const EMBED_LIMITS_DISCOVERY_WAIT_MS = 5_000;
+
+/** How often chunk sizing re-reads LM Studio's loaded context lengths. */
+const LMSTUDIO_LIMITS_REFRESH_MS = 60_000;
 
 /**
  * Chars per token for sizing chunks against a model's input cap.
@@ -462,6 +466,8 @@ export class VectorStoreService {
 	/** OpenAI-compatible providers whose model discovery chunk sizing started / saw finish. */
 	private readonly startedEmbedLimits = new Set<string>();
 	private readonly settledEmbedLimits = new Set<string>();
+	/** When each LM Studio provider's listing was last refreshed for chunk sizing. */
+	private readonly lmStudioLimitsRefreshedAt = new Map<string, number>();
 	private isInitialized = false;
 	private readonly vaultId: string;
 	/** Crash-backoff marker for scheduled bulk runs (`s2b-embedding-bulk-attempts`, vault-scoped). */
@@ -828,7 +834,16 @@ export class VectorStoreService {
 			return DEFAULT_EMBED_MAX_INPUT_TOKENS;
 		}
 
+		// LM Studio's limit is the length the model is *loaded* with, which changes when the user
+		// reloads it. Keep the listing fresh and don't memoize, so the next note is chunked to the
+		// current limit; hydration only reads the discovery cache, so recomputing is cheap.
+		const isLmStudio = getData().getProviderTemplateId(defaultModel.provider) === "lmstudio";
+		if (isLmStudio && hasLmStudioModels(defaultModel.provider)) {
+			this.refreshLmStudioLimits(defaultModel.provider);
+		}
+
 		if (
+			!isLmStudio &&
 			inst.maxInputTokensCache?.provider === defaultModel.provider &&
 			inst.maxInputTokensCache.model === defaultModel.model
 		) {
@@ -838,14 +853,16 @@ export class VectorStoreService {
 		const openRouterData = defaultModel.provider === "openrouter" ? await fetchOpenRouterModels() : null;
 		const templateId = getData().getProviderTemplateId(defaultModel.provider);
 
-		// An OpenAI-compatible endpoint's or Gemini's limits arrive with its model discovery, which
-		// may not have run yet this early in startup. Start it (once) and wait a bounded time; until
-		// it lands, size from the fallback without memoizing it, so the real limit applies once known.
-		// Gemini needs it most: gemini-embedding-001 takes 2048 tokens, a quarter of the fallback.
+		// An OpenAI-compatible endpoint's, Gemini's or LM Studio's limits arrive with its model
+		// discovery, which may not have run yet this early in startup. Start it (once) and wait a
+		// bounded time; until it lands, size from the fallback without memoizing it, so the real
+		// limit applies once known. Gemini needs it most: gemini-embedding-001 takes 2048 tokens,
+		// a quarter of the fallback.
 		let limitsPending = false;
 		if (
 			(templateId === "openai-compatible" && !hasCompatibleModelInfo(defaultModel.provider)) ||
-			(templateId === "google" && !hasGeminiModelInfo(defaultModel.provider))
+			(templateId === "google" && !hasGeminiModelInfo(defaultModel.provider)) ||
+			(templateId === "lmstudio" && !hasLmStudioModels(defaultModel.provider))
 		) {
 			limitsPending = await this.awaitEmbedLimitsDiscovery(defaultModel.provider);
 		}
@@ -865,7 +882,7 @@ export class VectorStoreService {
 			templateId,
 		});
 
-		if (!limitsPending) {
+		if (!limitsPending && !isLmStudio) {
 			inst.maxInputTokensCache = {
 				provider: defaultModel.provider,
 				model: defaultModel.model,
@@ -874,6 +891,22 @@ export class VectorStoreService {
 		}
 
 		return metadata.maxInputTokens;
+	}
+
+	/** Re-lists an LM Studio provider's models in the background, at most once a minute. */
+	private refreshLmStudioLimits(providerId: string): void {
+		const now = Date.now();
+		if (now - (this.lmStudioLimitsRefreshedAt.get(providerId) ?? 0) < LMSTUDIO_LIMITS_REFRESH_MS) return;
+		this.lmStudioLimitsRefreshedAt.set(providerId, now);
+		void (async () => {
+			try {
+				if (ensureProviderRegistered(getData(), providerId)) {
+					await getRegistry().discoverModels(providerId);
+				}
+			} catch (error) {
+				Logger.warn("[VectorStore] LM Studio model refresh failed; keeping the last known limit:", error);
+			}
+		})();
 	}
 
 	/** True while chunk sizing for this provider runs on a fallback awaiting its discovery. */
@@ -1630,8 +1663,14 @@ export class VectorStoreService {
 	 * Get the configured batch size for an index, falling back to provider defaults.
 	 */
 	private getBatchSize(indexId: string, providerId: string): number {
-		const configuredBatchSize = getData().getEmbeddingIndex(indexId)?.batchSize;
-		return normalizeEmbeddingBatchSize(configuredBatchSize ?? getDefaultEmbeddingBatchSize(providerId), providerId);
+		const data = getData();
+		const templateId = data.getProviderTemplateId(providerId);
+		const configuredBatchSize = data.getEmbeddingIndex(indexId)?.batchSize;
+		return normalizeEmbeddingBatchSize(
+			configuredBatchSize ?? getDefaultEmbeddingBatchSize(providerId, templateId),
+			providerId,
+			templateId,
+		);
 	}
 
 	/**

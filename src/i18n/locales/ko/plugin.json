@@ -90,6 +90,7 @@
 		"auth_failed_status": "인증 실패 ({status})",
 		"auth_failed": "인증 실패",
 		"request_failed_status": "요청 실패, 상태 {status}",
+		"lmstudio_not_running": "{url}에서 LM Studio에 연결할 수 없습니다. LM Studio를 열고 Developer 탭에서 서버를 켜세요(\"Status: Running\").",
 		"codex_sign_in_required": "Codex를 사용하려면 ChatGPT로 로그인하세요",
 		"openai_codex_sign_in_required": "Codex를 통해 OpenAI를 사용하려면 ChatGPT로 로그인하세요",
 		"huggingface_token_rejected": "Hugging Face가 이 액세스 토큰을 거부했습니다",
@@ -103,6 +104,7 @@
 			"anthropic": "Anthropic API를 통한 Claude 모델.",
 			"ollama": "Ollama API를 통한 로컬 Ollama 모델.",
 			"omlx": "oMLX의 OpenAI 호환 서버를 통해 Mac에서 실행하는 로컬 MLX 모델.",
+			"lmstudio": "컴퓨터에 설치된 LM Studio 앱의 로컬 모델.",
 			"openrouter": "OpenRouter 계정과 모델 카탈로그.",
 			"huggingface": "Hugging Face 추론 제공자의 오픈 모델.",
 			"google": "Google AI Studio API 키를 통한 Gemini 모델.",
@@ -145,6 +147,11 @@
 			"link": "oMLX 웹사이트",
 			"server_url_desc": "oMLX 서버가 실행 중인 URL",
 			"api_key_desc": "oMLX는 기본적으로 API 키가 필요합니다(관리자 패널의 전역 설정에서 확인). 키 확인을 비활성화한 경우에만 비워 두세요."
+		},
+		"lmstudio": {
+			"link": "LM Studio 서버 문서",
+			"server_url_desc": "LM Studio 서버가 실행 중인 URL",
+			"api_key_desc": "LM Studio 서버 설정에서 \"Require Authentication\"을 켠 경우에만 필요합니다."
 		},
 		"openrouter": {
 			"link": "OpenRouter 키",

@@ -16,6 +16,7 @@ import OllamaLogo from "../../components/ui/logos/OllamaLogo.svelte";
 import OpenAILogo from "../../components/ui/logos/OpenAILogo.svelte";
 import OpenRouterLogo from "../../components/ui/logos/OpenRouterLogo.svelte";
 import OmlxLogo from "../../components/ui/logos/OmlxLogo.svelte";
+import LmStudioLogo from "../../components/ui/logos/LmStudioLogo.svelte";
 import HuggingFaceLogo from "../../components/ui/logos/HuggingFaceLogo.svelte";
 import GoogleLogo from "../../components/ui/logos/GoogleLogo.svelte";
 import MistralLogo from "../../components/ui/logos/MistralLogo.svelte";
@@ -67,6 +68,7 @@ const isConfigured = $derived(data.isProviderConfigured(providerId));
 const PICKER_ORDER: ProviderTemplateId[] = [
 	"openai-compatible",
 	"omlx",
+	"lmstudio",
 	"openrouter",
 	"ollama",
 	"openai",
@@ -247,6 +249,7 @@ const TEMPLATE_LOGOS: Partial<Record<ProviderTemplateId, Component<LogoProps>>> 
 	anthropic: AnthropicLogo,
 	ollama: OllamaLogo,
 	omlx: OmlxLogo,
+	lmstudio: LmStudioLogo,
 	openrouter: OpenRouterLogo,
 	huggingface: HuggingFaceLogo,
 	google: GoogleLogo,

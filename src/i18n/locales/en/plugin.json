@@ -96,6 +96,7 @@
 		"auth_failed_status": "Authentication failed ({status})",
 		"auth_failed": "Authentication failed",
 		"request_failed_status": "Request failed with status {status}",
+		"lmstudio_not_running": "LM Studio isn't reachable at {url}. Open LM Studio, go to the Developer tab, and switch the server on (\"Status: Running\").",
 		"codex_sign_in_required": "Sign in with ChatGPT to use Codex",
 		"openai_codex_sign_in_required": "Sign in with ChatGPT to use OpenAI via Codex",
 		"huggingface_token_rejected": "Hugging Face rejected this access token",
@@ -109,6 +110,7 @@
 			"anthropic": "Claude models via Anthropic's API.",
 			"ollama": "Local Ollama models over the Ollama API.",
 			"omlx": "Local MLX models on your Mac via oMLX's OpenAI-compatible server.",
+			"lmstudio": "Local models from the LM Studio app on your computer.",
 			"openrouter": "OpenRouter account and model catalog.",
 			"huggingface": "Open models from Hugging Face's inference providers.",
 			"google": "Gemini models via a Google AI Studio API key.",
@@ -151,6 +153,11 @@
 			"link": "oMLX Website",
 			"server_url_desc": "The URL where your oMLX server is running",
 			"api_key_desc": "oMLX requires an API key by default (find it in the admin panel's global settings). Leave empty only if you disabled key verification."
+		},
+		"lmstudio": {
+			"link": "LM Studio server docs",
+			"server_url_desc": "The URL where LM Studio's server is running",
+			"api_key_desc": "Only needed if you turned on \"Require Authentication\" in LM Studio's server settings."
 		},
 		"openrouter": {
 			"link": "OpenRouter Keys",

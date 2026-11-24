@@ -11,6 +11,8 @@ import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type AgentConfig, type SkillMeta
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { hydrateChatModel } from "../lib/modelMetadataNormalizer";
 import { fetchOllamaModelsInfo } from "../providers/ollamaModels";
+import { hasLmStudioModels } from "../providers/lmstudioModels";
+import { clampLmStudioContextWindows, withinDeadline } from "./lmStudioContextWindow";
 import { SystemPromptModal } from "../components/modal/SystemPromptModal";
 import {
 	extractCapabilities as extractOpenRouterCapabilities,
@@ -196,12 +198,26 @@ function persistResolvedVisionSupport(model: ChatModel, supportsVision: boolean)
 }
 
 /**
+ * The query's result, or undefined as soon as the turn is cancelled. Lets Stop end a turn still
+ * waiting on a provider lookup; the lookup itself carries on and caches its answer for later.
+ */
+function untilAborted<T>(query: Promise<T>, signal?: AbortSignal): Promise<T | undefined> {
+	if (!signal) return query;
+	if (signal.aborted) return Promise.resolve(undefined);
+	return new Promise((resolve, reject) => {
+		const onAbort = () => resolve(undefined);
+		signal.addEventListener("abort", onAbort, { once: true });
+		query.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+	});
+}
+
+/**
  * Maps the UI ChatModel type to papa-ts ChooseModelParams.
  * Enriches supportsVision from what the model's provider reports. When it reports nothing,
  * this run treats the model as text-only and nothing is persisted, so the answer can still
  * arrive later or come from the user (the Agent editor's image-input toggle).
  */
-async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams> {
+async function toChooseModelParams(model: ChatModel, signal?: AbortSignal): Promise<ChooseModelParams> {
 	const options = { ...model.modelConfig };
 	const cacheKey = getVisionSupportCacheKey(model.provider, model.model);
 
@@ -212,7 +228,10 @@ async function toChooseModelParams(model: ChatModel): Promise<ChooseModelParams>
 	// If supportsVision is not explicitly set, resolve it from provider APIs
 	if (options.supportsVision === undefined) {
 		try {
-			const resolvedSupportsVision = await resolveVisionSupportCached(model.provider, model.model);
+			const resolvedSupportsVision = await untilAborted(
+				resolveVisionSupportCached(model.provider, model.model),
+				signal,
+			);
 			options.supportsVision = resolvedSupportsVision ?? false;
 			// Persist resolved capability via store update helper (avoid mutating model reference directly).
 			if (resolvedSupportsVision !== undefined) persistResolvedVisionSupport(model, resolvedSupportsVision);
@@ -289,6 +308,14 @@ async function resolveVisionSupport(providerId: string, modelId: string): Promis
 			const info = models.get(modelId);
 			if (info) return info.supportsVision;
 		}
+	}
+
+	// LM Studio: discovery fills the cache step 3 reads; run it if this session hasn't yet. Bounded
+	// like the context-window check, so a stalled server leaves vision unknown instead of holding the turn.
+	if (data.getProviderTemplateId(providerId) === "lmstudio" && !hasLmStudioModels(providerId)) {
+		const auth = data.getResolvedAuthState(providerId);
+		const discovery = auth && getProviderDefinition(providerId, data.getAllProviderMeta())?.discoverModels(auth);
+		if (discovery) await withinDeadline(discovery);
 	}
 
 	// 2. OpenRouter: derive vision from architecture.input_modalities (cached)
@@ -1708,6 +1735,8 @@ export class AgentManager {
 			// The model instance is built with the effort baked in (see providers/reasoningEffort.ts).
 			reasoningEffort: chatModel.modelConfig?.reasoningEffort ?? null,
 			summ: `${summarizationModel.provider}:${summarizationModel.model}`,
+			// The summarization middleware sizes its input from this, so a changed window must rebuild.
+			summContextWindow: summarizationModel.modelConfig?.contextWindow ?? null,
 			agentId: agent.id,
 			agentRev: this.agentConfigRevision(agent),
 			// A cached runnable holds the model instance it was BUILT with, and that
@@ -1744,7 +1773,10 @@ export class AgentManager {
 		this.agent?.invalidateRunnable(agentId);
 	}
 
-	private async prepareAgentForStream(agentId: string): Promise<{
+	private async prepareAgentForStream(
+		agentId: string,
+		signal?: AbortSignal,
+	): Promise<{
 		agent: Agent;
 		resolved: ResolvedRun;
 		chatModel: ChatModel;
@@ -1752,7 +1784,7 @@ export class AgentManager {
 		resolvedAgentId: string;
 	}> {
 		const agent = await this.ensureAgent();
-		await this.awaitDeferredSetup();
+		await untilAborted(this.awaitDeferredSetup(), signal);
 		const pluginData = getData();
 		// Empty agentId ("" default) → intentionally use global selection.
 		// Non-empty but unknown agentId → agent was deleted; throw rather than silently
@@ -1766,6 +1798,7 @@ export class AgentManager {
 			if (!found) throw new Error(`Agent "${agentId}" no longer exists — please select a different agent.`);
 			selectedAgent = found;
 		}
+		selectedAgent = await clampLmStudioContextWindows(selectedAgent, signal);
 		const chatModel = selectedAgent.chatModel;
 		if (!chatModel) throw new Error("No chat model configured");
 		const summarizationModel = resolveSummarizationChatModel(chatModel, selectedAgent.summarizationModel);
@@ -1797,9 +1830,9 @@ export class AgentManager {
 		let resolved: ResolvedRun;
 		try {
 			resolved = await agent.resolveRun({
-				...(await toChooseModelParams(chatModel)),
-				summarizationModel: await toChooseModelParams(summarizationModel),
-				titleModel: await toChooseModelParams(titleModel),
+				...(await toChooseModelParams(chatModel, signal)),
+				summarizationModel: await toChooseModelParams(summarizationModel, signal),
+				titleModel: await toChooseModelParams(titleModel, signal),
 				cacheKey,
 				systemPrompt,
 				tools,
@@ -1837,7 +1870,10 @@ export class AgentManager {
 		reviewStatus?: ReviewStatusRef,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.streamTokens({
@@ -1873,7 +1909,10 @@ export class AgentManager {
 		attachments?: ChatAttachment[],
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.editFromCheckpoint({
@@ -1903,7 +1942,10 @@ export class AgentManager {
 		signal?: AbortSignal,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.regenerateFromCheckpoint({
@@ -1932,7 +1974,10 @@ export class AgentManager {
 		signal?: AbortSignal,
 	): AsyncGenerator<AgentManagerStreamChunk, void, unknown> {
 		const resolvedThreadId = this.normalizeThreadId(threadId);
-		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(agentId);
+		const { agent, resolved, chatModel, runMetadata, resolvedAgentId } = await this.prepareAgentForStream(
+			agentId,
+			signal,
+		);
 
 		yield* this.dispatchStream(
 			agent.resumeFromInterrupt({

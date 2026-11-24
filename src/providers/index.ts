@@ -21,6 +21,7 @@ import { createGoogleProvider } from "./google";
 import { discoverMistralEmbeddingModels, discoverMistralModels, mistralProvider } from "./mistral";
 import { openAICodexProvider } from "./openai-codex";
 import { createOmlxProvider } from "./omlx";
+import { createLmStudioProvider } from "./lmstudio";
 
 export interface ProviderTemplateDefinition {
 	id: ProviderTemplateId;
@@ -53,6 +54,11 @@ const PROVIDER_TEMPLATES: readonly ProviderTemplateDefinition[] = [
 		id: "omlx",
 		displayName: "oMLX",
 		description: t("plugin.providers.templates.omlx"),
+	},
+	{
+		id: "lmstudio",
+		displayName: "LM Studio",
+		description: t("plugin.providers.templates.lmstudio"),
 	},
 	{
 		id: "openrouter",
@@ -101,6 +107,8 @@ function createTemplateDefinition(
 			});
 		case "omlx":
 			return createOmlxProvider(instanceId, meta.displayName);
+		case "lmstudio":
+			return createLmStudioProvider(instanceId, meta.displayName);
 		case "openai-codex":
 			return openAICodexProvider(instanceId, meta.displayName);
 		case "anthropic":

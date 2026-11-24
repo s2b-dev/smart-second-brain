@@ -90,6 +90,7 @@
 		"auth_failed_status": "認証に失敗しました ({status})",
 		"auth_failed": "認証に失敗しました",
 		"request_failed_status": "リクエストが失敗しました(ステータス {status})",
+		"lmstudio_not_running": "{url} で LM Studio に接続できません。LM Studio を開き、Developer タブでサーバーをオンにしてください(「Status: Running」)。",
 		"codex_sign_in_required": "Codex を使うには ChatGPT でサインインしてください",
 		"openai_codex_sign_in_required": "Codex 経由で OpenAI を使うには ChatGPT でサインインしてください",
 		"huggingface_token_rejected": "Hugging Face がこのアクセストークンを拒否しました",
@@ -103,6 +104,7 @@
 			"anthropic": "Anthropic の API 経由の Claude モデル。",
 			"ollama": "Ollama API 経由のローカル Ollama モデル。",
 			"omlx": "oMLX の OpenAI 互換サーバー経由で Mac 上のローカル MLX モデル。",
+			"lmstudio": "お使いのコンピューター上の LM Studio アプリのローカルモデル。",
 			"openrouter": "OpenRouter のアカウントとモデルカタログ。",
 			"huggingface": "Hugging Face の推論プロバイダーによるオープンモデル。",
 			"google": "Google AI Studio の API キー経由の Gemini モデル。",
@@ -145,6 +147,11 @@
 			"link": "oMLX ウェブサイト",
 			"server_url_desc": "oMLX サーバーが動作している URL",
 			"api_key_desc": "oMLX ではデフォルトで API キーが必要です(管理パネルのグローバル設定で確認できます)。キーの検証を無効にした場合のみ空欄にしてください。"
+		},
+		"lmstudio": {
+			"link": "LM Studio サーバーのドキュメント",
+			"server_url_desc": "LM Studio のサーバーが動作している URL",
+			"api_key_desc": "LM Studio のサーバー設定で「Require Authentication」をオンにした場合のみ必要です。"
 		},
 		"openrouter": {
 			"link": "OpenRouter のキー",
