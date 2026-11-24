@@ -159,7 +159,6 @@ const fakeData = {
 	get embeddingIndexes() {
 		return indexIds.map((id) => fakeData.getEmbeddingIndex(id));
 	},
-	getProviderTemplateId: (_providerId: string) => undefined,
 	getEmbeddingIndex: (id: string) => {
 		if (!indexIds.includes(id)) return undefined;
 		const [provider, model] = id.split(":");

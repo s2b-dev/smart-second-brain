@@ -114,6 +114,20 @@ describe("parseV1Models", () => {
 		expect(model.contextLength).toBe(8192);
 	});
 
+	it("marks a model with a reasoning setting as reasoning", () => {
+		const [model] = parseV1Models({
+			models: [
+				{
+					type: "llm",
+					key: "qwen/qwen3-8b",
+					max_context_length: 40960,
+					capabilities: { vision: false, reasoning: { allowed_options: ["off", "on"], default: "on" } },
+				},
+			],
+		});
+		expect(model.reasoning).toBe(true);
+	});
+
 	it("reads vision and tool capabilities", () => {
 		const [gemma, deepseek, nomic] = parseV1Models(V1_RESPONSE);
 		expect([gemma.supportsVision, gemma.supportsTools]).toEqual([true, true]);
@@ -168,8 +182,16 @@ describe("LM Studio discovery", () => {
 		expect(chat.contextWindow).toBe(4096);
 		expect(chat.capabilities.vision).toBe(true);
 		expect(chat.quantization).toBe("Q4_K_M");
+		expect(chat.capabilities.reasoning).toBe(false);
 
-		const embed = hydrateEmbeddingModel("lm-studio", "text-embedding-nomic-embed-text-v1.5-embedding");
+		// Only an LM Studio instance reads LM Studio's cache.
+		expect(hydrateChatModel("lm-studio", "google/gemma-4-26b-a4b", { templateId: "openai" }).contextWindow).toBe(
+			undefined,
+		);
+
+		const embed = hydrateEmbeddingModel("lm-studio", "text-embedding-nomic-embed-text-v1.5-embedding", {
+			templateId: "lmstudio",
+		});
 		expect(embed.maxInputTokens).toBe(2048);
 	});
 
