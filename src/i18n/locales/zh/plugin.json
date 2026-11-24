@@ -90,6 +90,7 @@
 		"auth_failed_status": "身份验证失败（{status}）",
 		"auth_failed": "身份验证失败",
 		"request_failed_status": "请求失败，状态码 {status}",
+		"lmstudio_not_running": "无法通过 {url} 访问 LM Studio。请打开 LM Studio，进入 Developer 标签页并开启服务器(“Status: Running”)。",
 		"codex_sign_in_required": "请使用 ChatGPT 登录以使用 Codex",
 		"openai_codex_sign_in_required": "请使用 ChatGPT 登录以通过 Codex 使用 OpenAI",
 		"huggingface_token_rejected": "Hugging Face 拒绝了此访问令牌",
@@ -103,6 +104,7 @@
 			"anthropic": "通过 Anthropic API 使用 Claude 模型。",
 			"ollama": "通过 Ollama API 使用本地 Ollama 模型。",
 			"omlx": "通过 oMLX 的 OpenAI 兼容服务器，在你的 Mac 上使用本地 MLX 模型。",
+			"lmstudio": "来自你电脑上 LM Studio 应用的本地模型。",
 			"openrouter": "OpenRouter 账户及模型目录。",
 			"huggingface": "来自 Hugging Face 推理提供商的开放模型。",
 			"google": "通过 Google AI Studio API 密钥使用 Gemini 模型。",
@@ -145,6 +147,11 @@
 			"link": "oMLX 网站",
 			"server_url_desc": "oMLX 服务器的运行地址",
 			"api_key_desc": "oMLX 默认需要 API 密钥（可在管理面板的全局设置中找到）。仅在你关闭了密钥验证时才可留空。"
+		},
+		"lmstudio": {
+			"link": "LM Studio 服务器文档",
+			"server_url_desc": "LM Studio 服务器的运行地址",
+			"api_key_desc": "仅当你在 LM Studio 的服务器设置中开启了“Require Authentication”时才需要。"
 		},
 		"openrouter": {
 			"link": "OpenRouter 密钥",

@@ -128,7 +128,7 @@ let hasProvider = $derived(configuredProviders.length > 0);
 // on once a provider exists, and its meaning inverts under public-by-default —
 // so derive the case rather than asserting one static claim.
 let isPublicByDefault = $derived(data.privacyMode === "public-by-default");
-// Local providers (ollama/omlx) seed trustedForPrivateData, so a user who
+// Local providers (Ollama, oMLX, LM Studio) seed trustedForPrivateData, so a user who
 // connected one is already unblocked and needs no call to action.
 let trustedProviders = $derived(configuredProviders.filter((p) => data.isProviderTrusted(p)));
 let privacyCase = $derived(

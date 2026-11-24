@@ -108,6 +108,7 @@
 		"auth_failed_status": "Preverjanje pristnosti ni uspelo ({status})",
 		"auth_failed": "Preverjanje pristnosti ni uspelo",
 		"request_failed_status": "Zahteva ni uspela s stanjem {status}",
+		"lmstudio_not_running": "LM Studio na {url} ni dosegljiv. Odprite LM Studio, pojdite na zavihek Developer in vklopite strežnik (»Status: Running«).",
 		"codex_sign_in_required": "Za uporabo Codexa se prijavite z računom ChatGPT",
 		"openai_codex_sign_in_required": "Za uporabo OpenAI prek Codexa se prijavite z računom ChatGPT",
 		"huggingface_token_rejected": "Hugging Face je zavrnil ta dostopni žeton",
@@ -121,6 +122,7 @@
 			"anthropic": "Modeli Claude prek API-ja Anthropic.",
 			"ollama": "Lokalni modeli Ollama prek API-ja Ollama.",
 			"omlx": "Lokalni modeli MLX na vašem Macu prek strežnika oMLX, združljivega z OpenAI.",
+			"lmstudio": "Lokalni modeli iz aplikacije LM Studio na vašem računalniku.",
 			"openrouter": "Račun OpenRouter in katalog modelov.",
 			"huggingface": "Odprti modeli ponudnikov sklepanja Hugging Face.",
 			"google": "Modeli Gemini prek ključa API iz Google AI Studio.",
@@ -163,6 +165,11 @@
 			"link": "Spletno mesto oMLX",
 			"server_url_desc": "URL, na katerem teče vaš strežnik oMLX",
 			"api_key_desc": "oMLX privzeto zahteva ključ API (najdete ga v globalnih nastavitvah skrbniške plošče). Pustite prazno le, če ste izklopili preverjanje ključa."
+		},
+		"lmstudio": {
+			"link": "Dokumentacija strežnika LM Studio",
+			"server_url_desc": "URL, na katerem teče strežnik LM Studio",
+			"api_key_desc": "Potreben le, če ste v nastavitvah strežnika LM Studio vklopili »Require Authentication«."
 		},
 		"openrouter": {
 			"link": "Ključi OpenRouter",

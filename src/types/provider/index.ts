@@ -28,6 +28,7 @@ export type {
 
 // Provider definition type guard
 export { isEmbeddingProvider } from "./definition";
+export { isLocalProviderTemplate } from "./stored";
 
 // Stored provider types
 export type { ProviderInstanceMeta, ProviderTemplateId } from "./stored";

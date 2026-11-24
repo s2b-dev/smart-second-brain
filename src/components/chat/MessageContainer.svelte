@@ -16,6 +16,7 @@ import { getPlugin } from "../../stores/state.svelte";
 import { thinkingProcessPref } from "../../stores/thinkingProcessPref.svelte";
 import { getData } from "../../stores/dataStore.svelte";
 import { DEFAULT_AGENT_ICON } from "../../types/plugin";
+import { isLocalProviderTemplate } from "../../types/provider/index";
 import { VIEW_TYPE_CHAT } from "../../views/chat/Chat";
 import Button from "../ui/Button.svelte";
 import Icon from "../ui/Icon.svelte";
@@ -55,17 +56,16 @@ const messages = $derived.by(() => {
 	return session?.messages;
 });
 
-// Whether this session's chat model runs on this machine. Ollama and oMLX are the
-// local templates (the same pair dataStore trusts with private data by default),
-// and only they can spend the pre-first-token window loading weights into memory —
-// which is what the streaming status says during it. Remote providers get the
+// Whether this session's chat model runs on this machine. Only the local templates
+// (the set dataStore trusts with private data by default) can spend the
+// pre-first-token window loading weights into memory — which is what the streaming status says during it. Remote providers get the
 // network wording instead.
 const isLocalModel = $derived.by(() => {
 	const data = getData();
 	const providerId = data.getAgent(session?.selectedAgentId ?? "")?.chatModel?.provider;
 	if (!providerId) return false;
 	const templateId = data.getProviderTemplateId(providerId);
-	return templateId === "ollama" || templateId === "omlx";
+	return isLocalProviderTemplate(templateId);
 });
 
 const onMobile = isMobileUI();

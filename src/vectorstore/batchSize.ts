@@ -1,3 +1,5 @@
+import { isLocalProviderTemplate, type ProviderTemplateId } from "../types/provider/stored";
+
 export const MIN_EMBEDDING_BATCH_SIZE = 1;
 export const MAX_EMBEDDING_BATCH_SIZE = 2048;
 
@@ -54,7 +56,13 @@ export function hasFullEmbeddingBatch<T>(
 	return false;
 }
 
-export function getDefaultEmbeddingBatchSize(providerId: string): number {
+/**
+ * Default chunks per embedding request. Local runners (by template, so a second instance or a
+ * renamed one gets it too) take small batches: one slow machine embeds them inside the request
+ * timeout. The instance-id cases cover callers that don't know the template.
+ */
+export function getDefaultEmbeddingBatchSize(providerId: string, templateId?: ProviderTemplateId): number {
+	if (isLocalProviderTemplate(templateId)) return 10;
 	switch (providerId) {
 		case "openai":
 		case "openrouter":
@@ -67,10 +75,14 @@ export function getDefaultEmbeddingBatchSize(providerId: string): number {
 	}
 }
 
-export function normalizeEmbeddingBatchSize(value: number | null | undefined, providerId: string): number {
+export function normalizeEmbeddingBatchSize(
+	value: number | null | undefined,
+	providerId: string,
+	templateId?: ProviderTemplateId,
+): number {
 	const parsed = typeof value === "number" ? value : Number.parseInt(String(value ?? ""), 10);
 	if (!Number.isFinite(parsed)) {
-		return getDefaultEmbeddingBatchSize(providerId);
+		return getDefaultEmbeddingBatchSize(providerId, templateId);
 	}
 
 	return Math.min(MAX_EMBEDDING_BATCH_SIZE, Math.max(MIN_EMBEDDING_BATCH_SIZE, Math.trunc(parsed)));

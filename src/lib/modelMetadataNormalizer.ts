@@ -13,6 +13,7 @@ import {
 import { getMistralModelInfo, type MistralModelInfo } from "../providers/mistralModels";
 import { type CompatibleModelInfo, getCompatibleModelInfo } from "../providers/openaiCompatibleModels";
 import { type GeminiModelInfo, getGeminiModelInfo } from "../providers/googleModels";
+import { getLmStudioModel, type LmStudioModelInfo } from "../providers/lmstudioModels";
 import type { ProviderTemplateId } from "../types/provider";
 import type { HydratedChatModelMetadata, HydratedEmbeddingModelMetadata } from "../types/modelMetadata";
 
@@ -54,7 +55,7 @@ export function knownEmbeddingMaxInputTokens(modelId: string): number | undefine
 /**
  * Inputs to hydration. Every fact comes from the provider serving the model: the catalogues
  * passed in here (OpenRouter, Ollama) or the per-instance caches discovery fills (Anthropic,
- * Codex, Gemini, Hugging Face, OpenAI-compatible endpoints). There is deliberately no third-party
+ * Codex, Gemini, Hugging Face, OpenAI-compatible endpoints, LM Studio). There is deliberately no third-party
  * fallback; what the provider doesn't report stays undefined.
  */
 export interface ModelHydrationSourceData {
@@ -132,6 +133,7 @@ interface ProviderMetadata {
 	compatible?: CompatibleModelInfo;
 	gemini?: GeminiModelInfo;
 	mistral?: MistralModelInfo;
+	lmStudio?: LmStudioModelInfo;
 }
 
 function lookupMetadata(provider: string, variantKey: string, sourceData: ModelHydrationSourceData): ProviderMetadata {
@@ -152,6 +154,7 @@ function lookupMetadata(provider: string, variantKey: string, sourceData: ModelH
 		compatible: templateId === "openai-compatible" ? getCompatibleModelInfo(provider, variantKey) : undefined,
 		gemini: templateId === "google" ? getGeminiModelInfo(provider, variantKey) : undefined,
 		mistral: templateId === "mistral" ? getMistralModelInfo(provider, variantKey) : undefined,
+		lmStudio: templateId === "lmstudio" ? getLmStudioModel(provider, variantKey) : undefined,
 	};
 }
 
@@ -160,13 +163,13 @@ export function hydrateChatModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedChatModelMetadata {
-	const { openRouter, ollama, huggingFace, anthropic, codex, compatible, gemini, mistral } = lookupMetadata(
+	const { openRouter, ollama, huggingFace, anthropic, codex, compatible, gemini, mistral, lmStudio } = lookupMetadata(
 		provider,
 		variantKey,
 		sourceData,
 	);
-	const paramSize = normalizeParamSize(ollama?.parameterSize);
-	const quantization = ollama?.quantization;
+	const paramSize = normalizeParamSize(ollama?.parameterSize ?? lmStudio?.paramSize);
+	const quantization = ollama?.quantization ?? lmStudio?.quantization;
 
 	const displayName = buildDisplayName(
 		provider,
@@ -176,6 +179,7 @@ export function hydrateChatModel(
 			anthropic?.displayName ||
 			codex?.displayName ||
 			gemini?.displayName ||
+			lmStudio?.displayName ||
 			(sourceData.templateId === "huggingface" ? huggingFaceDisplayName(variantKey) : undefined),
 		paramSize,
 	);
@@ -189,6 +193,7 @@ export function hydrateChatModel(
 		compatible?.contextWindow ||
 		gemini?.inputTokenLimit ||
 		mistral?.contextLength ||
+		lmStudio?.contextLength ||
 		undefined;
 
 	const inputUsdPer1M = toUsdPer1MFromPerToken(openRouter?.pricing?.prompt);
@@ -212,7 +217,8 @@ export function hydrateChatModel(
 				ollama?.supportsTools ??
 				huggingFace?.supportsTools ??
 				compatible?.toolCalls ??
-				mistral?.supportsTools,
+				mistral?.supportsTools ??
+				lmStudio?.supportsTools,
 			vision:
 				openRouterCapabilities?.supportsVision ??
 				ollama?.supportsVision ??
@@ -220,13 +226,15 @@ export function hydrateChatModel(
 				anthropic?.vision ??
 				codex?.vision ??
 				compatible?.vision ??
-				mistral?.supportsVision,
+				mistral?.supportsVision ??
+				lmStudio?.supportsVision,
 			reasoning:
 				openRouterCapabilities?.supportsReasoning ??
 				anthropic?.thinking ??
 				(effortLevels ? effortLevels.length > 0 : undefined) ??
 				compatible?.reasoning ??
-				gemini?.thinking,
+				gemini?.thinking ??
+				lmStudio?.reasoning,
 			structuredOutput:
 				openRouterCapabilities?.supportsStructuredOutput ??
 				huggingFace?.supportsStructuredOutput ??
@@ -243,14 +251,14 @@ export function hydrateEmbeddingModel(
 	variantKey: string,
 	sourceData: ModelHydrationSourceData = {},
 ): HydratedEmbeddingModelMetadata {
-	const { openRouter, ollama, compatible, gemini, mistral } = lookupMetadata(provider, variantKey, sourceData);
-	const paramSize = normalizeParamSize(ollama?.parameterSize);
-	const quantization = ollama?.quantization;
+	const { openRouter, ollama, compatible, gemini, mistral, lmStudio } = lookupMetadata(provider, variantKey, sourceData);
+	const paramSize = normalizeParamSize(ollama?.parameterSize ?? lmStudio?.paramSize);
+	const quantization = ollama?.quantization ?? lmStudio?.quantization;
 
 	const displayName = buildDisplayName(
 		provider,
 		variantKey,
-		openRouter?.name || ollama?.name || gemini?.displayName,
+		openRouter?.name || ollama?.name || gemini?.displayName || lmStudio?.displayName,
 		paramSize,
 	);
 
@@ -265,6 +273,7 @@ export function hydrateEmbeddingModel(
 		compatible?.contextWindow ||
 		gemini?.inputTokenLimit ||
 		mistral?.contextLength ||
+		lmStudio?.contextLength ||
 		knownEmbeddingMaxInputTokens(variantKey) ||
 		providerDefaultMaxInputTokens ||
 		DEFAULT_EMBEDDING_MAX_INPUT_TOKENS;

@@ -134,9 +134,9 @@ Every provider is one file in `src/providers/` plus a template entry.
 4. Vision and PDF support are resolved per model at runtime. Do not hard-code capabilities.
 5. Add a unit test under `test/providers/`.
 6. Providers are untrusted by default; trust controls whether notes on the user's privacy list
-   may be sent to them. Only providers that run on the user's own machine (Ollama, oMLX) are
-   seeded as trusted, via a template-id check in `src/stores/dataStore.svelte.ts` (search for
-   `trustedForPrivateData`). Extend that check only for a genuinely local provider.
+   may be sent to them. Only providers that run on the user's own machine (Ollama, oMLX,
+   LM Studio) are seeded as trusted, via `isLocalProviderTemplate` in
+   `src/types/provider/stored.ts`. Extend that check only for a genuinely local provider.
 7. Note in the PR that `smartsecondbrain.dev` needs its provider table updated (see below).
 
 If the API is plain OpenAI-compatible with nothing provider-specific (no OAuth, no model

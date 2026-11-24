@@ -11,6 +11,8 @@ import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type AgentConfig, type SkillMeta
 import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { hydrateChatModel } from "../lib/modelMetadataNormalizer";
 import { fetchOllamaModelsInfo } from "../providers/ollamaModels";
+import { hasLmStudioModels } from "../providers/lmstudioModels";
+import { clampLmStudioContextWindows } from "./lmStudioContextWindow";
 import { SystemPromptModal } from "../components/modal/SystemPromptModal";
 import {
 	extractCapabilities as extractOpenRouterCapabilities,
@@ -288,6 +290,16 @@ async function resolveVisionSupport(providerId: string, modelId: string): Promis
 			const models = await fetchOllamaModelsInfo(auth.baseUrl, [modelId]);
 			const info = models.get(modelId);
 			if (info) return info.supportsVision;
+		}
+	}
+
+	// LM Studio: discovery fills the cache step 3 reads; run it if this session hasn't yet.
+	if (data.getProviderTemplateId(providerId) === "lmstudio" && !hasLmStudioModels(providerId)) {
+		const auth = data.getResolvedAuthState(providerId);
+		if (auth) {
+			await getProviderDefinition(providerId, data.getAllProviderMeta())
+				?.discoverModels(auth)
+				.catch(() => undefined);
 		}
 	}
 
@@ -1708,6 +1720,8 @@ export class AgentManager {
 			// The model instance is built with the effort baked in (see providers/reasoningEffort.ts).
 			reasoningEffort: chatModel.modelConfig?.reasoningEffort ?? null,
 			summ: `${summarizationModel.provider}:${summarizationModel.model}`,
+			// The summarization middleware sizes its input from this, so a changed window must rebuild.
+			summContextWindow: summarizationModel.modelConfig?.contextWindow ?? null,
 			agentId: agent.id,
 			agentRev: this.agentConfigRevision(agent),
 			// A cached runnable holds the model instance it was BUILT with, and that
@@ -1766,6 +1780,7 @@ export class AgentManager {
 			if (!found) throw new Error(`Agent "${agentId}" no longer exists — please select a different agent.`);
 			selectedAgent = found;
 		}
+		selectedAgent = await clampLmStudioContextWindows(selectedAgent);
 		const chatModel = selectedAgent.chatModel;
 		if (!chatModel) throw new Error("No chat model configured");
 		const summarizationModel = resolveSummarizationChatModel(chatModel, selectedAgent.summarizationModel);

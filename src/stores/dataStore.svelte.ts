@@ -52,6 +52,7 @@ import {
 	type ProviderTemplateId,
 } from "../providers/index";
 import { syncAllProviders, syncProvider, unsyncProvider } from "../providers/registrySync";
+import { isLocalProviderTemplate } from "../types/provider/index";
 import { t } from "../i18n";
 
 const LANGSMITH_API_KEY_SECRET_ID = buildManagedSecretId("langsmith", "apiKey");
@@ -156,7 +157,7 @@ function buildManagedSecretId(providerId: string, fieldName: string): string {
 }
 
 function createProviderState(templateId: ProviderTemplateId): StoredProviderState {
-	// Base URL pre-seed. Only local providers (Ollama, oMLX) are seeded: their baseUrl is a
+	// Base URL pre-seed. Only local providers (Ollama, oMLX, LM Studio) are seeded: their baseUrl is a
 	// REQUIRED field (shown in the main section) pointing at a well-known local default, so
 	// filling it in saves the user typing without side effects.
 	//
@@ -169,6 +170,7 @@ function createProviderState(templateId: ProviderTemplateId): StoredProviderStat
 	const baseUrlByTemplate: Partial<Record<ProviderTemplateId, string>> = {
 		ollama: "http://localhost:11434",
 		omlx: "http://localhost:8000",
+		lmstudio: "http://localhost:1234",
 	};
 	const authMode = templateId === "openai-codex" ? "codex" : "apiKey";
 
@@ -180,7 +182,7 @@ function createProviderState(templateId: ProviderTemplateId): StoredProviderStat
 		},
 		chatModels: {},
 		embedModels: {},
-		trustedForPrivateData: templateId === "ollama" || templateId === "omlx",
+		trustedForPrivateData: isLocalProviderTemplate(templateId),
 	};
 }
 
@@ -1566,8 +1568,11 @@ export class PluginDataStore {
 		options?: { batchSize?: number },
 	): void {
 		const indexId = `${provider}:${model}`;
+		const templateId = this.getProviderTemplateId(provider);
 		const configuredBatchSize =
-			options?.batchSize !== undefined ? normalizeEmbeddingBatchSize(options.batchSize, provider) : undefined;
+			options?.batchSize !== undefined
+				? normalizeEmbeddingBatchSize(options.batchSize, provider, templateId)
+				: undefined;
 
 		// Ensure index config exists
 		const existing = this.#data.embeddingIndexes.find((i) => i.id === indexId);
@@ -1579,12 +1584,12 @@ export class PluginDataStore {
 				createdAt: Date.now(),
 				lastBuiltAt: null,
 				documentCount: 0,
-				batchSize: configuredBatchSize ?? getDefaultEmbeddingBatchSize(provider),
+				batchSize: configuredBatchSize ?? getDefaultEmbeddingBatchSize(provider, templateId),
 			});
 		} else if (configuredBatchSize !== undefined) {
 			existing.batchSize = configuredBatchSize;
 		} else if (existing.batchSize === undefined) {
-			existing.batchSize = getDefaultEmbeddingBatchSize(provider);
+			existing.batchSize = getDefaultEmbeddingBatchSize(provider, templateId);
 		}
 
 		// Set the index for the requested purpose

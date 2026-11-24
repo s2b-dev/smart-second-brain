@@ -102,6 +102,7 @@
 		"auth_failed_status": "Error de autenticación ({status})",
 		"auth_failed": "Error de autenticación",
 		"request_failed_status": "La solicitud falló con el estado {status}",
+		"lmstudio_not_running": "No se puede acceder a LM Studio en {url}. Abre LM Studio, ve a la pestaña Developer y activa el servidor («Status: Running»).",
 		"codex_sign_in_required": "Inicia sesión con ChatGPT para usar Codex",
 		"openai_codex_sign_in_required": "Inicia sesión con ChatGPT para usar OpenAI mediante Codex",
 		"huggingface_token_rejected": "Hugging Face rechazó este token de acceso",
@@ -115,6 +116,7 @@
 			"anthropic": "Modelos Claude mediante la API de Anthropic.",
 			"ollama": "Modelos locales de Ollama a través de la API de Ollama.",
 			"omlx": "Modelos MLX locales en tu Mac mediante el servidor compatible con OpenAI de oMLX.",
+			"lmstudio": "Modelos locales de la aplicación LM Studio en tu ordenador.",
 			"openrouter": "Cuenta y catálogo de modelos de OpenRouter.",
 			"huggingface": "Modelos abiertos de los proveedores de inferencia de Hugging Face.",
 			"google": "Modelos Gemini mediante una clave de API de Google AI Studio.",
@@ -157,6 +159,11 @@
 			"link": "Sitio web de oMLX",
 			"server_url_desc": "La URL donde se ejecuta tu servidor de oMLX",
 			"api_key_desc": "oMLX requiere una clave de API de forma predeterminada (la encontrarás en la configuración global del panel de administración). Déjala vacía solo si desactivaste la verificación de claves."
+		},
+		"lmstudio": {
+			"link": "Documentación del servidor de LM Studio",
+			"server_url_desc": "La URL donde se ejecuta el servidor de LM Studio",
+			"api_key_desc": "Solo es necesaria si activaste «Require Authentication» en la configuración del servidor de LM Studio."
 		},
 		"openrouter": {
 			"link": "Claves de OpenRouter",

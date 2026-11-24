@@ -1630,8 +1630,14 @@ export class VectorStoreService {
 	 * Get the configured batch size for an index, falling back to provider defaults.
 	 */
 	private getBatchSize(indexId: string, providerId: string): number {
-		const configuredBatchSize = getData().getEmbeddingIndex(indexId)?.batchSize;
-		return normalizeEmbeddingBatchSize(configuredBatchSize ?? getDefaultEmbeddingBatchSize(providerId), providerId);
+		const data = getData();
+		const templateId = data.getProviderTemplateId(providerId);
+		const configuredBatchSize = data.getEmbeddingIndex(indexId)?.batchSize;
+		return normalizeEmbeddingBatchSize(
+			configuredBatchSize ?? getDefaultEmbeddingBatchSize(providerId, templateId),
+			providerId,
+			templateId,
+		);
 	}
 
 	/**

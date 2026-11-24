@@ -96,6 +96,7 @@
 		"auth_failed_status": "Kimlik doğrulama başarısız ({status})",
 		"auth_failed": "Kimlik doğrulama başarısız",
 		"request_failed_status": "İstek {status} durum koduyla başarısız oldu",
+		"lmstudio_not_running": "LM Studio'ya {url} adresinden ulaşılamıyor. LM Studio'yu açın, Developer sekmesine gidin ve sunucuyu açın (\"Status: Running\").",
 		"codex_sign_in_required": "Codex'i kullanmak için ChatGPT ile oturum açın",
 		"openai_codex_sign_in_required": "OpenAI'ı Codex üzerinden kullanmak için ChatGPT ile oturum açın",
 		"huggingface_token_rejected": "Hugging Face bu erişim token'ını reddetti",
@@ -109,6 +110,7 @@
 			"anthropic": "Anthropic API'si üzerinden Claude modelleri.",
 			"ollama": "Ollama API'si üzerinden yerel Ollama modelleri.",
 			"omlx": "oMLX'in OpenAI uyumlu sunucusu aracılığıyla Mac'inizdeki yerel MLX modelleri.",
+			"lmstudio": "Bilgisayarınızdaki LM Studio uygulamasından yerel modeller.",
 			"openrouter": "OpenRouter hesabı ve model kataloğu.",
 			"huggingface": "Hugging Face çıkarım sağlayıcılarından açık modeller.",
 			"google": "Google AI Studio API anahtarıyla Gemini modelleri.",
@@ -151,6 +153,11 @@
 			"link": "oMLX web sitesi",
 			"server_url_desc": "oMLX sunucunuzun çalıştığı URL",
 			"api_key_desc": "oMLX varsayılan olarak bir API anahtarı gerektirir (yönetim panelinin genel ayarlarında bulabilirsiniz). Yalnızca anahtar doğrulamayı devre dışı bıraktıysanız boş bırakın."
+		},
+		"lmstudio": {
+			"link": "LM Studio sunucu belgeleri",
+			"server_url_desc": "LM Studio sunucusunun çalıştığı URL",
+			"api_key_desc": "Yalnızca LM Studio sunucu ayarlarında \"Require Authentication\" seçeneğini açtıysanız gereklidir."
 		},
 		"openrouter": {
 			"link": "OpenRouter anahtarları",
