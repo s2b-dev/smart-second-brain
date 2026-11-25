@@ -236,6 +236,13 @@ describe("chatLocation", () => {
 		keyboard.onActiveLeafChange(tab as unknown as ObsidianLeaf);
 		expect(pick("Chats/c.chat")).toBe("tab");
 
+		keyboard.onKeyDown(); // typing...
+		keyboard.onPointerDown(); // ...then a file-explorer click
+		now += 50;
+		keyboard.onActiveLeafChange(sidebar as unknown as ObsidianLeaf); // Obsidian's refocus
+		expect(pick("Chats/c.chat")).toBe("tab");
+
+		keyboard.onKeyDown();
 		now += 5_000; // long after the key
 		keyboard.onActiveLeafChange(sidebar as unknown as ObsidianLeaf);
 		expect(pick("Chats/c.chat")).toBe("tab");

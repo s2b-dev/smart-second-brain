@@ -701,9 +701,15 @@ export default class SecondBrainPlugin extends Plugin {
 		// On the window, capturing: Obsidian's hotkey handling stops a hotkey (Ctrl+Tab) before
 		// it reaches the document.
 		const watchChatChoice = (win: Window) => {
-			this.registerDomEvent(win, "pointerdown", (event) => recordChatPointer(this.app, event.target), {
-				capture: true,
-			});
+			this.registerDomEvent(
+				win,
+				"pointerdown",
+				(event) => {
+					keyboardChatFocus.onPointerDown();
+					recordChatPointer(this.app, event.target);
+				},
+				{ capture: true },
+			);
 			this.registerDomEvent(win, "keydown", () => keyboardChatFocus.onKeyDown(), { capture: true });
 		};
 		watchChatChoice(window);

@@ -134,6 +134,11 @@ export class KeyboardChatFocus {
 		this.lastKeyAt = performance.now();
 	}
 
+	/** A click is not keyboard intent: whatever focus follows it is the pointer's (or Obsidian's). */
+	onPointerDown(): void {
+		this.lastKeyAt = Number.NEGATIVE_INFINITY;
+	}
+
 	onActiveLeafChange(leaf: WorkspaceLeaf | null): void {
 		if (performance.now() - this.lastKeyAt > KEYBOARD_FOCUS_WINDOW_MS) return;
 		recordFocusedChat(this.app, leaf);
