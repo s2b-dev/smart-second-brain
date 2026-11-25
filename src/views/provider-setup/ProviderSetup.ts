@@ -147,12 +147,15 @@ export class ProviderSetupModal extends Modal {
 			return;
 		}
 
+		// Everything below uses this call's own id and entry: the awaits leave room for a
+		// later selection to move `this.selectedProvider` on.
+		const draftId = this.selectedProvider;
 		const template = getProviderTemplate(this.templateId);
 		const entry = this.directoryEntry;
 		const baseName = entry?.name ?? template?.displayName ?? "Provider";
 		const baseSlug = slugifyProviderName(baseName);
 		// If draft ID has a numeric suffix (e.g. "openai-compatible-2"), reflect it in the display name
-		const suffix = this.selectedProvider.slice(baseSlug.length); // "" or "-2"
+		const suffix = draftId.slice(baseSlug.length); // "" or "-2"
 		const displayName = suffix ? `${baseName} ${suffix.slice(1)}` : baseName;
 
 		// Reclaim any stale draft holding the ID or display name we're about to use. A leaked
@@ -165,25 +168,27 @@ export class ProviderSetupModal extends Modal {
 		const staleDrafts = Object.entries(data.getAllProviderMeta()).filter(
 			([id, meta]) =>
 				!data.isProviderConfigured(id) &&
-				(id === this.selectedProvider || meta.displayName.trim().toLowerCase() === wantedName),
+				(id === draftId || meta.displayName.trim().toLowerCase() === wantedName),
 		);
 		for (const [id] of staleDrafts) {
 			await data.deleteProvider(id);
 		}
 
-		await this.plugin.pluginData.addProviderInstance(this.selectedProvider, {
+		await this.plugin.pluginData.addProviderInstance(draftId, {
 			templateId: this.templateId,
 			displayName,
 			...(entry ? { directoryId: entry.id } : {}),
 		});
 		if (entry) {
 			// Stored, not just defaulted: the base URL field shows it and the user can edit it.
-			this.plugin.pluginData.setProviderAuthField(this.selectedProvider, "baseUrl", entry.api, false);
+			// Written to the id this call created, never `this.selectedProvider`, which a later
+			// selection may already have moved on.
+			this.plugin.pluginData.setProviderAuthField(draftId, "baseUrl", entry.api, false);
 		}
 		this.draftCreated = true;
 
 		if (this.isClosed && !this.isSubmitted) {
-			await this.plugin.pluginData.deleteProvider(this.selectedProvider);
+			await this.plugin.pluginData.deleteProvider(draftId);
 			this.draftCreated = false;
 		}
 	}

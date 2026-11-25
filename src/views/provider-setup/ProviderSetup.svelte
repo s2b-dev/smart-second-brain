@@ -279,9 +279,19 @@ const directoryCount = getDirectoryEntries().length;
 let directoryQuery = $state("");
 const directoryMatches = $derived(searchDirectory(directoryQuery));
 
+// One pick at a time: a second click while the first draft is still being saved would
+// start a second draft, and the two would race to become `providerId`.
+let isPickingEntry = $state(false);
+
 async function handleSelectDirectoryEntry(entry: DirectoryEntry) {
-	providerId = await modal.selectDirectoryEntry(entry);
-	step = "configure";
+	if (isPickingEntry) return;
+	isPickingEntry = true;
+	try {
+		providerId = await modal.selectDirectoryEntry(entry);
+		step = "configure";
+	} finally {
+		isPickingEntry = false;
+	}
 }
 
 async function handleSelectTemplate(id: ProviderTemplateId) {
@@ -574,7 +584,12 @@ const canFinish = $derived(
     {:else}
       <div class="provider-directory-list">
         {#each directoryMatches as entry (entry.id)}
-          <button type="button" class="provider-directory-row" onclick={() => void handleSelectDirectoryEntry(entry)}>
+          <button
+            type="button"
+            class="provider-directory-row"
+            disabled={isPickingEntry}
+            onclick={() => void handleSelectDirectoryEntry(entry)}
+          >
             <span class="provider-directory-logo"><DirectoryLogo svg={entry.logo} width={20} height={20} /></span>
             <span class="provider-directory-text">
               <span class="provider-directory-name">{entry.name}</span>
