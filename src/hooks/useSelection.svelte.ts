@@ -269,6 +269,7 @@ export class SelectionTracker {
 	readonly #workspace = getPlugin().app.workspace;
 	#selection: CapturedSelection | undefined = $state(undefined);
 	#refs: EventRef[] = [];
+	#vaultRefs: EventRef[] = [];
 	#refreshFrame: number | undefined;
 	/** When true, selection was pinned (focus left the note) and should be kept. */
 	#pinned = false;
@@ -302,6 +303,17 @@ export class SelectionTracker {
 				this.#scheduleRefresh();
 			}),
 		];
+		// A chat renames itself after its first turn (auto-title). A quote pinned
+		// from it must follow, or it would no longer match the composer's thread
+		// at send time and be labelled as coming from another chat.
+		this.#vaultRefs.push(
+			getPlugin().app.vault.on("rename", (file, oldPath) => {
+				const ref = this.#selection?.ref;
+				if (!this.#selection || ref?.viewType !== "chat" || ref.path !== oldPath) return;
+				const basename = (file as { basename?: string }).basename ?? ref.basename;
+				this.#selection = { ...this.#selection, ref: { ...ref, path: file.path, basename } };
+			}),
+		);
 		this.#listen(document);
 		this.#workspace.iterateAllLeaves((leaf) => this.#listen(leaf.view.containerEl.ownerDocument));
 		this.#refs.push(
@@ -555,6 +567,8 @@ export class SelectionTracker {
 			this.#workspace.offref(ref);
 		}
 		this.#refs = [];
+		for (const ref of this.#vaultRefs) getPlugin().app.vault.offref(ref);
+		this.#vaultRefs = [];
 		for (const doc of [...this.#listenedDocs]) this.#unlisten(doc);
 		if (this.#refreshFrame !== undefined) {
 			cancelAnimationFrame(this.#refreshFrame);

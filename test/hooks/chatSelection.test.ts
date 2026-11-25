@@ -56,6 +56,7 @@ function caret(node: Node) {
 }
 
 let leaves: ReturnType<typeof chatLeaf>[] = [];
+let renameHandler: ((file: { path: string; basename: string }, oldPath: string) => void) | undefined;
 
 beforeEach(() => {
 	(globalThis as { activeWindow?: Window }).activeWindow = window;
@@ -65,8 +66,16 @@ beforeEach(() => {
 		return frames.length;
 	});
 	leaves = [chatLeaf(THREAD)];
+	renameHandler = undefined;
 	setPlugin({
 		app: {
+			vault: {
+				on: (_name: string, cb: typeof renameHandler) => {
+					renameHandler = cb;
+					return {};
+				},
+				offref: () => {},
+			},
 			workspace: {
 				on: () => ({}),
 				offref: () => {},
@@ -162,6 +171,17 @@ describe("SelectionTracker — chat quotes", () => {
 
 		caret(textOf(".answer"));
 		expect(tracker.selection).toBeUndefined();
+		tracker.destroy();
+	});
+});
+
+describe("SelectionTracker — renamed chats", () => {
+	it("moves a pinned quote along when its chat is auto-titled", () => {
+		const tracker = new SelectionTracker();
+		select(textOf(".answer"));
+		tracker.pinChatSelection();
+		renameHandler?.({ path: "Chats/Roadmap.chat", basename: "Roadmap" }, THREAD);
+		expect(tracker.selection).toMatchObject({ path: "Chats/Roadmap.chat", basename: "Roadmap" });
 		tracker.destroy();
 	});
 });
