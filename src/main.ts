@@ -18,7 +18,7 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
-import { pickChatLeaf, recordChatLocation, shouldRedirectChatOpen } from "./utils/chatLocation";
+import { pickChatLeaf, recordChatLocation, recordFocusedChat, shouldRedirectChatOpen } from "./utils/chatLocation";
 import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
@@ -498,9 +498,9 @@ export default class SecondBrainPlugin extends Plugin {
 		// Read-only preview for embedded (![[chat.chat]]) and hovered .chat links.
 		registerChatEmbed(this);
 
-		// Intercept .chat file opens that would replace something else (a note in the active
-		// leaf, a chat link followed from a note) and send them where chats live instead: the
-		// open chat, or the place the last one was (utils/chatLocation.ts has the rules).
+		// Intercept .chat file opens into a leaf Obsidian picked (the active note, the last
+		// main-area tab after a file-explorer click) and send them where chats live instead:
+		// the most recent chat, or the place the last one was (utils/chatLocation.ts).
 		// Read as a plain function value: it is only ever re-invoked below with an
 		// explicit receiver (`.call(leaf, …)` / `.apply(this, …)`).
 		const leafProto = WorkspaceLeaf.prototype as { openFile: WorkspaceLeaf["openFile"] };
@@ -512,6 +512,7 @@ export default class SecondBrainPlugin extends Plugin {
 				if (target && target !== this) {
 					await origOpenFile.call(target, file, openState);
 					await app.workspace.revealLeaf(target);
+					if (openState?.active !== false) app.workspace.setActiveLeaf(target, { focus: true });
 					return;
 				}
 			}
@@ -682,11 +683,16 @@ export default class SecondBrainPlugin extends Plugin {
 			}),
 		);
 
-		// Chats open where the user last had one (utils/chatLocation.ts). Moving a chat between
-		// the sidebar and the main area changes the layout, focusing one changes the active
-		// leaf; either way, remember where the most recent chat now lives.
+		// Chats open where the user last had one (utils/chatLocation.ts). Moving the remembered
+		// chat between the sidebar and the main area changes the layout; focusing a chat (wired
+		// in onLayoutReady, so the workspace restore's own focus can't overwrite the memory)
+		// makes it the remembered one.
 		this.registerEvent(this.app.workspace.on("layout-change", () => recordChatLocation(this.app)));
-		this.registerEvent(this.app.workspace.on("active-leaf-change", () => recordChatLocation(this.app)));
+		this.app.workspace.onLayoutReady(() => {
+			this.registerEvent(
+				this.app.workspace.on("active-leaf-change", (leaf) => recordFocusedChat(this.app, leaf)),
+			);
+		});
 
 		this.registerNotebookNavigatorMenus();
 

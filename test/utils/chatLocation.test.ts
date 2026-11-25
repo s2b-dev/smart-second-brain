@@ -3,6 +3,7 @@ import { App, Platform, TFile, type WorkspaceLeaf } from "../__mocks__/obsidian"
 import {
 	pickChatLeaf,
 	recordChatLocation,
+	recordFocusedChat,
 	rememberedChatLocation,
 	seedChatLocation,
 	shouldRedirectChatOpen,
@@ -15,6 +16,7 @@ const rightSplit = { id: "right" };
 const rootSplit = { id: "root" };
 
 type FakeLeaf = {
+	id: string;
 	name: string;
 	activeTime: number;
 	root: object;
@@ -28,6 +30,7 @@ type FakeLeaf = {
 
 function leaf(name: string, opts: Partial<Pick<FakeLeaf, "activeTime" | "root" | "path" | "deferredPath" | "type">>) {
 	const l: FakeLeaf = {
+		id: `id-${name}`,
 		name,
 		activeTime: opts.activeTime ?? 0,
 		root: opts.root ?? rootSplit,
@@ -68,6 +71,7 @@ describe("chatLocation", () => {
 			leftSplit,
 			rightSplit,
 			getLeavesOfType: (type: string) => leaves.filter((l) => l.type === type),
+			getLeafById: (id: string) => leaves.find((l) => l.id === id) ?? null,
 			getLeftLeaf: () => created.left,
 			getRightLeaf: () => created.right,
 			getLeaf: () => created.tab,
@@ -95,16 +99,18 @@ describe("chatLocation", () => {
 	});
 
 	it("with no chat open, goes where the last one lived", () => {
-		leaves.push(leaf("left-chat", { activeTime: 3, path: "Chats/a.chat", root: leftSplit }));
-		recordChatLocation(a());
+		const left = leaf("left-chat", { activeTime: 3, path: "Chats/a.chat", root: leftSplit });
+		leaves.push(left);
+		recordFocusedChat(a(), left as unknown as ObsidianLeaf);
 		leaves.length = 0; // closed
+		recordChatLocation(a()); // the close is a layout change; the location stays
 		expect(pick("Chats/c.chat")).toBe("new-left");
 	});
 
 	it("follows a chat that was moved into the main area", () => {
 		const moved = leaf("chat", { activeTime: 3, path: "Chats/a.chat", root: rightSplit });
 		leaves.push(moved);
-		recordChatLocation(a());
+		recordFocusedChat(a(), moved as unknown as ObsidianLeaf);
 		moved.root = rootSplit;
 		recordChatLocation(a());
 		leaves.length = 0;
@@ -126,10 +132,48 @@ describe("chatLocation", () => {
 		expect(rememberedChatLocation(a())).toBe("tab");
 	});
 
-	it("redirects only opens that would replace something other than a chat or an empty leaf", () => {
+	it("redirects every open except into an empty leaf", () => {
 		const as = (l: FakeLeaf) => l as unknown as ObsidianLeaf;
 		expect(shouldRedirectChatOpen(as(leaf("note", { type: "markdown" })))).toBe(true);
+		expect(shouldRedirectChatOpen(as(leaf("older chat tab", {})))).toBe(true);
 		expect(shouldRedirectChatOpen(as(leaf("empty", { type: "empty" })))).toBe(false);
-		expect(shouldRedirectChatOpen(as(leaf("chat", {})))).toBe(false);
+	});
+
+	it("sends a file-explorer click on an older chat tab to the focused sidebar chat", () => {
+		const tab = leaf("tab", { activeTime: 1, path: "Chats/a.chat" });
+		const sidebar = leaf("sidebar", { activeTime: 5, path: "Chats/b.chat", root: rightSplit });
+		leaves.push(tab, sidebar);
+		expect(shouldRedirectChatOpen(tab as unknown as ObsidianLeaf)).toBe(true);
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+	});
+
+	it("records the focused chat before Obsidian stamps its activeTime", () => {
+		const tab = leaf("tab", { activeTime: 9, path: "Chats/a.chat" });
+		const sidebar = leaf("sidebar", { activeTime: 1, path: "Chats/b.chat", root: leftSplit });
+		leaves.push(tab, sidebar);
+		recordFocusedChat(a(), sidebar as unknown as ObsidianLeaf);
+		expect(rememberedChatLocation(a())).toBe("left");
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+	});
+
+	// After a reload only the restored active leaf carries an activeTime, so recency alone
+	// would send the next chat to the main area even though the sidebar chat was the last used.
+	it("keeps the remembered chat leaf across a restart that reset activeTime", () => {
+		const tab = leaf("tab", { activeTime: 0, path: "Chats/a.chat" });
+		const sidebar = leaf("sidebar", { activeTime: 0, path: "Chats/b.chat", root: rightSplit });
+		leaves.push(tab, sidebar);
+		recordFocusedChat(a(), sidebar as unknown as ObsidianLeaf);
+		tab.activeTime = 100; // restored as the active leaf
+		recordChatLocation(a()); // the restore's layout change
+		expect(rememberedChatLocation(a())).toBe("right");
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+	});
+
+	it("ignores focus on a leaf that is not a chat", () => {
+		const sidebar = leaf("sidebar", { path: "Chats/b.chat", root: leftSplit });
+		leaves.push(sidebar);
+		recordFocusedChat(a(), sidebar as unknown as ObsidianLeaf);
+		recordFocusedChat(a(), leaf("note", { type: "markdown" }) as unknown as ObsidianLeaf);
+		expect(pick("Chats/c.chat")).toBe("sidebar");
 	});
 });

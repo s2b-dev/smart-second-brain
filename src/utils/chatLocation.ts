@@ -6,19 +6,25 @@ import { isMobileUI } from "./platform";
  * Where chats open. There is no setting for it: a chat opens where the user last had one.
  *
  * 1. The thread is already open: that leaf.
- * 2. Another chat is open: the most recently active chat leaf, wherever it is (left sidebar,
+ * 2. The chat leaf the user last focused, if it is still open, wherever it is (left sidebar,
  *    right sidebar, a main-area tab, a popout). The new chat replaces it there, the way a
- *    sidebar chat always has.
- * 3. No chat is open: the place the last one lived, remembered per device (workspace layout
+ *    sidebar chat always has. Remembered by leaf id, which survives a restart; Obsidian's own
+ *    `activeTime` does not (after a reload only the restored active leaf has one, so recency
+ *    alone sends chats back to the main area).
+ * 3. Any other open chat, most recently active first.
+ * 4. No chat is open: the place the last one lived, remembered per device (workspace layout
  *    is per device too, so a desktop sidebar must not send a phone's chats into a drawer).
- * 4. Never had one on this device: the right sidebar on desktop, a tab on mobile.
+ * 5. Never had one on this device: the right sidebar on desktop, a tab on mobile.
  *
- * Moving a chat (dragging it from the sidebar into the main area, say) is how the user
- * chooses; `recordChatLocation` runs on every layout and active-leaf change to notice it.
+ * Focusing a chat makes it the remembered leaf (`recordFocusedChat`, on `active-leaf-change`,
+ * wired only once the layout is ready so the restore can't overwrite it). Moving it (dragging
+ * the sidebar chat into the main area) updates where it lives (`recordChatLocation`, on
+ * `layout-change`).
  */
 export type ChatLocation = "tab" | "left" | "right";
 
 const STORAGE_KEY = "s2b-chat-location";
+const LEAF_STORAGE_KEY = "s2b-chat-leaf";
 
 function isChatLocation(value: unknown): value is ChatLocation {
 	return value === "tab" || value === "left" || value === "right";
@@ -66,17 +72,49 @@ function leafThreadPath(leaf: WorkspaceLeaf): string | undefined {
 	return typeof stateFile === "string" ? stateFile : undefined;
 }
 
-/** Remember where the most recently active chat lives. Cheap; call on every layout change. */
+/** The open chat leaf showing `file`'s thread, if any. */
+export function findChatLeafShowing(app: App, file: TFile): WorkspaceLeaf | undefined {
+	return chatLeavesByRecency(app).find((leaf) => leafThreadPath(leaf) === file.path);
+}
+
+function leafId(leaf: WorkspaceLeaf): string | undefined {
+	return (leaf as { id?: string }).id;
+}
+
+function isChatLeaf(leaf: WorkspaceLeaf | null | undefined): leaf is WorkspaceLeaf {
+	return leaf?.view?.getViewType() === VIEW_TYPE_CHAT;
+}
+
+/** The chat leaf the user last focused, while it is still open as a chat. */
+function rememberedChatLeaf(app: App): WorkspaceLeaf | null {
+	const id: unknown = app.loadLocalStorage(LEAF_STORAGE_KEY);
+	if (typeof id !== "string") return null;
+	const leaf = app.workspace.getLeafById(id);
+	return isChatLeaf(leaf) ? leaf : null;
+}
+
+/** A chat leaf gained focus: it is now the one new chats open in. */
+export function recordFocusedChat(app: App, leaf: WorkspaceLeaf | null): void {
+	if (!isChatLeaf(leaf)) return;
+	const id = leafId(leaf);
+	if (id && app.loadLocalStorage(LEAF_STORAGE_KEY) !== id) app.saveLocalStorage(LEAF_STORAGE_KEY, id);
+	rememberChatLocation(app, chatLocationOf(app, leaf));
+}
+
+/** The layout changed: if the remembered chat moved, remember where it lives now. A closed
+ * chat leaves the location as it was, which is what the next chat falls back to. */
 export function recordChatLocation(app: App): void {
-	const [latest] = chatLeavesByRecency(app);
-	if (latest) rememberChatLocation(app, chatLocationOf(app, latest));
+	const leaf = rememberedChatLeaf(app);
+	if (leaf) rememberChatLocation(app, chatLocationOf(app, leaf));
 }
 
 /** The leaf a chat should open in, by the rules above. Creates one when no chat is open. */
-export function pickChatLeaf(app: App, file: TFile): WorkspaceLeaf | null {
+export function pickChatLeaf(app: App, file: TFile, options: { reuseShowing?: boolean } = {}): WorkspaceLeaf | null {
 	const chats = chatLeavesByRecency(app);
-	const showing = chats.find((leaf) => leafThreadPath(leaf) === file.path);
-	if (showing) return showing;
+	const showing = findChatLeafShowing(app, file);
+	if (showing && options.reuseShowing !== false) return showing;
+	const remembered = rememberedChatLeaf(app);
+	if (remembered) return remembered;
 	if (chats[0]) return chats[0];
 	const location = rememberedChatLocation(app);
 	if (location === "left") return app.workspace.getLeftLeaf(false);
@@ -85,12 +123,12 @@ export function pickChatLeaf(app: App, file: TFile): WorkspaceLeaf | null {
 }
 
 /**
- * Whether opening a chat in `leaf` should go to `pickChatLeaf` instead. Only when it would
- * replace something else: a note clicked into the active leaf, a chat link followed from a note.
- * A leaf that is empty (a new tab, a fresh split, a drag target) or already a chat is where the
- * user deliberately put it, so that is left alone.
+ * Whether opening a chat in `leaf` should go to `pickChatLeaf` instead. Not when the leaf is
+ * empty: a new tab, a fresh split or a drag target is where the user deliberately put it.
+ * Anything else was picked by Obsidian, not the user (a file-explorer click lands in the last
+ * main-area leaf, even when that is an older chat tab and the user was just in the sidebar
+ * chat), so the chat goes where chats live; when that is this very leaf, nothing moves.
  */
 export function shouldRedirectChatOpen(leaf: WorkspaceLeaf): boolean {
-	const type = leaf.view?.getViewType();
-	return type !== VIEW_TYPE_CHAT && type !== "empty";
+	return leaf.view?.getViewType() !== "empty";
 }

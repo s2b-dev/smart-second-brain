@@ -35,7 +35,7 @@ import { gzipString, toArrayBuffer } from "../utils/gzip";
 import { Logger } from "../utils/logging";
 import { agentDefinitionPath, memoriesDir } from "../utils/agentPaths";
 import { isAgentFilePath } from "../utils/fileFiltering";
-import { chatLeavesByRecency, pickChatLeaf } from "../utils/chatLocation";
+import { chatLeavesByRecency, findChatLeafShowing, pickChatLeaf } from "../utils/chatLocation";
 import {
 	editProviderAction,
 	openNoteAction,
@@ -2217,12 +2217,19 @@ export class AgentManager {
 	 * the last one was (see utils/chatLocation.ts). Reusing the thread's leaf matters beyond
 	 * tidiness: a second leaf on the same thread leaves a stale, unmounted-but-registered
 	 * .s2b-chat-root behind, which corrupts touch hit-testing on mobile (double-tap bug). */
-	private async openInChatLeaf(file: TFile) {
+	private async openInChatLeaf(file: TFile, options: { moveHere?: boolean } = {}) {
 		const workspace = this.plugin.app.workspace;
-		const leaf = pickChatLeaf(this.plugin.app, file);
+		// `moveHere`: open where a new chat goes even if another leaf already shows this thread,
+		// and close that other leaf. For reusing the empty "New Chat", which should appear
+		// where you asked for a new chat, not drag you to wherever an old leaf holds it.
+		const elsewhere = options.moveHere ? findChatLeafShowing(this.plugin.app, file) : undefined;
+		const leaf = pickChatLeaf(this.plugin.app, file, { reuseShowing: !options.moveHere });
 		if (!leaf) return;
+		if (elsewhere && elsewhere !== leaf) elsewhere.detach();
 		await leaf.openFile(file);
 		await workspace.revealLeaf(leaf);
+		// Focus it, so typing goes there and it becomes the remembered chat leaf.
+		workspace.setActiveLeaf(leaf, { focus: true });
 	}
 
 	/** Open (and reveal) the chat leaf for a given thread path. Used to navigate
@@ -2252,7 +2259,7 @@ export class AgentManager {
 		if (existingNewChat) {
 			const existingFile = this.plugin.app.vault.getAbstractFileByPath(existingNewChat);
 			if (existingFile instanceof TFile) {
-				await this.openInChatLeaf(existingFile);
+				await this.openInChatLeaf(existingFile, { moveHere: true });
 				return existingNewChat;
 			}
 		}
