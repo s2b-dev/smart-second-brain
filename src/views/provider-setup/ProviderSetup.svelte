@@ -39,6 +39,7 @@ import {
 	type DirectoryEntry,
 	directoryHost,
 	getDirectoryEntries,
+	matchesDirectoryQuery,
 	searchDirectory,
 } from "../../providers/directory/index";
 import { getData, slugifyProviderName } from "../../stores/dataStore.svelte";
@@ -75,19 +76,22 @@ const isConfigured = $derived(data.isProviderConfigured(providerId));
 // Templates not listed fall to the end in their registry order.
 const PICKER_ORDER: ProviderTemplateId[] = [
 	"openai-compatible",
-	"omlx",
-	"lmstudio",
 	"openrouter",
 	"ollama",
 	"openai",
 	"anthropic",
-	"huggingface",
 	"google",
 	"mistral",
 ];
+// Built-in templates that are less widely used sit in "More providers" instead of the grid,
+// listed above the catalog entries so search still finds their proper setup (sign-in,
+// local defaults) rather than a plain Custom provider.
+const DIRECTORY_TEMPLATES: ProviderTemplateId[] = ["lmstudio", "omlx", "huggingface"];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
-const providerTemplates = [...getAllProviderTemplates()]
-	.filter((tpl) => tpl.id !== "omlx" || Platform.isMacOS)
+const availableTemplates = getAllProviderTemplates().filter((tpl) => tpl.id !== "omlx" || Platform.isMacOS);
+const directoryTemplates = DIRECTORY_TEMPLATES.flatMap((id) => availableTemplates.filter((tpl) => tpl.id === id));
+const providerTemplates = availableTemplates
+	.filter((tpl) => !DIRECTORY_TEMPLATES.includes(tpl.id))
 	.sort((a, b) => {
 		const ai = PICKER_ORDER.indexOf(a.id);
 		const bi = PICKER_ORDER.indexOf(b.id);
@@ -276,7 +280,11 @@ $effect(() => {
 });
 
 const directoryCount = getDirectoryEntries().length;
+const directoryBuiltins = directoryTemplates.map((tpl) => tpl.displayName).join(", ");
 let directoryQuery = $state("");
+const directoryTemplateMatches = $derived(
+	directoryTemplates.filter((tpl) => matchesDirectoryQuery(directoryQuery, `${tpl.displayName} ${tpl.id}`)),
+);
 const directoryMatches = $derived(searchDirectory(directoryQuery));
 
 // One pick at a time: a second click while the first draft is still being saved would
@@ -289,6 +297,16 @@ async function handleSelectDirectoryEntry(entry: DirectoryEntry) {
 	try {
 		providerId = await modal.selectDirectoryEntry(entry);
 		step = "configure";
+	} finally {
+		isPickingEntry = false;
+	}
+}
+
+async function handleSelectDirectoryTemplate(id: ProviderTemplateId) {
+	if (isPickingEntry) return;
+	isPickingEntry = true;
+	try {
+		await handleSelectTemplate(id);
 	} finally {
 		isPickingEntry = false;
 	}
@@ -569,7 +587,7 @@ const canFinish = $derived(
       ← {t("onboarding.provider_setup.directory_back")}
     </button>
     <p class="provider-picker-desc">
-      {t("onboarding.provider_setup.directory_desc", { count: directoryCount })}
+      {t("onboarding.provider_setup.directory_desc", { count: directoryCount, builtins: directoryBuiltins })}
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <input
@@ -579,10 +597,25 @@ const canFinish = $derived(
       bind:value={directoryQuery}
       autofocus={!Platform.isMobile}
     />
-    {#if directoryMatches.length === 0}
+    {#if directoryTemplateMatches.length === 0 && directoryMatches.length === 0}
       <p class="provider-picker-desc provider-directory-empty">{t("onboarding.provider_setup.directory_empty")}</p>
     {:else}
       <div class="provider-directory-list">
+        {#each directoryTemplateMatches as template (template.id)}
+          {@const Logo = getTemplateLogo(template.id)}
+          <button
+            type="button"
+            class="provider-directory-row"
+            disabled={isPickingEntry}
+            onclick={() => void handleSelectDirectoryTemplate(template.id)}
+          >
+            <span class="provider-directory-logo"><Logo width={20} height={20} /></span>
+            <span class="provider-directory-text">
+              <span class="provider-directory-name">{template.displayName}</span>
+              <span class="provider-directory-host">{template.description}</span>
+            </span>
+          </button>
+        {/each}
         {#each directoryMatches as entry (entry.id)}
           <button
             type="button"

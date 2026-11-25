@@ -73,7 +73,7 @@
 		"picker_desc": "Bağlanacak bir sağlayıcı seçin.",
 		"setup_guide": "Kurulum kılavuzu",
 		"more_providers": "Daha fazla sağlayıcı",
-		"directory_desc": "models.dev dizininden OpenAI uyumlu API sunan {count} hizmet daha. Smart Second Brain bunları test etmedi; her biri düzenleyebileceğiniz özel bir sağlayıcı olarak eklenir.",
+		"directory_desc": "{builtins} için yerleşik kurulum, ayrıca models.dev dizininden OpenAI uyumlu API sunan {count} hizmet daha. Smart Second Brain bu hizmetleri test etmedi; her biri düzenleyebileceğiniz özel bir sağlayıcı olarak eklenir.",
 		"directory_search": "Sağlayıcı ara",
 		"directory_back": "Tüm sağlayıcılar",
 		"directory_empty": "Eşleşen sağlayıcı yok. Listede olmayan bir hizmet yine de özel sağlayıcı olarak eklenebilir.",

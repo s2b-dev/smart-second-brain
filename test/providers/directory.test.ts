@@ -3,6 +3,7 @@ import {
 	directoryHost,
 	getDirectoryEntries,
 	getDirectoryEntry,
+	matchesDirectoryQuery,
 	searchDirectory,
 } from "../../src/providers/directory/index";
 import { getProviderDefinition } from "../../src/providers/index";
@@ -81,6 +82,21 @@ describe("searchDirectory", () => {
 
 	it("shows the host", () => {
 		expect(directoryHost(sample[2])).toBe("api.z.ai");
+	});
+});
+
+describe("matchesDirectoryQuery", () => {
+	// The built-in templates listed in "More providers" are matched with this directly.
+	it("matches every term, ignoring case and accents", () => {
+		expect(matchesDirectoryQuery("hugging face", "Hugging Face huggingface")).toBe(true);
+		expect(matchesDirectoryQuery("STUDIO", "LM Studio lmstudio")).toBe(true);
+		expect(matchesDirectoryQuery("omlx", "oMLX omlx")).toBe(true);
+		expect(matchesDirectoryQuery("cafe", "Café")).toBe(true);
+		expect(matchesDirectoryQuery("lm hugging", "LM Studio lmstudio")).toBe(false);
+	});
+
+	it("matches anything on an empty query", () => {
+		expect(matchesDirectoryQuery(" ", "LM Studio")).toBe(true);
 	});
 });
 

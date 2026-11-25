@@ -77,7 +77,7 @@
 		"picker_desc": "Izberite ponudnika, ki ga želite povezati.",
 		"setup_guide": "Vodnik za nastavitev",
 		"more_providers": "Več ponudnikov",
-		"directory_desc": "Še {count} storitev z API-jem, združljivim z OpenAI, iz imenika models.dev. Smart Second Brain jih ni preizkusil; vsaka postane ponudnik po meri, ki ga lahko urejate.",
+		"directory_desc": "Vgrajena nastavitev za {builtins}, poleg tega še {count} storitev z API-jem, združljivim z OpenAI, iz imenika models.dev. Teh Smart Second Brain ni preizkusil; vsaka postane ponudnik po meri, ki ga lahko urejate.",
 		"directory_search": "Iskanje ponudnikov",
 		"directory_back": "Vsi ponudniki",
 		"directory_empty": "Noben ponudnik se ne ujema. Storitev, ki je ni na seznamu, lahko vseeno dodate kot ponudnika po meri.",

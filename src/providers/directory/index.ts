@@ -42,13 +42,16 @@ export function directoryHost(entry: DirectoryEntry): string {
 	}
 }
 
-/** Case- and accent-insensitive match on the name, id and host. Empty query matches all. */
-export function searchDirectory(query: string, entries: readonly DirectoryEntry[] = ENTRIES): DirectoryEntry[] {
-	const fold = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+const fold = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** Case- and accent-insensitive: every term of the query occurs in `text`. Empty query matches. */
+export function matchesDirectoryQuery(query: string, text: string): boolean {
 	const terms = fold(query).split(/\s+/).filter(Boolean);
-	if (terms.length === 0) return [...entries];
-	return entries.filter((entry) => {
-		const haystack = fold(`${entry.name} ${entry.id} ${directoryHost(entry)}`);
-		return terms.every((term) => haystack.includes(term));
-	});
+	const haystack = fold(text);
+	return terms.every((term) => haystack.includes(term));
+}
+
+/** Search on the name, id and host. Empty query matches all. */
+export function searchDirectory(query: string, entries: readonly DirectoryEntry[] = ENTRIES): DirectoryEntry[] {
+	return entries.filter((entry) => matchesDirectoryQuery(query, `${entry.name} ${entry.id} ${directoryHost(entry)}`));
 }

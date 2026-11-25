@@ -75,7 +75,7 @@
 		"picker_desc": "Choisissez un fournisseur à connecter.",
 		"setup_guide": "Guide de configuration",
 		"more_providers": "Plus de fournisseurs",
-		"directory_desc": "{count} autres services compatibles avec l'API OpenAI, issus de l'annuaire models.dev. Smart Second Brain ne les a pas testés ; chacun devient un fournisseur personnalisé modifiable.",
+		"directory_desc": "Configuration intégrée pour {builtins}, et {count} autres services compatibles avec l'API OpenAI, issus de l'annuaire models.dev. Smart Second Brain n'a pas testé ces derniers ; chacun devient un fournisseur personnalisé modifiable.",
 		"directory_search": "Rechercher un fournisseur",
 		"directory_back": "Tous les fournisseurs",
 		"directory_empty": "Aucun fournisseur ne correspond. Un service absent de la liste peut quand même être ajouté comme fournisseur personnalisé.",
