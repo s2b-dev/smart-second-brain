@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { SessionRegistry } from "../../src/stores/chatStore.svelte";
 import { ChatSession } from "../../src/stores/chatStore.svelte";
 import type { AgentManager } from "../../src/agent/AgentManager";
+import type SecondBrainPlugin from "../../src/main";
+import { setPlugin } from "../../src/stores/state.svelte";
 
 /* --------------------------------------------------------------------------
  * SessionRegistry — per-thread sessions, running set, eviction, rekey
@@ -131,6 +133,30 @@ describe("SessionRegistry — LRU eviction protects ALL running sessions", () =>
 		expect(r.sessions.has("p2.chat")).toBe(false);
 		expect(r.sessions.has("p1.chat")).toBe(false);
 		expect(r.sessions.has("p0.chat")).toBe(false);
+	});
+});
+
+describe("SessionRegistry — eviction keeps what is on screen", () => {
+	afterEach(() => setPlugin(undefined as unknown as SecondBrainPlugin));
+
+	// Two chats on screen (a tab and the sidebar): opening several chats in one must not
+	// evict the other's session, or that view shows an empty conversation until focused.
+	it("never evicts a session an open chat view shows, however old", () => {
+		const shownLeaf = { view: { file: { path: "p0.chat" } }, getViewState: () => ({}) };
+		setPlugin({
+			app: { workspace: { getLeavesOfType: () => [shownLeaf] } },
+		} as unknown as SecondBrainPlugin);
+		const r = makeRegistry();
+		for (let i = 0; i < 6; i++) seed(r, `p${i}.chat`).lastTouchedAt = 1000 + i;
+
+		(r as unknown as { evictParkedSessions(): void }).evictParkedSessions();
+
+		expect(r.sessions.has("p0.chat")).toBe(true); // shown, oldest
+		expect(r.sessions.has("p5.chat")).toBe(true);
+		expect(r.sessions.has("p4.chat")).toBe(true);
+		expect(r.sessions.has("p3.chat")).toBe(true);
+		expect(r.sessions.has("p2.chat")).toBe(false);
+		expect(r.sessions.has("p1.chat")).toBe(false);
 	});
 });
 

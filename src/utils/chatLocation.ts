@@ -75,6 +75,16 @@ function leafThreadPath(leaf: WorkspaceLeaf): string | undefined {
 	return typeof stateFile === "string" ? stateFile : undefined;
 }
 
+/** Thread paths shown by an open chat leaf (deferred ones included). */
+export function openChatThreadPaths(app: App): Set<string> {
+	const paths = new Set<string>();
+	for (const leaf of app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
+		const path = leafThreadPath(leaf);
+		if (path) paths.add(path);
+	}
+	return paths;
+}
+
 /** The open chat leaf showing `file`'s thread, if any. */
 export function findChatLeafShowing(app: App, file: TFile): WorkspaceLeaf | undefined {
 	return chatLeavesByRecency(app).find((leaf) => leafThreadPath(leaf) === file.path);

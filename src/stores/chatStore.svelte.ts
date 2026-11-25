@@ -16,6 +16,7 @@ import { type UUIDv7, genUUIDv7 } from "../utils/uuid7Validator";
 import { DEFAULT_AGENT_ID } from "./agentDefaults";
 import { getData } from "./dataStore.svelte";
 import { getPlugin } from "./state.svelte";
+import { openChatThreadPaths } from "../utils/chatLocation";
 import { Logger } from "../utils/logging";
 import { shouldSummarizeForEstimatedTokens } from "../agent/summarization";
 import { estimateConversationBaseTokens, estimateLiveDraftTokens } from "../utils/tokenEstimator";
@@ -1641,14 +1642,25 @@ export class SessionRegistry {
 
 	/** Drop least-recently-used idle parked sessions, keeping at most
 	 * MAX_PARKED_SESSIONS idle ones. Never evicts a running session (concurrency:
-	 * protects ALL running sessions, not a single slot). Sessions currently
-	 * mounted in a view stay in the MRU window because loading touches them. */
+	 * protects ALL running sessions, not a single slot), nor one an open chat view
+	 * is showing: with two chats on screen (a tab and the sidebar, say), opening a few
+	 * chats in one would otherwise evict the other's session, and that view would
+	 * show an empty conversation until focused again. */
 	private evictParkedSessions(): void {
-		const parked = [...this.sessions.values()].filter((s) => !s.isRunning);
+		const shown = this.shownThreadPaths();
+		const parked = [...this.sessions.values()].filter((s) => !s.isRunning && !shown.has(s.id));
 		if (parked.length <= MAX_PARKED_SESSIONS) return;
 		parked.sort((a, b) => b.lastTouchedAt - a.lastTouchedAt);
 		for (const s of parked.slice(MAX_PARKED_SESSIONS)) {
 			this.sessions.delete(s.id);
+		}
+	}
+
+	private shownThreadPaths(): Set<string> {
+		try {
+			return openChatThreadPaths(getPlugin().app);
+		} catch {
+			return new Set(); // no plugin (unit tests): nothing is on screen
 		}
 	}
 
