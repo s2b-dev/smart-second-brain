@@ -17,8 +17,8 @@ import { isMobileUI } from "./platform";
  * 5. Never had one on this device: the right sidebar on desktop, a tab on mobile.
  *
  * The user picks the remembered leaf by pressing into a chat (its content or its tab header:
- * `recordChatPointer`), and a chat opened into a leaf makes that leaf the remembered one
- * (`recordFocusedChat`). Obsidian's focus changes are NOT a choice: `active-leaf-change` is
+ * `recordChatPointer`) or switching to it from the keyboard (`KeyboardChatFocus`), and a chat
+ * opened into a leaf makes that leaf the remembered one (`recordFocusedChat`, once it shows it). Obsidian's focus changes are NOT a choice: `active-leaf-change` is
  * debounced, and Obsidian focuses leaves on its own (a file-explorer click opens the file, then
  * immediately focuses the last main-area leaf), so following it made the memory flip between
  * a sidebar chat and a main-area chat on every open. Moving the remembered chat (dragging it
@@ -107,12 +107,37 @@ export function recordFocusedChat(app: App, leaf: WorkspaceLeaf | null): void {
 /** A pointer press somewhere in the app: if it landed in a chat leaf or on its tab header, the
  * user chose that chat. */
 export function recordChatPointer(app: App, target: EventTarget | null): void {
-	if (!(target instanceof Node)) return;
+	// Not `instanceof Node`: a popout window's nodes come from that window's own `Node`.
+	if (!target || typeof (target as Node).nodeType !== "number") return;
+	const node = target as Node;
 	const leaf = app.workspace.getLeavesOfType(VIEW_TYPE_CHAT).find((candidate) => {
 		const tabHeaderEl = (candidate as { tabHeaderEl?: HTMLElement }).tabHeaderEl;
-		return candidate.view.containerEl.contains(target) || tabHeaderEl?.contains(target);
+		return candidate.view.containerEl.contains(node) || tabHeaderEl?.contains(node);
 	});
 	if (leaf) recordFocusedChat(app, leaf);
+}
+
+/** How long after a keypress a focus change still counts as the user's doing. */
+const KEYBOARD_FOCUS_WINDOW_MS = 500;
+
+/**
+ * Tells a focus change the user made from the keyboard (a tab-switch shortcut, a navigation
+ * command) from one Obsidian made on its own: only the first follows a keypress closely.
+ * Pointer choices go through `recordChatPointer`, so this ignores focus that follows a click.
+ */
+export class KeyboardChatFocus {
+	private lastKeyAt = Number.NEGATIVE_INFINITY;
+
+	constructor(private readonly app: App) {}
+
+	onKeyDown(): void {
+		this.lastKeyAt = performance.now();
+	}
+
+	onActiveLeafChange(leaf: WorkspaceLeaf | null): void {
+		if (performance.now() - this.lastKeyAt > KEYBOARD_FOCUS_WINDOW_MS) return;
+		recordFocusedChat(this.app, leaf);
+	}
 }
 
 /** The layout changed: if the remembered chat moved, remember where it lives now. A closed

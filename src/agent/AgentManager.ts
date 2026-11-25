@@ -2220,8 +2220,8 @@ export class AgentManager {
 	private async openInChatLeaf(file: TFile, leaf = pickChatLeaf(this.plugin.app, file)) {
 		const workspace = this.plugin.app.workspace;
 		if (!leaf) return;
-		recordFocusedChat(this.plugin.app, leaf);
 		await leaf.openFile(file);
+		recordFocusedChat(this.plugin.app, leaf);
 		await workspace.revealLeaf(leaf);
 		workspace.setActiveLeaf(leaf, { focus: true });
 	}

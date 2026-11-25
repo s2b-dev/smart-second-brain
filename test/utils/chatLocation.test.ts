@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, Platform, TFile, type WorkspaceLeaf } from "../__mocks__/obsidian";
 import {
+	KeyboardChatFocus,
 	pickChatLeaf,
 	recordChatLocation,
 	recordChatPointer,
@@ -85,6 +86,7 @@ describe("chatLocation", () => {
 
 	afterEach(() => {
 		Platform.isMobile = false;
+		vi.restoreAllMocks();
 	});
 
 	const a = () => app as unknown as ObsidianApp;
@@ -198,6 +200,44 @@ describe("chatLocation", () => {
 		const header = document.createElement("span");
 		tab.tabHeaderEl.appendChild(header);
 		recordChatPointer(a(), header);
+		expect(pick("Chats/c.chat")).toBe("tab");
+	});
+
+	it("counts a press in a popout window, whose nodes are not this window's Node", () => {
+		const frame = document.createElement("iframe");
+		document.body.appendChild(frame);
+		const popoutDoc = frame.contentDocument as Document;
+		const sidebar = leaf("sidebar", { activeTime: 1, path: "Chats/b.chat", root: rightSplit });
+		const tab = leaf("tab", { activeTime: 9, path: "Chats/a.chat" });
+		leaves.push(tab, sidebar);
+		const inside = popoutDoc.createElement("span");
+		popoutDoc.body.appendChild(sidebar.view.containerEl);
+		sidebar.view.containerEl.appendChild(inside);
+		expect(inside instanceof Node).toBe(false);
+		recordChatPointer(a(), inside);
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+		frame.remove();
+	});
+
+	it("follows focus changes that come right after a keypress, not Obsidian's own", () => {
+		let now = 1_000;
+		vi.spyOn(performance, "now").mockImplementation(() => now);
+		const tab = leaf("tab", { activeTime: 1, path: "Chats/a.chat" });
+		const sidebar = leaf("sidebar", { activeTime: 9, path: "Chats/b.chat", root: rightSplit });
+		leaves.push(tab, sidebar);
+		const keyboard = new KeyboardChatFocus(a());
+		recordFocusedChat(a(), sidebar as unknown as ObsidianLeaf);
+
+		keyboard.onActiveLeafChange(tab as unknown as ObsidianLeaf); // no key pressed: Obsidian's
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+
+		keyboard.onKeyDown(); // Ctrl+Tab
+		now += 50;
+		keyboard.onActiveLeafChange(tab as unknown as ObsidianLeaf);
+		expect(pick("Chats/c.chat")).toBe("tab");
+
+		now += 5_000; // long after the key
+		keyboard.onActiveLeafChange(sidebar as unknown as ObsidianLeaf);
 		expect(pick("Chats/c.chat")).toBe("tab");
 	});
 });

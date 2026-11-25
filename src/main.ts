@@ -19,6 +19,7 @@ import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
 import {
+	KeyboardChatFocus,
 	pickChatLeaf,
 	recordChatLocation,
 	recordChatPointer,
@@ -516,14 +517,17 @@ export default class SecondBrainPlugin extends Plugin {
 			if (file.extension === "chat" && shouldRedirectChatOpen(this)) {
 				const target = pickChatLeaf(app, file);
 				if (target && target !== this) {
-					recordFocusedChat(app, target);
 					await origOpenFile.call(target, file, openState);
+					// After the open: until then a fresh leaf is still empty, not a chat.
+					recordFocusedChat(app, target);
 					await app.workspace.revealLeaf(target);
 					if (openState?.active !== false) app.workspace.setActiveLeaf(target, { focus: true });
 					return;
 				}
 			}
-			return origOpenFile.call(this, file, openState);
+			await origOpenFile.call(this, file, openState);
+			// A chat opened where the user put it (a new tab, a split): that is the chat now.
+			if (file.extension === "chat" && openState?.active !== false) recordFocusedChat(app, this);
 		};
 		this.register(() => {
 			WorkspaceLeaf.prototype.openFile = origOpenFile;
@@ -690,15 +694,23 @@ export default class SecondBrainPlugin extends Plugin {
 			}),
 		);
 
-		// Chats open where the user last had one (utils/chatLocation.ts). Pressing into a chat
-		// chooses it (in popout windows too); moving it changes where it lives. Deliberately not
-		// `active-leaf-change`: Obsidian focuses leaves on its own, see chatLocation.ts.
-		const watchChatPointer = (doc: Document) =>
-			this.registerDomEvent(doc, "pointerdown", (event) => recordChatPointer(this.app, event.target), {
+		// Chats open where the user last had one (utils/chatLocation.ts). Pressing into a chat or
+		// switching to it from the keyboard chooses it (in popout windows too); moving it changes
+		// where it lives. Not every `active-leaf-change`: Obsidian focuses leaves on its own.
+		const keyboardChatFocus = new KeyboardChatFocus(this.app);
+		// On the window, capturing: Obsidian's hotkey handling stops a hotkey (Ctrl+Tab) before
+		// it reaches the document.
+		const watchChatChoice = (win: Window) => {
+			this.registerDomEvent(win, "pointerdown", (event) => recordChatPointer(this.app, event.target), {
 				capture: true,
 			});
-		watchChatPointer(document);
-		this.registerEvent(this.app.workspace.on("window-open", (win) => watchChatPointer(win.doc)));
+			this.registerDomEvent(win, "keydown", () => keyboardChatFocus.onKeyDown(), { capture: true });
+		};
+		watchChatChoice(window);
+		this.registerEvent(this.app.workspace.on("window-open", (win) => watchChatChoice(win.win)));
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", (leaf) => keyboardChatFocus.onActiveLeafChange(leaf)),
+		);
 		this.registerEvent(this.app.workspace.on("layout-change", () => recordChatLocation(this.app)));
 
 		this.registerNotebookNavigatorMenus();
