@@ -25,6 +25,7 @@ function chatLeaf(path: string) {
 		<div class="message-area">
 			<div class="s2b-message-text"><p class="answer">The second step is wrong.</p></div>
 			<div class="tool-card"><span class="tool-label">search_notes</span></div>
+			<div class="s2b-message-text"><p class="final">Use step three instead.</p></div>
 		</div>
 		<div class="composer"><p class="draft">my draft</p></div>`;
 	document.body.appendChild(containerEl);
@@ -72,6 +73,7 @@ beforeEach(() => {
 				getMostRecentLeaf: () => null,
 				getLeavesOfType: (type: string) => (type === VIEW_TYPE_CHAT ? leaves : []),
 				getActiveViewOfType: () => null,
+				iterateAllLeaves: (cb: (leaf: unknown) => void) => leaves.forEach(cb),
 			},
 		},
 	} as unknown as SecondBrainPlugin);
@@ -95,13 +97,12 @@ describe("SelectionTracker — chat quotes", () => {
 		select(textOf(".answer"));
 		expect(tracker.selection).toBeUndefined();
 
-		tracker.pinChatSelection(THREAD);
+		tracker.pinChatSelection();
 		expect(tracker.selection).toMatchObject({
 			path: THREAD,
 			basename: "Planning",
 			viewType: "chat",
 			text: "The second step is wrong.",
-			sameThread: true,
 		});
 		tracker.destroy();
 	});
@@ -111,7 +112,7 @@ describe("SelectionTracker — chat quotes", () => {
 		select(textOf(".answer"), 4, 10);
 		// The press collapsed the selection before the composer's handler ran.
 		window.getSelection()?.removeAllRanges();
-		tracker.pinChatSelection(THREAD);
+		tracker.pinChatSelection();
 		expect(tracker.selection?.text).toBe("second");
 		tracker.destroy();
 	});
@@ -119,28 +120,42 @@ describe("SelectionTracker — chat quotes", () => {
 	it("ignores selections outside message text", () => {
 		const tracker = new SelectionTracker();
 		select(textOf(".tool-label"));
-		tracker.pinChatSelection(THREAD);
+		tracker.pinChatSelection();
 		expect(tracker.selection).toBeUndefined();
 
 		select(textOf(".draft"));
-		tracker.pinChatSelection(THREAD);
+		tracker.pinChatSelection();
 		expect(tracker.selection).toBeUndefined();
 		tracker.destroy();
 	});
 
-	it("marks a quote from another chat as such", () => {
+	it("records which chat a quote came from", () => {
 		leaves.push(chatLeaf("Chats/Other.chat"));
 		const tracker = new SelectionTracker();
 		select(textOf(".answer", leaves[1]));
-		tracker.pinChatSelection(THREAD);
-		expect(tracker.selection).toMatchObject({ path: "Chats/Other.chat", sameThread: false });
+		tracker.pinChatSelection();
+		expect(tracker.selection).toMatchObject({ path: "Chats/Other.chat", basename: "Other" });
+		tracker.destroy();
+	});
+
+	it("cuts the UI between two messages out of a selection spanning both", () => {
+		const tracker = new SelectionTracker();
+		const range = document.createRange();
+		range.setStart(textOf(".answer"), 4);
+		range.setEnd(textOf(".final"), 3);
+		window.getSelection()?.removeAllRanges();
+		window.getSelection()?.addRange(range);
+		document.dispatchEvent(new Event("selectionchange"));
+		flushFrames();
+		tracker.pinChatSelection();
+		expect(tracker.selection?.text).toBe("second step is wrong.\n\nUse");
 		tracker.destroy();
 	});
 
 	it("keeps the pinned quote while typing, and drops it on a click into message text", () => {
 		const tracker = new SelectionTracker();
 		select(textOf(".answer"));
-		tracker.pinChatSelection(THREAD);
+		tracker.pinChatSelection();
 
 		caret(textOf(".draft"));
 		expect(tracker.selection?.viewType).toBe("chat");

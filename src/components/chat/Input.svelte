@@ -804,7 +804,7 @@ function sendMessage() {
 			contentToSend,
 			attachments.length > 0 ? [...attachments] : undefined,
 			activeVisibleNotes.length > 0 ? [...activeVisibleNotes] : undefined,
-			activeSelection ? { ...activeSelection } : undefined,
+			activeSelection ? withQuoteDestination(activeSelection) : undefined,
 			activeGraphNotes.length > 0 ? [...activeGraphNotes] : undefined,
 		)
 		.catch((error) => {
@@ -1302,7 +1302,15 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 // the composer. Capture phase, so it runs before the press moves the selection
 // into the editor and collapses it.
 function pinChatSelection(): void {
-	contextTrayRef?.pinChatSelection(threadPath);
+	contextTrayRef?.pinChatSelection();
+}
+
+/** Snapshot of the selection to send. A chat quote is told here, at send time,
+ * whether it comes from the thread it is sent in: a pinned quote outlives the
+ * composer switching threads, so the thread it was pinned in says nothing. */
+function withQuoteDestination(selection: SelectionRef): SelectionRef {
+	if (selection.viewType !== "chat") return { ...selection };
+	return { ...selection, sameThread: threadPath !== null && selection.path === threadPath };
 }
 </script>
 

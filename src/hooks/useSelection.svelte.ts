@@ -14,9 +14,9 @@ export interface SelectionRef {
 	text: string;
 	icon: string;
 	/** Chat selections only (`viewType: "chat"`): whether the text was quoted from the
-	 * same conversation it was sent in. Fixed at capture time, because the context block
-	 * is rebuilt from this ref to strip it again and a thread's path changes when it is
-	 * auto-titled. */
+	 * same conversation it was sent in. Set on the snapshot at send time and stored with
+	 * the message, because the context block is rebuilt from this ref to strip it again
+	 * and a thread's path changes when it is auto-titled. */
 	sameThread?: boolean;
 }
 
@@ -51,7 +51,32 @@ function chatLeafContaining(node: Node): WorkspaceLeaf | undefined {
 }
 
 /**
- * The live selection when it lies in message text of a chat view. Read from the
+ * The part of `range` that lies in quotable message text of `container`, one
+ * clamped range per message element. A drag from one message to another passes
+ * over the UI between them (an expanded tool card's output, footers); that text
+ * is not what the user means to quote, so it is cut out rather than sent.
+ */
+function quotableSlices(range: Range, container: HTMLElement): Range[] {
+	const slices: Range[] = [];
+	for (const el of container.querySelectorAll(QUOTABLE_CHAT_SELECTOR)) {
+		// A quotable element nested in another is covered by its ancestor's slice.
+		if (el.parentElement?.closest(QUOTABLE_CHAT_SELECTOR)) continue;
+		if (!range.intersectsNode(el)) continue;
+		const slice = el.ownerDocument.createRange();
+		slice.selectNodeContents(el);
+		if (slice.compareBoundaryPoints(Range.START_TO_START, range) < 0) {
+			slice.setStart(range.startContainer, range.startOffset);
+		}
+		if (slice.compareBoundaryPoints(Range.END_TO_END, range) > 0) {
+			slice.setEnd(range.endContainer, range.endOffset);
+		}
+		if (!slice.collapsed && slice.toString().trim()) slices.push(slice);
+	}
+	return slices;
+}
+
+/**
+ * The live selection when it covers message text of a chat view. Read from the
  * DOM rather than the active leaf: a sidebar chat never becomes the "most recent"
  * leaf, so the leaf the selection is in has to be found from the selection itself.
  */
@@ -61,19 +86,18 @@ function getChatSelection(): CapturedSelection | undefined {
 		if (!domSel || domSel.rangeCount === 0 || domSel.isCollapsed) return undefined;
 		const { anchorNode, focusNode } = domSel;
 		if (!anchorNode || !focusNode) return undefined;
-		if (!isInQuotableChatText(anchorNode) || !isInQuotableChatText(focusNode)) return undefined;
 		const leaf = chatLeafContaining(anchorNode);
 		if (!leaf || !leaf.view.containerEl.contains(focusNode)) return undefined;
 		const file = (leaf.view as { file?: { path: string; basename: string } | null }).file;
 		if (!file) return undefined;
 
-		const text = domSel.toString();
-		if (!text.trim()) return undefined;
-
 		const domRanges: Range[] = [];
 		for (let i = 0; i < domSel.rangeCount; i++) {
-			domRanges.push(domSel.getRangeAt(i).cloneRange());
+			domRanges.push(...quotableSlices(domSel.getRangeAt(i), leaf.view.containerEl));
 		}
+		if (domRanges.length === 0) return undefined;
+		const text = domRanges.map((r) => r.toString()).join("\n\n");
+
 		return {
 			ref: { path: file.path, basename: file.basename, viewType: "chat", text, icon: VIEW_ICONS.chat },
 			domRanges,
@@ -251,6 +275,9 @@ export class SelectionTracker {
 	/** Latest selection in chat message text, waiting for the composer to be engaged. */
 	#chatCandidate: CapturedSelection | undefined;
 	readonly #handleSelectionChange = () => this.#scheduleRefresh();
+	/** Every window document `selectionchange` is listened on: the main one plus
+	 * each popout window's, since the event never crosses documents. */
+	readonly #listenedDocs = new Set<Document>();
 
 	/** The current captured selection ref (serializable). */
 	get selection(): SelectionRef | undefined {
@@ -275,7 +302,23 @@ export class SelectionTracker {
 				this.#scheduleRefresh();
 			}),
 		];
-		document.addEventListener("selectionchange", this.#handleSelectionChange);
+		this.#listen(document);
+		this.#workspace.iterateAllLeaves((leaf) => this.#listen(leaf.view.containerEl.ownerDocument));
+		this.#refs.push(
+			this.#workspace.on("window-open", (win) => this.#listen(win.doc)),
+			this.#workspace.on("window-close", (win) => this.#unlisten(win.doc)),
+		);
+	}
+
+	#listen(doc: Document) {
+		if (this.#listenedDocs.has(doc)) return;
+		this.#listenedDocs.add(doc);
+		doc.addEventListener("selectionchange", this.#handleSelectionChange);
+	}
+
+	#unlisten(doc: Document) {
+		if (!this.#listenedDocs.delete(doc)) return;
+		doc.removeEventListener("selectionchange", this.#handleSelectionChange);
 	}
 
 	#scheduleRefresh() {
@@ -288,16 +331,15 @@ export class SelectionTracker {
 
 	/**
 	 * Adopt the selection in chat message text as the captured selection and pin
-	 * it. Called when the user presses or focuses the composer of the chat at
-	 * `threadPath`, before that press moves the selection into the editor — the
-	 * candidate from the last refresh covers the case where it already has.
+	 * it. Called when the user presses or focuses a composer, before that press
+	 * moves the selection into the editor — the candidate from the last refresh
+	 * covers the case where it already has.
 	 */
-	pinChatSelection(threadPath: string | null) {
+	pinChatSelection() {
 		const captured = getChatSelection() ?? this.#chatCandidate;
 		if (!captured) return;
 		this.#chatCandidate = undefined;
 		if (this.#selectionEqual(this.#selection, captured)) return;
-		captured.ref.sameThread = threadPath !== null && captured.ref.path === threadPath;
 
 		const previous = this.#selection;
 		this.#clearHighlights();
@@ -385,9 +427,12 @@ export class SelectionTracker {
 		// Reading / PDF: use CSS Custom Highlight API
 		if (captured.domRanges?.length) {
 			try {
-				if (CSS.highlights) {
-					const highlight = new Highlight(...captured.domRanges);
-					CSS.highlights.set("s2b-selection", highlight);
+				// Each window has its own highlight registry and `Highlight` class: a
+				// range in a popout only paints when registered on that popout's.
+				const win = (captured.domRanges[0].startContainer.ownerDocument?.defaultView ?? window) as Window &
+					typeof globalThis;
+				if (win.CSS?.highlights) {
+					win.CSS.highlights.set("s2b-selection", new win.Highlight(...captured.domRanges));
 				}
 			} catch {
 				/* API may not be available */
@@ -485,7 +530,9 @@ export class SelectionTracker {
 
 		// Remove CSS Highlight API highlights
 		try {
-			CSS.highlights?.delete("s2b-selection");
+			for (const doc of new Set([document, ...this.#listenedDocs])) {
+				(doc.defaultView as (Window & typeof globalThis) | null)?.CSS?.highlights?.delete("s2b-selection");
+			}
 		} catch {
 			/* safety */
 		}
@@ -508,7 +555,7 @@ export class SelectionTracker {
 			this.#workspace.offref(ref);
 		}
 		this.#refs = [];
-		document.removeEventListener("selectionchange", this.#handleSelectionChange);
+		for (const doc of [...this.#listenedDocs]) this.#unlisten(doc);
 		if (this.#refreshFrame !== undefined) {
 			cancelAnimationFrame(this.#refreshFrame);
 			this.#refreshFrame = undefined;
