@@ -151,6 +151,9 @@
 			"base_url_desc": "Osnovni URL končne točke API, združljive z OpenAI",
 			"api_key_desc": "Ključ API za preverjanje pristnosti (pustite prazno, če ga vaša končna točka ne potrebuje)"
 		},
+		"directory": {
+			"docs_link": "Dokumentacija API-ja {name}"
+		},
 		"anthropic": {
 			"link": "Konzola Anthropic",
 			"api_key_desc": "Vaš ključ API za Anthropic za preverjanje pristnosti",

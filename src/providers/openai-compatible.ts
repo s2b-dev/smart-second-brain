@@ -6,18 +6,19 @@
  */
 
 import { requestUrl } from "obsidian";
+import type { Component } from "svelte";
 import {
 	createBufferedTransportedChatOpenAI,
 	createTransportedChatOpenAI,
 	createTransportedOpenAIEmbeddings,
 } from "./chatProviders";
-import OpenAILogo from "../components/ui/logos/OpenAILogo.svelte";
 import type {
 	AuthObject,
 	AuthValidationResult,
 	BaseProviderDefinition,
 	ChatModelConfig,
 	EmbeddingProviderDefinition,
+	LogoProps,
 	ProviderSetupInstructions,
 } from "../types/provider/index";
 import {
@@ -30,8 +31,17 @@ import { t } from "../i18n";
 import { chatCompletionsReasoningFields } from "./reasoningEffort";
 import { liteLLMReasoningEffortSupport, setReasoningEffortSupport } from "./reasoningSupport";
 
-function sanitizeBaseUrl(url: string): string {
-	return url.replace(/\/+$/, "").replace(/\/v1$/i, "");
+/**
+ * The API root requests go to: `<root>/models`, `<root>/chat/completions`.
+ *
+ * The base URL is that root, used as given, the way OpenAI's SDK reads `baseURL`. Many
+ * servers don't live under `/v1` (Z.ai's `/api/paas/v4`, Volcengine's `/api/v3`, Novita's
+ * `/openai`), so a fixed suffix can't reach them. Only a bare host (`http://localhost:8000`)
+ * gets `/v1` appended: there the user plainly gave the server, not the API.
+ */
+export function resolveApiRoot(baseUrl: string): string {
+	const trimmed = baseUrl.trim().replace(/\/+$/, "");
+	return /^[a-z][a-z0-9+.-]*:\/\/[^/]+$/i.test(trimmed) ? `${trimmed}/v1` : trimmed;
 }
 
 interface OpenAIModelEntry extends CompatibleModelEntry {
@@ -65,7 +75,7 @@ async function fetchModelEntries(
 	providerId: string,
 	defaultBaseUrl: string,
 ): Promise<OpenAIModelEntry[]> {
-	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+	const apiUrl = resolveApiRoot(auth.baseUrl || defaultBaseUrl);
 	const response = await requestUrl({
 		url: `${apiUrl}/models`,
 		method: "GET",
@@ -92,7 +102,7 @@ export const MODEL_INFO_TIMEOUT_MS = 5000;
  * hold the model list back.
  */
 async function fetchLiteLLMModelInfo(auth: AuthObject, defaultBaseUrl: string): Promise<LiteLLMModelInfoEntry[]> {
-	const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+	const apiUrl = resolveApiRoot(auth.baseUrl || defaultBaseUrl);
 	const lookup = (async (): Promise<LiteLLMModelInfoEntry[]> => {
 		const response = await requestUrl({
 			url: `${apiUrl}/model/info`,
@@ -119,14 +129,14 @@ export interface OpenAICompatibleProviderInput {
 	id: string;
 	displayName: string;
 	defaultBaseUrl?: string;
-	logo?: typeof OpenAILogo;
+	logo?: Component<LogoProps>;
 	setupInstructions?: ProviderSetupInstructions;
 }
 
 export function createOpenAICompatibleProvider(
 	config: OpenAICompatibleProviderInput,
 ): BaseProviderDefinition | EmbeddingProviderDefinition {
-	const defaultBaseUrl = sanitizeBaseUrl(config.defaultBaseUrl ?? "https://api.openai.com");
+	const defaultBaseUrl = config.defaultBaseUrl ?? "https://api.openai.com";
 	const baseDefinition: BaseProviderDefinition = {
 		id: config.id,
 		displayName: config.displayName,
@@ -163,9 +173,8 @@ export function createOpenAICompatibleProvider(
 			},
 		},
 		createChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
-			const resolvedBaseUrl = sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl);
 			const configuration: Record<string, unknown> = {
-				baseURL: `${resolvedBaseUrl}/v1`,
+				baseURL: resolveApiRoot(auth.baseUrl || defaultBaseUrl),
 			};
 
 			if (auth.headers && Object.keys(auth.headers).length > 0) {
@@ -186,8 +195,7 @@ export function createOpenAICompatibleProvider(
 			return createTransportedChatOpenAI(config.id, chatConfig);
 		},
 		createSubAgentChatInstance: (auth: AuthObject, modelId: string, options?: Partial<ChatModelConfig>) => {
-			const resolvedBaseUrl = sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl);
-			const configuration: Record<string, unknown> = { baseURL: `${resolvedBaseUrl}/v1` };
+			const configuration: Record<string, unknown> = { baseURL: resolveApiRoot(auth.baseUrl || defaultBaseUrl) };
 			if (auth.headers && Object.keys(auth.headers).length > 0) {
 				configuration.defaultHeaders = auth.headers;
 			}
@@ -203,7 +211,7 @@ export function createOpenAICompatibleProvider(
 			return createBufferedTransportedChatOpenAI(config.id, chatConfig);
 		},
 		validateAuth: async (auth: AuthObject): Promise<AuthValidationResult> => {
-			const apiUrl = `${sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl)}/v1`;
+			const apiUrl = resolveApiRoot(auth.baseUrl || defaultBaseUrl);
 
 			try {
 				const response = await requestUrl({
@@ -252,9 +260,8 @@ export function createOpenAICompatibleProvider(
 	return {
 		...baseDefinition,
 		createEmbeddingInstance: (auth: AuthObject, modelId: string) => {
-			const resolvedBaseUrl = sanitizeBaseUrl(auth.baseUrl || defaultBaseUrl);
 			const configuration: Record<string, unknown> = {
-				baseURL: `${resolvedBaseUrl}/v1`,
+				baseURL: resolveApiRoot(auth.baseUrl || defaultBaseUrl),
 			};
 
 			if (auth.headers && Object.keys(auth.headers).length > 0) {

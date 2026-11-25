@@ -77,6 +77,12 @@ release" and covers the provider list, bundled skills, built-in tools,
 `BUILT_IN_TOOL_IDS`, `src/skills/defaults/`, or `manifest.json` means the site
 needs updating too.
 
+Also before a release, run `bun run directory:refresh` and commit the result. It
+regenerates `src/providers/directory/catalog.json`, the bundled models.dev snapshot
+behind Add provider → **More providers** (name, API root, docs link and logo of each
+OpenAI-compatible vendor; never model facts, see #586). The plugin never fetches
+models.dev at runtime, so the list is only as fresh as the last refresh.
+
 **Release notes live in `CHANGELOG.md`**, one `## X.Y.Z (YYYY-MM-DD)` section per
 stable release, newest first. It is the single source: the plugin bundles it (`?raw`)
 and, after an update, offers the sections since the last-seen version in a

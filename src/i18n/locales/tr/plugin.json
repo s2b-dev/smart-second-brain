@@ -139,6 +139,9 @@
 			"base_url_desc": "OpenAI uyumlu API uç noktasının temel URL'si",
 			"api_key_desc": "Kimlik doğrulama için API anahtarı (uç noktanız gerektirmiyorsa boş bırakın)"
 		},
+		"directory": {
+			"docs_link": "{name} API belgeleri"
+		},
 		"anthropic": {
 			"link": "Anthropic Console",
 			"api_key_desc": "Kimlik doğrulama için Anthropic API anahtarınız",

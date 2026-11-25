@@ -136,8 +136,11 @@
 			"sign_in_placeholder": "Authorized via ChatGPT sign-in"
 		},
 		"openai_compatible": {
-			"base_url_desc": "The base URL for the OpenAI-compatible API endpoint",
+			"base_url_desc": "The API root, used as given (e.g. https://api.example.com/v1). A bare host like http://localhost:8000 gets /v1 added.",
 			"api_key_desc": "API key for authentication (leave empty if your endpoint needs none)"
+		},
+		"directory": {
+			"docs_link": "{name} API docs"
 		},
 		"anthropic": {
 			"link": "Anthropic Console",

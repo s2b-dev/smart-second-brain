@@ -45,6 +45,7 @@
     "corpus:generate": "bun run scripts/generate-search-corpus.ts",
     "bench:layout": "bun run scripts/graph-layout-bench.ts",
     "bench:vector-memory": "bun run scripts/vector-memory-bench.ts",
+    "directory:refresh": "bun run scripts/refresh-provider-directory.ts",
     "test:benchmark": "vitest run --config vitest.integration.config.ts integration/search-relevance-benchmark.test.ts"
   },
   "type": "module",

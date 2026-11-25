@@ -20,6 +20,7 @@ import LmStudioLogo from "../../components/ui/logos/LmStudioLogo.svelte";
 import HuggingFaceLogo from "../../components/ui/logos/HuggingFaceLogo.svelte";
 import GoogleLogo from "../../components/ui/logos/GoogleLogo.svelte";
 import MistralLogo from "../../components/ui/logos/MistralLogo.svelte";
+import DirectoryLogo from "../../components/ui/logos/DirectoryLogo.svelte";
 import {
 	createAuthStateQuery,
 	getProviderStateQueryOptions,
@@ -34,6 +35,12 @@ import {
 	type ProviderTemplateId,
 	getProviderDefinition,
 } from "../../providers/index";
+import {
+	type DirectoryEntry,
+	directoryHost,
+	getDirectoryEntries,
+	searchDirectory,
+} from "../../providers/directory/index";
 import { getData, slugifyProviderName } from "../../stores/dataStore.svelte";
 import { t } from "../../i18n";
 import { icon } from "../../utils/utils";
@@ -49,8 +56,9 @@ const { modal }: Props = $props();
 const data = getData();
 
 // Two-step flow: "pick" shows the provider grid, "configure" shows the setup form.
-// Editing an existing provider skips straight to "configure".
-let step = $state<"pick" | "configure">(untrack(() => (modal.startInPicker ? "pick" : "configure")));
+// "directory" is a detour from "pick": the searchable list of further OpenAI-compatible
+// services (#588). Editing an existing provider skips straight to "configure".
+let step = $state<"pick" | "directory" | "configure">(untrack(() => (modal.startInPicker ? "pick" : "configure")));
 
 // providerId only changes once: when a new provider is committed (renamed to slug on submit),
 // or when a template is chosen from the picker. During editing it never changes.
@@ -155,8 +163,11 @@ const hasCredentials = $derived.by(() => {
 	const stored = data.getStoredAuthState(providerId);
 	const authFields = providerDefinition?.auth;
 	if (!stored || !authFields) return false;
+	// A directory entry arrives with its base URL already stored; that is the entry's, not
+	// something the user supplied, so only their own fields (the key) count here.
+	const prefilled = providerMeta?.directoryId ? "baseUrl" : undefined;
 	return Object.entries(authFields).some(
-		([key, field]) => field.required && (!!stored.values[key] || !!stored.secretIds[key]),
+		([key, field]) => field.required && key !== prefilled && (!!stored.values[key] || !!stored.secretIds[key]),
 	);
 });
 
@@ -263,6 +274,15 @@ function getTemplateLogo(id: ProviderTemplateId): Component<LogoProps> {
 $effect(() => {
 	displayName = providerMeta?.displayName ?? "";
 });
+
+const directoryCount = getDirectoryEntries().length;
+let directoryQuery = $state("");
+const directoryMatches = $derived(searchDirectory(directoryQuery));
+
+async function handleSelectDirectoryEntry(entry: DirectoryEntry) {
+	providerId = await modal.selectDirectoryEntry(entry);
+	step = "configure";
+}
 
 async function handleSelectTemplate(id: ProviderTemplateId) {
 	const newId = await modal.selectTemplate(id);
@@ -527,7 +547,43 @@ const canFinish = $derived(
           <span class="provider-picker-name">{template.displayName}</span>
         </button>
       {/each}
+      <button type="button" class="provider-picker-tile" onclick={() => (step = "directory")}>
+        <span class="provider-picker-logo provider-picker-more" use:icon={"list-plus"}></span>
+        <span class="provider-picker-name">{t("onboarding.provider_setup.more_providers")}</span>
+      </button>
     </div>
+  </div>
+{:else if step === "directory"}
+  <div class="modal-content">
+    <button type="button" class="auth-alt-link provider-directory-back" onclick={() => (step = "pick")}>
+      ← {t("onboarding.provider_setup.directory_back")}
+    </button>
+    <p class="provider-picker-desc">
+      {t("onboarding.provider_setup.directory_desc", { count: directoryCount })}
+    </p>
+    <!-- svelte-ignore a11y_autofocus -->
+    <input
+      type="search"
+      class="provider-directory-search"
+      placeholder={t("onboarding.provider_setup.directory_search")}
+      bind:value={directoryQuery}
+      autofocus={!Platform.isMobile}
+    />
+    {#if directoryMatches.length === 0}
+      <p class="provider-picker-desc provider-directory-empty">{t("onboarding.provider_setup.directory_empty")}</p>
+    {:else}
+      <div class="provider-directory-list">
+        {#each directoryMatches as entry (entry.id)}
+          <button type="button" class="provider-directory-row" onclick={() => void handleSelectDirectoryEntry(entry)}>
+            <span class="provider-directory-logo"><DirectoryLogo svg={entry.logo} width={20} height={20} /></span>
+            <span class="provider-directory-text">
+              <span class="provider-directory-name">{entry.name}</span>
+              <span class="provider-directory-host">{directoryHost(entry)}</span>
+            </span>
+          </button>
+        {/each}
+      </div>
+    {/if}
   </div>
 {:else}
   <div class="modal-content">
@@ -823,6 +879,82 @@ const canFinish = $derived(
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .provider-picker-more {
+    color: var(--text-muted);
+  }
+
+  .provider-picker-more :global(svg) {
+    width: 28px;
+    height: 28px;
+  }
+
+  .provider-directory-back {
+    margin-bottom: var(--size-4-2);
+  }
+
+  .provider-directory-search {
+    width: 100%;
+    margin-bottom: var(--size-4-2);
+  }
+
+  .provider-directory-list {
+    display: flex;
+    flex-direction: column;
+    max-height: min(420px, 55vh);
+    overflow-y: auto;
+  }
+
+  .provider-directory-row {
+    display: flex;
+    align-items: center;
+    /* Obsidian's base button centres its content. */
+    justify-content: flex-start;
+    gap: var(--size-4-3);
+    width: 100%;
+    height: auto;
+    padding: var(--size-4-2) var(--size-4-2);
+    border: 0;
+    border-radius: var(--radius-s);
+    background: transparent;
+    box-shadow: none;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .provider-directory-row:hover,
+  .provider-directory-row:focus-visible {
+    background: var(--background-modifier-hover);
+  }
+
+  .provider-directory-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: var(--text-normal);
+  }
+
+  .provider-directory-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .provider-directory-name {
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+  }
+
+  .provider-directory-host {
+    color: var(--text-muted);
+    font-size: var(--font-smaller);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .provider-picker-name {

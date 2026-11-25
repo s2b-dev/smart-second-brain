@@ -133,6 +133,9 @@
 			"base_url_desc": "OpenAI 兼容 API 端点的基础 URL",
 			"api_key_desc": "用于身份验证的 API 密钥（端点不需要时可留空）"
 		},
+		"directory": {
+			"docs_link": "{name} API 文档"
+		},
 		"anthropic": {
 			"link": "Anthropic 控制台",
 			"api_key_desc": "用于身份验证的 Anthropic API 密钥",
