@@ -72,16 +72,17 @@ const providerMeta = $derived(data.getProviderMeta(providerId));
 const oauth = $derived(providerDefinition?.oauth);
 const isConfigured = $derived(data.isProviderConfigured(providerId));
 
-// Picker display order: lead with the most-used providers so the grid scans fast.
-// Templates not listed fall to the end in their registry order.
+// Picker display order: local first (notes never leave the machine), then the most-used
+// cloud providers. Custom goes last, beside "More providers": both are the "my provider
+// isn't listed" path. Templates not listed fall to the end in their registry order.
 const PICKER_ORDER: ProviderTemplateId[] = [
-	"openai-compatible",
-	"openrouter",
 	"ollama",
 	"openai",
 	"anthropic",
 	"google",
+	"openrouter",
 	"mistral",
+	"openai-compatible",
 ];
 // Built-in templates that are less widely used sit in "More providers" instead of the grid,
 // listed above the catalog entries so search still finds their proper setup (sign-in,
