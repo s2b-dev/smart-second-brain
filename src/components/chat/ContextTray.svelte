@@ -218,6 +218,12 @@ function onSelectionClick(evt: MouseEvent): void {
 	dismissSelection();
 }
 
+/** Adopt a selection in chat message text (see `SelectionTracker.pinChatSelection`).
+ * The composer calls this when it is pressed or focused. */
+export function pinChatSelection(threadPath: string | null): void {
+	selectionTracker.pinChatSelection(threadPath);
+}
+
 function dismissSelection(): void {
 	dismissedSelection = selectionTracker.selection;
 	selectionTracker.clear();

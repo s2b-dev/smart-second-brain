@@ -1298,6 +1298,12 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 		savingFiles = false;
 	}
 }
+// Text selected in a chat's messages becomes a quote only once the user turns to
+// the composer. Capture phase, so it runs before the press moves the selection
+// into the editor and collapses it.
+function pinChatSelection(): void {
+	contextTrayRef?.pinChatSelection(threadPath);
+}
 </script>
 
 <div
@@ -1337,6 +1343,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     ondragleave={dropTargetMode === "input" ? handleDragLeave : undefined}
     ondrop={dropTargetMode === "input" ? handleDrop : undefined}
     onclick={handleWrapperClick}
+    onpointerdowncapture={pinChatSelection}
+    onfocusincapture={pinChatSelection}
     role="region"
     bind:this={wrapperEl}
     style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}
