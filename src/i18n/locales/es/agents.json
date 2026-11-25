@@ -216,11 +216,6 @@
 		"add_server": "Añadir servidor"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "Área principal (pestaña)",
-			"left": "Barra lateral izquierda",
-			"right": "Barra lateral derecha"
-		},
 		"cannot_delete_default": "No se puede eliminar el agente predeterminado integrado",
 		"delete_failed": "No se pudo eliminar el agente",
 		"no_chat_model": "Ningún modelo de chat seleccionado",
@@ -241,8 +236,6 @@
 		"chats_folder_desc": "Carpeta donde guardar los archivos de chat y los datos relacionados",
 		"attachment_folder_name": "Carpeta de adjuntos",
 		"attachment_folder_desc": "Carpeta para los archivos adjuntos del chat. Déjala vacía para usar la carpeta de adjuntos de Obsidian.",
-		"open_chat_in_name": "Abrir chat nuevo en",
-		"open_chat_in_desc": "Dónde abrir las nuevas ventanas de chat",
 		"status_bar_name": "Mostrar agentes activos en la barra de estado",
 		"status_bar_desc": "Muestra en la barra de estado un indicador en el que se puede hacer clic por cada chat con un agente en ejecución.",
 		"widgets_heading": "Widgets",

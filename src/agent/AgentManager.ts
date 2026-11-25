@@ -1,6 +1,6 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { Notice, normalizePath, TFile, type WorkspaceLeaf } from "obsidian";
+import { Notice, normalizePath, TFile } from "obsidian";
 import { installObsidianFetch } from "../lib/obsidianFetch";
 import { invalidateProviderState } from "../lib/query";
 import type SecondBrainPlugin from "../main";
@@ -8,7 +8,6 @@ import type { ChatModel } from "../stores/chatTimeline";
 import { getData } from "../stores/dataStore.svelte";
 import { getPendingChangesStore } from "../stores/pendingChangesStore.svelte";
 import { BUILT_IN_TOOL_IDS, type BuiltInToolId, type AgentConfig, type SkillMetadata } from "../types/plugin";
-import { VIEW_TYPE_CHAT } from "../views/chat/Chat";
 import { hydrateChatModel } from "../lib/modelMetadataNormalizer";
 import { fetchOllamaModelsInfo } from "../providers/ollamaModels";
 import { hasLmStudioModels } from "../providers/lmstudioModels";
@@ -36,6 +35,7 @@ import { gzipString, toArrayBuffer } from "../utils/gzip";
 import { Logger } from "../utils/logging";
 import { agentDefinitionPath, memoriesDir } from "../utils/agentPaths";
 import { isAgentFilePath } from "../utils/fileFiltering";
+import { chatLeavesByRecency, pickChatLeaf } from "../utils/chatLocation";
 import {
 	editProviderAction,
 	openNoteAction,
@@ -2213,28 +2213,13 @@ export class AgentManager {
 		this.agent = null;
 	}
 
+	/** Open a chat where chats live: the thread's own leaf, the most recent chat, or the place
+	 * the last one was (see utils/chatLocation.ts). Reusing the thread's leaf matters beyond
+	 * tidiness: a second leaf on the same thread leaves a stale, unmounted-but-registered
+	 * .s2b-chat-root behind, which corrupts touch hit-testing on mobile (double-tap bug). */
 	private async openInChatLeaf(file: TFile) {
-		const location = getData().chatOpenLocation;
 		const workspace = this.plugin.app.workspace;
-		let leaf: WorkspaceLeaf | null | undefined;
-		if (location === "left" || location === "right") {
-			const targetSplit = location === "left" ? workspace.leftSplit : workspace.rightSplit;
-			leaf = workspace.getLeavesOfType(VIEW_TYPE_CHAT).find((l) => l.getRoot() === targetSplit);
-			if (!leaf) {
-				leaf = location === "left" ? workspace.getLeftLeaf(false) : workspace.getRightLeaf(false);
-			}
-		} else {
-			// Reuse a tab already showing this exact thread instead of always opening a
-			// fresh one — otherwise every reopen of a backgrounded chat (running-indicator
-			// tap, "Ask agent", openLatestChat) stacks a new leaf on top of the old one.
-			// That leaves a stale, unmounted-but-still-registered .s2b-chat-root leaf behind,
-			// which corrupts touch hit-testing on mobile (double-tap bug). On mobile there's
-			// effectively one active pane, so getLeaf("tab") duplicating is especially costly.
-			leaf = workspace
-				.getLeavesOfType(VIEW_TYPE_CHAT)
-				.find((l) => (l.view as { file?: TFile }).file?.path === file.path);
-			if (!leaf) leaf = workspace.getLeaf("tab");
-		}
+		const leaf = pickChatLeaf(this.plugin.app, file);
 		if (!leaf) return;
 		await leaf.openFile(file);
 		await workspace.revealLeaf(leaf);
@@ -2330,17 +2315,12 @@ export class AgentManager {
 	 */
 	async resolveOrOpenChatForAttach(): Promise<string | null> {
 		const workspace = this.plugin.app.workspace;
-		const chatLeaves = workspace.getLeavesOfType(VIEW_TYPE_CHAT);
 
 		// Prefer an already-open chat, most-recently-used first, so the note is
-		// attached to the chat the user was last interacting with. Obsidian stamps
-		// each leaf with an `activeTime` when it's focused; sorting on it picks the
-		// right chat even when the *currently* active leaf isn't a chat (e.g. the
-		// user is in a note or the search modal when they trigger the attach).
-		const orderedLeaves = [...chatLeaves].sort(
-			(a, b) =>
-				((b as { activeTime?: number }).activeTime ?? 0) - ((a as { activeTime?: number }).activeTime ?? 0),
-		);
+		// attached to the chat the user was last interacting with, even when the
+		// *currently* active leaf isn't a chat (e.g. the user is in a note or the
+		// search modal when they trigger the attach).
+		const orderedLeaves = chatLeavesByRecency(this.plugin.app);
 
 		for (const leaf of orderedLeaves) {
 			const file = (leaf.view as { file?: TFile }).file;

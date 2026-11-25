@@ -90,4 +90,14 @@ describe("dataMigrations", () => {
 		expect(url("empty")).toBeUndefined();
 		expect(url("ollama")).toBe("http://localhost:11434/api");
 	});
+
+	// The setting retired in favour of a per-device remembered location (utils/chatLocation.ts).
+	it("v15 → v16 drops the synced chatOpenLocation setting", () => {
+		const data = { schemaVersion: 15, chatOpenLocation: "left" } as unknown as PluginData;
+
+		runMigrations(data);
+
+		expect(data.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+		expect("chatOpenLocation" in data).toBe(false);
+	});
 });

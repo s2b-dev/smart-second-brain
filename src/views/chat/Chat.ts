@@ -5,7 +5,9 @@ import type SecondBrainPlugin from "../../main";
 import { getSessionRegistry } from "../../stores/chatStore.svelte";
 import { ThreadPathStore } from "./threadPathStore.svelte";
 
-export const VIEW_TYPE_CHAT = "smart-second-brain-chat";
+import { VIEW_TYPE_CHAT } from "./viewType";
+
+export { VIEW_TYPE_CHAT };
 
 export class ChatView extends FileView {
 	plugin!: SecondBrainPlugin;

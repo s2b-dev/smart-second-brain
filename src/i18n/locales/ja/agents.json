@@ -212,11 +212,6 @@
 		"add_server": "サーバーを追加"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "メインエリア(タブ)",
-			"left": "左サイドバー",
-			"right": "右サイドバー"
-		},
 		"cannot_delete_default": "組み込みのデフォルトエージェントは削除できません",
 		"delete_failed": "エージェントを削除できませんでした",
 		"no_chat_model": "チャットモデルが選択されていません",
@@ -237,8 +232,6 @@
 		"chats_folder_desc": "チャットファイルと関連データを保存するフォルダ",
 		"attachment_folder_name": "添付ファイルフォルダ",
 		"attachment_folder_desc": "チャットの添付ファイル用のフォルダ。空欄にすると Obsidian の添付ファイルフォルダを使用します。",
-		"open_chat_in_name": "新しいチャットを開く場所",
-		"open_chat_in_desc": "新しいチャットウィンドウを開く場所",
 		"status_bar_name": "実行中のエージェントをステータスバーに表示",
 		"status_bar_desc": "エージェントが実行中のチャットごとに、クリック可能なインジケーターをステータスバーに表示します。",
 		"widgets_heading": "ウィジェット",

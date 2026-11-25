@@ -216,11 +216,6 @@
 		"add_server": "Ajouter le serveur"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "Zone principale (onglet)",
-			"left": "Barre latérale gauche",
-			"right": "Barre latérale droite"
-		},
 		"cannot_delete_default": "Impossible de supprimer l’agent par défaut intégré",
 		"delete_failed": "Échec de la suppression de l’agent",
 		"no_chat_model": "Aucun modèle de chat sélectionné",
@@ -241,8 +236,6 @@
 		"chats_folder_desc": "Dossier où stocker les fichiers de chat et les données associées",
 		"attachment_folder_name": "Dossier des pièces jointes",
 		"attachment_folder_desc": "Dossier des pièces jointes du chat. Laissez vide pour utiliser le dossier des pièces jointes d’Obsidian.",
-		"open_chat_in_name": "Ouvrir les nouveaux chats dans",
-		"open_chat_in_desc": "Où ouvrir les nouvelles fenêtres de chat",
 		"status_bar_name": "Afficher les agents actifs dans la barre d’état",
 		"status_bar_desc": "Affiche dans la barre d’état un indicateur cliquable pour chaque chat dont l’agent est en cours d’exécution.",
 		"widgets_heading": "Widgets",

@@ -18,6 +18,7 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import { pickChatLeaf, recordChatLocation, shouldRedirectChatOpen } from "./utils/chatLocation";
 import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
@@ -497,32 +498,21 @@ export default class SecondBrainPlugin extends Plugin {
 		// Read-only preview for embedded (![[chat.chat]]) and hovered .chat links.
 		registerChatEmbed(this);
 
-		// Intercept .chat file opens so they go directly to the sidebar
-		// without ever replacing the note in the main editor area.
+		// Intercept .chat file opens that would replace something else (a note in the active
+		// leaf, a chat link followed from a note) and send them where chats live instead: the
+		// open chat, or the place the last one was (utils/chatLocation.ts has the rules).
 		// Read as a plain function value: it is only ever re-invoked below with an
 		// explicit receiver (`.call(leaf, …)` / `.apply(this, …)`).
 		const leafProto = WorkspaceLeaf.prototype as { openFile: WorkspaceLeaf["openFile"] };
 		const origOpenFile = leafProto.openFile;
 		const app = this.app;
 		WorkspaceLeaf.prototype.openFile = async function (file, openState) {
-			if (file.extension === "chat") {
-				const location = getData().chatOpenLocation;
-				if (location === "left" || location === "right") {
-					const ws = app.workspace;
-					const root = this.getRoot();
-					if (root !== ws.leftSplit && root !== ws.rightSplit) {
-						const targetSplit = location === "left" ? ws.leftSplit : ws.rightSplit;
-						const sidebarLeaf =
-							ws
-								.getLeavesOfType(VIEW_TYPE_CHAT)
-								.find((l: WorkspaceLeaf) => l.getRoot() === targetSplit) ??
-							(location === "left" ? ws.getLeftLeaf(false) : ws.getRightLeaf(false));
-						if (sidebarLeaf) {
-							await origOpenFile.call(sidebarLeaf, file, openState);
-							await ws.revealLeaf(sidebarLeaf);
-							return;
-						}
-					}
+			if (file.extension === "chat" && shouldRedirectChatOpen(this)) {
+				const target = pickChatLeaf(app, file);
+				if (target && target !== this) {
+					await origOpenFile.call(target, file, openState);
+					await app.workspace.revealLeaf(target);
+					return;
 				}
 			}
 			return origOpenFile.call(this, file, openState);
@@ -691,6 +681,12 @@ export default class SecondBrainPlugin extends Plugin {
 				void registry.loadSession(file);
 			}),
 		);
+
+		// Chats open where the user last had one (utils/chatLocation.ts). Moving a chat between
+		// the sidebar and the main area changes the layout, focusing one changes the active
+		// leaf; either way, remember where the most recent chat now lives.
+		this.registerEvent(this.app.workspace.on("layout-change", () => recordChatLocation(this.app)));
+		this.registerEvent(this.app.workspace.on("active-leaf-change", () => recordChatLocation(this.app)));
 
 		this.registerNotebookNavigatorMenus();
 

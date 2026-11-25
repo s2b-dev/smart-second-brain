@@ -10,6 +10,7 @@ import { getSecret, listSecrets, removeSecret, setSecret } from "../lib/secretSt
 import { DEFAULT_CONTENT_INDEXING, installContentIndexingSource, isAgentFilePath } from "../utils/fileFiltering";
 import { sanitizeAgentFileName } from "../utils/agentPaths";
 import { installAgentPathSource } from "../utils/agentPathSource";
+import { seedChatLocation } from "../utils/chatLocation";
 import { DEFAULT_AGENT_ID, createDefaultAgent, createDefaultAgentConfig, normalizeAgents } from "./agentDefaults";
 import { CURRENT_SCHEMA_VERSION, runMigrations } from "./dataMigrations";
 import { computeStaleGuidance } from "./staleGuidance";
@@ -20,7 +21,6 @@ import type {
 	AgentsConfig,
 	BuiltInToolId,
 	DefaultEmbedModel,
-	ChatOpenLocation,
 	ContentGroup,
 	ContentIndexingSettings,
 	DiffViewMode,
@@ -235,7 +235,6 @@ export const DEFAULT_SETTINGS: PluginData = {
 	// UI state
 	isVerbose: false,
 	showToolIODetails: false,
-	chatOpenLocation: "tab",
 	lastActiveChatId: null,
 	onboardingComplete: false,
 	onboardingSplashSeen: false,
@@ -1714,16 +1713,6 @@ export class PluginDataStore {
 		return this.#data.vaultSlug ?? "vault";
 	}
 
-	// --- Chat Open Location ---
-
-	get chatOpenLocation(): ChatOpenLocation {
-		return this.#data.chatOpenLocation ?? "tab";
-	}
-	set chatOpenLocation(val: ChatOpenLocation) {
-		this.#data.chatOpenLocation = val;
-		void this.saveSettings();
-	}
-
 	// --- Favorite Models ---
 
 	get favoriteModels(): Array<{ provider: string; model: string }> {
@@ -2433,6 +2422,9 @@ async function normalizeLoadedData(
 		...rawData,
 	};
 
+	// The retired "Open new chat in" setting seeds this device's remembered chat location
+	// before the v15 → v16 migration drops it from the synced data.
+	seedChatLocation(plugin.app, (rawData as { chatOpenLocation?: unknown } | null | undefined)?.chatOpenLocation);
 	runMigrations(mergedData);
 	// Nested, so the shallow merge above would drop a group added after this data
 	// was saved.
