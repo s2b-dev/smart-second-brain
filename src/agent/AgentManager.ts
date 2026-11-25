@@ -2217,15 +2217,9 @@ export class AgentManager {
 	 * the last one was (see utils/chatLocation.ts). Reusing the thread's leaf matters beyond
 	 * tidiness: a second leaf on the same thread leaves a stale, unmounted-but-registered
 	 * .s2b-chat-root behind, which corrupts touch hit-testing on mobile (double-tap bug). */
-	private async openInChatLeaf(file: TFile, options: { moveHere?: boolean } = {}) {
+	private async openInChatLeaf(file: TFile, leaf = pickChatLeaf(this.plugin.app, file)) {
 		const workspace = this.plugin.app.workspace;
-		// `moveHere`: open where a new chat goes even if another leaf already shows this thread,
-		// and close that other leaf. For reusing the empty "New Chat", which should appear
-		// where you asked for a new chat, not drag you to wherever an old leaf holds it.
-		const elsewhere = options.moveHere ? findChatLeafShowing(this.plugin.app, file) : undefined;
-		const leaf = pickChatLeaf(this.plugin.app, file, { reuseShowing: !options.moveHere });
 		if (!leaf) return;
-		if (elsewhere && elsewhere !== leaf) elsewhere.detach();
 		await leaf.openFile(file);
 		await workspace.revealLeaf(leaf);
 		// Focus it, so typing goes there and it becomes the remembered chat leaf.
@@ -2253,15 +2247,23 @@ export class AgentManager {
 			data.selectedAgentId = data.defaultAgentId;
 		}
 
-		// Only ever keep one unsubmitted "New Chat" around: if an empty new chat
-		// already exists, reopen it instead of creating another.
-		const existingNewChat = await this.chatManager.findEmptyNewChatThread();
-		if (existingNewChat) {
-			const existingFile = this.plugin.app.vault.getAbstractFileByPath(existingNewChat);
-			if (existingFile instanceof TFile) {
-				await this.openInChatLeaf(existingFile, { moveHere: true });
-				return existingNewChat;
-			}
+		// Don't pile up unsubmitted "New Chat"s: reuse an empty one, in the leaf a new chat
+		// goes to. Skip one another leaf is showing: the user has it open over there and asked
+		// for a new chat here, so moving it would yank it out of that leaf (two chat leaves
+		// would keep trading it back and forth). With none left to reuse, make a fresh one.
+		const app = this.plugin.app;
+		const targetFor = (file: TFile) => pickChatLeaf(app, file, { reuseShowing: false });
+		const reusable = (threadId: string) => {
+			const file = app.vault.getFileByPath(threadId);
+			if (!file) return false;
+			const showing = findChatLeafShowing(app, file);
+			return !showing || showing === targetFor(file);
+		};
+		const existingNewChat = await this.chatManager.findEmptyNewChatThread(reusable);
+		const existingFile = existingNewChat ? app.vault.getFileByPath(existingNewChat) : null;
+		if (existingNewChat && existingFile) {
+			await this.openInChatLeaf(existingFile, targetFor(existingFile));
+			return existingNewChat;
 		}
 
 		// Ensure folder exists

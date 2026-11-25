@@ -76,7 +76,7 @@ let editorContainer: HTMLDivElement | undefined = $state();
 let attachmentInputEl: HTMLInputElement | undefined = $state();
 let cameraInputEl: HTMLInputElement | undefined = $state();
 let markdownEditor: EmbeddableMarkdownEditor | undefined = $state();
-let inputValue = $state("");
+let inputValue = $state(untrack(() => (threadPath !== null && composerDrafts.get(threadPath)) || ""));
 
 let attachments: ChatAttachment[] = $state([]);
 let attachmentSizes: Map<string, number> = $state(new Map());
@@ -587,6 +587,11 @@ $effect(() => {
 
 onDestroy(() => {
 	destroyed = true;
+	// Closing the leaf is no reason to lose what was typed: reopening this chat brings it back
+	// (an edit's text is the message's own, not a draft, so it is not kept).
+	if (composerThreadPath !== null && lastSeededEditId === null && inputValue.trim().length > 0) {
+		composerDrafts.set(composerThreadPath, inputValue);
+	}
 	// Stop any in-flight edit-attachment seeding; its writes would land on a
 	// dead component's state (and mint object URLs nothing revokes).
 	seedEditToken++;

@@ -494,10 +494,11 @@ export class ObsidianChatManager extends BaseCheckpointSaver {
 	 * new chat stops being "new" once the user submits their first query, which
 	 * renames the file away from "New Chat".
 	 */
-	async findEmptyNewChatThread(): Promise<string | undefined> {
+	/** The first unsubmitted default-titled chat that `accept` allows (all, by default). */
+	async findEmptyNewChatThread(accept: (threadId: string) => boolean = () => true): Promise<string | undefined> {
 		const threads = await this.listThreads();
 		for (const thread of threads) {
-			if (!isDefaultChatTitle(thread.threadId)) continue;
+			if (!isDefaultChatTitle(thread.threadId) || !accept(thread.threadId)) continue;
 
 			const data = await this.ensureThreadLoaded(thread.threadId);
 			if (data && Object.keys(data.checkpoints).length === 0) {
