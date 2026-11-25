@@ -71,7 +71,7 @@
 		"picker_desc": "选择要连接的提供商。",
 		"setup_guide": "设置指南",
 		"more_providers": "更多提供商",
-		"directory_desc": "{builtins} 提供内置设置；另有来自 models.dev 目录的 {count} 个兼容 OpenAI API 的服务。Smart Second Brain 未对这些服务测试；选择后会添加为可编辑的自定义提供商。",
+		"directory_desc": "兼容 OpenAI API 的服务。这些服务未经测试。",
 		"directory_search": "搜索提供商",
 		"directory_back": "所有提供商",
 		"directory_empty": "没有匹配的提供商。未列出的服务仍可作为自定义提供商添加。",

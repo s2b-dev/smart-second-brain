@@ -71,7 +71,7 @@
 		"picker_desc": "接続するプロバイダーを選択してください。",
 		"setup_guide": "設定ガイド",
 		"more_providers": "その他のプロバイダー",
-		"directory_desc": "{builtins} は専用のセットアップに対応しています。さらに models.dev のディレクトリにある、OpenAI 互換 API を提供するサービスが {count} 件あります。これらは Smart Second Brain では未検証で、選ぶと編集可能なカスタムプロバイダーとして追加されます。",
+		"directory_desc": "OpenAI API に対応したサービスです。これらは未検証です。",
 		"directory_search": "プロバイダーを検索",
 		"directory_back": "すべてのプロバイダー",
 		"directory_empty": "一致するプロバイダーがありません。一覧にないサービスもカスタムプロバイダーとして追加できます。",

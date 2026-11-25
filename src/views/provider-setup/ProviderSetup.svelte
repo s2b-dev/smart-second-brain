@@ -38,7 +38,6 @@ import {
 import {
 	type DirectoryEntry,
 	directoryHost,
-	getDirectoryEntries,
 	matchesDirectoryQuery,
 	searchDirectory,
 } from "../../providers/directory/index";
@@ -280,8 +279,6 @@ $effect(() => {
 	displayName = providerMeta?.displayName ?? "";
 });
 
-const directoryCount = getDirectoryEntries().length;
-const directoryBuiltins = directoryTemplates.map((tpl) => tpl.displayName).join(", ");
 let directoryQuery = $state("");
 const directoryTemplateMatches = $derived(
 	directoryTemplates.filter((tpl) => matchesDirectoryQuery(directoryQuery, `${tpl.displayName} ${tpl.id}`)),
@@ -588,7 +585,8 @@ const canFinish = $derived(
       ← {t("onboarding.provider_setup.directory_back")}
     </button>
     <p class="provider-picker-desc">
-      {t("onboarding.provider_setup.directory_desc", { count: directoryCount, builtins: directoryBuiltins })}
+      {t("onboarding.provider_setup.directory_desc")}
+      <DocsLink variant="inline" doc="moreProviders" />
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <input
