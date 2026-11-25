@@ -16,10 +16,13 @@ import { isMobileUI } from "./platform";
  *    is per device too, so a desktop sidebar must not send a phone's chats into a drawer).
  * 5. Never had one on this device: the right sidebar on desktop, a tab on mobile.
  *
- * Focusing a chat makes it the remembered leaf (`recordFocusedChat`, on `active-leaf-change`,
- * wired only once the layout is ready so the restore can't overwrite it). Moving it (dragging
- * the sidebar chat into the main area) updates where it lives (`recordChatLocation`, on
- * `layout-change`).
+ * The user picks the remembered leaf by pressing into a chat (its content or its tab header:
+ * `recordChatPointer`), and a chat opened into a leaf makes that leaf the remembered one
+ * (`recordFocusedChat`). Obsidian's focus changes are NOT a choice: `active-leaf-change` is
+ * debounced, and Obsidian focuses leaves on its own (a file-explorer click opens the file, then
+ * immediately focuses the last main-area leaf), so following it made the memory flip between
+ * a sidebar chat and a main-area chat on every open. Moving the remembered chat (dragging it
+ * into the main area) updates where it lives (`recordChatLocation`, on `layout-change`).
  */
 export type ChatLocation = "tab" | "left" | "right";
 
@@ -93,12 +96,23 @@ function rememberedChatLeaf(app: App): WorkspaceLeaf | null {
 	return isChatLeaf(leaf) ? leaf : null;
 }
 
-/** A chat leaf gained focus: it is now the one new chats open in. */
+/** A chat leaf was chosen (pressed into, or opened into): it is now the one new chats open in. */
 export function recordFocusedChat(app: App, leaf: WorkspaceLeaf | null): void {
 	if (!isChatLeaf(leaf)) return;
 	const id = leafId(leaf);
 	if (id && app.loadLocalStorage(LEAF_STORAGE_KEY) !== id) app.saveLocalStorage(LEAF_STORAGE_KEY, id);
 	rememberChatLocation(app, chatLocationOf(app, leaf));
+}
+
+/** A pointer press somewhere in the app: if it landed in a chat leaf or on its tab header, the
+ * user chose that chat. */
+export function recordChatPointer(app: App, target: EventTarget | null): void {
+	if (!(target instanceof Node)) return;
+	const leaf = app.workspace.getLeavesOfType(VIEW_TYPE_CHAT).find((candidate) => {
+		const tabHeaderEl = (candidate as { tabHeaderEl?: HTMLElement }).tabHeaderEl;
+		return candidate.view.containerEl.contains(target) || tabHeaderEl?.contains(target);
+	});
+	if (leaf) recordFocusedChat(app, leaf);
 }
 
 /** The layout changed: if the remembered chat moved, remember where it lives now. A closed

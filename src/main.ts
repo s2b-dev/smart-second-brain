@@ -18,7 +18,13 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
-import { pickChatLeaf, recordChatLocation, recordFocusedChat, shouldRedirectChatOpen } from "./utils/chatLocation";
+import {
+	pickChatLeaf,
+	recordChatLocation,
+	recordChatPointer,
+	recordFocusedChat,
+	shouldRedirectChatOpen,
+} from "./utils/chatLocation";
 import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
@@ -510,6 +516,7 @@ export default class SecondBrainPlugin extends Plugin {
 			if (file.extension === "chat" && shouldRedirectChatOpen(this)) {
 				const target = pickChatLeaf(app, file);
 				if (target && target !== this) {
+					recordFocusedChat(app, target);
 					await origOpenFile.call(target, file, openState);
 					await app.workspace.revealLeaf(target);
 					if (openState?.active !== false) app.workspace.setActiveLeaf(target, { focus: true });
@@ -683,16 +690,16 @@ export default class SecondBrainPlugin extends Plugin {
 			}),
 		);
 
-		// Chats open where the user last had one (utils/chatLocation.ts). Moving the remembered
-		// chat between the sidebar and the main area changes the layout; focusing a chat (wired
-		// in onLayoutReady, so the workspace restore's own focus can't overwrite the memory)
-		// makes it the remembered one.
+		// Chats open where the user last had one (utils/chatLocation.ts). Pressing into a chat
+		// chooses it (in popout windows too); moving it changes where it lives. Deliberately not
+		// `active-leaf-change`: Obsidian focuses leaves on its own, see chatLocation.ts.
+		const watchChatPointer = (doc: Document) =>
+			this.registerDomEvent(doc, "pointerdown", (event) => recordChatPointer(this.app, event.target), {
+				capture: true,
+			});
+		watchChatPointer(document);
+		this.registerEvent(this.app.workspace.on("window-open", (win) => watchChatPointer(win.doc)));
 		this.registerEvent(this.app.workspace.on("layout-change", () => recordChatLocation(this.app)));
-		this.app.workspace.onLayoutReady(() => {
-			this.registerEvent(
-				this.app.workspace.on("active-leaf-change", (leaf) => recordFocusedChat(this.app, leaf)),
-			);
-		});
 
 		this.registerNotebookNavigatorMenus();
 

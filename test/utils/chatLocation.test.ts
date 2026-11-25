@@ -3,6 +3,7 @@ import { App, Platform, TFile, type WorkspaceLeaf } from "../__mocks__/obsidian"
 import {
 	pickChatLeaf,
 	recordChatLocation,
+	recordChatPointer,
 	recordFocusedChat,
 	rememberedChatLocation,
 	seedChatLocation,
@@ -25,7 +26,8 @@ type FakeLeaf = {
 	type: string;
 	getRoot(): object;
 	getViewState(): { state?: { file?: string } };
-	view: { file?: { path: string } | null; getViewType(): string };
+	tabHeaderEl: HTMLElement;
+	view: { file?: { path: string } | null; getViewType(): string; containerEl: HTMLElement };
 };
 
 function leaf(name: string, opts: Partial<Pick<FakeLeaf, "activeTime" | "root" | "path" | "deferredPath" | "type">>) {
@@ -39,7 +41,9 @@ function leaf(name: string, opts: Partial<Pick<FakeLeaf, "activeTime" | "root" |
 		type: opts.type ?? VIEW_TYPE_CHAT,
 		getRoot: () => l.root,
 		getViewState: () => ({ state: l.deferredPath ? { file: l.deferredPath } : {} }),
+		tabHeaderEl: document.createElement("div"),
 		view: {
+			containerEl: document.createElement("div"),
 			get file() {
 				return l.path ? { path: l.path } : null;
 			},
@@ -175,5 +179,25 @@ describe("chatLocation", () => {
 		recordFocusedChat(a(), sidebar as unknown as ObsidianLeaf);
 		recordFocusedChat(a(), leaf("note", { type: "markdown" }) as unknown as ObsidianLeaf);
 		expect(pick("Chats/c.chat")).toBe("sidebar");
+	});
+
+	// Obsidian focuses leaves on its own (a file-explorer click focuses the last main-area leaf
+	// right after opening the file), so only a press into a chat counts as choosing it.
+	it("a press into a chat's content or tab header chooses it; elsewhere does not", () => {
+		const tab = leaf("tab", { activeTime: 9, path: "Chats/a.chat" });
+		const sidebar = leaf("sidebar", { activeTime: 1, path: "Chats/b.chat", root: rightSplit });
+		leaves.push(tab, sidebar);
+		const inside = document.createElement("span");
+		sidebar.view.containerEl.appendChild(inside);
+		recordChatPointer(a(), inside);
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+
+		recordChatPointer(a(), document.createElement("div")); // the file explorer, say
+		expect(pick("Chats/c.chat")).toBe("sidebar");
+
+		const header = document.createElement("span");
+		tab.tabHeaderEl.appendChild(header);
+		recordChatPointer(a(), header);
+		expect(pick("Chats/c.chat")).toBe("tab");
 	});
 });

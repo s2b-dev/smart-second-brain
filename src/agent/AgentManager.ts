@@ -35,7 +35,7 @@ import { gzipString, toArrayBuffer } from "../utils/gzip";
 import { Logger } from "../utils/logging";
 import { agentDefinitionPath, memoriesDir } from "../utils/agentPaths";
 import { isAgentFilePath } from "../utils/fileFiltering";
-import { chatLeavesByRecency, findChatLeafShowing, pickChatLeaf } from "../utils/chatLocation";
+import { chatLeavesByRecency, findChatLeafShowing, pickChatLeaf, recordFocusedChat } from "../utils/chatLocation";
 import {
 	editProviderAction,
 	openNoteAction,
@@ -2220,9 +2220,9 @@ export class AgentManager {
 	private async openInChatLeaf(file: TFile, leaf = pickChatLeaf(this.plugin.app, file)) {
 		const workspace = this.plugin.app.workspace;
 		if (!leaf) return;
+		recordFocusedChat(this.plugin.app, leaf);
 		await leaf.openFile(file);
 		await workspace.revealLeaf(leaf);
-		// Focus it, so typing goes there and it becomes the remembered chat leaf.
 		workspace.setActiveLeaf(leaf, { focus: true });
 	}
 
