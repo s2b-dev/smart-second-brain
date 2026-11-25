@@ -75,7 +75,7 @@
 		"picker_desc": "Elige un proveedor para conectar.",
 		"setup_guide": "Guía de configuración",
 		"more_providers": "Más proveedores",
-		"directory_desc": "Servicios que funcionan con la API de OpenAI. No se han probado.",
+		"directory_desc": "Servicios que funcionan con la API de OpenAI.",
 		"directory_search": "Buscar proveedores",
 		"directory_back": "Todos los proveedores",
 		"directory_empty": "Ningún proveedor coincide. Un servicio que no aparece aquí se puede añadir igualmente como proveedor personalizado.",

@@ -73,7 +73,7 @@
 		"picker_desc": "Wähle einen Anbieter zum Verbinden.",
 		"setup_guide": "Einrichtungsanleitung",
 		"more_providers": "Weitere Anbieter",
-		"directory_desc": "Dienste, die mit der OpenAI-API funktionieren. Diese wurden nicht getestet.",
+		"directory_desc": "Dienste, die mit der OpenAI-API funktionieren.",
 		"directory_search": "Anbieter suchen",
 		"directory_back": "Alle Anbieter",
 		"directory_empty": "Kein Anbieter passt. Ein nicht aufgeführter Dienst lässt sich trotzdem als benutzerdefinierter Anbieter hinzufügen.",

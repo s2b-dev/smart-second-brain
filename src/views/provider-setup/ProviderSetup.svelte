@@ -84,7 +84,7 @@ const PICKER_ORDER: ProviderTemplateId[] = [
 	"openai-compatible",
 ];
 // Built-in templates that are less widely used sit in "More providers" instead of the grid,
-// listed above the catalog entries so search still finds their proper setup (sign-in,
+// sorted in with the catalog entries, so search still finds their proper setup (sign-in,
 // local defaults) rather than a plain Custom provider.
 const DIRECTORY_TEMPLATES: ProviderTemplateId[] = ["lmstudio", "omlx", "huggingface"];
 // oMLX is a macOS-native app (Apple Silicon), so its template is only offered on macOS.
@@ -280,10 +280,28 @@ $effect(() => {
 });
 
 let directoryQuery = $state("");
-const directoryTemplateMatches = $derived(
-	directoryTemplates.filter((tpl) => matchesDirectoryQuery(directoryQuery, `${tpl.displayName} ${tpl.id}`)),
+// One alphabetical list: the built-in templates (which open their own setup) mixed in
+// with the catalog entries (which become Custom providers).
+type DirectoryRow =
+	| { kind: "template"; key: string; name: string; template: (typeof directoryTemplates)[number] }
+	| { kind: "entry"; key: string; name: string; entry: DirectoryEntry };
+const directoryRows = $derived(
+	[
+		...directoryTemplates
+			.filter((tpl) => matchesDirectoryQuery(directoryQuery, `${tpl.displayName} ${tpl.id}`))
+			.map(
+				(template): DirectoryRow => ({
+					kind: "template",
+					key: `template:${template.id}`,
+					name: template.displayName,
+					template,
+				}),
+			),
+		...searchDirectory(directoryQuery).map(
+			(entry): DirectoryRow => ({ kind: "entry", key: entry.id, name: entry.name, entry }),
+		),
+	].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" })),
 );
-const directoryMatches = $derived(searchDirectory(directoryQuery));
 
 // One pick at a time: a second click while the first draft is still being saved would
 // start a second draft, and the two would race to become `providerId`.
@@ -586,7 +604,6 @@ const canFinish = $derived(
     </button>
     <p class="provider-picker-desc">
       {t("onboarding.provider_setup.directory_desc")}
-      <DocsLink variant="inline" doc="moreProviders" />
     </p>
     <!-- svelte-ignore a11y_autofocus -->
     <input
@@ -596,38 +613,39 @@ const canFinish = $derived(
       bind:value={directoryQuery}
       autofocus={!Platform.isMobile}
     />
-    {#if directoryTemplateMatches.length === 0 && directoryMatches.length === 0}
+    {#if directoryRows.length === 0}
       <p class="provider-picker-desc provider-directory-empty">{t("onboarding.provider_setup.directory_empty")}</p>
     {:else}
       <div class="provider-directory-list">
-        {#each directoryTemplateMatches as template (template.id)}
-          {@const Logo = getTemplateLogo(template.id)}
-          <button
-            type="button"
-            class="provider-directory-row"
-            disabled={isPickingEntry}
-            onclick={() => void handleSelectDirectoryTemplate(template.id)}
-          >
-            <span class="provider-directory-logo"><Logo width={20} height={20} /></span>
-            <span class="provider-directory-text">
-              <span class="provider-directory-name">{template.displayName}</span>
-              <span class="provider-directory-host">{template.description}</span>
-            </span>
-          </button>
-        {/each}
-        {#each directoryMatches as entry (entry.id)}
-          <button
-            type="button"
-            class="provider-directory-row"
-            disabled={isPickingEntry}
-            onclick={() => void handleSelectDirectoryEntry(entry)}
-          >
-            <span class="provider-directory-logo"><DirectoryLogo svg={entry.logo} width={20} height={20} /></span>
-            <span class="provider-directory-text">
-              <span class="provider-directory-name">{entry.name}</span>
-              <span class="provider-directory-host">{directoryHost(entry)}</span>
-            </span>
-          </button>
+        {#each directoryRows as row (row.key)}
+          {#if row.kind === "template"}
+            {@const Logo = getTemplateLogo(row.template.id)}
+            <button
+              type="button"
+              class="provider-directory-row"
+              disabled={isPickingEntry}
+              onclick={() => void handleSelectDirectoryTemplate(row.template.id)}
+            >
+              <span class="provider-directory-logo"><Logo width={20} height={20} /></span>
+              <span class="provider-directory-text">
+                <span class="provider-directory-name">{row.name}</span>
+                <span class="provider-directory-host">{row.template.description}</span>
+              </span>
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="provider-directory-row"
+              disabled={isPickingEntry}
+              onclick={() => void handleSelectDirectoryEntry(row.entry)}
+            >
+              <span class="provider-directory-logo"><DirectoryLogo svg={row.entry.logo} width={20} height={20} /></span>
+              <span class="provider-directory-text">
+                <span class="provider-directory-name">{row.name}</span>
+                <span class="provider-directory-host">{directoryHost(row.entry)}</span>
+              </span>
+            </button>
+          {/if}
         {/each}
       </div>
     {/if}

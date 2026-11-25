@@ -73,7 +73,7 @@
 		"picker_desc": "Choose a provider to connect.",
 		"setup_guide": "Setup guide",
 		"more_providers": "More providers",
-		"directory_desc": "Services that work with the OpenAI API. These haven't been tested.",
+		"directory_desc": "Services that work with the OpenAI API.",
 		"directory_search": "Search providers",
 		"directory_back": "All providers",
 		"directory_empty": "No provider matches. A service that isn't listed can still be added as a Custom provider.",

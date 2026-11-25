@@ -73,7 +73,7 @@
 		"picker_desc": "Bağlanacak bir sağlayıcı seçin.",
 		"setup_guide": "Kurulum kılavuzu",
 		"more_providers": "Daha fazla sağlayıcı",
-		"directory_desc": "OpenAI API ile çalışan hizmetler. Bunlar test edilmedi.",
+		"directory_desc": "OpenAI API ile çalışan hizmetler.",
 		"directory_search": "Sağlayıcı ara",
 		"directory_back": "Tüm sağlayıcılar",
 		"directory_empty": "Eşleşen sağlayıcı yok. Listede olmayan bir hizmet yine de özel sağlayıcı olarak eklenebilir.",

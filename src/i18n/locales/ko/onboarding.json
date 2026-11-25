@@ -71,7 +71,7 @@
 		"picker_desc": "연결할 제공자를 선택하세요.",
 		"setup_guide": "설정 가이드",
 		"more_providers": "더 많은 제공자",
-		"directory_desc": "OpenAI API와 호환되는 서비스입니다. 테스트되지 않았습니다.",
+		"directory_desc": "OpenAI API와 호환되는 서비스입니다.",
 		"directory_search": "제공자 검색",
 		"directory_back": "모든 제공자",
 		"directory_empty": "일치하는 제공자가 없습니다. 목록에 없는 서비스도 사용자 지정 제공자로 추가할 수 있습니다.",

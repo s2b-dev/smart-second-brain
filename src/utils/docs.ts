@@ -27,7 +27,6 @@ export const DOCS = Object.freeze({
 	installation: `${DOCS_BASE}/start/installation/`,
 	firstRun: `${DOCS_BASE}/start/first-run/`,
 	providers: `${DOCS_BASE}/start/providers/`,
-	moreProviders: `${DOCS_BASE}/start/providers/#more-providers`,
 
 	// Features
 	search: `${DOCS_BASE}/search/`,
