@@ -218,11 +218,6 @@
 		"add_server": "Dodaj strežnik"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "Glavno območje (zavihek)",
-			"left": "Leva stranska vrstica",
-			"right": "Desna stranska vrstica"
-		},
 		"cannot_delete_default": "Vgrajenega privzetega agenta ni mogoče izbrisati",
 		"delete_failed": "Brisanje agenta ni uspelo",
 		"no_chat_model": "Ni izbranega modela za klepet",
@@ -243,8 +238,6 @@
 		"chats_folder_desc": "Mapa za shranjevanje datotek klepetov in povezanih podatkov",
 		"attachment_folder_name": "Mapa prilog",
 		"attachment_folder_desc": "Mapa za priloge v klepetu. Pustite prazno, če želite uporabiti mapo prilog Obsidiana.",
-		"open_chat_in_name": "Odpri nov klepet v",
-		"open_chat_in_desc": "Kje naj se odpirajo nova okna klepeta",
 		"status_bar_name": "Prikaži aktivne agente v vrstici stanja",
 		"status_bar_desc": "V vrstici stanja prikaže klikljiv indikator za vsak klepet z delujočim agentom.",
 		"widgets_heading": "Gradniki",

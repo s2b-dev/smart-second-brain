@@ -214,11 +214,6 @@
 		"add_server": "Sunucu ekle"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "Ana alan (sekme)",
-			"left": "Sol kenar çubuğu",
-			"right": "Sağ kenar çubuğu"
-		},
 		"cannot_delete_default": "Yerleşik varsayılan ajan silinemez",
 		"delete_failed": "Ajan silinemedi",
 		"no_chat_model": "Sohbet modeli seçilmedi",
@@ -239,8 +234,6 @@
 		"chats_folder_desc": "Sohbet dosyalarının ve ilgili verilerin saklanacağı klasör",
 		"attachment_folder_name": "Ek klasörü",
 		"attachment_folder_desc": "Sohbet dosya ekleri için klasör. Obsidian'ın ek klasörünü kullanmak için boş bırakın.",
-		"open_chat_in_name": "Yeni sohbeti şurada aç",
-		"open_chat_in_desc": "Yeni sohbet pencerelerinin açılacağı yer",
 		"status_bar_name": "Etkin ajanları durum çubuğunda göster",
 		"status_bar_desc": "Çalışan bir ajana sahip her sohbet için durum çubuğunda tıklanabilir bir gösterge görüntüle.",
 		"widgets_heading": "Widget'lar",

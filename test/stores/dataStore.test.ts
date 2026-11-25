@@ -992,12 +992,6 @@ describe("PluginDataStore – Settings", () => {
 		expect(store.targetFolder).toBe("Chats");
 	});
 
-	it("should get and set chatOpenLocation", () => {
-		expect(store.chatOpenLocation).toBe("tab");
-		store.chatOpenLocation = "right";
-		expect(store.chatOpenLocation).toBe("right");
-	});
-
 	it("should get and set diffViewMode", () => {
 		expect(store.diffViewMode).toBe("two-pane");
 		store.diffViewMode = "word-diff";

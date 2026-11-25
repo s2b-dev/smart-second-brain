@@ -1,3 +1,9 @@
+<script lang="ts" module>
+/** Unsent composer text per thread, kept while a chat leaf shows another thread (see
+ * `switchComposerThread`). Module-level so it outlives the leaf's switch; session-lifetime only. */
+const composerDrafts = new Map<string, string>();
+</script>
+
 <script lang="ts">
 import { Notice, Platform, TFile, normalizePath } from "obsidian";
 import { selectChatModelAction, showActionNotice } from "../../utils/actionNotice";
@@ -70,7 +76,7 @@ let editorContainer: HTMLDivElement | undefined = $state();
 let attachmentInputEl: HTMLInputElement | undefined = $state();
 let cameraInputEl: HTMLInputElement | undefined = $state();
 let markdownEditor: EmbeddableMarkdownEditor | undefined = $state();
-let inputValue = $state("");
+let inputValue = $state(untrack(() => (threadPath !== null && composerDrafts.get(threadPath)) || ""));
 
 let attachments: ChatAttachment[] = $state([]);
 let attachmentSizes: Map<string, number> = $state(new Map());
@@ -413,6 +419,59 @@ function restorePreEditComposerState() {
 	seededEditPaths = new Set();
 }
 
+// A chat leaf can switch threads under a mounted composer: chats open in the most recent chat
+// leaf (utils/chatLocation.ts), replacing what it showed. Everything the composer holds belongs
+// to the thread it was typed in, so on a switch: unwind an edit in progress (it lives on the old
+// thread's session and re-seeds when that thread comes back), keep the draft text for the old
+// thread, drop the unsent attachments, and bring back the new thread's draft. Declared before
+// the edit-seeding effect below so it runs first and that effect sees the switch already done.
+let composerThreadPath = untrack(() => threadPath);
+$effect(() => {
+	const next = threadPath;
+	untrack(() => {
+		if (next === composerThreadPath) return;
+		const previous = composerThreadPath;
+		composerThreadPath = next;
+		// A rename (the auto-title after the first reply) moves this same thread to a new path;
+		// the old file is gone. That is not a switch: keep everything the user is composing.
+		if (previous !== null && !getPlugin().app.vault.getAbstractFileByPath(previous)) return;
+		switchComposerThread(previous, next);
+	});
+});
+
+function switchComposerThread(previous: string | null, next: string | null) {
+	if (lastSeededEditId !== null) {
+		lastSeededEditId = null;
+		restorePreEditComposerState();
+	}
+	stashedDraft = null;
+	if (previous !== null) {
+		if (inputValue.trim().length > 0) composerDrafts.set(previous, inputValue);
+		else composerDrafts.delete(previous);
+	}
+	discardUnsentAttachments();
+	const draft = (next !== null && composerDrafts.get(next)) || "";
+	if (next !== null) composerDrafts.delete(next);
+	inputValue = draft;
+	markdownEditor?.setValue(draft);
+}
+
+/** Clear the tray of attachments that were never sent: revoke their previews and remove the
+ * temp copies the composer made (files the user picked from the vault stay). */
+function discardUnsentAttachments() {
+	seedEditToken++;
+	seededEditPaths = new Set();
+	const adapter = getPlugin().app.vault.adapter;
+	for (const att of attachments) {
+		if (managedAttachmentPaths.has(att.vaultPath)) adapter.remove(att.vaultPath).catch(() => {});
+	}
+	for (const url of previewUrls.values()) URL.revokeObjectURL(url);
+	attachments = [];
+	attachmentSizes = new Map();
+	managedAttachmentPaths = new Set();
+	previewUrls = new Map();
+}
+
 $effect(() => {
 	if (editingPairId === null) {
 		if (lastSeededEditId !== null) {
@@ -528,6 +587,11 @@ $effect(() => {
 
 onDestroy(() => {
 	destroyed = true;
+	// Closing the leaf is no reason to lose what was typed: reopening this chat brings it back
+	// (an edit's text is the message's own, not a draft, so it is not kept).
+	if (composerThreadPath !== null && lastSeededEditId === null && inputValue.trim().length > 0) {
+		composerDrafts.set(composerThreadPath, inputValue);
+	}
 	// Stop any in-flight edit-attachment seeding; its writes would land on a
 	// dead component's state (and mint object URLs nothing revokes).
 	seedEditToken++;

@@ -10,24 +10,17 @@ import SettingItem from "../../components/settings/SettingItem.svelte";
 import Badge from "../../components/ui/Badge.svelte";
 import Button from "../../components/ui/Button.svelte";
 import { confirmDelete } from "../../components/modal/ConfirmModal";
-import Dropdown from "../../components/ui/Dropdown.svelte";
 import Icon from "../../components/ui/Icon.svelte";
 import Toggle from "../../components/ui/Toggle.svelte";
 import { getProviderDefinition } from "../../providers/index";
 import { getData } from "../../stores/dataStore.svelte";
 import { DEFAULT_AGENT_ID } from "../../stores/agentDefaults";
 import { getPlugin } from "../../stores/state.svelte";
-import { DEFAULT_AGENT_ICON, type ChatOpenLocation } from "../../types/plugin";
+import { DEFAULT_AGENT_ICON } from "../../types/plugin";
 import { isMobileUI } from "../../utils/platform";
 
 const pluginData = getData();
 const plugin = getPlugin();
-
-const chatOpenLocationOptions: { display: string; value: ChatOpenLocation }[] = [
-	{ display: t("agents.settings.open_location.tab"), value: "tab" },
-	{ display: t("agents.settings.open_location.left"), value: "left" },
-	{ display: t("agents.settings.open_location.right"), value: "right" },
-];
 
 function suggestFolders(): TFolder[] {
 	return plugin.app.vault.getAllFolders(true);
@@ -241,15 +234,6 @@ function getAgentSkillsSummary(agentId: string): { icons: string[]; overflow: nu
           )}
         onSelected={(path: string) => (pluginData.attachmentFolder = path)}
         onSubmit={(path: string) => (pluginData.attachmentFolder = path)}
-      />
-    </SettingItem>
-
-    <SettingItem name={t("agents.settings.open_chat_in_name")} desc={t("agents.settings.open_chat_in_desc")}>
-      <Dropdown
-        type="options"
-        dropdown={chatOpenLocationOptions}
-        selected={pluginData.chatOpenLocation}
-        onchange={(value) => (pluginData.chatOpenLocation = value)}
       />
     </SettingItem>
 

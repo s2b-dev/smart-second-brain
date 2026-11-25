@@ -1,7 +1,7 @@
 import type { PluginData } from "../types/plugin";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 15;
+export const CURRENT_SCHEMA_VERSION = 16;
 
 type Migration = (data: PluginData) => void;
 
@@ -219,6 +219,13 @@ const MIGRATIONS: Migration[] = [
 			if (!path || /\/v\d+[a-z0-9]*$/i.test(path)) continue;
 			values.baseUrl = `${url}/v1`;
 		}
+	},
+	// v15 → v16: the "Open new chat in" setting is gone; chats open where the last one was,
+	//            remembered per device in local storage (utils/chatLocation.ts). The stored
+	//            value has already seeded this device's memory (normalizeLoadedData runs
+	//            seedChatLocation first); drop it from the synced data.
+	(data) => {
+		Reflect.deleteProperty(data, "chatOpenLocation");
 	},
 ];
 

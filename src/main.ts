@@ -18,6 +18,14 @@ import { seedMemoryFolder } from "./agent/memoryNotes";
 import { memoriesDir } from "./utils/agentPaths";
 import { resetAvailableModels, useAvailableModels } from "./hooks/useAvailableModels.svelte";
 import { isMobileUI } from "./utils/platform";
+import {
+	KeyboardChatFocus,
+	pickChatLeaf,
+	recordChatLocation,
+	recordChatPointer,
+	recordFocusedChat,
+	shouldRedirectChatOpen,
+} from "./utils/chatLocation";
 import { planUpdateAnnouncement } from "./utils/releaseNotes";
 import { COMMUNITY_PLUGIN_URL, UPDATE_MANIFEST_URL, runUpdateCheck } from "./utils/updateCheck";
 import { StartupProfiler } from "./utils/startupProfiler";
@@ -497,35 +505,29 @@ export default class SecondBrainPlugin extends Plugin {
 		// Read-only preview for embedded (![[chat.chat]]) and hovered .chat links.
 		registerChatEmbed(this);
 
-		// Intercept .chat file opens so they go directly to the sidebar
-		// without ever replacing the note in the main editor area.
+		// Intercept .chat file opens into a leaf Obsidian picked (the active note, the last
+		// main-area tab after a file-explorer click) and send them where chats live instead:
+		// the most recent chat, or the place the last one was (utils/chatLocation.ts).
 		// Read as a plain function value: it is only ever re-invoked below with an
 		// explicit receiver (`.call(leaf, …)` / `.apply(this, …)`).
 		const leafProto = WorkspaceLeaf.prototype as { openFile: WorkspaceLeaf["openFile"] };
 		const origOpenFile = leafProto.openFile;
 		const app = this.app;
 		WorkspaceLeaf.prototype.openFile = async function (file, openState) {
-			if (file.extension === "chat") {
-				const location = getData().chatOpenLocation;
-				if (location === "left" || location === "right") {
-					const ws = app.workspace;
-					const root = this.getRoot();
-					if (root !== ws.leftSplit && root !== ws.rightSplit) {
-						const targetSplit = location === "left" ? ws.leftSplit : ws.rightSplit;
-						const sidebarLeaf =
-							ws
-								.getLeavesOfType(VIEW_TYPE_CHAT)
-								.find((l: WorkspaceLeaf) => l.getRoot() === targetSplit) ??
-							(location === "left" ? ws.getLeftLeaf(false) : ws.getRightLeaf(false));
-						if (sidebarLeaf) {
-							await origOpenFile.call(sidebarLeaf, file, openState);
-							await ws.revealLeaf(sidebarLeaf);
-							return;
-						}
-					}
+			if (file.extension === "chat" && shouldRedirectChatOpen(this)) {
+				const target = pickChatLeaf(app, file);
+				if (target && target !== this) {
+					await origOpenFile.call(target, file, openState);
+					// After the open: until then a fresh leaf is still empty, not a chat.
+					recordFocusedChat(app, target);
+					await app.workspace.revealLeaf(target);
+					if (openState?.active !== false) app.workspace.setActiveLeaf(target, { focus: true });
+					return;
 				}
 			}
-			return origOpenFile.call(this, file, openState);
+			await origOpenFile.call(this, file, openState);
+			// A chat opened where the user put it (a new tab, a split): that is the chat now.
+			if (file.extension === "chat" && openState?.active !== false) recordFocusedChat(app, this);
 		};
 		this.register(() => {
 			WorkspaceLeaf.prototype.openFile = origOpenFile;
@@ -691,6 +693,31 @@ export default class SecondBrainPlugin extends Plugin {
 				void registry.loadSession(file);
 			}),
 		);
+
+		// Chats open where the user last had one (utils/chatLocation.ts). Pressing into a chat or
+		// switching to it from the keyboard chooses it (in popout windows too); moving it changes
+		// where it lives. Not every `active-leaf-change`: Obsidian focuses leaves on its own.
+		const keyboardChatFocus = new KeyboardChatFocus(this.app);
+		// On the window, capturing: Obsidian's hotkey handling stops a hotkey (Ctrl+Tab) before
+		// it reaches the document.
+		const watchChatChoice = (win: Window) => {
+			this.registerDomEvent(
+				win,
+				"pointerdown",
+				(event) => {
+					keyboardChatFocus.onPointerDown();
+					recordChatPointer(this.app, event.target);
+				},
+				{ capture: true },
+			);
+			this.registerDomEvent(win, "keydown", () => keyboardChatFocus.onKeyDown(), { capture: true });
+		};
+		watchChatChoice(window);
+		this.registerEvent(this.app.workspace.on("window-open", (win) => watchChatChoice(win.win)));
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", (leaf) => keyboardChatFocus.onActiveLeafChange(leaf)),
+		);
+		this.registerEvent(this.app.workspace.on("layout-change", () => recordChatLocation(this.app)));
 
 		this.registerNotebookNavigatorMenus();
 

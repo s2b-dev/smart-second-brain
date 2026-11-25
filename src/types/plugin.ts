@@ -458,8 +458,6 @@ export type AgentsConfig = Record<string, AgentConfig>;
 
 export type DiffViewMode = "word-diff" | "two-pane";
 
-export type ChatOpenLocation = "tab" | "left" | "right";
-
 export type PrivacyMode = "private-by-default" | "public-by-default";
 
 export interface PluginData {
@@ -549,7 +547,6 @@ export interface PluginData {
 	// UI State
 	// ============================================================================
 
-	chatOpenLocation: ChatOpenLocation;
 	lastActiveChatId: UUIDv7 | null;
 	/** Whether the user has completed (or dismissed) the first-run onboarding flow. */
 	onboardingComplete: boolean;

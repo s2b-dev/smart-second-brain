@@ -212,11 +212,6 @@
 		"add_server": "添加服务器"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "主区域（标签页）",
-			"left": "左侧边栏",
-			"right": "右侧边栏"
-		},
 		"cannot_delete_default": "无法删除内置的默认智能体",
 		"delete_failed": "删除智能体失败",
 		"no_chat_model": "未选择对话模型",
@@ -237,8 +232,6 @@
 		"chats_folder_desc": "用于存储对话文件及相关数据的文件夹",
 		"attachment_folder_name": "附件文件夹",
 		"attachment_folder_desc": "用于存放对话附件的文件夹。留空则使用 Obsidian 的附件文件夹。",
-		"open_chat_in_name": "新对话打开位置",
-		"open_chat_in_desc": "新对话窗口的打开位置",
 		"status_bar_name": "在状态栏显示活动的智能体",
 		"status_bar_desc": "为每个正在运行智能体的对话在状态栏中显示一个可点击的指示器。",
 		"widgets_heading": "小组件",

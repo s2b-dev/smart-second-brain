@@ -212,11 +212,6 @@
 		"add_server": "서버 추가"
 	},
 	"settings": {
-		"open_location": {
-			"tab": "메인 영역 (탭)",
-			"left": "왼쪽 사이드바",
-			"right": "오른쪽 사이드바"
-		},
 		"cannot_delete_default": "기본 제공 기본 에이전트는 삭제할 수 없습니다",
 		"delete_failed": "에이전트를 삭제하지 못했습니다",
 		"no_chat_model": "선택된 채팅 모델 없음",
@@ -237,8 +232,6 @@
 		"chats_folder_desc": "채팅 파일과 관련 데이터를 저장할 폴더",
 		"attachment_folder_name": "첨부 파일 폴더",
 		"attachment_folder_desc": "채팅 첨부 파일을 저장할 폴더입니다. 비워 두면 Obsidian의 첨부 파일 폴더를 사용합니다.",
-		"open_chat_in_name": "새 채팅 열 위치",
-		"open_chat_in_desc": "새 채팅 창을 열 위치",
 		"status_bar_name": "상태 표시줄에 실행 중인 에이전트 표시",
 		"status_bar_desc": "에이전트가 실행 중인 각 채팅에 대해 상태 표시줄에 클릭 가능한 표시기를 보여줍니다.",
 		"widgets_heading": "위젯",
