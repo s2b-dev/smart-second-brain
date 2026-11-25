@@ -133,6 +133,9 @@
 			"base_url_desc": "OpenAI 호환 API 엔드포인트의 기본 URL",
 			"api_key_desc": "인증용 API 키 (엔드포인트에 필요 없으면 비워 두세요)"
 		},
+		"directory": {
+			"docs_link": "{name} API 문서"
+		},
 		"anthropic": {
 			"link": "Anthropic 콘솔",
 			"api_key_desc": "인증에 사용할 Anthropic API 키",

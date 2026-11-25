@@ -133,6 +133,9 @@
 			"base_url_desc": "OpenAI 互換 API エンドポイントのベース URL",
 			"api_key_desc": "認証用の API キー(エンドポイントで不要な場合は空欄)"
 		},
+		"directory": {
+			"docs_link": "{name} の API ドキュメント"
+		},
 		"anthropic": {
 			"link": "Anthropic Console",
 			"api_key_desc": "認証に使う Anthropic の API キー",

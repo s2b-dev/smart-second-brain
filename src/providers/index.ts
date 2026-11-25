@@ -8,10 +8,14 @@
 import type {
 	BaseProviderDefinition,
 	EmbeddingProviderDefinition,
+	LogoProps,
 	ProviderInstanceMeta,
 	ProviderTemplateId,
 } from "../types/provider/index";
-import { createOpenAICompatibleProvider } from "./openai-compatible";
+import type { Component } from "svelte";
+import DirectoryLogo from "../components/ui/logos/DirectoryLogo.svelte";
+import { createOpenAICompatibleProvider, type OpenAICompatibleProviderInput } from "./openai-compatible";
+import { getDirectoryEntry } from "./directory/index";
 import { anthropicProvider, discoverAnthropicModels } from "./anthropic";
 import { ollamaProvider } from "./ollama";
 import { discoverOpenAIModels, openaiProvider } from "./openai";
@@ -22,6 +26,41 @@ import { discoverMistralEmbeddingModels, discoverMistralModels, mistralProvider 
 import { openAICodexProvider } from "./openai-codex";
 import { createOmlxProvider } from "./omlx";
 import { createLmStudioProvider } from "./lmstudio";
+
+const directoryLogos = new Map<string, Component<LogoProps>>();
+
+/**
+ * A logo component bound to one entry's SVG. Cached so a definition rebuilt on every lookup
+ * hands back the same component, and a mounted header logo isn't torn down for nothing.
+ */
+function directoryLogo(id: string, svg: string | undefined): Component<LogoProps> {
+	let logo = directoryLogos.get(id);
+	if (!logo) {
+		logo = (internals, props) => DirectoryLogo(internals, { ...props, svg });
+		directoryLogos.set(id, logo);
+	}
+	return logo;
+}
+
+/**
+ * What a directory entry contributes to its Custom instance: the vendor's API root as the
+ * default base URL, its logo, and setup steps pointing at its docs. A missing entry (the
+ * snapshot dropped it) leaves a plain Custom provider, which still works off its stored URL.
+ */
+function directoryOverrides(directoryId: string | undefined): Partial<OpenAICompatibleProviderInput> {
+	const entry = getDirectoryEntry(directoryId);
+	if (!entry) return { defaultBaseUrl: "https://api.openai.com" };
+	return {
+		defaultBaseUrl: entry.api,
+		logo: directoryLogo(entry.id, entry.logo),
+		setupInstructions: {
+			steps: [`Get an API key from ${entry.name}`, "Paste it below; the base URL is already filled in"],
+			...(entry.doc
+				? { link: { url: entry.doc, text: t("plugin.providers.directory.docs_link", { name: entry.name }) } }
+				: {}),
+		},
+	};
+}
 
 export interface ProviderTemplateDefinition {
 	id: ProviderTemplateId;
@@ -103,7 +142,7 @@ function createTemplateDefinition(
 			return createOpenAICompatibleProvider({
 				id: instanceId,
 				displayName: meta.displayName,
-				defaultBaseUrl: "https://api.openai.com",
+				...directoryOverrides(meta.directoryId),
 			});
 		case "omlx":
 			return createOmlxProvider(instanceId, meta.displayName);

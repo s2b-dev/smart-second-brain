@@ -145,6 +145,9 @@
 			"base_url_desc": "L’URL de base du point de terminaison API compatible OpenAI",
 			"api_key_desc": "Clé API pour l’authentification (laisser vide si votre point de terminaison n’en exige pas)"
 		},
+		"directory": {
+			"docs_link": "Documentation de l'API {name}"
+		},
 		"anthropic": {
 			"link": "Console Anthropic",
 			"api_key_desc": "Votre clé API Anthropic pour l’authentification",

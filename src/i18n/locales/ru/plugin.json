@@ -151,6 +151,9 @@
 			"base_url_desc": "Базовый URL OpenAI-совместимого эндпоинта API",
 			"api_key_desc": "API-ключ для аутентификации (оставьте пустым, если эндпоинту он не нужен)"
 		},
+		"directory": {
+			"docs_link": "Документация API {name}"
+		},
 		"anthropic": {
 			"link": "Консоль Anthropic",
 			"api_key_desc": "Ваш API-ключ Anthropic для аутентификации",

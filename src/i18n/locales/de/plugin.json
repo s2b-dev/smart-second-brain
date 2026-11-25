@@ -139,6 +139,9 @@
 			"base_url_desc": "Die Basis-URL des OpenAI-kompatiblen API-Endpunkts",
 			"api_key_desc": "API-Schlüssel zur Authentifizierung (leer lassen, wenn dein Endpunkt keinen benötigt)"
 		},
+		"directory": {
+			"docs_link": "API-Dokumentation von {name}"
+		},
 		"anthropic": {
 			"link": "Anthropic Console",
 			"api_key_desc": "Dein Anthropic-API-Schlüssel zur Authentifizierung",

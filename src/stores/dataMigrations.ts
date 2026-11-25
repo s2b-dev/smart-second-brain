@@ -1,7 +1,7 @@
 import type { PluginData } from "../types/plugin";
 
 /** Increment this when making any breaking change to PluginData. Add a corresponding entry to MIGRATIONS. */
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 
 type Migration = (data: PluginData) => void;
 
@@ -201,6 +201,23 @@ const MIGRATIONS: Migration[] = [
 		for (const agent of Object.values(data.agents ?? {})) {
 			const manageSkills = agent.toolsConfig?.manage_skills as unknown as Record<string, unknown> | undefined;
 			if (manageSkills) manageSkills.enabled = true;
+		}
+	},
+	// v14 → v15: Custom (openai-compatible) base URLs are now the API root, used as given;
+	//            only a bare host still gets `/v1` (#589). Before, `/v1` was always appended,
+	//            so a saved `https://gateway.example/openai` meant `/openai/v1`. Append it
+	//            where the old rule did, so those providers keep working, EXCEPT after a
+	//            version segment (`/api/paas/v4`): `/v4/v1` never worked, and as given it does.
+	(data) => {
+		for (const [providerId, meta] of Object.entries(data.providerMeta ?? {})) {
+			if (meta?.templateId !== "openai-compatible") continue;
+			const values = data.providerConfig?.[providerId]?.auth?.values;
+			const raw = values?.baseUrl;
+			if (!values || typeof raw !== "string") continue;
+			const url = raw.trim().replace(/\/+$/, "");
+			const path = /^[a-z][a-z0-9+.-]*:\/\/[^/]+(\/.*)?$/i.exec(url)?.[1];
+			if (!path || /\/v\d+[a-z0-9]*$/i.test(path)) continue;
+			values.baseUrl = `${url}/v1`;
 		}
 	},
 ];

@@ -50,4 +50,44 @@ describe("dataMigrations", () => {
 		expect(data.agents.a3.toolsConfig.manage_skills).toBeUndefined();
 		expect(data.agents.a4.toolsConfig).toBeUndefined();
 	});
+
+	// Custom base URLs became "used as given"; saved ones keep resolving where they did.
+	it("v14 → v15 pins the old /v1 suffix on saved Custom base URLs", () => {
+		const custom = (baseUrl?: string) => ({
+			auth: { values: baseUrl === undefined ? {} : { baseUrl }, secretIds: {} },
+		});
+		const data = {
+			schemaVersion: 14,
+			providerMeta: {
+				gateway: { templateId: "openai-compatible", displayName: "Gateway" },
+				slash: { templateId: "openai-compatible", displayName: "Slash" },
+				v1: { templateId: "openai-compatible", displayName: "V1" },
+				host: { templateId: "openai-compatible", displayName: "Host" },
+				zai: { templateId: "openai-compatible", displayName: "Z" },
+				empty: { templateId: "openai-compatible", displayName: "Empty" },
+				ollama: { templateId: "ollama", displayName: "Ollama" },
+			},
+			providerConfig: {
+				gateway: custom("https://gateway.example/openai"),
+				slash: custom("https://proxy.example/litellm/"),
+				v1: custom("https://api.example.com/v1"),
+				host: custom("http://localhost:8000"),
+				zai: custom("https://api.z.ai/api/paas/v4"),
+				empty: custom(),
+				ollama: custom("http://localhost:11434/api"),
+			},
+		} as unknown as PluginData;
+
+		runMigrations(data);
+
+		const url = (id: string) => data.providerConfig[id].auth.values.baseUrl;
+		expect(data.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+		expect(url("gateway")).toBe("https://gateway.example/openai/v1");
+		expect(url("slash")).toBe("https://proxy.example/litellm/v1");
+		expect(url("v1")).toBe("https://api.example.com/v1");
+		expect(url("host")).toBe("http://localhost:8000");
+		expect(url("zai")).toBe("https://api.z.ai/api/paas/v4");
+		expect(url("empty")).toBeUndefined();
+		expect(url("ollama")).toBe("http://localhost:11434/api");
+	});
 });

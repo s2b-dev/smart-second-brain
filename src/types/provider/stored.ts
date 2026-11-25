@@ -37,4 +37,11 @@ export interface ProviderInstanceMeta {
 
 	/** User-visible display name for the configured instance. */
 	displayName: string;
+
+	/**
+	 * Set when the instance was created from the provider directory (`providers/directory`):
+	 * an `openai-compatible` instance that takes its logo, default base URL and key link from
+	 * that entry. Nothing else about it differs from a hand-made Custom provider.
+	 */
+	directoryId?: string;
 }
