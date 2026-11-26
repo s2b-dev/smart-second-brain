@@ -34,14 +34,28 @@ export function deflateToBase64(text: string): string {
 	return deflateRawSync(Buffer.from(text, "utf8"), { level: 9 }).toString("base64");
 }
 
+/** Locale directory names (dotfiles and stray files such as `.DS_Store` skipped), sorted. */
+function localeDirs(localesDir: string): string[] {
+	return readdirSync(localesDir, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+		.map((entry) => entry.name)
+		.sort();
+}
+
+/** A locale's catalog files (`<namespace>.json`), sorted. */
+function catalogFiles(localeDir: string): string[] {
+	return readdirSync(localeDir)
+		.filter((file) => file.endsWith(".json"))
+		.sort();
+}
+
 /** Every locale except English, as `{ <locale>: { <namespace>: catalog } }`. */
 export function readLocalePacks(localesDir: string): Record<string, Record<string, unknown>> {
 	const packs: Record<string, Record<string, unknown>> = {};
-	for (const locale of readdirSync(localesDir).sort()) {
-		if (locale === "en" || locale.startsWith(".")) continue;
+	for (const locale of localeDirs(localesDir)) {
+		if (locale === "en") continue;
 		const pack: Record<string, unknown> = {};
-		for (const file of readdirSync(join(localesDir, locale)).sort()) {
-			if (!file.endsWith(".json")) continue;
+		for (const file of catalogFiles(join(localesDir, locale))) {
 			pack[file.slice(0, -".json".length)] = JSON.parse(readFileSync(join(localesDir, locale, file), "utf8"));
 		}
 		packs[locale] = pack;
@@ -62,9 +76,9 @@ export function compressedAssets(options: { localesDir: string }): Plugin {
 				for (const [locale, pack] of Object.entries(readLocalePacks(options.localesDir))) {
 					encoded[locale] = deflateToBase64(JSON.stringify(pack));
 				}
-				for (const locale of readdirSync(options.localesDir)) {
+				for (const locale of localeDirs(options.localesDir)) {
 					const dir = join(options.localesDir, locale);
-					for (const file of readdirSync(dir)) this.addWatchFile(join(dir, file));
+					for (const file of catalogFiles(dir)) this.addWatchFile(join(dir, file));
 				}
 				return { code: `export default ${JSON.stringify(encoded)};`, map: null };
 			}
