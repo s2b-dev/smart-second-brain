@@ -287,9 +287,14 @@ function portalComposer(node: HTMLElement) {
 	const safeBottom = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
 	probe.remove();
 	// The band below the composer, mirroring the `max()` in its `top` rule, with
-	// the toolbar's share swapped for `COMPOSING_BAND` while composing.
+	// the toolbar's share swapped for `COMPOSING_BAND` while composing. Includes
+	// the leaf's bottom gap (published by `publishGeometry`), or a drawer chat
+	// whose leaf ends above the navbar would start each keyboard slide from the
+	// wrong place and jump by the difference.
+	const leafBottomGap = () =>
+		Number.parseFloat(composer?.style.getPropertyValue("--s2b-leaf-bottom-gap") ?? "") || 0;
 	const band = (keyboard: number, isComposing: boolean) =>
-		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom);
+		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom, leafBottomGap());
 
 	// Core's toolbar technique: the element is already at its end position, so
 	// offset it back by the distance travelled and transition the offset away.
