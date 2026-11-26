@@ -7,7 +7,7 @@ import {
 	type VisibleNote,
 	type VisibleNoteRef,
 } from "../../hooks/useVisibleNotes.svelte";
-import { SelectionTracker, type SelectionRef } from "../../hooks/useSelection.svelte";
+import { SELECTION_ICON, SelectionTracker, type SelectionRef } from "../../hooks/useSelection.svelte";
 import type { GraphNoteRef } from "../../stores/chatTimeline";
 import type { ChatAttachment } from "../../types/shared";
 import { getPlugin } from "../../stores/state.svelte";
@@ -216,6 +216,12 @@ function onSelectionClick(evt: MouseEvent): void {
 		return;
 	}
 	dismissSelection();
+}
+
+/** Keep the quote chip of a selection in chat message text (see `SelectionTracker.pinChatSelection`).
+ * The composer calls this when it is pressed or focused. */
+export function pinChatSelection(): void {
+	selectionTracker.pinChatSelection();
 }
 
 function dismissSelection(): void {
@@ -427,7 +433,7 @@ onDestroy(() => {
         })}
         onclick={onSelectionClick}
       >
-        <div class="chip-icon" use:icon={activeSelection.icon} style="--icon-size: 12px"></div>
+        <div class="chip-icon" use:icon={SELECTION_ICON} style="--icon-size: 12px"></div>
         <span class="chip-label">{selectionPreview(activeSelection.text)}</span>
         {#if selectionTracker.isLong}
           <span class="chip-warning" title={t("chat.context_tray.selection_long")}>⚠</span>

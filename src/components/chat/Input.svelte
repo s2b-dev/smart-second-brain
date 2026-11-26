@@ -804,7 +804,7 @@ function sendMessage() {
 			contentToSend,
 			attachments.length > 0 ? [...attachments] : undefined,
 			activeVisibleNotes.length > 0 ? [...activeVisibleNotes] : undefined,
-			activeSelection ? { ...activeSelection } : undefined,
+			activeSelection ? withQuoteDestination(activeSelection) : undefined,
 			activeGraphNotes.length > 0 ? [...activeGraphNotes] : undefined,
 		)
 		.catch((error) => {
@@ -1298,6 +1298,20 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 		savingFiles = false;
 	}
 }
+// Text selected in a chat's messages shows as a quote chip at once, but it is
+// kept only once the user turns to the composer. Capture phase, so it runs
+// before the press moves the selection into the editor and collapses it.
+function pinChatSelection(): void {
+	contextTrayRef?.pinChatSelection();
+}
+
+/** Snapshot of the selection to send. A chat quote is told here, at send time,
+ * whether it comes from the thread it is sent in: a pinned quote outlives the
+ * composer switching threads, so the thread it was pinned in says nothing. */
+function withQuoteDestination(selection: SelectionRef): SelectionRef {
+	if (selection.viewType !== "chat") return { ...selection };
+	return { ...selection, sameThread: threadPath !== null && selection.path === threadPath };
+}
 </script>
 
 <div
@@ -1337,6 +1351,8 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
     ondragleave={dropTargetMode === "input" ? handleDragLeave : undefined}
     ondrop={dropTargetMode === "input" ? handleDrop : undefined}
     onclick={handleWrapperClick}
+    onpointerdowncapture={pinChatSelection}
+    onfocusincapture={pinChatSelection}
     role="region"
     bind:this={wrapperEl}
     style:min-height={cardMinHeight ? `${cardMinHeight}px` : undefined}

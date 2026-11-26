@@ -51,7 +51,7 @@ function handleClick(evt: MouseEvent) {
     class="s2b-overflow-hidden s2b-transition-[max-height] s2b-duration-200 s2b-ease-out s2b-break-words s2b-wrap-anywhere"
     style:max-height={isExpanded || !isTruncated ? "none" : `${COLLAPSED_HEIGHT}px`}
   >
-    <MarkdownRenderer {content} class="[&>p]:s2b-m-0 s2b-break-words s2b-wrap-anywhere" />
+    <MarkdownRenderer {content} class="s2b-user-bubble-text [&>p]:s2b-m-0 s2b-break-words s2b-wrap-anywhere" />
   </div>
 
   {#if isTruncated && !isExpanded}

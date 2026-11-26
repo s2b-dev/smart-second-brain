@@ -4,6 +4,7 @@ import { getData } from "../stores/dataStore.svelte";
 import { clearSelectionHighlight, setSelectionHighlight } from "../editor/selectionHighlightExtension";
 import { getEditorView } from "../lib/editor";
 import { SELECTION_BUDGET_FRACTION, contextWindowToCharBudget, truncateToBudget } from "../utils/contentBudget";
+import { VIEW_TYPE_CHAT } from "../views/chat/viewType";
 
 /** Serializable snapshot of user-selected text. Persisted in HumanMessage additional_kwargs. */
 export interface SelectionRef {
@@ -11,7 +12,11 @@ export interface SelectionRef {
 	basename: string;
 	viewType: string;
 	text: string;
-	icon: string;
+	/** Chat selections only (`viewType: "chat"`): whether the text was quoted from the
+	 * same conversation it was sent in. Set on the snapshot at send time and stored with
+	 * the message, because the context block is rebuilt from this ref to strip it again
+	 * and a thread's path changes when it is auto-titled. */
+	sameThread?: boolean;
 }
 
 interface CapturedSelection {
@@ -22,10 +27,98 @@ interface CapturedSelection {
 	domRanges?: Range[];
 }
 
-const VIEW_ICONS: Record<string, string> = {
-	markdown: "file-text",
-	pdf: "file-type",
-};
+/** Icon of a selection chip. Every selection is a quote, wherever it came from:
+ * the icon tells it apart from the file chips of visible notes, and the tooltip
+ * names the source. Old persisted refs may still carry an `icon`; it is ignored. */
+export const SELECTION_ICON = "quote";
+
+/** Message text inside a chat view that can be quoted: rendered assistant text
+ * (including the text segments of a tool timeline) and the user's own bubbles.
+ * Everything else in the view (composer, tray, tool cards, bars) is UI. */
+const QUOTABLE_CHAT_SELECTOR = ".s2b-message-text, .s2b-user-bubble-text";
+
+function isInQuotableChatText(node: Node | null): boolean {
+	const el = node instanceof Element ? node : node?.parentElement;
+	return Boolean(el?.closest(QUOTABLE_CHAT_SELECTOR));
+}
+
+function chatLeafContaining(node: Node): WorkspaceLeaf | undefined {
+	return getPlugin()
+		.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)
+		.find((leaf) => leaf.view.containerEl.contains(node));
+}
+
+/**
+ * The part of `range` that lies in quotable message text of `container`, one
+ * clamped range per message element. A drag from one message to another passes
+ * over the UI between them (an expanded tool card's output, footers); that text
+ * is not what the user means to quote, so it is cut out rather than sent.
+ */
+function quotableSlices(range: Range, container: HTMLElement): Range[] {
+	const slices: Range[] = [];
+	for (const el of container.querySelectorAll(QUOTABLE_CHAT_SELECTOR)) {
+		// A quotable element nested in another is covered by its ancestor's slice.
+		if (el.parentElement?.closest(QUOTABLE_CHAT_SELECTOR)) continue;
+		if (!range.intersectsNode(el)) continue;
+		const slice = el.ownerDocument.createRange();
+		slice.selectNodeContents(el);
+		if (slice.compareBoundaryPoints(Range.START_TO_START, range) < 0) {
+			slice.setStart(range.startContainer, range.startOffset);
+		}
+		if (slice.compareBoundaryPoints(Range.END_TO_END, range) > 0) {
+			slice.setEnd(range.endContainer, range.endOffset);
+		}
+		if (!slice.collapsed && slice.toString().trim()) slices.push(slice);
+	}
+	return slices;
+}
+
+/**
+ * The live selection when it covers message text of a chat view. Read from the
+ * DOM rather than the active leaf: a sidebar chat never becomes the "most recent"
+ * leaf, so the leaf the selection is in has to be found from the selection itself.
+ */
+function getChatSelection(): CapturedSelection | undefined {
+	try {
+		const domSel = activeWindow.getSelection();
+		if (!domSel || domSel.rangeCount === 0 || domSel.isCollapsed) return undefined;
+		const { anchorNode, focusNode } = domSel;
+		if (!anchorNode || !focusNode) return undefined;
+		const leaf = chatLeafContaining(anchorNode);
+		if (!leaf || !leaf.view.containerEl.contains(focusNode)) return undefined;
+		const file = (leaf.view as { file?: { path: string; basename: string } | null }).file;
+		if (!file) return undefined;
+
+		const domRanges: Range[] = [];
+		for (let i = 0; i < domSel.rangeCount; i++) {
+			domRanges.push(...quotableSlices(domSel.getRangeAt(i), leaf.view.containerEl));
+		}
+		if (domRanges.length === 0) return undefined;
+		const text = domRanges.map((r) => r.toString()).join("\n\n");
+
+		return {
+			ref: { path: file.path, basename: file.basename, viewType: "chat", text },
+			domRanges,
+		};
+	} catch {
+		return undefined;
+	}
+}
+
+/** Whether the user clicked (a collapsed selection) into message text of the chat
+ * at `path` — the chat-side twin of `hasCollapsedSelectionInLeaf`. */
+function hasCollapsedChatSelection(path: string): boolean {
+	try {
+		const domSel = activeWindow.getSelection();
+		if (!domSel || domSel.rangeCount === 0 || !domSel.isCollapsed) return false;
+		const node = domSel.anchorNode;
+		if (!node || !isInQuotableChatText(node)) return false;
+		const file = (chatLeafContaining(node)?.view as { file?: { path: string } | null } | undefined)?.file;
+		return file?.path === path;
+	} catch {
+		return false;
+	}
+}
 
 /**
  * Whether the leaf currently holds a *live but collapsed* selection — i.e. the
@@ -96,7 +189,6 @@ function getSelectionFromLeaf(leaf: WorkspaceLeaf): CapturedSelection | undefine
 					basename: file.basename,
 					viewType: "markdown",
 					text,
-					icon: VIEW_ICONS.markdown,
 				},
 				cmRanges: ranges.map((r: { from: number; to: number }) => ({ from: r.from, to: r.to })),
 			};
@@ -125,9 +217,8 @@ function getSelectionFromLeaf(leaf: WorkspaceLeaf): CapturedSelection | undefine
 				domRanges.push(domSel.getRangeAt(i).cloneRange());
 			}
 
-			const icon = viewType === "pdf" ? VIEW_ICONS.pdf : VIEW_ICONS.markdown;
 			return {
-				ref: { path: file.path, basename: file.basename, viewType, text, icon },
+				ref: { path: file.path, basename: file.basename, viewType, text },
 				domRanges,
 			};
 		} catch {
@@ -149,6 +240,14 @@ function selectionCharBudget(): number {
  * window so a huge selection can't dominate (or overflow) the request. */
 export function formatSelectionContext(ref: SelectionRef): string {
 	const { text } = truncateToBudget(ref.text, selectionCharBudget());
+	if (ref.viewType === "chat") {
+		// A chat path means nothing to the model, and a quote from the same thread
+		// is text it has already seen: what the user adds is *which part* they mean.
+		const header = ref.sameThread
+			? "[Quoted from earlier in this conversation]"
+			: `[Quoted from the chat "${ref.basename}" (${ref.path})]`;
+		return `${header}\n${text}`;
+	}
 	return `[Selected text from ${ref.path}]\n${text}`;
 }
 
@@ -156,15 +255,25 @@ export function formatSelectionContext(ref: SelectionRef): string {
  * Reactive tracker for user text selections in the main workspace area.
  * Polls the active leaf for non-empty selections and exposes a snapshot
  * that persists even after focus moves to the chat input.
+ *
+ * Selections in a chat's own message text are tracked too, and shown live
+ * like a note selection. A chat leaf holds the composer as well, so engaging
+ * it changes no active leaf: the composer pins the quote itself
+ * (`pinChatSelection`). Until then a chat selection that collapses (copied,
+ * then clicked away) drops its chip.
  */
 export class SelectionTracker {
 	readonly #workspace = getPlugin().app.workspace;
 	#selection: CapturedSelection | undefined = $state(undefined);
 	#refs: EventRef[] = [];
+	#vaultRefs: EventRef[] = [];
 	#refreshFrame: number | undefined;
 	/** When true, selection was pinned (focus left the note) and should be kept. */
 	#pinned = false;
 	readonly #handleSelectionChange = () => this.#scheduleRefresh();
+	/** Every window document `selectionchange` is listened on: the main one plus
+	 * each popout window's, since the event never crosses documents. */
+	readonly #listenedDocs = new Set<Document>();
 
 	/** The current captured selection ref (serializable). */
 	get selection(): SelectionRef | undefined {
@@ -182,14 +291,42 @@ export class SelectionTracker {
 		this.#refs = [
 			this.#workspace.on("active-leaf-change", () => {
 				// When focus leaves a note (e.g. to the chat sidebar),
-				// pin whatever we captured so the chip stays.
-				if (this.#selection && !this.#pinned) {
+				// pin whatever we captured so the chip stays. A chat quote is pinned
+				// only by its composer: leaving the chat for a note drops it.
+				if (this.#selection && !this.#pinned && this.#selection.ref.viewType !== "chat") {
 					this.#pin();
 				}
 				this.#scheduleRefresh();
 			}),
 		];
-		document.addEventListener("selectionchange", this.#handleSelectionChange);
+		// A chat renames itself after its first turn (auto-title). A quote pinned
+		// from it must follow, or it would no longer match the composer's thread
+		// at send time and be labelled as coming from another chat.
+		this.#vaultRefs.push(
+			getPlugin().app.vault.on("rename", (file, oldPath) => {
+				const ref = this.#selection?.ref;
+				if (!this.#selection || ref?.viewType !== "chat" || ref.path !== oldPath) return;
+				const basename = (file as { basename?: string }).basename ?? ref.basename;
+				this.#selection = { ...this.#selection, ref: { ...ref, path: file.path, basename } };
+			}),
+		);
+		this.#listen(document);
+		this.#workspace.iterateAllLeaves((leaf) => this.#listen(leaf.view.containerEl.ownerDocument));
+		this.#refs.push(
+			this.#workspace.on("window-open", (win) => this.#listen(win.doc)),
+			this.#workspace.on("window-close", (win) => this.#unlisten(win.doc)),
+		);
+	}
+
+	#listen(doc: Document) {
+		if (this.#listenedDocs.has(doc)) return;
+		this.#listenedDocs.add(doc);
+		doc.addEventListener("selectionchange", this.#handleSelectionChange);
+	}
+
+	#unlisten(doc: Document) {
+		if (!this.#listenedDocs.delete(doc)) return;
+		doc.removeEventListener("selectionchange", this.#handleSelectionChange);
 	}
 
 	#scheduleRefresh() {
@@ -200,7 +337,47 @@ export class SelectionTracker {
 		});
 	}
 
+	/**
+	 * Pin the chat quote the chip shows. Called when the user presses or focuses
+	 * a composer, before that press moves the selection into the editor; the
+	 * chip adopted on the last refresh covers the case where it already has.
+	 */
+	pinChatSelection() {
+		const live = getChatSelection();
+		if (live && !this.#selectionEqual(this.#selection, live)) this.#adoptChatSelection(live);
+		if (this.#selection?.ref.viewType === "chat" && !this.#pinned) this.#pin();
+	}
+
+	/** Show a chat selection as the (unpinned) captured selection. */
+	#adoptChatSelection(captured: CapturedSelection) {
+		const previous = this.#selection;
+		this.#clearHighlights();
+		// A note selection this replaces would otherwise be re-adopted from the
+		// editor's still-live range on the next refresh.
+		if (previous && previous.ref.viewType !== "chat") this.#clearNativeSelection(previous);
+		this.#pinned = false;
+		this.#selection = captured;
+	}
+
 	#refresh() {
+		const chat = getChatSelection();
+		if (chat) {
+			if (!this.#selectionEqual(this.#selection, chat)) this.#adoptChatSelection(chat);
+			return;
+		}
+		if (this.#selection?.ref.viewType === "chat") {
+			// The selection was never taken to a composer: it was copied, or the
+			// user clicked away. Drop the chip and look for a note selection.
+			if (!this.#pinned) this.#selection = undefined;
+			// Clicking into the quoted chat's message text dismisses the pinned quote,
+			// like placing a cursor in the note that owns a pinned note selection.
+			else if (hasCollapsedChatSelection(this.#selection.ref.path)) {
+				this.clear();
+				return;
+			}
+		}
+		const pinnedChat = this.#pinned && this.#selection?.ref.viewType === "chat";
+
 		// `activeLeaf` is deprecated; the most recently focused leaf is the one the
 		// active-leaf-change event just fired for, and it is not always a markdown
 		// view (PDFs count), so `getActiveViewOfType` alone is not enough.
@@ -223,7 +400,7 @@ export class SelectionTracker {
 			}
 			// User clicked (placed a cursor) with no range in the note that owns the
 			// pinned selection → treat as an intentional dismissal, not a stray blur.
-			if (!captured && hasCollapsedSelectionInLeaf(activeLeaf)) {
+			if (!captured && !pinnedChat && hasCollapsedSelectionInLeaf(activeLeaf)) {
 				this.clear();
 			}
 			return;
@@ -252,12 +429,16 @@ export class SelectionTracker {
 
 		const captured = this.#selection;
 
-		// CM6 edit mode: dispatch decoration marks
+		// CM6 edit mode: dispatch decoration marks into the editor that owns the
+		// selection. Found by path, not as the active view: pinning happens on
+		// active-leaf-change, by which time the active view is the chat.
 		if (captured.cmRanges?.length) {
 			try {
-				const activeView = this.#workspace.getActiveViewOfType(MarkdownView);
-				if (activeView) {
-					const cm = getEditorView(activeView.editor);
+				for (const leaf of this.#workspace.getLeavesOfType("markdown")) {
+					const view = leaf.view;
+					if (!(view instanceof MarkdownView) || view.getMode() !== "source") continue;
+					if (view.file?.path !== captured.ref.path) continue;
+					const cm = getEditorView(view.editor);
 					if (cm) setSelectionHighlight(cm, captured.cmRanges);
 				}
 			} catch {
@@ -268,9 +449,12 @@ export class SelectionTracker {
 		// Reading / PDF: use CSS Custom Highlight API
 		if (captured.domRanges?.length) {
 			try {
-				if (CSS.highlights) {
-					const highlight = new Highlight(...captured.domRanges);
-					CSS.highlights.set("s2b-selection", highlight);
+				// Each window has its own highlight registry and `Highlight` class: a
+				// range in a popout only paints when registered on that popout's.
+				const win = (captured.domRanges[0].startContainer.ownerDocument?.defaultView ?? window) as Window &
+					typeof globalThis;
+				if (win.CSS?.highlights) {
+					win.CSS.highlights.set("s2b-selection", new win.Highlight(...captured.domRanges));
 				}
 			} catch {
 				/* API may not be available */
@@ -327,6 +511,9 @@ export class SelectionTracker {
 		try {
 			const domSel = activeWindow.getSelection();
 			if (!domSel || domSel.rangeCount === 0) return;
+			// A chat leaf also holds the composer, where the selection usually is by
+			// now: only collapse a range that is still in message text.
+			if (cleared.ref.viewType === "chat" && !isInQuotableChatText(domSel.anchorNode)) return;
 			const container = this.#leafContainerForPath(path);
 			if (container?.contains(domSel.getRangeAt(0).commonAncestorContainer)) {
 				domSel.removeAllRanges();
@@ -338,7 +525,7 @@ export class SelectionTracker {
 
 	/** Container element of the visible note leaf owning `path`, if any. */
 	#leafContainerForPath(path: string): HTMLElement | undefined {
-		for (const type of ["markdown", "pdf"]) {
+		for (const type of ["markdown", "pdf", VIEW_TYPE_CHAT]) {
 			for (const leaf of this.#workspace.getLeavesOfType(type)) {
 				if ((leaf.view as { file?: { path: string } }).file?.path === path) {
 					return leaf.view.containerEl;
@@ -364,7 +551,9 @@ export class SelectionTracker {
 
 		// Remove CSS Highlight API highlights
 		try {
-			CSS.highlights?.delete("s2b-selection");
+			for (const doc of new Set([document, ...this.#listenedDocs])) {
+				(doc.defaultView as (Window & typeof globalThis) | null)?.CSS?.highlights?.delete("s2b-selection");
+			}
 		} catch {
 			/* safety */
 		}
@@ -386,7 +575,9 @@ export class SelectionTracker {
 			this.#workspace.offref(ref);
 		}
 		this.#refs = [];
-		document.removeEventListener("selectionchange", this.#handleSelectionChange);
+		for (const ref of this.#vaultRefs) getPlugin().app.vault.offref(ref);
+		this.#vaultRefs = [];
+		for (const doc of [...this.#listenedDocs]) this.#unlisten(doc);
 		if (this.#refreshFrame !== undefined) {
 			cancelAnimationFrame(this.#refreshFrame);
 			this.#refreshFrame = undefined;
