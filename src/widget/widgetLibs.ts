@@ -7,11 +7,13 @@
  * bundle cost (the source ships inside main.js as a string), which is why the set is
  * small, opt-in, and each entry is a single self-contained UMD/IIFE build.
  *
- * Adding one: vendor a browser build that defines a global, import it `?raw`, add an
- * entry, and document the global and its scope in the `widgets` skill.
+ * Adding one: vendor a browser build that defines a global, import it `?deflate` (shipped
+ * compressed, inflated on first use: see `bundling/compressedAssets.ts`), add an entry, and
+ * document the global and its scope in the `widgets` skill.
  */
 
-import plotlySource from "plotly.js-gl3d-dist-min/plotly-gl3d.min.js?raw";
+import plotlyDeflated from "plotly.js-gl3d-dist-min/plotly-gl3d.min.js?deflate";
+import { inflateAsset, lazyAsset } from "../lib/compressedAsset";
 
 export interface WidgetLib {
 	/** The id a widget writes under `libs:`. */
@@ -20,8 +22,19 @@ export interface WidgetLib {
 	displayName: string;
 	/** The global the inlined build defines, for the skill's documentation. */
 	global: string;
-	/** The build's source text, injected verbatim (after inline-script escaping). */
-	source: string;
+	/** The build's source text, injected verbatim (after inline-script escaping). Inflated on first read. */
+	readonly source: string;
+}
+
+/** A widget library whose source is inflated from its compressed form the first time it is read. */
+function compressedLib(meta: Omit<WidgetLib, "source">, deflated: string): WidgetLib {
+	const source = lazyAsset(() => inflateAsset(deflated));
+	return {
+		...meta,
+		get source() {
+			return source();
+		},
+	};
 }
 
 /**
@@ -30,12 +43,7 @@ export interface WidgetLib {
  * full bundle because it is less than half its size and covers both study plots and 3D.
  */
 export const WIDGET_LIBS: Readonly<Record<string, WidgetLib>> = {
-	plotly: {
-		id: "plotly",
-		displayName: "Plotly",
-		global: "Plotly",
-		source: plotlySource,
-	},
+	plotly: compressedLib({ id: "plotly", displayName: "Plotly", global: "Plotly" }, plotlyDeflated),
 };
 
 /** Resolve requested ids (deduplicated, in order) to sources; unknown ids are reported, not dropped silently. */
