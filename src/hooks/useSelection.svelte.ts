@@ -12,7 +12,6 @@ export interface SelectionRef {
 	basename: string;
 	viewType: string;
 	text: string;
-	icon: string;
 	/** Chat selections only (`viewType: "chat"`): whether the text was quoted from the
 	 * same conversation it was sent in. Set on the snapshot at send time and stored with
 	 * the message, because the context block is rebuilt from this ref to strip it again
@@ -28,11 +27,10 @@ interface CapturedSelection {
 	domRanges?: Range[];
 }
 
-const VIEW_ICONS: Record<string, string> = {
-	markdown: "file-text",
-	pdf: "file-type",
-	chat: "quote",
-};
+/** Icon of a selection chip. Every selection is a quote, wherever it came from:
+ * the icon tells it apart from the file chips of visible notes, and the tooltip
+ * names the source. Old persisted refs may still carry an `icon`; it is ignored. */
+export const SELECTION_ICON = "quote";
 
 /** Message text inside a chat view that can be quoted: rendered assistant text
  * (including the text segments of a tool timeline) and the user's own bubbles.
@@ -99,7 +97,7 @@ function getChatSelection(): CapturedSelection | undefined {
 		const text = domRanges.map((r) => r.toString()).join("\n\n");
 
 		return {
-			ref: { path: file.path, basename: file.basename, viewType: "chat", text, icon: VIEW_ICONS.chat },
+			ref: { path: file.path, basename: file.basename, viewType: "chat", text },
 			domRanges,
 		};
 	} catch {
@@ -191,7 +189,6 @@ function getSelectionFromLeaf(leaf: WorkspaceLeaf): CapturedSelection | undefine
 					basename: file.basename,
 					viewType: "markdown",
 					text,
-					icon: VIEW_ICONS.markdown,
 				},
 				cmRanges: ranges.map((r: { from: number; to: number }) => ({ from: r.from, to: r.to })),
 			};
@@ -220,9 +217,8 @@ function getSelectionFromLeaf(leaf: WorkspaceLeaf): CapturedSelection | undefine
 				domRanges.push(domSel.getRangeAt(i).cloneRange());
 			}
 
-			const icon = viewType === "pdf" ? VIEW_ICONS.pdf : VIEW_ICONS.markdown;
 			return {
-				ref: { path: file.path, basename: file.basename, viewType, text, icon },
+				ref: { path: file.path, basename: file.basename, viewType, text },
 				domRanges,
 			};
 		} catch {

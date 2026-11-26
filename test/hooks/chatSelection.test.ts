@@ -199,7 +199,6 @@ describe("formatSelectionContext — chat quotes", () => {
 		basename: "Planning",
 		viewType: "chat",
 		text: "Step two",
-		icon: "quote",
 	};
 
 	it("frames a same-thread selection as a quote of the conversation", () => {

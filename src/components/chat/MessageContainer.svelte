@@ -29,6 +29,7 @@ import AssistantStatusNotice from "./AssistantStatusNotice.svelte";
 import ToolCallsSection from "./ToolCallsSection.svelte";
 import ChatRecommendations from "./ChatRecommendations.svelte";
 import { icon } from "../../utils/utils";
+import { SELECTION_ICON } from "../../hooks/useSelection.svelte";
 import { getLocale, t } from "../../i18n";
 
 interface Props {
@@ -813,7 +814,7 @@ $effect(() => {
                         onmouseover={(evt) => previewReferencedNote(evt, selection.path)}
                         onfocus={(evt) => previewReferencedNote(evt, selection.path)}
                       >
-                        <span class="chip-icon" use:icon={selection.icon} style="--icon-size: 12px"
+                        <span class="chip-icon" use:icon={SELECTION_ICON} style="--icon-size: 12px"
                         ></span>
                         <span
                           >{selection.basename}<span class="chip-context">
