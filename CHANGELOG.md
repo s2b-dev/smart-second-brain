@@ -22,7 +22,7 @@ prefixed with the area when it helps (`**Chat: …**`). PR references like
 
 ## 2.7.1 (2026-11-26)
 
-The new reasoning effort setting now speaks your language.
+A translation fix for the reasoning effort setting.
 
 ### Fixes
 - **Agents: the Reasoning effort setting is translated.** Its name, description and options in the Agent editor, and the notice shown when a model rejects an effort, were in English in every language (#597).
