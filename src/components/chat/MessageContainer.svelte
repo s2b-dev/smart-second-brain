@@ -736,7 +736,7 @@ $effect(() => {
              is a single left-aligned column that centres itself via its own
              max-width + auto margins, so centring here would collapse it to its
              content width and re-ragged the left edge. -->
-        <div class="s2b-flex s2b-flex-col s2b-items-stretch s2b-justify-center s2b-h-full">
+        <div class="s2b-chat-empty-state s2b-flex s2b-flex-col s2b-items-stretch s2b-justify-center s2b-h-full">
           <ChatRecommendations {registry} {threadPath} />
         </div>
       {:else}

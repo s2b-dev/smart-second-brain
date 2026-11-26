@@ -265,10 +265,9 @@ function portalComposer(node: HTMLElement) {
 	const band = (keyboard: number, isComposing: boolean) =>
 		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom);
 
-	// Core's toolbar technique: the composer is already at its end position, so
+	// Core's toolbar technique: the element is already at its end position, so
 	// offset it back by the distance travelled and transition the offset away.
-	const slideComposer = (el: HTMLElement, offset: number) => {
-		if (offset === 0 || reducedMotion.matches || el.style.display === "none") return;
+	const slide = (el: HTMLElement, offset: number) => {
 		el.style.transition = "none";
 		el.style.transform = `translateY(${offset}px)`;
 		// Commit the offset now, in the triggering task, so the slide starts on
@@ -277,7 +276,7 @@ function portalComposer(node: HTMLElement) {
 		el.style.transition = KEYBOARD_SLIDE;
 		el.style.transform = "";
 		// Children's transitions (the input card's border colour changes on
-		// focus, mid-slide) bubble here too; only the composer's own transform
+		// focus, mid-slide) bubble here too; only the element's own transform
 		// ends the slide.
 		const finishSlide = (event: TransitionEvent) => {
 			if (event.target !== el || event.propertyName !== "transform") return;
@@ -285,6 +284,17 @@ function portalComposer(node: HTMLElement) {
 			el.removeEventListener("transitionend", finishSlide);
 		};
 		el.addEventListener("transitionend", finishSlide);
+	};
+
+	// The message area resizes with the band in one frame too (see
+	// `.s2b-chat-root` in the styles), so an empty chat's greeting, centred in
+	// it, would jump by half the distance the composer slides. It rides along
+	// on the same curve over that half.
+	const slideComposer = (el: HTMLElement, offset: number) => {
+		if (offset === 0 || reducedMotion.matches || el.style.display === "none") return;
+		slide(el, offset);
+		const emptyState = node.querySelector<HTMLElement>(".s2b-chat-empty-state");
+		if (emptyState) slide(emptyState, offset / 2);
 	};
 
 	const setComposing = (el: HTMLElement, on: boolean) => {
