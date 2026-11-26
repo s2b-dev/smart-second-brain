@@ -102,6 +102,15 @@ function portalComposer(node: HTMLElement) {
 	// viewport height, so the same 100vh-anchored positioning holds, and being a
 	// descendant inherits the drawer's own slide transform exactly like mod-root's.
 	//
+	// Specifically `.workspace-drawer-inner`, not `.workspace-drawer`: the inner
+	// box has `contain: content` and so is its own stacking context, holding the
+	// drawer's tab switcher. Its dropdown list (`z-index: 1`, plus Cupertino's
+	// full-drawer scrim) can only stack within that context, so a composer hosted
+	// as a later sibling of the inner box painted over the open list and swallowed
+	// the taps meant for its tabs (verified on-device). Inside it, the list's
+	// `z-index: 1` wins over the composer's `auto`. The inner box covers the same
+	// rect as the drawer, so positioning is unchanged.
+	//
 	// Resolved lazily, not once at mount: this action runs as soon as `.s2b-chat-root`
 	// exists, which can be BEFORE Obsidian has moved the leaf into the drawer (the
 	// composer itself is awaited via MutationObserver below, so `portal()` often
@@ -109,7 +118,7 @@ function portalComposer(node: HTMLElement) {
 	// drawer-docked chats to mod-root — the tablet symptom was a composer sitting
 	// at x=1366 on a 1366px-wide viewport, i.e. just off-screen.
 	const resolveHost = () =>
-		node.closest<HTMLElement>(".workspace-drawer") ??
+		node.closest<HTMLElement>(".workspace-drawer-inner") ??
 		document.querySelector<HTMLElement>(".workspace-split.mod-root");
 	if (!resolveHost()) return {};
 
