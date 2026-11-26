@@ -80,7 +80,9 @@
 			"one": "{count} modification partiellement appliquée a été conservée — résolvez-la dans la barre de révision.",
 			"many": "{count} modifications partiellement appliquées ont été conservées — résolvez-les dans la barre de révision.",
 			"other": "{count} modifications partiellement appliquées ont été conservées — résolvez-les dans la barre de révision."
-		}
+		},
+		"reasoning_effort_rejected": "{model} n’accepte pas d’effort de raisonnement.",
+		"reasoning_effort_use_default": "Utiliser la valeur par défaut du modèle"
 	},
 	"errors": {
 		"request_failed": "La requête au modèle a échoué.",

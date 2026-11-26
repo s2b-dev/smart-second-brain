@@ -68,7 +68,9 @@
 		},
 		"kept_partial_changes": {
 			"other": "保留了 {count} 个部分应用的更改——请在审阅栏中处理。"
-		}
+		},
+		"reasoning_effort_rejected": "{model} 不支持设置推理强度。",
+		"reasoning_effort_use_default": "使用模型默认"
 	},
 	"errors": {
 		"request_failed": "模型请求失败。",

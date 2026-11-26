@@ -86,7 +86,9 @@
 			"two": "{count} delno uveljavljeni spremembi sta ohranjeni – razrešite ju v vrstici za pregled.",
 			"few": "{count} delno uveljavljene spremembe so ohranjene – razrešite jih v vrstici za pregled.",
 			"other": "{count} delno uveljavljenih sprememb je ohranjenih – razrešite jih v vrstici za pregled."
-		}
+		},
+		"reasoning_effort_rejected": "{model} ne sprejema napora razmišljanja.",
+		"reasoning_effort_use_default": "Uporabi privzeto za model"
 	},
 	"errors": {
 		"request_failed": "Zahteva za model ni uspela.",

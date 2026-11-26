@@ -68,7 +68,9 @@
 		},
 		"kept_partial_changes": {
 			"other": "일부 적용된 변경 {count}개는 유지되었습니다 — 검토 막대에서 해결하세요."
-		}
+		},
+		"reasoning_effort_rejected": "{model}은(는) 추론 강도 설정을 지원하지 않습니다.",
+		"reasoning_effort_use_default": "모델 기본값 사용"
 	},
 	"errors": {
 		"request_failed": "모델 요청이 실패했습니다.",

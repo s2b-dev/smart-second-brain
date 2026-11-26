@@ -74,7 +74,9 @@
 		"kept_partial_changes": {
 			"one": "{count} partially applied change was kept — resolve it in the review bar.",
 			"other": "{count} partially applied changes were kept — resolve them in the review bar."
-		}
+		},
+		"reasoning_effort_rejected": "{model} doesn't accept a reasoning effort.",
+		"reasoning_effort_use_default": "Use model default"
 	},
 	"errors": {
 		"request_failed": "The model request failed.",

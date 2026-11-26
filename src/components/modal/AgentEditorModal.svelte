@@ -178,9 +178,13 @@ const showReasoningEffort = $derived.by(() => {
 });
 
 const REASONING_EFFORT_DEFAULT = "default";
-const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = { low: "Low", medium: "Medium", high: "High" };
+const REASONING_EFFORT_LABELS: Record<ReasoningEffort, string> = {
+	low: t("agents.editor.reasoning_effort_low"),
+	medium: t("agents.editor.reasoning_effort_medium"),
+	high: t("agents.editor.reasoning_effort_high"),
+};
 const reasoningEffortOptions = [
-	{ display: "Model default", value: REASONING_EFFORT_DEFAULT },
+	{ display: t("agents.editor.reasoning_effort_default"), value: REASONING_EFFORT_DEFAULT },
 	...REASONING_EFFORTS.map((effort) => ({ display: REASONING_EFFORT_LABELS[effort], value: effort })),
 ];
 
@@ -899,8 +903,8 @@ function getServerToolsState(serverId: string): MCPServerToolsState | undefined 
           </SettingItem>
           {#if showReasoningEffort}
             <SettingItem
-              name="Reasoning effort"
-              desc="How long the model thinks before it answers. Higher is slower and uses more tokens; lower is quicker. Model default sends nothing. If the model rejects a level, set this back to Model default."
+              name={t("agents.editor.reasoning_effort_name")}
+              desc={t("agents.editor.reasoning_effort_desc")}
             >
               <Dropdown
                 type="options"

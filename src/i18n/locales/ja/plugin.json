@@ -68,7 +68,9 @@
 		},
 		"kept_partial_changes": {
 			"other": "部分的に適用された変更 {count} 件を保持しました — レビューバーで解決してください。"
-		}
+		},
+		"reasoning_effort_rejected": "{model} は推論の深さの指定に対応していません。",
+		"reasoning_effort_use_default": "モデルの既定を使う"
 	},
 	"errors": {
 		"request_failed": "モデルへのリクエストに失敗しました。",

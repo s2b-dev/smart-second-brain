@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { getData } from "../stores/dataStore.svelte";
 import { showActionNotice } from "../utils/actionNotice";
 import { Logger } from "../utils/logging";
@@ -48,8 +49,8 @@ function showResetNotice(agentId: string): void {
 	if (!agent || !chatModel?.modelConfig?.reasoningEffort) return;
 
 	const { model, provider } = chatModel;
-	showActionNotice(`${model} doesn't accept a reasoning effort.`, {
-		label: "Use model default",
+	showActionNotice(t("plugin.agent.reasoning_effort_rejected", { model }), {
+		label: t("plugin.agent.reasoning_effort_use_default"),
 		run: () => {
 			// Re-read: the agent may have changed model since the notice appeared.
 			const current = data.getAgent(agent.id)?.chatModel;
