@@ -20,6 +20,30 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.7.0 (2026-11-26)
+
+Three new providers, a directory of hundreds more, and a reasoning-effort setting for each agent.
+
+### New
+- **Providers: Google Gemini.** Chat and note indexing with one API key from Google AI Studio. The free tier needs no billing, and images and PDFs go straight to Gemini (#584).
+- **Providers: Mistral.** Chat and embeddings from Mistral's EU-hosted platform with one API key. The free Experiment plan works (#585).
+- **Providers: LM Studio.** Use your local LM Studio models. The plugin finds your chat and embedding models, knows which ones see images, and uses the context length the model is actually loaded with. Like Ollama, it is trusted with private notes by default (#583).
+- **Providers: a directory of OpenAI-compatible services.** Add provider → **More providers** lists over 260 services, such as DeepSeek, Groq, Fireworks and Moonshot. Picking one fills in its address, logo and docs link (#589).
+- **Agents: reasoning effort.** The Agent editor has a **Reasoning effort** setting (Low, Medium, High) for models that take one. **Model default** leaves it to the provider (#582).
+- **Chat: ask about text from a chat.** Select text in a chat message and it shows up as a chip in the input, like a selection in a note, so you can quote it in your next message (#593).
+
+### Improvements
+- **Chat: chats open where you last had one.** The "Open new chat in" setting is gone. A chat opens in the chat you last used, whether that is in a sidebar, a tab or a popout window, remembered per device (#592).
+- **Providers: model details come from the provider.** Context windows, image support and reasoning support are now what each provider reports for your account, not figures from a public catalogue that could be wrong for proxies and self-hosted servers. Anthropic models now show their real context window and image support (#586).
+- **Providers: Custom endpoints use the base URL as given.** Services that don't live under `/v1`, such as Z.ai, Volcengine, DeepInfra and Novita, can now be reached. A bare host still gets `/v1` added (#589).
+- **Mobile: easier-to-tap attachments.** Attachment pills and note chips in the chat input are larger, and an attachment's remove button sits inside its pill (#596).
+
+### Fixes
+- **Mobile: chat in the sidebar drawer.** The chat input no longer covers the drawer's tab list or slips behind its tab switcher, and it matches the drawer's colour instead of sitting in a white band (#596).
+- **Mobile: Cupertino theme.** The model picker and search no longer leave a large gap and a blur seam under the Dynamic Island, the search field lost a stray inner box, and chips in the chat input are no longer oversized (#596).
+- **Mobile: the formatting toolbar comes back in notes** after you type in a chat. It could stay hidden (#595).
+- **Mobile: the empty-chat greeting moves with the keyboard** instead of jumping (#594).
+
 ## 2.6.0 (2026-11-20)
 
 Your agent now shows its plan as a task list, asks when a request is unclear, and speaks your language.
