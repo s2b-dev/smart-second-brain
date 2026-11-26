@@ -185,6 +185,10 @@ function portalComposer(node: HTMLElement) {
 		if (!composer) return;
 		const rendered = leafEl ? getComputedStyle(leafEl).display !== "none" : true;
 		composer.style.display = rendered ? "" : "none";
+		// Hiding the focused composer this way (switching to a note's tab) fires
+		// no `focusout` in WebKit, so composing would stay on and keep the
+		// toolbar hidden in every note. End it here instead.
+		if (!rendered && composing) setComposing(composer, false);
 	};
 
 	const leafEl = node.closest<HTMLElement>(".workspace-leaf");
@@ -314,20 +318,34 @@ function portalComposer(node: HTMLElement) {
 		node.classList.toggle(COMPOSING_CLASS, on);
 		if (keyboard > 0) slideComposer(el, band(keyboard, on) - before);
 	};
+	const isEditorTarget = (target: EventTarget | null) =>
+		target instanceof HTMLElement &&
+		(target.isContentEditable || target.closest("input, textarea, .cm-editor") !== null);
 	const watchComposing = (el: HTMLElement) => {
 		const onFocusIn = () => setComposing(el, true);
+		// iOS often reports a null `relatedTarget` when focus moves straight from
+		// the composer into a note, so `onFocusOut` can't tell it went to an
+		// editor and defers until the keyboard closes — which it never does
+		// while the note is being edited. Watching where focus actually lands
+		// catches that: any editor outside the composer ends composing at once.
+		// Non-editor targets (tapping the conversation) keep the deferral.
+		const onDocumentFocusIn = (event: FocusEvent) => {
+			if (!composing || el.contains(event.target as Node)) return;
+			if (isEditorTarget(event.target)) setComposing(el, false);
+		};
 		const onFocusOut = (event: FocusEvent) => {
 			const next = event.relatedTarget as HTMLElement | null;
 			if (next && el.contains(next)) return;
-			const toEditor = next?.isContentEditable || next?.closest("input, textarea, .cm-editor");
-			if (toEditor || readKeyboardHeight() === 0) setComposing(el, false);
+			if (isEditorTarget(next) || readKeyboardHeight() === 0) setComposing(el, false);
 			else composingPending = true;
 		};
 		el.addEventListener("focusin", onFocusIn);
 		el.addEventListener("focusout", onFocusOut);
+		document.addEventListener("focusin", onDocumentFocusIn, true);
 		composingCleanup = () => {
 			el.removeEventListener("focusin", onFocusIn);
 			el.removeEventListener("focusout", onFocusOut);
+			document.removeEventListener("focusin", onDocumentFocusIn, true);
 			setComposing(el, false);
 		};
 	};
