@@ -74,7 +74,9 @@
 		"kept_partial_changes": {
 			"one": "{count} teilweise übernommene Änderung wurde behalten – kläre sie in der Prüfleiste.",
 			"other": "{count} teilweise übernommene Änderungen wurden behalten – kläre sie in der Prüfleiste."
-		}
+		},
+		"reasoning_effort_rejected": "{model} akzeptiert keinen Denkaufwand.",
+		"reasoning_effort_use_default": "Modellstandard verwenden"
 	},
 	"errors": {
 		"request_failed": "Die Anfrage an das Modell ist fehlgeschlagen.",

@@ -74,7 +74,9 @@
 		"kept_partial_changes": {
 			"one": "Kısmen uygulanmış {count} değişiklik korundu — inceleme çubuğunda çözün.",
 			"other": "Kısmen uygulanmış {count} değişiklik korundu — inceleme çubuğunda çözün."
-		}
+		},
+		"reasoning_effort_rejected": "{model} akıl yürütme düzeyi ayarını kabul etmiyor.",
+		"reasoning_effort_use_default": "Model varsayılanını kullan"
 	},
 	"errors": {
 		"request_failed": "Model isteği başarısız oldu.",

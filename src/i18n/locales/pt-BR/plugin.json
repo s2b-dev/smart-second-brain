@@ -80,7 +80,9 @@
 			"one": "{count} alteração aplicada parcialmente foi mantida — resolva-a na barra de revisão.",
 			"many": "{count} alterações aplicadas parcialmente foram mantidas — resolva-as na barra de revisão.",
 			"other": "{count} alterações aplicadas parcialmente foram mantidas — resolva-as na barra de revisão."
-		}
+		},
+		"reasoning_effort_rejected": "{model} não aceita um esforço de raciocínio.",
+		"reasoning_effort_use_default": "Usar o padrão do modelo"
 	},
 	"errors": {
 		"request_failed": "A solicitação ao modelo falhou.",

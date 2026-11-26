@@ -80,7 +80,9 @@
 			"one": "Se conservó {count} cambio aplicado parcialmente; resuélvelo en la barra de revisión.",
 			"many": "Se conservaron {count} cambios aplicados parcialmente; resuélvelos en la barra de revisión.",
 			"other": "Se conservaron {count} cambios aplicados parcialmente; resuélvelos en la barra de revisión."
-		}
+		},
+		"reasoning_effort_rejected": "{model} no acepta un esfuerzo de razonamiento.",
+		"reasoning_effort_use_default": "Usar el predeterminado del modelo"
 	},
 	"errors": {
 		"request_failed": "La solicitud al modelo falló.",
