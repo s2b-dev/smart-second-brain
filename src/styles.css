@@ -223,6 +223,12 @@ button.s2b-pill--interactive:hover {
 	border: none;
 	border-radius: 0;
 	box-shadow: none;
+	/* Cupertino puts its frosted-glass pill on `.prompt-input` itself, blur
+	   included. With the fill stripped, the blur alone still showed as a lighter
+	   rectangle inside the field, exactly the input's text box (verified
+	   on-device). */
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
 
 	/* Text dropped ~6px the moment the first character was typed. Mobile core
 	   sizes BOTH `.prompt-input-container` and `.prompt-input` to a fixed 52px,

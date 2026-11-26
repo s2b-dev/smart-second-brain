@@ -478,7 +478,13 @@ onDestroy(() => {
     width: var(--s2b-tile-size);
   }
 
-  button.attachment-tile-body {
+  /* Every button rule in this tray names `.context-tray` as well: themes
+     restyle bare buttons on a phone, and Cupertino's
+     `body:is(.mod-macos, …).is-phone button:where(…)` (0,2,2) beat a lone
+     scoped `button.<class>` (0,2,1) — padding `0 20px` squeezed the card's
+     name and stretched the 20px remove button into an oval (verified
+     on-device). */
+  .context-tray button.attachment-tile-body {
     position: relative;
     display: flex;
     flex-direction: column;
@@ -489,7 +495,9 @@ onDestroy(() => {
     height: 100%;
     padding: 8px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-m);
+    /* Capped: a theme's `--radius-m` can be large enough (Cupertino: 24px)
+       to round a short card into a pill. */
+    border-radius: min(var(--radius-m), 12px);
     overflow: hidden;
     background: var(--background-secondary);
     color: var(--text-normal);
@@ -499,7 +507,7 @@ onDestroy(() => {
     cursor: var(--cursor);
   }
 
-  .has-preview button.attachment-tile-body {
+  .context-tray .has-preview button.attachment-tile-body {
     padding: 0;
     background: var(--background-modifier-hover);
   }
@@ -552,15 +560,71 @@ onDestroy(() => {
     font-weight: var(--font-semibold);
   }
 
-  /* On a phone the card is too short for icon + two lines + extension. */
-  :global(body.is-phone) .attachment-card-icon,
+  /* On a phone a document is one row, not a card: icon and name, the name
+     ellipsized. The 56px card fit only ~8 characters per line there, so even
+     a short name like `Workout-366.md` broke across two lines (verified
+     on-device), and a theme with a large `--radius-m` (Cupertino: 24px) turned
+     the card into a blob. Image and PDF previews keep their square tiles. */
+  :global(body.is-phone) .attachment-tile.is-document:not(.has-preview) {
+    height: auto;
+    width: auto;
+    max-width: min(100%, 16rem);
+  }
+
+  /* 36px tall, the same as the reference chips beside it: 31px read cramped
+     against the text line below, and the extended hit area (::before) takes the
+     tap target to 44px, Apple's minimum. The remove button lives inside the
+     pill's right end (padding-right) instead of hanging over its corner. */
+  :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-body {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 34px 0 10px;
+    overflow: visible;
+  }
+
+  :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-body::before {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
+  }
+
+  :global(body.is-phone) .attachment-tile.is-document:not(.has-preview) .attachment-card-name {
+    display: block;
+    min-width: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--font-ui-small);
+  }
+
+  /* The corner badge only exists to overhang a thumbnail; on the one-row pill
+     the whole 34px right end is the remove target, and nothing overhangs. */
+  :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-remove {
+    top: 0;
+    right: 0;
+    width: 34px;
+    height: 100%;
+    border: none;
+    border-radius: 0 min(var(--radius-m), 12px) min(var(--radius-m), 12px) 0;
+    background: transparent;
+  }
+
+  /* Nothing overhangs a row of pills, so the room kept for the badges goes. */
+  :global(body.is-phone) .attachment-tiles:not(:has(.has-preview)) {
+    padding-top: 0;
+    /* Wide enough for both pills' 4px hit-area extensions (::before), so a
+       wrapped row's targets never overlap. */
+    row-gap: 8px;
+  }
+
   :global(body.is-phone) .attachment-card-ext {
     display: none;
   }
 
   /* Always visible, not revealed on hover: mobile has no hover, and an
      opacity-0 reveal there turns every remove into a double tap. */
-  button.attachment-tile-remove {
+  .context-tray button.attachment-tile-remove {
     position: absolute;
     top: -6px;
     right: -6px;
@@ -578,7 +642,18 @@ onDestroy(() => {
     cursor: var(--cursor);
   }
 
-  button.attachment-tile-remove:hover {
+  /* A thumbnail's badge stays 20px to look right, but on a phone its hit area
+     grows to 34px (the WCAG 2.5.8 minimum is 24px). It grows only down and
+     left, into its own tile: the badge already overhangs the tile by 6px up
+     and right, exactly the gap between tiles, so reaching further would land
+     on the neighbouring tile's area when previews wrap. */
+  :global(body.is-phone) .context-tray .has-preview button.attachment-tile-remove::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 -14px -14px;
+  }
+
+  .context-tray button.attachment-tile-remove:hover {
     color: var(--text-normal);
     background: var(--background-modifier-hover);
   }
@@ -724,14 +799,47 @@ onDestroy(() => {
     background: var(--s2b-pill-bg-hover);
   }
 
+  /* Both halves are <button>s, which themes size to the touch target on a
+     phone (Cupertino: `height: var(--input-height)`, 48px, plus `padding: 0
+     20px` at (0,2,2)). In the composer that made every reference chip twice
+     the height of the text line below it. The chip is sized by its content;
+     the `.context-tray` ancestor lifts these over the theme's button rule. */
+  .context-tray .s2b-chip button.chip-body,
+  .context-tray .s2b-chip button.chip-action {
+    height: auto;
+  }
+
+  /* Vertical padding tracks the compact tray pill above. */
+  .context-tray .s2b-chip button.chip-action {
+    padding: 2px 7px 2px 5px;
+  }
+
+  /* On a phone the chips are tap targets: 36px tall like the file pills (the
+     19px desktop size left the paperclip a 24x19 target), with a slightly
+     larger label to match. */
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-body,
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-action {
+    min-height: 36px;
+  }
+
+  :global(body.is-phone) .context-tray :global(.s2b-pill) {
+    padding: 2px 10px;
+    font-size: var(--font-ui-small);
+  }
+
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-action {
+    padding: 0 10px;
+  }
+
   .chip-action {
     display: inline-flex;
     align-items: center;
+    /* Match the body's height: the icon is shorter than the label's line box,
+       which left this half 1-2px short and its border out of line. */
+    align-self: stretch;
     /* Fixed-size target: it must not absorb the squeeze that belongs to the
        label when the chip hits its width cap. */
     flex-shrink: 0;
-    /* Vertical padding tracks the compact tray pill above. */
-    padding: 2px 7px 2px 5px;
     border: 1px solid var(--s2b-pill-border);
     border-left: none;
     border-top-right-radius: 999px;

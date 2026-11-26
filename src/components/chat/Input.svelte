@@ -1543,6 +1543,21 @@ function withQuoteDestination(selection: SelectionRef): SelectionRef {
     background: linear-gradient(to bottom, transparent 0%, var(--background-primary) 24px) !important;
   }
 
+  /* A chat docked in a sidebar drawer sits on the drawer's own surface, not the
+     page: themes paint `.workspace-drawer` with `--mobile-sidebar-background`
+     (Cupertino: a grey distinct from the white page). The page-coloured band
+     above showed there as a white slab around the composer (verified
+     on-device). The composer is portaled straight into the drawer (see
+     `portalComposer`), so the ancestor selector matches it. */
+  :global(.is-mobile .workspace-drawer .s2b-chat-input-container) {
+    background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        var(--mobile-sidebar-background, var(--background-secondary)) 24px
+      )
+      !important;
+  }
+
   /* The wrapper's shape and internal rhythm live here, not in utility classes
      on the element (the markup carries only layout/transition utilities, so
      this block and the markup can't disagree about the design). All
@@ -1656,6 +1671,14 @@ function withQuoteDestination(selection: SelectionRef): SelectionRef {
   :global(.is-mobile) .markdown-editor-container {
     padding-left: 6px;
     padding-right: 6px;
+  }
+
+  /* With 36px chips in it (ContextTray), the tray needs air on a phone: 8px
+     below the border and 8px above the text line, not 6px and 2px. Only when
+     something is in it, so an empty tray adds no height. */
+  :global(.is-phone) .composer-tray-row:has(:global(.attachment-tile, .s2b-chip)) {
+    padding-top: 4px;
+    margin-bottom: 6px;
   }
 
   .chat-input-wrapper:focus-within {

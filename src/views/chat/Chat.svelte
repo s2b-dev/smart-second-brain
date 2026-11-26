@@ -102,6 +102,15 @@ function portalComposer(node: HTMLElement) {
 	// viewport height, so the same 100vh-anchored positioning holds, and being a
 	// descendant inherits the drawer's own slide transform exactly like mod-root's.
 	//
+	// Specifically `.workspace-drawer-inner`, not `.workspace-drawer`: the inner
+	// box has `contain: content` and so is its own stacking context, holding the
+	// drawer's tab switcher. Its dropdown list (`z-index: 1`, plus Cupertino's
+	// full-drawer scrim) can only stack within that context, so a composer hosted
+	// as a later sibling of the inner box painted over the open list and swallowed
+	// the taps meant for its tabs (verified on-device). Inside it, the list's
+	// `z-index: 1` wins over the composer's `auto`. The inner box covers the same
+	// rect as the drawer, so positioning is unchanged.
+	//
 	// Resolved lazily, not once at mount: this action runs as soon as `.s2b-chat-root`
 	// exists, which can be BEFORE Obsidian has moved the leaf into the drawer (the
 	// composer itself is awaited via MutationObserver below, so `portal()` often
@@ -109,7 +118,7 @@ function portalComposer(node: HTMLElement) {
 	// drawer-docked chats to mod-root — the tablet symptom was a composer sitting
 	// at x=1366 on a 1366px-wide viewport, i.e. just off-screen.
 	const resolveHost = () =>
-		node.closest<HTMLElement>(".workspace-drawer") ??
+		node.closest<HTMLElement>(".workspace-drawer-inner") ??
 		document.querySelector<HTMLElement>(".workspace-split.mod-root");
 	if (!resolveHost()) return {};
 
@@ -159,6 +168,19 @@ function portalComposer(node: HTMLElement) {
 		if (!Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--keyboard-height"))) {
 			node.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
 			composer.style.setProperty("--s2b-view-top", `${Math.round(leaf.top)}px`);
+			// How far above the viewport bottom the LEAF ends — not `node`, which
+			// is itself sized by the viewport formula. A main-area leaf runs to the
+			// bottom behind the floating navbar (0), but a drawer leaf can stop well
+			// short of it: the default theme puts the drawer's tab switcher and file
+			// header below the leaf (measured on-device: leaf bottom 732 of 874), so
+			// the navbar clearance alone parked the composer behind the switcher.
+			// Same keyboard-down rule as above; skipped while the leaf is hidden.
+			const leafBox = (node.closest<HTMLElement>(".workspace-leaf") ?? node.parentElement)?.getBoundingClientRect();
+			if (leafBox && leafBox.height > 0) {
+				const gap = `${Math.max(0, Math.round(window.innerHeight - leafBox.bottom))}px`;
+				node.style.setProperty("--s2b-leaf-bottom-gap", gap);
+				composer.style.setProperty("--s2b-leaf-bottom-gap", gap);
+			}
 		}
 	};
 
@@ -265,9 +287,14 @@ function portalComposer(node: HTMLElement) {
 	const safeBottom = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
 	probe.remove();
 	// The band below the composer, mirroring the `max()` in its `top` rule, with
-	// the toolbar's share swapped for `COMPOSING_BAND` while composing.
+	// the toolbar's share swapped for `COMPOSING_BAND` while composing. Includes
+	// the leaf's bottom gap (published by `publishGeometry`), or a drawer chat
+	// whose leaf ends above the navbar would start each keyboard slide from the
+	// wrong place and jump by the difference.
+	const leafBottomGap = () =>
+		Number.parseFloat(composer?.style.getPropertyValue("--s2b-leaf-bottom-gap") ?? "") || 0;
 	const band = (keyboard: number, isComposing: boolean) =>
-		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom);
+		Math.max(keyboard + (isComposing ? COMPOSING_BAND : toolbarHeight), 52 + safeBottom, leafBottomGap());
 
 	// Core's toolbar technique: the element is already at its end position, so
 	// offset it back by the distance travelled and transition the offset away.
@@ -380,6 +407,9 @@ function portalComposer(node: HTMLElement) {
 		ro = new ResizeObserver(publishGeometry);
 		ro.observe(found);
 		ro.observe(node);
+		// The leaf's own box moves independently of `node` (a drawer's tab
+		// switcher appearing or collapsing), and its bottom gap is published above.
+		if (leafEl) ro.observe(leafEl);
 		if (leafEl) {
 			syncActiveState();
 			leafObserver = new MutationObserver(() => {
@@ -443,11 +473,13 @@ function portalComposer(node: HTMLElement) {
 				"--s2b-composer-width",
 				"--s2b-composer-height",
 				"--s2b-view-top",
+				"--s2b-leaf-bottom-gap",
 			]) {
 				composer.style.removeProperty(prop);
 			}
 			node.style.removeProperty("--s2b-composer-height");
 			node.style.removeProperty("--s2b-view-top");
+			node.style.removeProperty("--s2b-leaf-bottom-gap");
 			// Put it back so Svelte's own teardown finds it where it expects.
 			home?.insertBefore(composer, nextSibling);
 		},
@@ -581,6 +613,12 @@ function portalComposer(node: HTMLElement) {
     --chat-bg: var(--background-secondary);
   }
 
+  /* Phones and tablets dock sidebar chats in a `.workspace-drawer` instead of a
+     split, painted with `--mobile-sidebar-background`. */
+  :global(.workspace-drawer .s2b-chat-root) {
+    --chat-bg: var(--mobile-sidebar-background, var(--background-secondary));
+  }
+
   /* Mobile keyboard handling.
 
      The composer is moved out of the leaf and re-parented to the workspace
@@ -627,7 +665,8 @@ function portalComposer(node: HTMLElement) {
       100vh - var(--s2b-view-top, 0px) -
         max(
           calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
-          calc(52px + env(safe-area-inset-bottom))
+          calc(52px + env(safe-area-inset-bottom)),
+          var(--s2b-leaf-bottom-gap, 0px)
         )
     );
   }
@@ -643,6 +682,8 @@ function portalComposer(node: HTMLElement) {
      `.mobile-navbar` (52px + the safe-area inset, landing us 2px above the
      navbar top — the same clearance this view had before the composer was
      portaled). `max()` picks whichever edge is higher without a conditional.
+     A third term, `--s2b-leaf-bottom-gap`, covers a leaf that ends above both
+     (a drawer whose tab switcher sits below it); see `publishGeometry`.
 
      No `z-index`: core's navbar and toolbar live outside our host with
      `z-index: auto`, so leaving this unstyled lets them paint on top where they
@@ -679,7 +720,8 @@ function portalComposer(node: HTMLElement) {
       100vh - var(--s2b-composer-height, 0px) -
         max(
           calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
-          calc(52px + env(safe-area-inset-bottom))
+          calc(52px + env(safe-area-inset-bottom)),
+          var(--s2b-leaf-bottom-gap, 0px)
         )
     );
     margin-top: 0;
@@ -691,7 +733,8 @@ function portalComposer(node: HTMLElement) {
       100vh - var(--s2b-view-top, 0px) -
         max(
           calc(var(--keyboard-height, 0px) + var(--mobile-toolbar-height, 52px)),
-          calc(52px + env(safe-area-inset-bottom))
+          calc(52px + env(safe-area-inset-bottom)),
+          var(--s2b-leaf-bottom-gap, 0px)
         )
     );
   }

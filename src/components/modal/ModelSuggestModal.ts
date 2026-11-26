@@ -81,7 +81,7 @@ export class ModelSuggestModal extends SuggestModal<HydratedModel> {
 	onOpen(): void {
 		void super.onOpen();
 		this.buildFilterBar();
-		applyPromptSafeArea(this.modalEl);
+		applyPromptSafeArea(this.modalEl, this.filterBarEl);
 	}
 
 	private toClassifiable(model: HydratedModel): UiClassifiableModel {
