@@ -164,6 +164,8 @@ August 2026; recover it from git history if useful, but do not trust it.)
 
 `vite.config.ts` outputs a CommonJS bundle as `main.js` for Obsidian. Externals: `obsidian`, `electron`, all `@codemirror/*` and `@lezer/*` (provided by host), `@sap-ai-sdk/langchain` (optional dep), and Node builtins. Dev mode emits to `build/smart-second-brain/` with sourcemaps; production wipes and emits minified to `build/prod`.
 
+`main.js` must stay small: Obsidian Sync Standard refuses files over 5 MB and the plugin review warns past it. Large text the plugin carries but rarely reads whole ships deflated and is inflated on first use (`src/bundling/compressedAssets.ts` at build time, `lib/compressedAsset.ts` at runtime): the widget Plotly build (`?deflate` import) and every non-English locale (`virtual:s2b-locale-packs`). Put any new large embedded text on the same path rather than inlining it raw.
+
 Tests mock `obsidian`, `electron`, and `@sap-ai-sdk/langchain` via `test/__mocks__/` aliases in `vitest.config.ts`. The unit suite uses `jsdom`, runs `pool: forks` with `fileParallelism: false` and `mockReset: true` to prevent leakage. Coverage scope is `src/providers/**` only.
 
 ## Code conventions

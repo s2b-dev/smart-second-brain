@@ -1,8 +1,13 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vitest/config";
+import { compressedAssets } from "./src/bundling/compressedAssets";
 
 export default defineConfig({
-	plugins: [svelte({ hot: false })],
+	// The same compressed-asset plugin as the build, so tests decode what the plugin ships.
+	plugins: [
+		compressedAssets({ localesDir: new URL("./src/i18n/locales", import.meta.url).pathname }),
+		svelte({ hot: false }),
+	],
 	test: {
 		// Environment
 		environment: "jsdom",
@@ -20,6 +25,10 @@ export default defineConfig({
 			include: ["src/providers/**/*.ts"],
 			exclude: ["test/**/*.ts"],
 		},
+
+		// Vitest hands node_modules imports to Node directly, past every plugin; a
+		// `?deflate` import of a vendored library must go through compressedAssets instead.
+		server: { deps: { inline: [/plotly\.js-gl3d-dist-min/] } },
 
 		// Global test timeout
 		testTimeout: 10000,

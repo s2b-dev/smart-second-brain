@@ -6,7 +6,9 @@
  * and the model answers in the user's language on its own (see the `# Formatting` rule in
  * `agent/prompts.ts`).
  *
- * Catalogs live in `locales/<locale>/<namespace>.json`. A key is `<namespace>.<path>`, e.g.
+ * Catalogs live in `locales/<locale>/<namespace>.json`. English is bundled as plain JSON; every
+ * other locale ships compressed (`virtual:s2b-locale-packs`, see `bundling/compressedAssets.ts`)
+ * and only the one in use is inflated. A key is `<namespace>.<path>`, e.g.
  * `t("chat.input.placeholder")`. English is the source of truth and the type of every key is
  * derived from it, so a typo or a key missing from `en` fails `bun run check`. Other locales may
  * lag behind: a key missing there falls back to English at runtime, and
@@ -24,6 +26,8 @@
  *   language needs (Russian `one`/`few`/`many`/`other`; Japanese, Chinese and Korean only `other`).
  */
 import { getLanguage } from "obsidian";
+import localePacks from "virtual:s2b-locale-packs";
+import { inflateAsset } from "../lib/compressedAsset";
 
 import agents from "./locales/en/agents.json";
 import common from "./locales/en/common.json";
@@ -60,21 +64,15 @@ type LeafPaths<T, Prefix extends string = ""> = {
 /** Every translatable key, derived from the English catalogs. */
 export type MessageKey = LeafPaths<typeof en>;
 
-const localeModules = import.meta.glob<Catalog>("./locales/*/*.json", { eager: true, import: "default" });
+const catalogs: Partial<Record<Locale, Catalog>> = { en };
 
-function buildCatalogs(): Record<string, Catalog> {
-	const catalogs: Record<string, Catalog> = {};
-	for (const [path, catalog] of Object.entries(localeModules)) {
-		const match = /\.\/locales\/([^/]+)\/([^/]+)\.json$/.exec(path);
-		if (!match) continue;
-		const [, locale, namespace] = match;
-		catalogs[locale] ??= {};
-		catalogs[locale][namespace] = catalog;
-	}
-	return catalogs;
+/** The catalog for `locale`, inflating its compressed pack on first use. */
+function catalogFor(locale: Locale): Catalog | undefined {
+	if (locale in catalogs) return catalogs[locale];
+	const pack = localePacks[locale];
+	catalogs[locale] = pack === undefined ? undefined : (JSON.parse(inflateAsset(pack)) as Catalog);
+	return catalogs[locale];
 }
-
-const catalogs = buildCatalogs();
 
 /**
  * Map an Obsidian language code onto a shipped locale: exact match, then the base language
@@ -144,7 +142,7 @@ const englishRules = new Intl.PluralRules("en");
  * already have rejected).
  */
 export function t(key: MessageKey, vars?: Vars): string {
-	const localized = lookup(catalogs[currentLocale], key);
+	const localized = lookup(catalogFor(currentLocale), key);
 	if (localized !== undefined) return interpolate(select(localized, vars, pluralRules), vars);
 	const fallback = lookup(catalogs.en, key);
 	if (fallback !== undefined) return interpolate(select(fallback, vars, englishRules), vars);

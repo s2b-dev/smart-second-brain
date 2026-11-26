@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { patchVendoredLib, VENDORED_LIB_FORBIDDEN } from "../../src/widget/vendoredLibPatches";
 import { resolveWidgetLibs, WIDGET_LIBS } from "../../src/widget/widgetLibs";
@@ -12,13 +13,14 @@ describe("widget libraries", () => {
 		expect(plotly.source).toContain("Plotly");
 	});
 
-	it("patches the Plotly build so no dynamic-code construct ships in main.js", () => {
-		// The unit-test import is the unpatched file (vitest does not run vite.config's
-		// plugins); the build applies exactly this function before inlining it.
-		const patched = patchVendoredLib(PLOTLY_PATH, WIDGET_LIBS.plotly.source);
+	it("patches the Plotly build so no dynamic-code construct reaches a widget frame", () => {
+		const original = readFileSync(PLOTLY_PATH, "utf8");
+		const patched = patchVendoredLib(PLOTLY_PATH, original);
 		for (const [, pattern] of VENDORED_LIB_FORBIDDEN) expect(patched).not.toMatch(pattern);
 		expect(patched).toContain("globalThis");
-		expect(patched.length).toBeLessThan(WIDGET_LIBS.plotly.source.length);
+		expect(patched.length).toBeLessThan(original.length);
+		// The shipped source is the compressed copy, inflated: exactly the patched text.
+		expect(WIDGET_LIBS.plotly.source).toBe(patched);
 	});
 
 	it("fails loudly when a library changes under a patch", () => {

@@ -1,6 +1,6 @@
 // vite.config.ts
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import { patchVendoredLib, vendoredLibPatchesFor } from "./src/widget/vendoredLibPatches";
+import { compressedAssets } from "./src/bundling/compressedAssets";
 import { builtinRequireRouterPrelude } from "./src/lib/builtinRequireRouter";
 import { defineConfig, type Plugin } from "vite";
 import { copyFileSync, readFileSync } from "node:fs";
@@ -174,24 +174,6 @@ function shimModules(isProduction: boolean): Plugin {
 	};
 }
 
-/**
- * Serve the browser bundles a widget can request (`src/widget/widgetLibs.ts`) as raw text
- * with their build-time patches applied (`src/widget/vendoredLibPatches.ts`), so the
- * string literal that lands in main.js is the patched one. A `load` hook, so the file
- * never passes through Vite's own `?raw` handling unpatched.
- */
-function vendoredWidgetLibs(): Plugin {
-	return {
-		name: "vendored-view-libs",
-		enforce: "pre",
-		load(id) {
-			const [path, query] = id.split("?");
-			if (query !== "raw" || !vendoredLibPatchesFor(path)) return null;
-			return { code: `export default ${JSON.stringify(patchVendoredLib(path, readFileSync(path, "utf8")))};`, map: null };
-		},
-	};
-}
-
 const setOutDir = (mode: string) => {
 	switch (mode) {
 		case "development":
@@ -210,7 +192,7 @@ export default defineConfig(({ mode }) => {
 	return {
 		plugins: [
 			shimModules(!isDevelopment),
-			vendoredWidgetLibs(),
+			compressedAssets({ localesDir: resolve(configDir, "src/i18n/locales") }),
 			svelte({
 				preprocess: vitePreprocess(),
 				onwarn: (warning, handler) => {
