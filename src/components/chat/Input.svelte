@@ -1673,6 +1673,14 @@ function withQuoteDestination(selection: SelectionRef): SelectionRef {
     padding-right: 6px;
   }
 
+  /* With 36px chips in it (ContextTray), the tray needs air on a phone: 8px
+     below the border and 8px above the text line, not 6px and 2px. Only when
+     something is in it, so an empty tray adds no height. */
+  :global(.is-phone) .composer-tray-row:has(:global(.attachment-tile, .s2b-chip)) {
+    padding-top: 4px;
+    margin-bottom: 6px;
+  }
+
   .chat-input-wrapper:focus-within {
     border-color: var(--interactive-accent);
   }

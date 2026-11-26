@@ -571,11 +571,23 @@ onDestroy(() => {
     max-width: min(100%, 16rem);
   }
 
+  /* 36px tall, the same as the reference chips beside it: 31px read cramped
+     against the text line below, and the extended hit area (::before) takes the
+     tap target to 44px, Apple's minimum. The remove button lives inside the
+     pill's right end (padding-right) instead of hanging over its corner. */
   :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-body {
     flex-direction: row;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 34px 0 10px;
+    overflow: visible;
+  }
+
+  :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-body::before {
+    content: "";
+    position: absolute;
+    inset: -4px 0;
   }
 
   :global(body.is-phone) .attachment-tile.is-document:not(.has-preview) .attachment-card-name {
@@ -583,6 +595,24 @@ onDestroy(() => {
     min-width: 0;
     white-space: nowrap;
     text-overflow: ellipsis;
+    font-size: var(--font-ui-small);
+  }
+
+  /* The corner badge only exists to overhang a thumbnail; on the one-row pill
+     the whole 34px right end is the remove target, and nothing overhangs. */
+  :global(body.is-phone) .context-tray .attachment-tile.is-document:not(.has-preview) button.attachment-tile-remove {
+    top: 0;
+    right: 0;
+    width: 34px;
+    height: 100%;
+    border: none;
+    border-radius: 0 min(var(--radius-m), 12px) min(var(--radius-m), 12px) 0;
+    background: transparent;
+  }
+
+  /* Nothing overhangs a row of pills, so the room kept for the badges goes. */
+  :global(body.is-phone) .attachment-tiles:not(:has(.has-preview)) {
+    padding-top: 0;
   }
 
   :global(body.is-phone) .attachment-card-ext {
@@ -607,6 +637,14 @@ onDestroy(() => {
     color: var(--text-muted);
     box-shadow: none;
     cursor: var(--cursor);
+  }
+
+  /* A thumbnail's badge stays 20px to look right, but on a phone its hit area
+     extends to 40px: the WCAG 2.5.8 minimum is 24px, Apple's is 44pt. */
+  :global(body.is-phone) .context-tray .has-preview button.attachment-tile-remove::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
   }
 
   .context-tray button.attachment-tile-remove:hover {
@@ -768,6 +806,23 @@ onDestroy(() => {
   /* Vertical padding tracks the compact tray pill above. */
   .context-tray .s2b-chip button.chip-action {
     padding: 2px 7px 2px 5px;
+  }
+
+  /* On a phone the chips are tap targets: 36px tall like the file pills (the
+     19px desktop size left the paperclip a 24x19 target), with a slightly
+     larger label to match. */
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-body,
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-action {
+    min-height: 36px;
+  }
+
+  :global(body.is-phone) .context-tray :global(.s2b-pill) {
+    padding: 2px 10px;
+    font-size: var(--font-ui-small);
+  }
+
+  :global(body.is-phone) .context-tray .s2b-chip button.chip-action {
+    padding: 0 10px;
   }
 
   .chip-action {
