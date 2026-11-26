@@ -581,6 +581,12 @@ function portalComposer(node: HTMLElement) {
     --chat-bg: var(--background-secondary);
   }
 
+  /* Phones and tablets dock sidebar chats in a `.workspace-drawer` instead of a
+     split, painted with `--mobile-sidebar-background`. */
+  :global(.workspace-drawer .s2b-chat-root) {
+    --chat-bg: var(--mobile-sidebar-background, var(--background-secondary));
+  }
+
   /* Mobile keyboard handling.
 
      The composer is moved out of the leaf and re-parented to the workspace
