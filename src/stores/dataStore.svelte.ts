@@ -442,7 +442,7 @@ export class PluginDataStore {
 			const next = await normalizeLoadedData(this._plugin, rawData, this.#data.vaultSlug);
 			if (generation !== this.#saveGeneration) continue;
 
-			const previous = $state.snapshot(this.#data) as PluginData;
+			const previous: PluginData = $state.snapshot(this.#data);
 			this.#data = next;
 			this.#lastDiskContent = content;
 			return this.applyExternalChange(previous, next);
@@ -2292,7 +2292,7 @@ export class PluginDataStore {
 		await this.saveSettingsOrThrow();
 		// The config is saved either way; a listener that fails logs and leaves
 		// the index to rebuild, which is what happened before on every rename.
-		await Promise.all([...this.#providerRenameListeners].map((listener) => listener(oldId, newId)));
+		await Promise.all([...this.#providerRenameListeners].map(async (listener) => listener(oldId, newId)));
 	}
 
 	/**

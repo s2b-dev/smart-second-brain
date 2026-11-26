@@ -63,10 +63,10 @@ export class SyncAsyncLocalStorage<T> implements AsyncLocalStorageLike<T> {
 
 /** The two `async_hooks` primitives the hooks-based implementation needs. */
 interface AsyncHooksPrimitives {
-	createHook(callbacks: {
+	createHook: (callbacks: {
 		init(asyncId: number, type: string, triggerAsyncId: number, resource: object): void;
-	}): { enable(): void; disable(): void };
-	executionAsyncResource(): object;
+	}) => { enable(): void; disable(): void };
+	executionAsyncResource: () => object;
 }
 
 /** Async resources carry one slot per storage instance, keyed by its symbol. */
@@ -84,7 +84,7 @@ function asAsyncHooks(candidate: unknown): AsyncHooksPrimitives | null {
 function tryRequireAsyncHooks(): AsyncHooksPrimitives | null {
 	// Electron renderer (Obsidian desktop) exposes CommonJS `require`.
 	try {
-		const req = (globalThis as { require?: (id: string) => unknown }).require;
+		const req = (self as { require?: (id: string) => unknown }).require;
 		if (typeof req === "function") {
 			const mod = asAsyncHooks(req("async_hooks"));
 			if (mod) return mod;
@@ -95,7 +95,7 @@ function tryRequireAsyncHooks(): AsyncHooksPrimitives | null {
 	// Plain Node (e.g. Vitest) has no global `require` under ESM, but exposes the
 	// synchronous builtin accessor `process.getBuiltinModule` (Node 20.16+).
 	try {
-		const proc = (globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }).process;
+		const proc = (self as { process?: { getBuiltinModule?: (id: string) => unknown } }).process;
 		if (typeof proc?.getBuiltinModule === "function") {
 			const mod = asAsyncHooks(proc.getBuiltinModule("async_hooks"));
 			if (mod) return mod;
@@ -131,7 +131,7 @@ class HooksAsyncLocalStorage<T> implements AsyncLocalStorageLike<T> {
 	private enable(): void {
 		if (this.enabled) return;
 		this.enabled = true;
-		enabledStorages.push(this as HooksAsyncLocalStorage<unknown>);
+		enabledStorages.push(this);
 		if (!propagationHook) {
 			const { executionAsyncResource } = this.hooks;
 			propagationHook = this.hooks.createHook({

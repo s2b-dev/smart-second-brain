@@ -162,7 +162,7 @@ function applyMessageWrites(
 	if (writes.length === 0) return base;
 	const channel = deltaPrototype.fromCheckpoint(base);
 	channel.replayWrites(writes.map(([taskId, ch, value]) => [taskId, ch, reviveMessagesValue(value, revive)]));
-	return channel.isAvailable() ? (channel.get() as BaseMessage[]) : base;
+	return channel.isAvailable() ? channel.get() : base;
 }
 
 function seedMessages(seed: unknown, revive: MessageReviver): BaseMessage[] {

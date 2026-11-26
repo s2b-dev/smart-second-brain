@@ -114,14 +114,14 @@ async function fetchLiteLLMModelInfo(auth: AuthObject, defaultBaseUrl: string): 
 		const data = (response.json as { data?: unknown } | null)?.data;
 		return Array.isArray(data) ? (data as LiteLLMModelInfoEntry[]) : [];
 	})().catch((): LiteLLMModelInfoEntry[] => []);
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: number | undefined;
 	const timeout = new Promise<LiteLLMModelInfoEntry[]>((resolve) => {
-		timer = setTimeout(() => resolve([]), MODEL_INFO_TIMEOUT_MS);
+		timer = window.setTimeout(() => resolve([]), MODEL_INFO_TIMEOUT_MS);
 	});
 	try {
 		return await Promise.race([lookup, timeout]);
 	} finally {
-		clearTimeout(timer);
+		window.clearTimeout(timer);
 	}
 }
 

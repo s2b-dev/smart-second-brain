@@ -1617,7 +1617,7 @@ export class SearchModal extends SuggestModal<SearchSuggestion> {
 
 	private stopGlowAnimation(): void {
 		if (this.glowAnimationId !== null) {
-			cancelAnimationFrame(this.glowAnimationId);
+			window.cancelAnimationFrame(this.glowAnimationId);
 			this.glowAnimationId = null;
 		}
 		if (this.borderEl) {

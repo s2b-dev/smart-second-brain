@@ -50,7 +50,7 @@ export function stampGenerationMetadata(message: AIMessage, generation: Generati
 
 function currentRunMetadata(): Record<string, unknown> | undefined {
 	try {
-		return getConfig()?.metadata as Record<string, unknown> | undefined;
+		return getConfig()?.metadata;
 	} catch {
 		return undefined; // outside a graph run (tests calling the model directly)
 	}

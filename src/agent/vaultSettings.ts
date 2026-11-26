@@ -173,7 +173,7 @@ export function redactVaultSettings(data: VaultSettingsData, privacy: VaultSetti
 
 /** Today's file name formatter from Obsidian's global Moment, when present. */
 export function windowMomentFormatter(): ((format: string) => string) | undefined {
-	const moment = (globalThis as { moment?: () => { format(format: string): string } }).moment;
+	const moment = (self as { moment?: () => { format(format: string): string } }).moment;
 	return typeof moment === "function" ? (format) => moment().format(format) : undefined;
 }
 

@@ -120,7 +120,7 @@ export async function renderPdfThumbnail(data: Uint8Array, width: number): Promi
 		const page = await pdf.getPage(1);
 		const natural = page.getViewport({ scale: 1 });
 		const viewport = page.getViewport({ scale: width / natural.width });
-		const canvas = document.createElement("canvas");
+		const canvas = createEl("canvas");
 		canvas.width = Math.ceil(viewport.width);
 		// The tile shows only the top of the page, so a very tall page (a long
 		// receipt, a scrolling export) renders into a canvas cut at a square
