@@ -613,6 +613,9 @@ onDestroy(() => {
   /* Nothing overhangs a row of pills, so the room kept for the badges goes. */
   :global(body.is-phone) .attachment-tiles:not(:has(.has-preview)) {
     padding-top: 0;
+    /* Wide enough for both pills' 4px hit-area extensions (::before), so a
+       wrapped row's targets never overlap. */
+    row-gap: 8px;
   }
 
   :global(body.is-phone) .attachment-card-ext {
@@ -640,11 +643,14 @@ onDestroy(() => {
   }
 
   /* A thumbnail's badge stays 20px to look right, but on a phone its hit area
-     extends to 40px: the WCAG 2.5.8 minimum is 24px, Apple's is 44pt. */
+     grows to 34px (the WCAG 2.5.8 minimum is 24px). It grows only down and
+     left, into its own tile: the badge already overhangs the tile by 6px up
+     and right, exactly the gap between tiles, so reaching further would land
+     on the neighbouring tile's area when previews wrap. */
   :global(body.is-phone) .context-tray .has-preview button.attachment-tile-remove::after {
     content: "";
     position: absolute;
-    inset: -10px;
+    inset: 0 0 -14px -14px;
   }
 
   .context-tray button.attachment-tile-remove:hover {
