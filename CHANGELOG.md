@@ -20,6 +20,13 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.7.1 (2026-11-26)
+
+The new reasoning effort setting now speaks your language.
+
+### Fixes
+- **Agents: the Reasoning effort setting is translated.** Its name, description and options in the Agent editor, and the notice shown when a model rejects an effort, were in English in every language (#597).
+
 ## 2.7.0 (2026-11-26)
 
 Three new providers, a directory of hundreds more, and a reasoning-effort setting for each agent.
