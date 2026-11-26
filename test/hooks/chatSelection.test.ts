@@ -12,9 +12,9 @@ import type SecondBrainPlugin from "../../src/main";
 /* --------------------------------------------------------------------------
  * Quoting text from a chat (#591).
  *
- * A selection in a chat's message text is never shown live (people select chat
- * text to copy it); it becomes the captured selection when the composer is
- * engaged, and reaches the model framed as a quote rather than as a file.
+ * A selection in a chat's message text shows as a chip at once, like a note
+ * selection; it is kept once the composer is engaged, and reaches the model
+ * framed as a quote rather than as a file.
  * ------------------------------------------------------------------------*/
 
 const THREAD = "Chats/Planning.chat";
@@ -101,18 +101,25 @@ function textOf(selector: string, leaf = leaves[0]): Node {
 }
 
 describe("SelectionTracker — chat quotes", () => {
-	it("holds a chat selection back until the composer is engaged", () => {
+	it("shows a chat selection as soon as it is made", () => {
 		const tracker = new SelectionTracker();
 		select(textOf(".answer"));
-		expect(tracker.selection).toBeUndefined();
-
-		tracker.pinChatSelection();
 		expect(tracker.selection).toMatchObject({
 			path: THREAD,
 			basename: "Planning",
 			viewType: "chat",
 			text: "The second step is wrong.",
 		});
+		tracker.destroy();
+	});
+
+	it("drops the chip when the selection goes away without the composer being engaged", () => {
+		const tracker = new SelectionTracker();
+		select(textOf(".answer"));
+		window.getSelection()?.removeAllRanges();
+		document.dispatchEvent(new Event("selectionchange"));
+		flushFrames();
+		expect(tracker.selection).toBeUndefined();
 		tracker.destroy();
 	});
 

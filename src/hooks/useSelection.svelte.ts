@@ -260,10 +260,11 @@ export function formatSelectionContext(ref: SelectionRef): string {
  * Polls the active leaf for non-empty selections and exposes a snapshot
  * that persists even after focus moves to the chat input.
  *
- * Selections in a chat's own message text are tracked too, but never shown
- * live: people select chat text to copy it far more often than to ask about
- * it. They are held as a candidate and only become the selection when the
- * user engages a composer (`pinChatSelection`).
+ * Selections in a chat's own message text are tracked too, and shown live
+ * like a note selection. A chat leaf holds the composer as well, so engaging
+ * it changes no active leaf: the composer pins the quote itself
+ * (`pinChatSelection`). Until then a chat selection that collapses (copied,
+ * then clicked away) drops its chip.
  */
 export class SelectionTracker {
 	readonly #workspace = getPlugin().app.workspace;
@@ -273,8 +274,6 @@ export class SelectionTracker {
 	#refreshFrame: number | undefined;
 	/** When true, selection was pinned (focus left the note) and should be kept. */
 	#pinned = false;
-	/** Latest selection in chat message text, waiting for the composer to be engaged. */
-	#chatCandidate: CapturedSelection | undefined;
 	readonly #handleSelectionChange = () => this.#scheduleRefresh();
 	/** Every window document `selectionchange` is listened on: the main one plus
 	 * each popout window's, since the event never crosses documents. */
@@ -296,8 +295,9 @@ export class SelectionTracker {
 		this.#refs = [
 			this.#workspace.on("active-leaf-change", () => {
 				// When focus leaves a note (e.g. to the chat sidebar),
-				// pin whatever we captured so the chip stays.
-				if (this.#selection && !this.#pinned) {
+				// pin whatever we captured so the chip stays. A chat quote is pinned
+				// only by its composer: leaving the chat for a note drops it.
+				if (this.#selection && !this.#pinned && this.#selection.ref.viewType !== "chat") {
 					this.#pin();
 				}
 				this.#scheduleRefresh();
@@ -342,35 +342,45 @@ export class SelectionTracker {
 	}
 
 	/**
-	 * Adopt the selection in chat message text as the captured selection and pin
-	 * it. Called when the user presses or focuses a composer, before that press
-	 * moves the selection into the editor — the candidate from the last refresh
-	 * covers the case where it already has.
+	 * Pin the chat quote the chip shows. Called when the user presses or focuses
+	 * a composer, before that press moves the selection into the editor; the
+	 * chip adopted on the last refresh covers the case where it already has.
 	 */
 	pinChatSelection() {
-		const captured = getChatSelection() ?? this.#chatCandidate;
-		if (!captured) return;
-		this.#chatCandidate = undefined;
-		if (this.#selectionEqual(this.#selection, captured)) return;
+		const live = getChatSelection();
+		if (live && !this.#selectionEqual(this.#selection, live)) this.#adoptChatSelection(live);
+		if (this.#selection?.ref.viewType === "chat" && !this.#pinned) this.#pin();
+	}
 
+	/** Show a chat selection as the (unpinned) captured selection. */
+	#adoptChatSelection(captured: CapturedSelection) {
 		const previous = this.#selection;
 		this.#clearHighlights();
 		// A note selection this replaces would otherwise be re-adopted from the
 		// editor's still-live range on the next refresh.
 		if (previous && previous.ref.viewType !== "chat") this.#clearNativeSelection(previous);
+		this.#pinned = false;
 		this.#selection = captured;
-		this.#pin();
 	}
 
 	#refresh() {
-		this.#chatCandidate = getChatSelection();
-		const pinnedChat = this.#pinned && this.#selection?.ref.viewType === "chat";
-		// Clicking into the quoted chat's message text dismisses the pinned quote,
-		// like placing a cursor in the note that owns a pinned note selection.
-		if (pinnedChat && !this.#chatCandidate && hasCollapsedChatSelection(this.#selection?.ref.path ?? "")) {
-			this.clear();
+		const chat = getChatSelection();
+		if (chat) {
+			if (!this.#selectionEqual(this.#selection, chat)) this.#adoptChatSelection(chat);
 			return;
 		}
+		if (this.#selection?.ref.viewType === "chat") {
+			// The selection was never taken to a composer: it was copied, or the
+			// user clicked away. Drop the chip and look for a note selection.
+			if (!this.#pinned) this.#selection = undefined;
+			// Clicking into the quoted chat's message text dismisses the pinned quote,
+			// like placing a cursor in the note that owns a pinned note selection.
+			else if (hasCollapsedChatSelection(this.#selection.ref.path)) {
+				this.clear();
+				return;
+			}
+		}
+		const pinnedChat = this.#pinned && this.#selection?.ref.viewType === "chat";
 
 		// `activeLeaf` is deprecated; the most recently focused leaf is the one the
 		// active-leaf-change event just fired for, and it is not always a markdown
@@ -456,7 +466,6 @@ export class SelectionTracker {
 	clear() {
 		const cleared = this.#selection;
 		this.#selection = undefined;
-		this.#chatCandidate = undefined;
 		this.#pinned = false;
 		this.#clearHighlights();
 		this.#clearNativeSelection(cleared);
@@ -560,7 +569,6 @@ export class SelectionTracker {
 		// Reset our own state + highlights, but leave the user's live selection
 		// intact (don't collapse it just because the chat view unmounted).
 		this.#selection = undefined;
-		this.#chatCandidate = undefined;
 		this.#pinned = false;
 		this.#clearHighlights();
 		for (const ref of this.#refs) {

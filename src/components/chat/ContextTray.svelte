@@ -218,7 +218,7 @@ function onSelectionClick(evt: MouseEvent): void {
 	dismissSelection();
 }
 
-/** Adopt a selection in chat message text (see `SelectionTracker.pinChatSelection`).
+/** Keep the quote chip of a selection in chat message text (see `SelectionTracker.pinChatSelection`).
  * The composer calls this when it is pressed or focused. */
 export function pinChatSelection(): void {
 	selectionTracker.pinChatSelection();

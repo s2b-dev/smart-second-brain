@@ -1298,9 +1298,9 @@ async function promoteVisibleNoteToAttachment(note: VisibleNote) {
 		savingFiles = false;
 	}
 }
-// Text selected in a chat's messages becomes a quote only once the user turns to
-// the composer. Capture phase, so it runs before the press moves the selection
-// into the editor and collapses it.
+// Text selected in a chat's messages shows as a quote chip at once, but it is
+// kept only once the user turns to the composer. Capture phase, so it runs
+// before the press moves the selection into the editor and collapses it.
 function pinChatSelection(): void {
 	contextTrayRef?.pinChatSelection();
 }
