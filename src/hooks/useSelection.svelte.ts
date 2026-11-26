@@ -429,12 +429,16 @@ export class SelectionTracker {
 
 		const captured = this.#selection;
 
-		// CM6 edit mode: dispatch decoration marks
+		// CM6 edit mode: dispatch decoration marks into the editor that owns the
+		// selection. Found by path, not as the active view: pinning happens on
+		// active-leaf-change, by which time the active view is the chat.
 		if (captured.cmRanges?.length) {
 			try {
-				const activeView = this.#workspace.getActiveViewOfType(MarkdownView);
-				if (activeView) {
-					const cm = getEditorView(activeView.editor);
+				for (const leaf of this.#workspace.getLeavesOfType("markdown")) {
+					const view = leaf.view;
+					if (!(view instanceof MarkdownView) || view.getMode() !== "source") continue;
+					if (view.file?.path !== captured.ref.path) continue;
+					const cm = getEditorView(view.editor);
 					if (cm) setSelectionHighlight(cm, captured.cmRanges);
 				}
 			} catch {
