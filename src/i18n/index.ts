@@ -131,7 +131,7 @@ function interpolate(message: string, vars: Vars | undefined): string {
 function select(message: string | PluralMessage, vars: Vars | undefined, rules: Intl.PluralRules): string {
 	if (typeof message === "string") return message;
 	const count = typeof vars?.count === "number" ? vars.count : Number(vars?.count ?? Number.NaN);
-	const category = Number.isFinite(count) ? (rules.select(count) as PluralCategory) : "other";
+	const category = Number.isFinite(count) ? rules.select(count) : "other";
 	if (count === 0 && message.zero !== undefined) return message.zero;
 	return message[category] ?? message.other;
 }

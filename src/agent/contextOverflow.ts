@@ -70,7 +70,7 @@ export function createContextOverflowRecoveryMiddleware(options: {
 			} catch (error) {
 				if (!isContextOverflowError(error)) throw error;
 
-				const sentTokens = await options.tokenCounter(request.state.messages as BaseMessage[]);
+				const sentTokens = await options.tokenCounter(request.state.messages);
 				const keepTokens = Math.max(Math.floor(sentTokens * OVERFLOW_KEEP_RATIO), 1);
 				Logger.warn(
 					`[Agent] Context window exceeded at ~${sentTokens} history tokens; summarizing all but the last ~${keepTokens} and retrying once.`,

@@ -471,8 +471,9 @@ function isTransportFailure(error: unknown): boolean {
  * one, and cancellation is honoured on this side instead — see
  * `fetchWithLocalAbort`.
  */
-function abortErrorFor(signal: AbortSignal): unknown {
-	return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+function abortErrorFor(signal: AbortSignal): Error {
+	// Every abort in this plugin passes a DOMException reason (or none).
+	return (signal.reason as Error | undefined) ?? new DOMException("The operation was aborted.", "AbortError");
 }
 
 /**

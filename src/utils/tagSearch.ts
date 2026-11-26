@@ -45,7 +45,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 
 		// Try to find existing search view first
 		let searchLeaf = workspace.getLeavesOfType("search").first();
-		let searchView = searchLeaf?.view as SearchView | undefined;
+		let searchView: SearchView | undefined = searchLeaf?.view;
 
 		// Check if view exists but isn't fully initialized
 		// A deferred/lazy view will have no children and no setQuery method
@@ -60,7 +60,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 				await commands.executeCommandById("global-search:open");
 				await new Promise((resolve) => window.setTimeout(resolve, 50));
 				searchLeaf = workspace.getLeavesOfType("search").first();
-				searchView = searchLeaf?.view as SearchView | undefined;
+				searchView = searchLeaf?.view;
 			}
 
 			// Fallback: try to create the view manually
@@ -72,7 +72,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 						active: true,
 					});
 					searchLeaf = leftLeaf;
-					searchView = searchLeaf?.view as SearchView | undefined;
+					searchView = searchLeaf?.view;
 				}
 			}
 		}
@@ -104,7 +104,7 @@ export async function openTagSearch(app: App, tag: string): Promise<boolean> {
 		}
 
 		// Reveal and focus the search pane
-		workspace.revealLeaf(searchLeaf);
+		await workspace.revealLeaf(searchLeaf);
 		workspace.setActiveLeaf(searchLeaf, { focus: true });
 
 		return true;

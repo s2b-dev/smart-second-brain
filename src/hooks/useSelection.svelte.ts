@@ -451,8 +451,7 @@ export class SelectionTracker {
 			try {
 				// Each window has its own highlight registry and `Highlight` class: a
 				// range in a popout only paints when registered on that popout's.
-				const win = (captured.domRanges[0].startContainer.ownerDocument?.defaultView ?? window) as Window &
-					typeof globalThis;
+				const win = captured.domRanges[0].startContainer.ownerDocument?.defaultView ?? window;
 				if (win.CSS?.highlights) {
 					win.CSS.highlights.set("s2b-selection", new win.Highlight(...captured.domRanges));
 				}
@@ -552,7 +551,7 @@ export class SelectionTracker {
 		// Remove CSS Highlight API highlights
 		try {
 			for (const doc of new Set([document, ...this.#listenedDocs])) {
-				(doc.defaultView as (Window & typeof globalThis) | null)?.CSS?.highlights?.delete("s2b-selection");
+				doc.defaultView?.CSS?.highlights?.delete("s2b-selection");
 			}
 		} catch {
 			/* safety */
@@ -579,7 +578,7 @@ export class SelectionTracker {
 		this.#vaultRefs = [];
 		for (const doc of [...this.#listenedDocs]) this.#unlisten(doc);
 		if (this.#refreshFrame !== undefined) {
-			cancelAnimationFrame(this.#refreshFrame);
+			window.cancelAnimationFrame(this.#refreshFrame);
 			this.#refreshFrame = undefined;
 		}
 	}

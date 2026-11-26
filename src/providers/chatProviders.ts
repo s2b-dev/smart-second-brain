@@ -457,9 +457,10 @@ const defaultFailedAttempt = new (class extends AsyncCaller {
  */
 export function embedFailedAttempt(error: unknown): void {
 	if (typeof error !== "object" || error === null) return;
-	if (isConnectionRefusedError(error) || isRequestTimeoutError(error)) throw error;
+	// p-retry hands this hook the thrown Error; rethrowing it aborts the retries.
+	if (isConnectionRefusedError(error) || isRequestTimeoutError(error)) throw error as Error;
 	const { status_code: statusCode } = error as { status_code?: unknown };
-	if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) throw error;
+	if (typeof statusCode === "number" && statusCode >= 400 && statusCode < 500) throw error as Error;
 	defaultFailedAttempt(error);
 }
 

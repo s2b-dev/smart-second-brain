@@ -19,7 +19,7 @@ export interface WidgetLib {
 	/** Shown in notices. */
 	displayName: string;
 	/** The global the inlined build defines, for the skill's documentation. */
-	global: string;
+	globalName: string;
 	/** The build's source text, injected verbatim (after inline-script escaping). */
 	source: string;
 }
@@ -33,7 +33,7 @@ export const WIDGET_LIBS: Readonly<Record<string, WidgetLib>> = {
 	plotly: {
 		id: "plotly",
 		displayName: "Plotly",
-		global: "Plotly",
+		globalName: "Plotly",
 		source: plotlySource,
 	},
 };

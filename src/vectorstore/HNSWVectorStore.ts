@@ -780,8 +780,8 @@ export class HNSWVectorStore implements VectorStore {
 	 */
 	private trackGraph(index: HNSW): void {
 		const tracked = index as unknown as {
-			insertNeighbor(node: HnswNode, neighborId: number, level: number): number[];
-			removeReciprocalLinks(node: HnswNode, removedIds: number[], level: number): void;
+			insertNeighbor: (node: HnswNode, neighborId: number, level: number) => number[];
+			removeReciprocalLinks: (node: HnswNode, removedIds: number[], level: number) => void;
 		};
 		const insertNeighbor = tracked.insertNeighbor;
 		const removeReciprocalLinks = tracked.removeReciprocalLinks;

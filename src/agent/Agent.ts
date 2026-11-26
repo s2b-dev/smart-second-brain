@@ -1608,7 +1608,7 @@ export class Agent {
 				checkpointId,
 				step: (tuple.metadata?.step as number) ?? 0,
 				parentCheckpointId,
-				ts: tuple.checkpoint?.ts as string | undefined,
+				ts: tuple.checkpoint?.ts,
 				...(interrupts.length > 0 ? { interrupts } : {}),
 			});
 		}

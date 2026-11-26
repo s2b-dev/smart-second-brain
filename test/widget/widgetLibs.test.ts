@@ -7,7 +7,7 @@ const PLOTLY_PATH = "node_modules/plotly.js-gl3d-dist-min/plotly-gl3d.min.js";
 describe("widget libraries", () => {
 	it("ships Plotly as a self-contained build that defines its global", () => {
 		const plotly = WIDGET_LIBS.plotly;
-		expect(plotly.global).toBe("Plotly");
+		expect(plotly.globalName).toBe("Plotly");
 		expect(plotly.source.length).toBeGreaterThan(500_000);
 		expect(plotly.source).toContain("Plotly");
 	});
