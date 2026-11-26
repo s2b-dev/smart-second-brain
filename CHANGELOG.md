@@ -34,7 +34,7 @@ Three new providers, a directory of hundreds more, and a reasoning-effort settin
 ### New
 - **Providers: Google Gemini.** Chat and note indexing with one API key from Google AI Studio. The free tier needs no billing, and images and PDFs go straight to Gemini (#584).
 - **Providers: Mistral.** Chat and embeddings from Mistral's EU-hosted platform with one API key. The free Experiment plan works (#585).
-- **Providers: LM Studio.** Use your local LM Studio models. The plugin finds your chat and embedding models, knows which ones see images, and uses the context length the model is actually loaded with. Like Ollama, it is trusted with private notes by default (#583).
+- **Providers: LM Studio.** Use your local LM Studio models. The plugin finds your chat and embedding models, knows which ones accept images, and uses the context length the model is actually loaded with. Like Ollama, it is trusted with private notes by default (#583).
 - **Providers: a directory of OpenAI-compatible services.** Add provider → **More providers** lists over 260 services, such as DeepSeek, Groq, Fireworks and Moonshot. Picking one fills in its address, logo and docs link (#589).
 - **Agents: reasoning effort.** The Agent editor has a **Reasoning effort** setting (Low, Medium, High) for models that take one. **Model default** leaves it to the provider (#582).
 - **Chat: ask about text from a chat.** Select text in a chat message and it shows up as a chip in the input, like a selection in a note, so you can quote it in your next message (#593).
@@ -53,13 +53,13 @@ Three new providers, a directory of hundreds more, and a reasoning-effort settin
 
 ## 2.6.0 (2026-11-20)
 
-Your agent now shows its plan as a task list, asks when a request is unclear, and speaks your language.
+A task list for multi-step work, clarifying questions from the agent, and the interface in ten more languages.
 
 ### New
 - **Chat: a task list for multi-step work.** When a request takes several steps, like restructuring a folder or merging notes, the agent writes its plan as a checklist above the chat input and ticks items off as it goes. Simple requests skip it. You can turn it off in the Tools modal (#569).
 - **Chat: the agent can ask you a question.** When a request is unclear, the agent stops and asks a multiple-choice question above the chat input instead of guessing. Pick an option, type your own answer, or dismiss it. An open question survives reloads. Originally built by @Klabundo (#504).
 - **Providers: Hugging Face.** Chat with models from Hugging Face Inference Providers. Click "Sign in with Hugging Face" and approve in the browser; no token to create or paste. A pasted access token works too (#575).
-- **The plugin speaks your language.** The interface follows Obsidian's language setting and is available in German, French, Spanish, Brazilian Portuguese, Russian, Turkish, Slovenian, Simplified Chinese, Japanese and Korean. The translations are machine-made; corrections are welcome (#579).
+- **The interface in ten more languages.** The interface follows Obsidian's language setting and is available in German, French, Spanish, Brazilian Portuguese, Russian, Turkish, Slovenian, Simplified Chinese, Japanese and Korean. The translations are machine-made; corrections are welcome (#579).
 
 ### Improvements
 - **Agents: long chats no longer fail when they outgrow the model.** If a provider rejects a request as too long, the chat is summarized and the request retried once, instead of the turn ending in an error (#571).
