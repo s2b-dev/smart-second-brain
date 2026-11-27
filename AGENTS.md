@@ -83,6 +83,11 @@ behind Add provider → **More providers** (name, API root, docs link and logo o
 OpenAI-compatible vendor; never model facts, see #586). The plugin never fetches
 models.dev at runtime, so the list is only as fresh as the last refresh.
 
+**The Obsidian community listing** (tagline and About on community.obsidian.md)
+is copied over by hand from `.github/community-listing.md`. Update that file
+whenever a release changes what it claims (providers, features), and tell the
+maintainer the listing needs re-pasting.
+
 **Release notes live in `CHANGELOG.md`**, one `## X.Y.Z (YYYY-MM-DD)` section per
 stable release, newest first. It is the single source: the plugin bundles it (`?raw`)
 and, after an update, offers the sections since the last-seen version in a
