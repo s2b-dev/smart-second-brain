@@ -20,6 +20,13 @@ with nothing else gets only the lede. Lead each bullet with a bold summary,
 prefixed with the area when it helps (`**Chat: …**`). PR references like
 `(#505)` become links in the plugin.
 
+## 2.7.2 (2026-11-27)
+
+A tidier provider directory and cleanup from Obsidian's plugin review.
+
+### Improvements
+- **Providers: a back button in the directory header.** **More providers** drops its one-line description, and the "← All providers" link is now a chevron before the page title, like other nested pages (#600).
+
 ## 2.7.1 (2026-11-26)
 
 A translation fix for the reasoning effort setting.
