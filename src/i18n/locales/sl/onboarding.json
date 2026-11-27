@@ -77,7 +77,6 @@
 		"picker_desc": "Izberite ponudnika, ki ga želite povezati.",
 		"setup_guide": "Vodnik za nastavitev",
 		"more_providers": "Več ponudnikov",
-		"directory_desc": "Storitve, ki delujejo z API-jem OpenAI.",
 		"directory_search": "Iskanje ponudnikov",
 		"directory_back": "Vsi ponudniki",
 		"directory_empty": "Noben ponudnik se ne ujema. Storitev, ki je ni na seznamu, lahko vseeno dodate kot ponudnika po meri.",
