@@ -1,7 +1,7 @@
 <script lang="ts">
 import type { Component } from "svelte";
 import { mount, unmount, untrack } from "svelte";
-import { Platform } from "obsidian";
+import { Platform, setIcon } from "obsidian";
 import AuthConfigFields from "../../components/settings/AuthConfigFields.svelte";
 import SettingItem from "../../components/settings/SettingItem.svelte";
 import Button from "../../components/ui/Button.svelte";
@@ -427,8 +427,9 @@ function getProviderLogo(): Component<LogoProps> {
 	return providerDefinition?.logo ?? GenericAIIcon;
 }
 
-function renderHeaderLogo() {
-	if (step !== "configure") return;
+// Lay the modal header out as a row so something can sit before the title (the provider
+// logo on the configure step, the back button on the directory step).
+function layoutHeader(): HTMLElement | null {
 	const title = modal.titleEl;
 	const header = title.parentElement;
 	// Don't let the title stretch — it would push the trust icon onto a new line, where
@@ -446,6 +447,13 @@ function renderHeaderLogo() {
 		// Clear the absolutely-positioned close button in the top-right corner.
 		paddingInlineEnd: "2rem",
 	});
+	return header;
+}
+
+function renderHeaderLogo() {
+	if (step !== "configure") return;
+	const title = modal.titleEl;
+	const header = layoutHeader();
 	if (header) {
 		// Logo before the title.
 		if (!headerLogoHost || headerLogoHost.parentElement !== header) {
@@ -507,6 +515,36 @@ $effect(() => {
 		}
 		headerStatusHost?.remove();
 		headerStatusHost = null;
+	};
+});
+
+// The directory is a page below the picker, so it goes back the way a nested page does:
+// a chevron before its title in the header, not a link in the body.
+$effect(() => {
+	if (step !== "directory") return;
+	const header = layoutHeader();
+	modal.setTitle(t("onboarding.provider_setup.more_providers"));
+	const back = header?.createDiv({
+		cls: "clickable-icon provider-setup-header-back",
+		attr: { role: "button", tabindex: "0", "aria-label": t("onboarding.provider_setup.directory_back") },
+	});
+	if (back && header) {
+		header.insertBefore(back, modal.titleEl);
+		setIcon(back, "chevron-left");
+		const goBack = () => {
+			step = "pick";
+		};
+		back.addEventListener("click", goBack);
+		back.addEventListener("keydown", (event) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				goBack();
+			}
+		});
+	}
+	return () => {
+		back?.remove();
+		modal.refreshTitle();
 	};
 });
 
@@ -599,12 +637,6 @@ const canFinish = $derived(
   </div>
 {:else if step === "directory"}
   <div class="modal-content">
-    <button type="button" class="auth-alt-link provider-directory-back" onclick={() => (step = "pick")}>
-      ← {t("onboarding.provider_setup.directory_back")}
-    </button>
-    <p class="provider-picker-desc">
-      {t("onboarding.provider_setup.directory_desc")}
-    </p>
     <!-- svelte-ignore a11y_autofocus -->
     <input
       type="search"
@@ -953,10 +985,6 @@ const canFinish = $derived(
   .provider-picker-more :global(svg) {
     width: 28px;
     height: 28px;
-  }
-
-  .provider-directory-back {
-    margin-bottom: var(--size-4-2);
   }
 
   .provider-directory-search {
