@@ -10,7 +10,7 @@
 
 <br>
 
-Your Smart Second Brain is a **free** and **open-source** Obsidian plugin that makes your vault smarter: better search, an interactive knowledge graph, and an AI assistant that actually knows your notes.
+Smart Second Brain is a **free**, **open-source** Obsidian plugin that adds better search, an interactive knowledge graph, and an AI assistant that knows your notes.
 
 Search surfaces your notes, the graph groups them into the topics your vault is actually about, and the assistant can draw on both when answering. **Search and the graph work right away with no AI provider.** Connecting one unlocks the full agent. Runs on desktop and mobile.
 
